@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,8 @@ import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
+import dev.mascwa.pulse.desktop.theme.LcarsSkyPlot
+import dev.mascwa.pulse.desktop.theme.SkyPoint
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
@@ -126,7 +129,32 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                     Modifier.padding(top = 12.dp),
                     trailing = "${visible.size} OF ${data.planets.size}",
                 )
-                LcarsFrame(Modifier.fillMaxWidth()) {
+                // ⚠️ The altitude and azimuth were being computed and printed as two numbers per row.
+                // Two numbers do not tell you where to look; a polar plot does, which is the whole
+                // reason the phone draws one. North is up and east is RIGHT — the mirror of a paper
+                // star chart, because you are looking up rather than down.
+                //
+                // ⚠️ Planets only, deliberately. The station is the brightest thing this page could
+                // point at, but a look angle is not the same fact as a sub-point: plotting it needs
+                // an observer-relative altitude and azimuth, and this view model computes neither —
+                // it reports where the station is over the Earth, not where to look for it from here.
+                // Drawing it would mean inventing a sighting, so it stays off until the pass search
+                // the phone runs is ported.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LcarsSkyPlot(
+                        points = visible.map { p ->
+                            SkyPoint(
+                                azimuthDeg = p.azimuthDeg,
+                                altitudeDeg = p.altitudeDeg,
+                                label = p.name.take(3),
+                                // Brighter is bigger, which is what the eye is looking for.
+                                color = c.amber,
+                                radiusDp = if (p.magnitude < 0.0) 4.dp else 3.dp,
+                            )
+                        },
+                        modifier = Modifier.size(SKY_PLOT).padding(top = 3.dp),
+                    )
+                    LcarsFrame(Modifier.weight(1f)) {
                     Column {
                         visible.sortedBy { it.magnitude }.forEach { p ->
                             LcarsDataRow(
@@ -135,6 +163,7 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                                     "mag ${String.format(java.util.Locale.US, "%.1f", p.magnitude)}",
                             )
                         }
+                    }
                     }
                 }
             }
@@ -290,3 +319,6 @@ private fun compass(deg: Double): String {
     val points = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
     return points[(((deg % 360.0) + 360.0) % 360.0 / 45.0).toInt() % 8]
 }
+
+/** Square, because a polar plot that is not square is an ellipse and lies about the sky. */
+private val SKY_PLOT = 168.dp

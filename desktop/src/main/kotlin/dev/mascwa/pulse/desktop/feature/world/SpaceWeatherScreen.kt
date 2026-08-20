@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,7 +28,11 @@ import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
+import dev.mascwa.pulse.desktop.theme.ChartBand
+import dev.mascwa.pulse.desktop.theme.ChartSeries
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
+import dev.mascwa.pulse.desktop.theme.LcarsGauge
+import dev.mascwa.pulse.desktop.theme.LcarsTimeChart
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
 import dev.mascwa.pulse.desktop.theme.Pulse
@@ -49,6 +55,25 @@ class SpaceWeatherViewModel(
  * shared now, so there is no second copy of the parsing to drift. What differs is the arrangement: a
  * desktop window is wide, so the readings sit in rows of blocks rather than a single column.
  */
+/**
+ * A GOES long-channel flux in the class letters an operator actually uses.
+ *
+ * ⚠️ The letters ARE the decades — A is 1e-8, B 1e-7, C 1e-6, M 1e-5, X 1e-4 — which is why an axis
+ * labelled in watts per square metre is unreadable and this is not merely prettier. Anything under
+ * A-class is below what the instrument meaningfully resolves and says so rather than inventing a
+ * letter for it.
+ */
+private fun flareClass(wattsPerM2: Double): String {
+    if (!wattsPerM2.isFinite() || wattsPerM2 <= 0.0) return "—"
+    val letters = listOf("A" to 1e-8, "B" to 1e-7, "C" to 1e-6, "M" to 1e-5, "X" to 1e-4)
+    val band = letters.lastOrNull { wattsPerM2 >= it.second } ?: return "<A"
+    // One decimal, which is how the class is actually written (M1.2, X2.8) — and the trailing ".0"
+    // is dropped so a tick lands on "X1" rather than "X1.0".
+    val mantissa = wattsPerM2 / band.second
+    val text = String.format(java.util.Locale.US, "%.1f", mantissa)
+    return band.first + text.removeSuffix(".0")
+}
+
 @Composable
 fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, modifier: Modifier = Modifier) {
     val state: Async<SpaceWeather> by vm.feed.state.collectAsState()
@@ -91,6 +116,57 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, modifier: Modifier = Modifier)
                         LcarsDataRow("IMF Bz", "${fmt1(it)} nT", valueColor = if (it < 0) c.amber else c.ink)
                     }
                 }
+            }
+
+            // ⚠️ The instruments, not more rows. Kp is a bounded index and reads as a dial; the X-ray
+            // flux runs over several decades and reads as a chart — and both series were being
+            // fetched, parsed and shown as a single latest number.
+            if (sw.kpPoints.size >= 2 || sw.kp != null) {
+                LcarsHeaderBar("Geomagnetic", Modifier.padding(top = 12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LcarsGauge(
+                        value = sw.kp,
+                        min = 0.0,
+                        max = 9.0,
+                        modifier = Modifier.width(140.dp).height(110.dp),
+                        // NOAA's own G-scale boundaries, so the dial says what the scale says.
+                        bands = listOf(
+                            ChartBand(5.0, 6.0, c.amber),
+                            ChartBand(6.0, 7.0, c.amber),
+                            ChartBand(7.0, 9.0, c.negative),
+                        ),
+                        label = "Kp",
+                        valueColor = if ((sw.kp ?: 0.0) >= 5.0) c.amber else c.ink,
+                    )
+                    if (sw.kpPoints.size >= 2) {
+                        LcarsTimeChart(
+                            series = listOf(
+                                ChartSeries("Kp", sw.kpPoints.map { it.t to it.v }, c.sky, filled = true),
+                            ),
+                            modifier = Modifier.weight(1f).height(110.dp),
+                            bands = listOf(ChartBand(5.0, 9.0, c.amber)),
+                            // Pinned to the scale's own range rather than the data's, so a quiet day
+                            // looks quiet instead of being stretched to fill the box.
+                            forceMin = 0.0,
+                            forceMax = 9.0,
+                            yTicks = 3,
+                        )
+                    }
+                }
+            }
+
+            if (sw.xrayPoints.size >= 2) {
+                LcarsHeaderBar("X-ray flux", Modifier.padding(top = 12.dp), trailing = "GOES · LONG")
+                LcarsTimeChart(
+                    series = listOf(
+                        ChartSeries("Long", sw.xrayPoints.map { it.t to it.v }, c.amber),
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    // ⚠️ Labelled in flare classes rather than in watts. The axis spans several
+                    // decades, and "4e-06" is a number where "C4" is a fact somebody can act on.
+                    valueFormat = { flareClass(it) },
+                    yTicks = 4,
+                )
             }
 
             LcarsHeaderBar("The Sun", Modifier.padding(top = 12.dp))

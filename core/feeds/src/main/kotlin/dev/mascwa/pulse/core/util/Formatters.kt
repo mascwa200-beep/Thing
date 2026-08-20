@@ -5,6 +5,7 @@ import java.util.Currency
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Locale-aware formatting helpers used across every screen. */
 object Formatters {
@@ -27,6 +28,31 @@ object Formatters {
         val nf = NumberFormat.getNumberInstance(Locale.getDefault())
         nf.maximumFractionDigits = maxFractionDigits
         return nf.format(value)
+    }
+
+    /**
+     * A short axis label that stays honest: 3.0 -> "3", 3.25 -> "3.3", 0.004 -> "4e-03".
+     *
+     * ⚠️ A different rule from [number] and [compact], and it lives here because BOTH chart kits draw
+     * it — the phone's and the desktop's. The scientific tail is not decoration: an X-ray flux axis
+     * runs over several decades, and rounding 4e-08 to "0.00" would make every tick on it identical.
+     *
+     * `Locale.US` throughout, deliberately. These are the tick labels of a chart drawn beside its own
+     * gridlines, and a comma decimal separator reads as a thousands separator against them.
+     */
+    fun axisLabel(v: Double): String {
+        // roundToInt() throws outright on NaN, and a NaN reaches here whenever any series value is
+        // NaN — minOf/maxOf propagate it straight into the axis ticks.
+        if (!v.isFinite()) return "—"
+        val whole = v.roundToInt()
+        return when {
+            v == 0.0 -> "0"
+            abs(v) >= 100 -> whole.toString()
+            abs(v) >= 1 && v == whole.toDouble() -> whole.toString()
+            abs(v) >= 1 -> String.format(Locale.US, "%.1f", v)
+            abs(v) >= 0.01 -> String.format(Locale.US, "%.2f", v)
+            else -> String.format(Locale.US, "%.0e", v)
+        }
     }
 
     /** Compact, human magnitudes: 1.2K, 3.4M, 5.6B, 7.8T. */

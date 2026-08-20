@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,7 +29,9 @@ import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
+import dev.mascwa.pulse.desktop.theme.ChartSeries
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
+import dev.mascwa.pulse.desktop.theme.LcarsTimeChart
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
@@ -133,6 +137,47 @@ fun WeatherScreen(vm: WeatherViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
+            // ⚠️ The hourly series was being fetched, parsed, carried through the cache and never
+            // drawn — the desktop showed only the current reading and a week of min/max rows. What a
+            // forecast is actually for is the SHAPE of the next day, which is a chart.
+            val hours = remember(wd) { wd.hourly.take(HOURS_CHARTED).mapNotNull { h -> hourEpoch(h.timeIso, wd.timezone)?.let { it to h } } }
+            if (hours.size >= 2) {
+                LcarsHeaderBar("The next day", Modifier.padding(top = 12.dp), trailing = "HOURLY")
+                LcarsTimeChart(
+                    series = listOfNotNull(
+                        hours.mapNotNull { (t, h) -> h.temperature?.let { t to it } }
+                            .takeIf { it.size >= 2 }
+                            ?.let { ChartSeries("Temperature", it, c.amber, filled = true) },
+                        // Drawn only where it differs enough to be worth a second line — two lines
+                        // one degree apart is a thicker line, not more information.
+                        hours.mapNotNull { (t, h) -> h.apparentTemperature?.let { t to it } }
+                            .takeIf { pts ->
+                                pts.size >= 2 && hours.any { (_, h) ->
+                                    val a = h.apparentTemperature; val r = h.temperature
+                                    a != null && r != null && kotlin.math.abs(a - r) >= APPARENT_GAP
+                                }
+                            }
+                            ?.let { ChartSeries("Feels like", it, c.sky) },
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    valueFormat = { "${it.toInt()}${wd.tempUnitSymbol}" },
+                )
+
+                val rain = hours.mapNotNull { (t, h) -> h.precipProbability?.let { t to it.toDouble() } }
+                if (rain.size >= 2 && rain.any { it.second > 0 }) {
+                    LcarsTimeChart(
+                        series = listOf(ChartSeries("Rain", rain, c.sky, filled = true)),
+                        modifier = Modifier.fillMaxWidth().height(70.dp),
+                        // Pinned to the full range of a percentage: an afternoon peaking at 20%
+                        // should look like a fifth of the box, not like a certainty.
+                        forceMin = 0.0,
+                        forceMax = 100.0,
+                        yTicks = 2,
+                        valueFormat = { "${it.toInt()}%" },
+                    )
+                }
+            }
+
             if (wd.daily.isNotEmpty()) {
                 LcarsHeaderBar("The week", Modifier.padding(top = 12.dp))
                 wd.daily.take(7).forEach { day ->
@@ -186,3 +231,25 @@ fun WeatherScreen(vm: WeatherViewModel, modifier: Modifier = Modifier) {
         }
     }
 }
+
+
+/** How much of the hourly run the chart shows. A full week of hours is a smear at this width. */
+private const val HOURS_CHARTED = 30
+
+/** Below this the "feels like" line is the temperature line drawn twice. Degrees, in display units. */
+private const val APPARENT_GAP = 1.5
+
+/**
+ * One hourly stamp as an instant.
+ *
+ * ⚠️ Parsed in the FORECAST's timezone, not this machine's. Open-Meteo stamps hourly readings in the
+ * requested location's zone, and reading them as local time would shift the whole chart by the
+ * offset between here and there — which is exactly the mistake this repository has already shipped
+ * twice with UTC.
+ */
+private fun hourEpoch(iso: String, timezone: String): Long? = runCatching {
+    java.time.LocalDateTime.parse(iso)
+        .atZone(java.time.ZoneId.of(timezone))
+        .toInstant()
+        .toEpochMilli()
+}.getOrNull()

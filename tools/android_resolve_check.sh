@@ -53,8 +53,26 @@ SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.j
 # worse than no gate. Whenever the core takes a new dependency, add it here too.
 JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
 if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head -1); fi
+# ⚠️ `:core:feeds` as COMPILED CLASSES, never as sources. It is the second plain-JVM module `:app`
+# depends on — the HTTP client, the disk cache, `Async`, `Formatters`, `Geo` and 22 repositories —
+# and without it every app file that touches one of them cascades exactly the way the jsoup note
+# above describes. A run that named `Formatters` and `util` unresolved while the real build
+# compiled clean is what put this line here.
+#
+# Classes rather than sources for the reason `tools/kotlin_jvm_check.sh` records at length: passing
+# a module's sources folds it into THIS compilation unit, which makes it the same module as the
+# file under test — and a cross-module smart-cast error then vanishes, so the gate would pass on
+# code CI rejects. The three jars below are feeds' own dependencies, needed only so the signatures
+# in those class files resolve.
+FEEDS=core/feeds/build/classes/kotlin/main
+OKHTTP=$(find "$GC/com.squareup.okhttp3" -name 'okhttp-*.jar' 2>/dev/null | head -1)
+OKIO=$(find "$GC/com.squareup.okio" -name 'okio-jvm-*.jar' 2>/dev/null | head -1)
+SERJ=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-json-jvm-*.jar' 2>/dev/null | head -1)
+if [ ! -d "$FEEDS" ]; then
+  echo "note: $FEEDS not built — run ./gradlew :core:feeds:classes or expect false positives" >&2
+fi
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$COR:$SER:$JSOUP:$G/kotlin-stdlib-2.0.21.jar"
+TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar"
 
 # The whole pure core, so its types DO resolve — exactly one file in it imports android.*.
 mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')

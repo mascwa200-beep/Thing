@@ -92,4 +92,90 @@ class FormattersTest {
     fun theFixturesAndTheFormatterShareAZone() {
         assertEquals(TimeZone.getDefault(), Calendar.getInstance().timeZone)
     }
+
+    // ---- axisLabel ---------------------------------------------------------------------------
+    //
+    // Untested for as long as it lived privately inside the phone's chart kit. It has two consumers
+    // now — both chart kits draw their ticks through it — so a change here silently relabels every
+    // axis on two platforms at once, which is exactly the kind of rule that earns a test.
+
+    /** A tick is a number a reader glances at, so a whole number carries no decimal point. */
+    @Test
+    fun wholeNumbersLoseTheirDecimal() {
+        assertEquals("0", Formatters.axisLabel(0.0))
+        assertEquals("3", Formatters.axisLabel(3.0))
+        assertEquals("-7", Formatters.axisLabel(-7.0))
+        assertEquals("100", Formatters.axisLabel(100.0))
+    }
+
+    /**
+     * Past a hundred a tenth is noise on an axis, so the label rounds to the integer.
+     *
+     * ⚠️ `roundToInt` breaks ties towards POSITIVE infinity, not away from zero, so +1234.5 goes to
+     * 1235 and -1234.5 goes to -1234. Asserted rather than smoothed over: it is the shipped
+     * behaviour, it is half a unit on an axis running past a hundred, and pinning it means a future
+     * switch to a different rounding rule fails here instead of quietly moving every large tick.
+     */
+    @Test
+    fun largeValuesRoundToTheInteger() {
+        assertEquals("1235", Formatters.axisLabel(1234.5))
+        assertEquals("-1234", Formatters.axisLabel(-1234.5))
+        assertEquals("-1235", Formatters.axisLabel(-1234.6))
+    }
+
+    /** Between one and a hundred, one decimal is the most an axis can show without crowding. */
+    @Test
+    fun midRangeValuesKeepOneDecimal() {
+        assertEquals("3.3", Formatters.axisLabel(3.25))
+        assertEquals("99.5", Formatters.axisLabel(99.5))
+    }
+
+    /** Under one, one decimal would collapse distinct ticks onto each other. */
+    @Test
+    fun smallValuesKeepTwo() {
+        assertEquals("0.25", Formatters.axisLabel(0.25))
+        assertEquals("-0.50", Formatters.axisLabel(-0.5))
+    }
+
+    /**
+     * The reason the scientific tail exists at all.
+     *
+     * An X-ray flux axis runs over several decades — the flare classes A through X ARE decades — so
+     * rounding 4e-08 and 4e-06 to "0.00" would make every tick on that chart identical.
+     */
+    @Test
+    fun valuesSpanningDecadesStayDistinguishable() {
+        assertEquals("4e-03", Formatters.axisLabel(0.004))
+        val ticks = listOf(1e-8, 1e-7, 1e-6, 1e-5, 1e-4).map { Formatters.axisLabel(it) }
+        assertEquals("a decade axis must not collapse: $ticks", 5, ticks.toSet().size)
+    }
+
+    /**
+     * ⚠️ Not defensive padding. `minOf`/`maxOf` propagate a NaN straight from any series value into
+     * the axis bounds, and `roundToInt()` throws outright on one — so without this the chart takes
+     * the whole screen down rather than drawing a blank tick.
+     */
+    @Test
+    fun nonFiniteValuesDoNotThrow() {
+        assertEquals("—", Formatters.axisLabel(Double.NaN))
+        assertEquals("—", Formatters.axisLabel(Double.POSITIVE_INFINITY))
+        assertEquals("—", Formatters.axisLabel(Double.NEGATIVE_INFINITY))
+    }
+
+    /**
+     * ⚠️ `Locale.US` throughout, deliberately, and this is the assertion that holds it there. These
+     * labels sit beside their own gridlines, where a comma decimal separator reads as a thousands
+     * separator — "1,5" on an axis running to 2 is unreadable.
+     */
+    @Test
+    fun theDecimalSeparatorIsNotTheDeviceLocale() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.GERMANY)
+            assertEquals("3.3", Formatters.axisLabel(3.25))
+            assertEquals("0.25", Formatters.axisLabel(0.25))
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
 }

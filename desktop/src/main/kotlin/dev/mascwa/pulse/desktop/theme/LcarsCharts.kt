@@ -1,6 +1,5 @@
-package dev.mascwa.pulse.feature.common
+package dev.mascwa.pulse.desktop.theme
 
-import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
@@ -10,13 +9,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.util.Formatters
-import dev.mascwa.pulse.ui.theme.Pulse
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,13 +27,20 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The LCARS instrument kit — the charts the MAPS & SKY consoles are built from.
+ * The LCARS instrument kit for the desktop — the same charts the phone's MAPS & SKY consoles are
+ * built from, so a space-weather page or a forecast looks like itself on both machines.
  *
- * [Charts.kt] gives a sparkline and a bare line chart, both index-based on X with no axes, no
- * labels and no time. A space-weather console needs a real time axis with a scale you can read, a
- * gauge for a bounded index like Kp, a histogram for counts, and a polar alt-azimuth plot for
- * anything in the sky. All of it is hand-drawn `Canvas` work in the house style — no new dependency
- * (the `composeCharts` entry in the version catalog has never been wired up and stays unused).
+ * ⚠️ **This is a real port rather than a copy, and the reason is text.** The Android original draws
+ * every label through `android.graphics.Paint` on `nativeCanvas`, which positions text by an
+ * ANCHOR (left/centre/right) at a BASELINE. Compose's own `drawText` positions by the TOP-LEFT
+ * corner. Ported naively, every label would sit half its own width to the right and most of its
+ * height too low — the chart would draw perfectly and be unreadable. [drawLabel] below does the
+ * measuring the anchor used to do for free, which is why every call site here passes an alignment
+ * instead of setting one on a shared paint object.
+ *
+ * The geometry — the gutters, the band shading, the tick counts, the 240° gauge sweep, the polar
+ * plot's north-up east-right convention — is deliberately identical to the phone's, so the two are
+ * the same instrument rather than two instruments that resemble each other.
  *
  * Every composable degrades to an empty [Box] rather than throwing when there is nothing to draw.
  */
@@ -62,6 +71,47 @@ data class SkyPoint(
     val glyph: String? = null,
 )
 
+/** Where a label's given x sits within it. The replacement for `Paint.Align`. */
+enum class LabelAlign { Start, Center, End }
+
+/** Where a label's given y sits within it. `Paint` had only a baseline; this is more honest. */
+enum class LabelVAlign { Top, Middle, Bottom }
+
+/**
+ * Draw one short label, positioned the way a chart wants to think about it.
+ *
+ * ⚠️ The measure is the whole point. Compose can only place text by its top-left corner, so
+ * "centred on this tick" and "right-aligned against this gutter" have to be computed from the
+ * text's own size — which is exactly the arithmetic `Paint.Align` used to hide.
+ */
+private fun DrawScope.drawLabel(
+    measurer: TextMeasurer,
+    text: String,
+    x: Float,
+    y: Float,
+    color: Color,
+    sizeSp: Float,
+    align: LabelAlign = LabelAlign.Center,
+    vAlign: LabelVAlign = LabelVAlign.Middle,
+) {
+    if (text.isEmpty()) return
+    val style = TextStyle(color = color, fontSize = sizeSp.sp, fontFamily = JetBrainsMono)
+    val laid = measurer.measure(text, style)
+    val w = laid.size.width.toFloat()
+    val h = laid.size.height.toFloat()
+    val left = when (align) {
+        LabelAlign.Start -> x
+        LabelAlign.Center -> x - w / 2f
+        LabelAlign.End -> x - w
+    }
+    val top = when (vAlign) {
+        LabelVAlign.Top -> y
+        LabelVAlign.Middle -> y - h / 2f
+        LabelVAlign.Bottom -> y - h
+    }
+    drawText(measurer, text, topLeft = Offset(left, top), style = style)
+}
+
 /**
  * A time-series chart with labelled axes: value gridlines on the left, clock times along the
  * bottom, optional shaded [bands], and any number of overlaid [series]. X is real time, so an
@@ -74,26 +124,25 @@ fun LcarsTimeChart(
     bands: List<ChartBand> = emptyList(),
     yTicks: Int = 4,
     xTicks: Int = 4,
-    valueFormat: (Double) -> String = { trimNumber(it) },
+    valueFormat: (Double) -> String = { Formatters.axisLabel(it) },
     forceMin: Double? = null,
     forceMax: Double? = null,
     /**
      * Label the horizontal axis with something other than a clock.
      *
-     * The axis is a Long because it was written for real time, and that is still what it usually
-     * is. But the same chart draws a route's elevation against distance, where the number is
-     * metres and a clock label would be nonsense — so a caller with a different axis says what
-     * its numbers mean rather than getting one made up for it.
+     * The axis is a Long because it was written for real time, and that is still what it usually is.
+     * But the same chart draws a route's elevation against distance, where the number is metres and
+     * a clock label would be nonsense.
      */
     xFormat: ((Long) -> String)? = null,
 ) {
     val c = Pulse.colors
+    val measurer = rememberTextMeasurer()
     val usable = series.filter { it.points.size >= 2 }
     if (usable.isEmpty()) {
         Box(modifier)
         return
     }
-    val axisPaint = remember { Paint().apply { isAntiAlias = true } }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.US) }
     val dayFormat = remember { SimpleDateFormat("d MMM", Locale.US) }
 
@@ -106,7 +155,7 @@ fun LcarsTimeChart(
 
     var vMin = forceMin ?: minOf(all.minOf { it.second }, bands.minOfOrNull { it.from } ?: Double.MAX_VALUE)
     var vMax = forceMax ?: maxOf(all.maxOf { it.second }, bands.maxOfOrNull { it.to } ?: -Double.MAX_VALUE)
-    // Order before widening. A caller pinning one end (forceMin = 0 against an all-negative
+    // ⚠️ Order before widening. A caller pinning one end (forceMin = 0 against an all-negative
     // series — which is exactly what IMF Bz is) would otherwise leave vMax below vMin, and every
     // coerceIn(vMin, vMax) below throws on an inverted range.
     if (vMax < vMin) { val swap = vMin; vMin = vMax; vMax = swap }
@@ -115,9 +164,7 @@ fun LcarsTimeChart(
     val ySteps = yTicks.coerceAtLeast(1)
     val xSteps = xTicks.coerceAtLeast(1)
     // Sort once per data change, not once per frame: this runs inside the draw lambda otherwise.
-    val prepared = remember(usable) {
-        usable.map { s -> s to s.points.sortedBy { it.first } }
-    }
+    val prepared = remember(usable) { usable.map { s -> s to s.points.sortedBy { it.first } } }
 
     Canvas(modifier) {
         val gutter = 34.dp.toPx()   // left, for value labels
@@ -142,9 +189,6 @@ fun LcarsTimeChart(
         }
 
         // Value gridlines + labels.
-        axisPaint.color = c.faint.toArgb()
-        axisPaint.textSize = 8.dp.toPx()
-        axisPaint.textAlign = Paint.Align.RIGHT
         for (i in 0..ySteps) {
             val v = vMin + vSpan * i / ySteps
             val y = py(v)
@@ -152,14 +196,14 @@ fun LcarsTimeChart(
                 color = c.lineSoft.copy(alpha = 0.7f),
                 start = Offset(gutter, y), end = Offset(size.width, y), strokeWidth = 1f,
             )
-            drawContext.canvas.nativeCanvas.drawText(
-                valueFormat(v), gutter - 4.dp.toPx(), y + 3.dp.toPx(), axisPaint,
+            drawLabel(
+                measurer, valueFormat(v), gutter - 4.dp.toPx(), y, c.faint, 8f,
+                align = LabelAlign.End, vAlign = LabelVAlign.Middle,
             )
         }
 
         // Time ticks along the bottom.
-        axisPaint.textAlign = Paint.Align.CENTER
-        // Keep the label bounds ordered: in a container narrower than the gutter plus both margins
+        // ⚠️ Keep the label bounds ordered: in a container narrower than the gutter plus both margins
         // — including the zero-width first layout pass — the upper bound falls below the lower one
         // and coerceIn throws on the empty range.
         val loX = gutter + 10.dp.toPx()
@@ -171,9 +215,10 @@ fun LcarsTimeChart(
                 color = c.lineSoft.copy(alpha = 0.5f),
                 start = Offset(x, 0f), end = Offset(x, plotH), strokeWidth = 1f,
             )
-            drawContext.canvas.nativeCanvas.drawText(
-                xFormat?.invoke(t) ?: labelFormat.format(Date(t)),
-                x, size.height - 2.dp.toPx(), axisPaint,
+            drawLabel(
+                measurer, xFormat?.invoke(t) ?: labelFormat.format(Date(t)),
+                x, size.height, c.faint, 8f,
+                align = LabelAlign.Center, vAlign = LabelVAlign.Bottom,
             )
         }
 
@@ -220,7 +265,7 @@ fun LcarsGauge(
     valueColor: Color? = null,
 ) {
     val c = Pulse.colors
-    val textPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
+    val measurer = rememberTextMeasurer()
     val span = (max - min).takeIf { abs(it) > 1e-9 } ?: 1.0
     val sweepTotal = 240f
     val startAngle = 150f // 150° -> 30°, i.e. a dial opening downward
@@ -255,7 +300,7 @@ fun LcarsGauge(
 
         if (value != null) {
             val frac = ((value - min) / span).coerceIn(0.0, 1.0)
-            val angle = Math.toRadians((startAngle + frac * sweepTotal))
+            val angle = Math.toRadians(startAngle + frac * sweepTotal)
             val r = arcSize.width / 2
             drawLine(
                 color = valueColor ?: c.ink,
@@ -266,22 +311,22 @@ fun LcarsGauge(
             drawCircle(valueColor ?: c.ink, radius = 3.5.dp.toPx(), center = Offset(cx, cy))
         }
 
-        textPaint.color = (valueColor ?: c.ink).toArgb()
-        textPaint.textSize = 20.dp.toPx()
-        drawContext.canvas.nativeCanvas.drawText(
-            if (value == null) "—" else trimNumber(value) + unit, cx, cy + 7.dp.toPx(), textPaint,
+        drawLabel(
+            measurer,
+            if (value == null) "—" else Formatters.axisLabel(value) + unit,
+            cx, cy, valueColor ?: c.ink, 20f,
         )
         if (label != null) {
-            textPaint.color = c.muted.toArgb()
-            textPaint.textSize = 8.dp.toPx()
-            drawContext.canvas.nativeCanvas.drawText(
-                label.uppercase(Locale.US), cx, cy + arcSize.height / 2 - 1.dp.toPx(), textPaint,
+            drawLabel(
+                measurer, label.uppercase(Locale.US),
+                cx, cy + arcSize.height / 2, c.muted, 8f,
+                align = LabelAlign.Center, vAlign = LabelVAlign.Bottom,
             )
         }
     }
 }
 
-/** A labelled bar chart — flare counts by class, passes per night, contacts per band. */
+/** A labelled bar chart — flare counts by class, passes per night, hours of rain. */
 @Composable
 fun LcarsHistogram(
     bars: List<Pair<String, Double>>,
@@ -290,12 +335,12 @@ fun LcarsHistogram(
     barColors: List<Color>? = null,
 ) {
     val c = Pulse.colors
+    val measurer = rememberTextMeasurer()
     if (bars.isEmpty()) {
         Box(modifier)
         return
     }
     val fill = color ?: c.accent
-    val textPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
     val peak = bars.maxOf { it.second }.takeIf { it > 0.0 } ?: 1.0
 
     Canvas(modifier) {
@@ -311,10 +356,9 @@ fun LcarsHistogram(
                 topLeft = Offset(x, plotH - h),
                 size = Size(barW, h),
             )
-            textPaint.color = c.muted.toArgb()
-            textPaint.textSize = 8.dp.toPx()
-            drawContext.canvas.nativeCanvas.drawText(
-                name, slot * i + slot / 2, size.height - 2.dp.toPx(), textPaint,
+            drawLabel(
+                measurer, name, slot * i + slot / 2, size.height, c.muted, 8f,
+                align = LabelAlign.Center, vAlign = LabelVAlign.Bottom,
             )
         }
         drawLine(c.line, Offset(0f, plotH), Offset(size.width, plotH), strokeWidth = 1.5f)
@@ -334,8 +378,7 @@ fun LcarsSkyPlot(
     rings: List<Int> = listOf(30, 60),
 ) {
     val c = Pulse.colors
-    val textPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
-    val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT } }
+    val measurer = rememberTextMeasurer()
 
     Canvas(modifier) {
         val cx = size.width / 2
@@ -359,15 +402,13 @@ fun LcarsSkyPlot(
             )
         }
         // Cardinals on the rim.
-        textPaint.textSize = 9.dp.toPx()
         listOf("N" to 0.0, "E" to 90.0, "S" to 180.0, "W" to 270.0).forEach { (name, az) ->
             val rad = Math.toRadians(az)
-            textPaint.color = (if (name == "N") c.accent else c.muted).toArgb()
-            drawContext.canvas.nativeCanvas.drawText(
-                name,
+            drawLabel(
+                measurer, name,
                 cx + (r * 1.07f * sin(rad)).toFloat(),
-                cy - (r * 1.07f * cos(rad)).toFloat() + 3.dp.toPx(),
-                textPaint,
+                cy - (r * 1.07f * cos(rad)).toFloat(),
+                if (name == "N") c.accent else c.muted, 9f,
             )
         }
 
@@ -378,17 +419,18 @@ fun LcarsSkyPlot(
             val x = cx + (pr * sin(rad)).toFloat()
             val y = cy - (pr * cos(rad)).toFloat()
             if (p.glyph != null) {
-                textPaint.color = p.color.toArgb()
-                textPaint.textSize = p.radiusDp.toPx() * 3f
-                drawContext.canvas.nativeCanvas.drawText(p.glyph, x, y + p.radiusDp.toPx(), textPaint)
+                // ⚠️ The glyph is CENTRED on the body's position, both ways. The Android original
+                // nudged the baseline down by the radius to achieve that with a centre-anchored
+                // paint; here the vertical centring is stated instead of arrived at.
+                drawLabel(measurer, p.glyph, x, y, p.color, p.radiusDp.value * 3f)
             } else {
                 drawCircle(p.color, radius = p.radiusDp.toPx(), center = Offset(x, y))
             }
             if (p.label != null) {
-                labelPaint.color = c.muted.toArgb()
-                labelPaint.textSize = 8.dp.toPx()
-                drawContext.canvas.nativeCanvas.drawText(
-                    p.label, x + p.radiusDp.toPx() + 3.dp.toPx(), y + 3.dp.toPx(), labelPaint,
+                drawLabel(
+                    measurer, p.label,
+                    x + p.radiusDp.toPx() + 3.dp.toPx(), y, c.muted, 8f,
+                    align = LabelAlign.Start, vAlign = LabelVAlign.Middle,
                 )
             }
         }
@@ -432,11 +474,3 @@ fun LcarsMeter(
         }
     }
 }
-
-/**
- * 3.0 -> "3", 3.25 -> "3.3", 0.004 -> "4e-03" — short axis labels that stay honest.
- *
- * The rule itself moved to `Formatters.axisLabel` once the desktop grew a chart kit that draws the
- * same ticks. This keeps the name its callers already use.
- */
-internal fun trimNumber(v: Double): String = Formatters.axisLabel(v)
