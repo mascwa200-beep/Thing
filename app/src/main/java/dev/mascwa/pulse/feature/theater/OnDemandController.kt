@@ -365,10 +365,23 @@ object OnDemandController {
         }
     }
 
+    /**
+     * Give up, and say everything that is known about why.
+     *
+     * ⚠️ The extractor's own notes are appended here, and this is the case they exist for: the
+     * resolve SUCCEEDED — title, duration and thumbnail all arrived — and the address it produced
+     * was then refused. "403" alone leaves nobody any wiser; "403, and by the way there was no
+     * JavaScript runtime so some formats were missing" is a diagnosis. The notes are carried on the
+     * item precisely so they survive from the resolve to this moment, seconds or hours later.
+     */
     private fun failPermanently(item: MediaItem, reason: String?) {
         pollJob?.cancel()
         runOnMain { releasePlayerInternal() }
-        _state.value = OnDemandState(item, Status.ERROR, reason)
+        val detail = listOfNotNull(reason?.takeIf { it.isNotBlank() })
+            .plus(item.notes)
+            .joinToString("\n")
+            .ifBlank { null }
+        _state.value = OnDemandState(item, Status.ERROR, detail)
         AudioFloor.released(MediaFloor.Owner.ONDEMAND)
     }
 

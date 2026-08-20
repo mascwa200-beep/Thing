@@ -138,12 +138,16 @@ fun ViewscreenScreen(
                     when (val r = resolve) {
                         ViewscreenViewModel.Resolve.Idle -> {}
                         ViewscreenViewModel.Resolve.Working -> StatusLine("Resolving…", c.amber)
-                        is ViewscreenViewModel.Resolve.Refused ->
+                        is ViewscreenViewModel.Resolve.Refused -> {
                             StatusLine(
                                 MediaResolution.say(r.reason) +
                                     if (r.detail.isNotBlank()) "  (${r.detail})" else "",
                                 c.negative,
                             )
+                            // The extractor's own words, dimmer than the verdict above them. Every
+                            // address has already been removed on the Python side.
+                            r.notes.forEach { StatusLine(it, c.muted) }
+                        }
                         is ViewscreenViewModel.Resolve.Ready ->
                             PlayerPanel(vm = vm, ready = r, playback = playback, progress = progress)
                     }

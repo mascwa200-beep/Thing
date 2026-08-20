@@ -64,6 +64,18 @@ data class MediaItem(
     val expiresAtMs: Long = 0,
     /** True when the source says this is a live stream, which has no meaningful duration or end. */
     val isLive: Boolean = false,
+    /**
+     * What the extractor said on its way to producing this, with every address removed.
+     *
+     * ⚠️ **Carried on a SUCCESSFUL resolve, which is the point.** The most valuable thing the
+     * extractor has to say — "no JavaScript runtime, so some formats are missing" — arrives on a
+     * resolve that otherwise looks like it worked, and only becomes interesting later, when the
+     * address it handed over is refused. Keeping the notes on the item means the failure can show
+     * the reason instead of a bare status code.
+     *
+     * Empty is the normal case. Never contains a media address — see the extractor's redaction.
+     */
+    val notes: List<String> = emptyList(),
 ) {
     val isResolved: Boolean get() = streamUrl.isNotBlank() || audioUrl.isNotBlank()
 
@@ -102,8 +114,17 @@ data class MediaItem(
 sealed interface MediaResolution {
     data class Ready(val item: MediaItem) : MediaResolution
 
-    /** Named so the surface can say what to do about it. */
-    data class Refused(val reason: Reason, val detail: String = "") : MediaResolution
+    /**
+     * Named so the surface can say what to do about it.
+     *
+     * [notes] is whatever the extractor said on the way down, addresses removed — the difference
+     * between "could not resolve that right now" and a sentence naming the actual obstacle.
+     */
+    data class Refused(
+        val reason: Reason,
+        val detail: String = "",
+        val notes: List<String> = emptyList(),
+    ) : MediaResolution
 
     enum class Reason {
         /** The address was not one this app knows how to resolve. */

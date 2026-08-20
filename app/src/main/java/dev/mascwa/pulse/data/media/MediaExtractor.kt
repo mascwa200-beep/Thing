@@ -68,7 +68,7 @@ class MediaExtractor(private val python: PythonRuntime) {
             )
         }
         if (wire.kind != null) {
-            return MediaResolution.Refused(reasonOf(wire.kind), wire.error.orEmpty())
+            return MediaResolution.Refused(reasonOf(wire.kind), wire.error.orEmpty(), wire.notes)
         }
 
         val item = MediaItem(
@@ -87,11 +87,13 @@ class MediaExtractor(private val python: PythonRuntime) {
             pageUrl = wire.page.ifBlank { key },
             expiresAtMs = wire.expires,
             isLive = wire.live,
+            notes = wire.notes,
         )
         if (!item.isResolved) {
             return MediaResolution.Refused(
                 MediaResolution.Reason.NO_STREAM,
                 "Nothing playable in the result.",
+                wire.notes,
             )
         }
         // ⚠️ Only cached when the address states when it dies. Caching an unknown-expiry item would
@@ -161,6 +163,14 @@ class MediaExtractor(private val python: PythonRuntime) {
         val audio_headers: Map<String, String> = emptyMap(),
         /** True when [stream] is video-only and [audio] is its other half. See `MediaItem.isAdaptive`. */
         val adaptive: Boolean = false,
+    /**
+     * Whatever yt-dlp said on the way, addresses already removed on the Python side.
+     *
+     * ⚠️ Present on SUCCESS as well as failure. "No JavaScript runtime, formats may be missing"
+     * arrives on a resolve that otherwise looks fine, and is the sentence that explains a refusal
+     * several seconds later.
+     */
+    val notes: List<String> = emptyList(),
         val uploader: String = "",
         val thumbnail: String = "",
         val page: String = "",

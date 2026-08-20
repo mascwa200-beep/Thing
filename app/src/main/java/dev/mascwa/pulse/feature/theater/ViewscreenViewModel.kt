@@ -50,7 +50,18 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
     sealed interface Resolve {
         data object Idle : Resolve
         data object Working : Resolve
-        data class Refused(val reason: MediaResolution.Reason, val detail: String) : Resolve
+        data class Refused(
+            val reason: MediaResolution.Reason,
+            val detail: String,
+            /**
+             * What the extractor said on the way down, addresses removed.
+             *
+             * ⚠️ Shown rather than logged. Until this existed the screen could only report the
+             * app's own summary of a failure, which is one remove from what actually went wrong —
+             * and the extractor's own sentence is usually the whole diagnosis.
+             */
+            val notes: List<String> = emptyList(),
+        ) : Resolve
         data class Ready(
             val item: MediaItem,
             /** Usable (merged, policy-filtered) segments; empty when skipping is off or none exist. */
@@ -330,7 +341,8 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
             // must not win — it neither publishes state nor starts playback.
             if (gen != playGeneration) return@launch
             when (r) {
-                is MediaResolution.Refused -> _resolve.value = Resolve.Refused(r.reason, r.detail)
+                is MediaResolution.Refused ->
+                    _resolve.value = Resolve.Refused(r.reason, r.detail, r.notes)
                 is MediaResolution.Ready -> {
                     val skippingOn = c.settingsRepository.current().sponsorSkip
                     val segments = if (skippingOn) fetchSegments(url, r.item) else emptyList()
