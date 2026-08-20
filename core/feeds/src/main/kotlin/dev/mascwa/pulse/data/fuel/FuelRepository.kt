@@ -5,7 +5,7 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.markets.MarketsRepository
-import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.FuelPreferences
 import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import kotlinx.coroutines.async
@@ -30,7 +30,8 @@ class FuelRepository(
     private val markets: MarketsRepository,
     private val worldBank: WorldBankClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /** Whose pump prices, and the optional EIA key. Read per fetch. See [FuelPreferences]. */
+    private val preferences: suspend () -> FuelPreferences,
 ) {
     private val ttl = 30 * 60 * 1000L
 
@@ -43,9 +44,9 @@ class FuelRepository(
     )
 
     suspend fun fetch(force: Boolean): Fetched<FuelData> {
-        val s = settings.current()
+        val s = preferences()
         val country = s.countryCode.ifBlank { "US" }
-        val key = "fuel_${country}_${s.apiKeys.hasEia}"
+        val key = "fuel_${country}_${s.hasEia}"
         if (!force) {
             cache.read(key, ttl, FuelData.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)
@@ -55,8 +56,8 @@ class FuelRepository(
             val data = coroutineScope {
                 val benchmarksD = async { runCatching { markets.quotesFor(energySymbols) }.getOrDefault(emptyList()) }
                 val eiaD = async {
-                    if (s.apiKeys.hasEia && country.equals("US", true)) {
-                        runCatching { fetchEiaUsRetail(s.apiKeys.eia) }.getOrDefault(emptyList())
+                    if (s.hasEia && country.equals("US", true)) {
+                        runCatching { fetchEiaUsRetail(s.eiaKey) }.getOrDefault(emptyList())
                     } else emptyList()
                 }
 

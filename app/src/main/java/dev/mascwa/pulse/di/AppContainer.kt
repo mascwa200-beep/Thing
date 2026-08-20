@@ -18,7 +18,10 @@ import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sensors.SurvivalTools
+import dev.mascwa.pulse.data.settings.FuelPreferences
+import dev.mascwa.pulse.data.settings.MarketPreferences
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.WeatherPreferences
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -185,16 +188,25 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.live.LiveCatalogRepository(http, diskCache)
     }
     val marketsRepository: MarketsRepository by lazy {
-        MarketsRepository(http, diskCache, settingsRepository)
+        MarketsRepository(http, diskCache) {
+            val v = settingsRepository.current()
+            MarketPreferences(v.currencyCode, v.watchlist, v.cryptoList)
+        }
     }
     val economyRepository: EconomyRepository by lazy {
-        EconomyRepository(worldBank, diskCache, settingsRepository)
+        EconomyRepository(worldBank, diskCache) { settingsRepository.current().countryCode }
     }
     val fuelRepository: FuelRepository by lazy {
-        FuelRepository(http, marketsRepository, worldBank, diskCache, settingsRepository)
+        FuelRepository(http, marketsRepository, worldBank, diskCache) {
+            val v = settingsRepository.current()
+            FuelPreferences(v.countryCode, v.apiKeys.eia)
+        }
     }
     val weatherRepository: WeatherRepository by lazy {
-        WeatherRepository(http, diskCache, settingsRepository)
+        WeatherRepository(http, diskCache) {
+            val v = settingsRepository.current()
+            WeatherPreferences(v.temperatureUnit, v.windUnit, v.precipUnit)
+        }
     }
     val spaceWeatherRepository: SpaceWeatherRepository by lazy {
         SpaceWeatherRepository(http, diskCache)

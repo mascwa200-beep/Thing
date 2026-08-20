@@ -5,7 +5,7 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.MarketBar
 import dev.mascwa.pulse.core.telemetry.MarketSession
 import dev.mascwa.pulse.core.util.Fetched
-import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.MarketPreferences
 import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +39,8 @@ import java.net.URLEncoder
 class MarketsRepository(
     private val http: HttpClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /** What to price and in what currency, read per fetch. See [MarketPreferences]. */
+    private val preferences: suspend () -> MarketPreferences,
 ) {
     private val ttl = 5 * 60 * 1000L
 
@@ -49,7 +50,7 @@ class MarketsRepository(
     private val yahooGate = Semaphore(YAHOO_CONCURRENCY)
 
     suspend fun fetchWatchlist(force: Boolean): Fetched<List<Quote>> {
-        val s = settings.current()
+        val s = preferences()
         val key = "markets_watchlist_${s.currencyCode}"
         if (!force) {
             cache.read(key, ttl, ListSerializer(Quote.serializer()))?.let {
@@ -77,7 +78,7 @@ class MarketsRepository(
     }
 
     suspend fun fetchCrypto(force: Boolean): Fetched<List<Quote>> {
-        val s = settings.current()
+        val s = preferences()
         val vs = s.currencyCode.lowercase()
         val key = "markets_crypto_$vs"
         if (!force) {

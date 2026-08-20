@@ -2,20 +2,20 @@ package dev.mascwa.pulse.data.economy
 
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.util.Fetched
-import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
 class EconomyRepository(
     private val worldBank: WorldBankClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /** Whose figures, as an ISO country code. Read per fetch; blank falls back to the United States. */
+    private val countryCode: suspend () -> String,
 ) {
     private val ttl = 12 * 60 * 60 * 1000L // 12h — annual data changes slowly
 
     /** All headline indicators for the dashboard / Economy screen. */
     suspend fun fetchDashboard(force: Boolean, countryOverride: String? = null): Fetched<EconomyDashboard> {
-        val country = (countryOverride ?: settings.current().countryCode).ifBlank { "US" }
+        val country = (countryOverride ?: countryCode()).ifBlank { "US" }
         val key = "economy_dashboard_$country"
         if (!force) {
             cache.read(key, ttl, EconomyDashboard.serializer())?.let {
@@ -46,7 +46,7 @@ class EconomyRepository(
         force: Boolean,
         countryOverride: String? = null,
     ): Fetched<IndicatorSeries> {
-        val country = (countryOverride ?: settings.current().countryCode).ifBlank { "US" }
+        val country = (countryOverride ?: countryCode()).ifBlank { "US" }
         val key = "economy_series_${indicator.id}_$country"
         if (!force) {
             cache.read(key, ttl, IndicatorSeries.serializer())?.let {

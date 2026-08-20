@@ -6,7 +6,7 @@ import dev.mascwa.pulse.core.telemetry.WeatherUnits
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.PrecipUnit
 import dev.mascwa.pulse.data.settings.SavedLocation
-import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.WeatherPreferences
 import dev.mascwa.pulse.data.settings.TemperatureUnit
 import dev.mascwa.pulse.data.settings.WindUnit
 import kotlinx.coroutines.async
@@ -16,7 +16,13 @@ import java.net.URLEncoder
 class WeatherRepository(
     private val http: HttpClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /**
+     * The units to ask for and render in.
+     *
+     * ⚠️ A function returning three values, not a settings object — see [WeatherPreferences]. Read per
+     * fetch, so changing the unit in settings takes effect on the next refresh.
+     */
+    private val preferences: suspend () -> WeatherPreferences,
 ) {
     private val ttl = 30 * 60 * 1000L
 
@@ -26,7 +32,7 @@ class WeatherRepository(
         locationName: String,
         force: Boolean,
     ): Fetched<WeatherData> {
-        val s = settings.current()
+        val s = preferences()
         val key = "weather_${"%.3f".format(latitude)}_${"%.3f".format(longitude)}" +
             "_${s.temperatureUnit.apiValue}_${s.windUnit.apiValue}_${s.precipUnit.apiValue}"
         if (!force) {
@@ -67,7 +73,7 @@ class WeatherRepository(
     }
 
     private suspend fun loadForecast(
-        lat: Double, lon: Double, name: String, s: dev.mascwa.pulse.data.settings.AppSettings,
+        lat: Double, lon: Double, name: String, s: WeatherPreferences,
     ): WeatherData {
         val url = buildString {
             append("https://api.open-meteo.com/v1/forecast")

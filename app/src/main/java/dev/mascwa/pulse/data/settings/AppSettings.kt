@@ -25,23 +25,6 @@ enum class AccentColor(val argb: Long, val r: Int, val g: Int, val b: Int) {
     YELLOW(0xFFFCEE0A, 252, 238, 10),
 }
 
-enum class TemperatureUnit(val apiValue: String, val symbol: String) {
-    CELSIUS("celsius", "°C"),
-    FAHRENHEIT("fahrenheit", "°F"),
-}
-
-enum class WindUnit(val apiValue: String, val symbol: String) {
-    KMH("kmh", "km/h"),
-    MPH("mph", "mph"),
-    MS("ms", "m/s"),
-    KNOTS("kn", "kn"),
-}
-
-enum class PrecipUnit(val apiValue: String, val symbol: String) {
-    MM("mm", "mm"),
-    INCH("inch", "in"),
-}
-
 /** Sections shown on the Home dashboard; order is user-customizable. */
 enum class HomeSection(val title: String) {
     HEADLINES("Top Headlines"),
@@ -54,30 +37,6 @@ enum class HomeSection(val title: String) {
     TECH("Tech"),
     POPCULTURE("Pop Culture"),
 }
-
-enum class WatchType { INDEX, STOCK, FOREX, COMMODITY, CRYPTO }
-
-@Serializable
-data class WatchItem(
-    val id: String,          // stooq symbol or coingecko id
-    val label: String,       // display name
-    val type: WatchType,
-)
-
-@Serializable
-data class CustomFeed(
-    val name: String,
-    val url: String,
-)
-
-@Serializable
-data class SavedLocation(
-    val name: String,
-    val country: String = "",
-    val latitude: Double,
-    val longitude: Double,
-    val timezone: String = "auto",
-)
 
 /** Personal medical / ICE info for the SOS card (stays on-device). */
 @Serializable

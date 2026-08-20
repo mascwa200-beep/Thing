@@ -44,6 +44,7 @@ enum class Screen {
     LIBRARY, SEARCH, STUDY, PACKS,
     NEWS, LIVE,
     SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
+    MARKETS, WEATHER, ECONOMY,
     NOTES, DIARY,
 }
 
@@ -69,6 +70,12 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("hospital", "shelter", "clinic", "food bank", "a&e", "emergency room")),
         DeskEntry(Screen.WILDLIFE, "Wildlife", "What lives around here and what to do about it",
             listOf("animals", "snake", "bear", "bite", "sting", "fauna")),
+        DeskEntry(Screen.MARKETS, "Markets", "Your watch list, and whether the market is even open",
+            listOf("stocks", "shares", "crypto", "prices", "ticker", "forex", "commodities")),
+        DeskEntry(Screen.WEATHER, "Weather", "The forecast, and what it will actually feel like",
+            listOf("forecast", "rain", "temperature", "wind", "air quality", "uv")),
+        DeskEntry(Screen.ECONOMY, "Economy", "A country's figures, each with how old it is",
+            listOf("inflation", "gdp", "unemployment", "world bank", "indicators")),
     )),
     DeskGroup("MAPS & SKY", { it.positive }, listOf(
         DeskEntry(Screen.SPACE_WEATHER, "Space weather", "What the Sun is doing, and what it is doing to us",
