@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -154,6 +155,14 @@ fun LcarsScreenFrame(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     rail: Boolean = true,
+    /**
+     * How wide the rail column — and therefore the header's corner block — is.
+     *
+     * ⚠️ ONE number for both: they are the two arms of the same L, and if they differ the corner does
+     * not close. The shell passes a wider one, because there the column is the directory rather than
+     * decoration. Same additive change as the phone's frame, for the same reason.
+     */
+    railWidth: Dp = LcarsRailWidth,
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
@@ -168,7 +177,7 @@ fun LcarsScreenFrame(
             // on the phone, and it was the single most reported "inconsistent back button" symptom.
             Box(
                 Modifier
-                    .width(LcarsRailWidth)
+                    .width(railWidth)
                     .fillMaxHeight()
                     .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
                     .background(if (onBack != null) c.accent else c.raise)
@@ -234,7 +243,7 @@ fun LcarsScreenFrame(
             Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(RailGutter),
         ) {
-            if (rail) LcarsRail(seed, Modifier.width(LcarsRailWidth).fillMaxHeight())
+            if (rail) LcarsRail(seed, Modifier.width(railWidth).fillMaxHeight())
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     }

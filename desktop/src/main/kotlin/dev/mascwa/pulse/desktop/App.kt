@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,18 +9,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.cache.DiskCache
@@ -37,52 +44,35 @@ import dev.mascwa.pulse.desktop.feature.remote.RemoteScreen
 import dev.mascwa.pulse.desktop.feature.remote.RemoteViewModel
 import dev.mascwa.pulse.desktop.feature.search.SearchScreen
 import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
+import dev.mascwa.pulse.desktop.feature.settings.SettingsScreen
+import dev.mascwa.pulse.desktop.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.desktop.feature.study.StudyScreen
 import dev.mascwa.pulse.desktop.feature.study.StudyViewModel
 import dev.mascwa.pulse.desktop.library.LibraryRepository
-import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
-import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.library.PackRepository
 import dev.mascwa.pulse.desktop.library.PackStore
+import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
+import dev.mascwa.pulse.desktop.live.LivePlayer
+import dev.mascwa.pulse.desktop.location.IpLocationService
 import dev.mascwa.pulse.desktop.network.HttpClient
-import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.news.NewsRepository
-import dev.mascwa.pulse.desktop.study.StudyStore
-import dev.mascwa.pulse.desktop.telemetry.currentStardateText
-import dev.mascwa.pulse.desktop.update.DesktopUpdater
+import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
+import dev.mascwa.pulse.desktop.theme.LcarsCorner
+import dev.mascwa.pulse.desktop.theme.LcarsScreenFrame
+import dev.mascwa.pulse.desktop.theme.LocalConsoleSection
 import dev.mascwa.pulse.desktop.theme.Orbitron
-import dev.mascwa.pulse.desktop.theme.LcarsNavItem
+import dev.mascwa.pulse.desktop.theme.ProvideStardate
 import dev.mascwa.pulse.desktop.theme.Pulse
 import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
+import dev.mascwa.pulse.desktop.theme.lcarsBlockShape
+import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-
-/**
- * The desktop's screens, each carrying what it is for.
- *
- * ⚠️ The rail is the directory here. On the phone that job belongs to a separate flat MENU page,
- * because a phone cannot keep a directory on screen alongside the content; a desktop can, so making
- * someone open a page to read the same seven words would be worse, not better. The [description] is
- * what turns a list of nouns into something navigable by a person who has not memorised it.
- *
- * [section] groups the rail, so the shape of the app is legible at a glance rather than being a flat
- * run of equals.
- */
-enum class Screen(val title: String, val section: String, val description: String) {
-    REMOTE("Remote", "THIS MACHINE", "Pair with your phone and control it over the local network"),
-    ABOUT("About", "THIS MACHINE", "Which build you are on, and install a newer one"),
-    LIBRARY("Library", "KNOWLEDGE", "Every bundled page, by subject — works offline"),
-    SEARCH("Search", "KNOWLEDGE", "Find a page, or a study card, by what you need"),
-    STUDY("Study", "KNOWLEDGE", "Learn the library a piece a day, and be asked again"),
-    PACKS("Packs", "KNOWLEDGE", "Add more subjects — downloads once, then offline"),
-    NEWS("News", "THE WORLD", "Headlines, refreshed while you watch"),
-    LIVE("Live", "THE WORLD", "Television news, in a window of its own"),
-}
 
 /**
  * The desktop shell: a left LCARS rail and the selected screen.
@@ -145,6 +135,9 @@ fun PulseDesktopApp(
         val aboutVm = remember {
             AboutViewModel(scope, DesktopUpdater(HttpClient.create(json), settings), settings)
         }
+        val settingsVm = remember {
+            SettingsViewModel(scope, settings, IpLocationService(HttpClient.create(json)))
+        }
 
         // Opening a guide from STUDY or SEARCH means switching screen AND telling the reader what to
         // open — the desktop's equivalent of the Android app's `openRoute`. Hoisted here because it is
@@ -154,96 +147,150 @@ fun PulseDesktopApp(
             screen = Screen.LIBRARY
         }
 
-        Surface(color = c.void) {
-            Row(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.width(216.dp).fillMaxHeight().background(c.carbon).padding(vertical = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        "LCARS",
-                        // The wordmark is the identity element, so it takes the console face first.
-                        fontFamily = Orbitron, fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp, letterSpacing = 3.sp, color = c.accent,
-                        modifier = Modifier.padding(start = 14.dp, bottom = 18.dp),
-                    )
-                    // Grouped, so the rail reads as the app's shape rather than a flat run of
-                    // equals. `entries` is declaration-ordered and the enum is declared grouped, so
-                    // the headers fall out of one pass with no second list to keep in step.
-                    var lastSection: String? = null
-                    Screen.entries.forEach { s ->
-                        if (s.section != lastSection) {
-                            lastSection = s.section
-                            Text(
-                                s.section,
-                                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.6.sp,
-                                color = c.faint,
-                                modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 4.dp),
+        // Where you are, for the frame's header readout — one provider around everything, so no
+        // screen has to know its own name. Same arrangement as the phone's.
+        CompositionLocalProvider(LocalConsoleSection provides (DESK_SECTION[screen] ?: "")) {
+            ProvideStardate {
+                Surface(color = c.void) {
+                    val entry = DESK_ENTRIES[screen]
+                    LcarsScreenFrame(
+                        title = entry?.label ?: "LCARS",
+                        seed = screen.name,
+                        // ⚠️ `rail = false` AND a wider `railWidth`: the frame skips its decorative
+                        // block column so the directory can occupy the same slot, and the header's
+                        // corner takes the same width so the console's L still closes.
+                        rail = false,
+                        railWidth = DIRECTORY_WIDTH,
+                    ) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Directory(
+                                current = screen,
+                                onSelect = { screen = it },
+                                modifier = Modifier.width(DIRECTORY_WIDTH).fillMaxHeight(),
                             )
+                            Box(Modifier.weight(1f).fillMaxHeight()) {
+                                when (screen) {
+                                    Screen.REMOTE -> RemoteScreen(remoteVm, Modifier.fillMaxWidth())
+                                    Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
+                                    Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
+                                    Screen.SETTINGS -> SettingsScreen(settingsVm, Modifier.fillMaxWidth())
+                                    Screen.STUDY -> StudyScreen(
+                                        studyVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Screen.LIBRARY -> LibraryScreen(
+                                        vm = libraryVm,
+                                        repository = library,
+                                        // "STUDY THIS" from the reader: turn the guide into questions,
+                                        // then go answer them. Marking it read instead would record the
+                                        // visit and teach nothing, which is not what the button says.
+                                        onStudy = { id ->
+                                            studyVm.teach(id)
+                                            screen = Screen.STUDY
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Screen.PACKS -> PacksScreen(packsVm, Modifier.fillMaxWidth())
+                                    Screen.SEARCH -> SearchScreen(
+                                        searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Screen.ABOUT -> AboutScreen(
+                                        vm = aboutVm,
+                                        // The installer cannot replace files this process holds open, so
+                                        // handing over means actually letting go.
+                                        onQuitForInstall = onQuitForInstall,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
                         }
-                        LcarsNavItem(
-                            s.title,
-                            selected = screen == s,
-                            onClick = { screen = s },
-                            description = s.description,
-                        )
-                    }
-                    Box(Modifier.weight(1f))
-                    // The date, said the way the phone says it — from the same mirrored core, so the
-                    // two consoles can never show different stardates for the same moment.
-                    //
-                    // Recomputed on the hour by the same rule as the phone's: the last digit is
-                    // `hour * 10 / 24`, so it can only ever change on an hour boundary. `delay` here
-                    // costs one suspended coroutine for the life of the window.
-                    val stardate by produceState(initialValue = currentStardateText()) {
-                        while (true) {
-                            val now = System.currentTimeMillis()
-                            delay(((now / 3_600_000L + 1) * 3_600_000L - now).coerceAtLeast(1_000L))
-                            value = currentStardateText()
-                        }
-                    }
-                    Text(
-                        stardate,
-                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,
-                        modifier = Modifier.padding(start = 14.dp, bottom = 2.dp),
-                    )
-                    Text(
-                        "DESKTOP",
-                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,
-                        modifier = Modifier.padding(start = 14.dp),
-                    )
-                }
-
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    when (screen) {
-                        Screen.REMOTE -> RemoteScreen(remoteVm, Modifier.fillMaxWidth())
-                        Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
-                        Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
-                        Screen.STUDY -> StudyScreen(studyVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
-                        Screen.LIBRARY -> LibraryScreen(
-                            vm = libraryVm,
-                            repository = library,
-                            // "STUDY THIS" from the reader: turn the guide into questions, then go
-                            // answer them. Marking it read instead would record the visit and teach
-                            // nothing, which is not what the button says.
-                            onStudy = { id ->
-                                studyVm.teach(id)
-                                screen = Screen.STUDY
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Screen.PACKS -> PacksScreen(packsVm, Modifier.fillMaxWidth())
-                        Screen.SEARCH -> SearchScreen(searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
-                        Screen.ABOUT -> AboutScreen(
-                            vm = aboutVm,
-                            // The installer cannot replace files this process holds open, so handing over
-                            // means actually letting go.
-                            onQuitForInstall = onQuitForInstall,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
                     }
                 }
             }
         }
     }
 }
+
+/**
+ * The directory column: every screen this machine has, grouped, always on view.
+ *
+ * ⚠️ **The same design as the phone's MENU, and that is the point of it being here rather than a
+ * left rail of plain rows.** There, twenty-nine destinations in one vertical run meant scrolling to
+ * find anything; here the answer is the same two-pane arrangement — group headers and their contents,
+ * in fixed positions, no scrolling in the ordinary case. Someone who learns one console knows the
+ * other.
+ *
+ * It occupies the frame's own rail slot, so it costs no width the console was not already spending:
+ * on every other screen that column is decorative blocks, and here it is the same blocks doing work.
+ */
+@Composable
+private fun Directory(
+    current: Screen,
+    onSelect: (Screen) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = Pulse.colors
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            "LCARS",
+            // The wordmark is the identity element, so it takes the console face first.
+            fontFamily = Orbitron, fontWeight = FontWeight.Bold,
+            fontSize = 18.sp, letterSpacing = 3.sp, color = c.accent,
+            modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 14.dp),
+        )
+        DESK_GROUPS.forEach { group ->
+            Text(
+                group.label,
+                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.6.sp, color = c.faint,
+                modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 3.dp),
+            )
+            group.entries.forEach { e ->
+                DirectoryBlock(e, group.accent(c), e.screen == current) { onSelect(e.screen) }
+            }
+        }
+        Box(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun DirectoryBlock(
+    entry: DeskEntry,
+    accent: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = Pulse.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(lcarsBlockShape(14.dp, LcarsCorner.TopStart))
+            .background(if (selected) accent else c.raise)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text(
+            entry.label.uppercase(),
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+            fontSize = 12.sp, letterSpacing = 1.sp,
+            // Black on the lit block: LCARS letters a filled block in the ground colour, and the
+            // group accents are all light.
+            color = if (selected) c.void else c.ink,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            entry.description,
+            fontFamily = JetBrainsMono, fontSize = 9.sp, lineHeight = 12.sp,
+            color = if (selected) c.void.copy(alpha = 0.72f) else c.muted,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+    }
+}
+
+/**
+ * ⚠️ Wider than a phone's rail because it holds a description as well as a name, and a desktop window
+ * has the room to spend. It is one number so a screenshot can settle it.
+ */
+private val DIRECTORY_WIDTH = 232.dp
