@@ -16,7 +16,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.MediaFloor
 import dev.mascwa.pulse.core.telemetry.MediaItem
@@ -221,8 +220,14 @@ object OnDemandController {
         releasePlayerInternal()
         runCatching {
             val exo = ExoPlayer.Builder(app)
+                // ⚠️ The headers for the track this mode will actually fetch, not the video's in
+                // every case. Both prepare paths hand the player an explicitly-built source, so this
+                // factory is only reached by something media3 resolves for itself — a sideloaded
+                // subtitle, a child load — but when that happens it must not go out with an identity
+                // minted for a different track, or for no track at all. `emptyMap()` here was how the
+                // audio-only mode came to be requesting with the video's User-Agent.
                 .setMediaSourceFactory(
-                    DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory(app, item.streamHeaders))),
+                    DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory(app, headersFor(item)))),
                 )
                 .setAudioAttributes(
                     AudioAttributes.Builder()
@@ -400,16 +405,24 @@ object OnDemandController {
      * same header is given to each, the header is only ever given to one of them. That is the whole
      * reason this is a function instead of two lines at the call site.
      *
-     * ⚠️ Falls back to [MediaHttp.BROWSER_UA] only when the extractor named no agent. That constant
-     * is shared with the radio and the live-TV players, which have nothing to do with this one, so it
-     * is read here and never written.
+     * ⚠️ **A MISSING header set is not an invitation to invent one.** This used to substitute a
+     * desktop-Chrome User-Agent whenever the extractor named no agent, which is worse than sending
+     * nothing: a signed address minted for, say, the `android_vr` client and then fetched by
+     * something claiming to be Chrome on Linux is exactly the mismatch that earns a 403 — and from
+     * the outside it was indistinguishable from the headers being carried correctly. The fallback is
+     * now used only when there are NO headers at all, where some agent must be chosen and the shared
+     * browser string is as good as any. When the extractor supplied headers but no agent, its
+     * headers go out as given and media3 sends its own default agent, which at least does not
+     * impersonate a client the address was not issued to.
      */
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     private fun httpFactory(app: Context, headers: Map<String, String>): DefaultHttpDataSource.Factory {
         val agent = headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
         val rest = headers.filterKeys { !it.equals("User-Agent", ignoreCase = true) }
+        val chosen = agent?.takeIf { it.isNotBlank() }
+            ?: MediaHttp.BROWSER_UA.takeIf { headers.isEmpty() }
         return DefaultHttpDataSource.Factory()
-            .setUserAgent(agent?.takeIf { it.isNotBlank() } ?: MediaHttp.BROWSER_UA)
+            .setUserAgent(chosen)
             .setDefaultRequestProperties(rest)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(MediaHttp.TIMEOUT_MS)
@@ -435,13 +448,30 @@ object OnDemandController {
      * audio sets genuinely differ; one shared factory is the obvious shortcut and it fails on
      * whichever track it does not happen to match.
      */
+    /**
+     * The header set for the track the CURRENT mode will actually fetch.
+     *
+     * Small, but it exists so that "which track is this mode playing" is answered in one place
+     * rather than re-derived at each call site — which is how the player-level factory came to be
+     * built with the video's headers while playing audio.
+     */
+    private fun headersFor(item: MediaItem): Map<String, String> =
+        if (_state.value.audioOnly && item.audioUrl.isNotBlank()) item.audioHeaders
+        else if (item.streamUrl.isNotBlank()) item.streamHeaders
+        else item.audioHeaders
+
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     private fun sourceFor(app: Context, item: MediaItem): MediaSource {
         // ⚠️ An address and its headers are ONE thing and are only ever named together. Passing them
         // as two arguments invites a call site that takes one track's address and the other track's
         // headers, which is not a compile error and produces a 403 that looks like a dead video.
-        fun progressive(track: Pair<String, Map<String, String>>) =
-            ProgressiveMediaSource.Factory(DefaultDataSource.Factory(app, httpFactory(app, track.second)))
+        // ⚠️ Progressive is right for a plain file and WRONG for a manifest. yt-dlp hands back an
+        // `.m3u8` for plenty of sources — anything live, and some ordinary videos — and feeding that
+        // to the progressive loader fails as a container-parse error rather than playing.
+        // `media3-exoplayer-hls` is already a dependency; `DefaultMediaSourceFactory` picks the right
+        // loader from the address, which is exactly the judgement wanted here.
+        fun source(track: Pair<String, Map<String, String>>): MediaSource =
+            DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory(app, track.second)))
                 .createMediaSource(ExoMediaItem.fromUri(track.first))
 
         val video = item.streamUrl to item.streamHeaders
@@ -449,7 +479,7 @@ object OnDemandController {
 
         val audioOnly = _state.value.audioOnly && item.audioUrl.isNotBlank()
         if (audioOnly || item.streamUrl.isBlank()) {
-            return progressive(if (item.audioUrl.isNotBlank()) sound else video)
+            return source(if (item.audioUrl.isNotBlank()) sound else video)
         }
         if (item.isAdaptive && item.audioUrl.isNotBlank()) {
             return MergingMediaSource(
@@ -458,11 +488,11 @@ object OnDemandController {
                 // without clipping, the merge asserts on the mismatch rather than playing.
                 /* adjustPeriodTimeOffsets = */ true,
                 /* clipDurations = */ true,
-                progressive(video),
-                progressive(sound),
+                source(video),
+                source(sound),
             )
         }
-        return progressive(video)
+        return source(video)
     }
 
     /**
