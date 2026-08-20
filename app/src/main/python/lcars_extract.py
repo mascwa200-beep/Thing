@@ -413,13 +413,22 @@ def resolve(url: str) -> str:
             })
         info = entries[0]
 
-    # ⚠️ **THE ASSEMBLY IS GUARDED TOO, and it was not.** Everything below reads fields out of a
-    # dictionary this code did not build, and the docstring above promises never to raise. `_pick`
-    # walks `requested_formats` assuming a list of dicts; `float(...)` on a duration yt-dlp reported
-    # as a string raises `ValueError`; `_earliest_expiry` parses a query string. None of that is
-    # likely and all of it is possible, and the failure mode is the misleading kind: the exception
-    # crosses back through Chaquopy, `callString` returns null, and the screen says the PYTHON
-    # RUNTIME is unavailable — pointing at the bridge when the bridge worked perfectly.
+    # ⚠️ **THE ASSEMBLY IS GUARDED TOO — as a contract, not because a specific field is known to
+    # break.** Everything below reads out of a dictionary this code did not build, while the
+    # docstring above promises never to raise, and the failure mode if it did would be the
+    # misleading kind: the exception crosses back through Chaquopy, `callString` returns null, and
+    # the screen blames the PYTHON RUNTIME for a bridge that worked perfectly.
+    #
+    # ⚠️ **The obvious example is NOT reachable, and saying so is the point of this note.** A first
+    # draft justified this guard with "`float()` on a duration yt-dlp reported as a string". It
+    # cannot be: `extract_info` runs with `process=True` and `extract_flat: False`, so
+    # `process_video_result` always calls `sanitize_numeric_fields`, and `duration` is in
+    # `_NUMERIC_FIELDS` — anything non-numeric becomes `int_or_none(...)`, i.e. None. So `duration`
+    # arrives as int | float | None and `float(x or 0)` is total. `id` is forced through `str()` on
+    # the same path. What remains genuinely unguarded upstream is `_pick` walking
+    # `requested_formats` and `_earliest_expiry` parsing a query string, neither of which yt-dlp
+    # sanitises for us. The guard is cheap, changes nothing on the working path, and makes the
+    # docstring true by construction rather than by argument.
     try:
         picked = _pick(info)
         if not picked["stream"] and not picked["audio"]:

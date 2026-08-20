@@ -6646,3 +6646,61 @@ stay on air, with now-playing appearing without a second connection).
 bot-flagged by YouTube, so its own 403 said nothing about the phone's residential one. T2 is the
 leading candidate (a missing runtime means the n-parameter cannot be transformed), and T4 is the
 insurance either way.
+
+#### T4 shipped, then a 20-agent verification pass — and it falsified one of its own blockers
+
+T4 (the IFrame fallback) landed as `40fc6a3` with all eight of the adversarial review's confirmed
+findings applied. A second, deeper verification workflow (20 agents, 4 lenses) then returned
+**8 confirmed, 8 refuted, 4 cleared** — and reading it properly changed two things I had written.
+
+⚠️ **"REFUTED" FROM A VERIFICATION PASS CAN MEAN "ALREADY FIXED", AND THAT DEMANDS THE OPPOSITE
+RESPONSE TO "NOT A DEFECT". Read the `why` on every one.** Six of the eight refutations here were
+of the first kind — the workflow was analysing a **moving HEAD** and my commit landed mid-run, so
+the verifiers found the fix already present and correctly marked the finding superseded. One says
+so outright: *"HEAD advanced from 58c3476 to 40fc6a3 during this analysis"*, and it detected this
+by noticing the line citations no longer matched. Treating those as "I was wrong, revert" would
+have undone working fixes; treating the genuine ones as confirmations would have left false
+comments in the tree. The tell is stale line numbers plus a quote of your own new code.
+
+**The two that were genuinely not defects, verified rather than asserted:**
+- `key(videoId)` on the WebView. The Compose mechanism is real (`factory` runs once, `update`
+  defaults to `NoOpUpdate`) but **no path reaches it**: every playback entry point routes through
+  `beginPlayback()`, whose first statement is a synchronous `closeEmbedded()`, so the transition is
+  always non-null → null → non-null. I checked that myself rather than taking it on trust — five
+  call sites, all through `beginPlayback`. Kept as belt-and-braces against a future caller; the
+  comment now says so instead of claiming it prevents a live bug.
+- `resolve()`'s assembly guard. The `float()`-on-a-string-duration example I used to justify it is
+  **unreachable**: `extract_info` runs with `process=True`, so `sanitize_numeric_fields` always
+  runs and `duration` is in `_NUMERIC_FIELDS`, arriving as int | float | None. The verifier proved
+  it empirically against the real pinned yt-dlp. The guard stays (it makes the "never raises"
+  docstring true by construction, and `_pick`/`_earliest_expiry` genuinely are unsanitised) but the
+  comment no longer cites a hazard that cannot occur.
+- `runtime_info` memoisation is a micro-optimisation, not a contract fix: upstream's own
+  `EJSBaseJCP.runtime_info` is likewise an uncached property, and yt-dlp memoises only the half that
+  spawns a subprocess. Comment corrected.
+
+⚠️ **THE BLOCKER WAS REAL IN MECHANISM AND WRONG IN SEVERITY, and only a CI run could tell them
+apart.** The claim — AGP names every executable a CMake project defines when `targets` is unset — is
+exceptionally well evidenced: the agent disassembled `CxxRegularBuilder.findLibrariesToBuild` in the
+real AGP 8.7.3 jar, mapped the `lookupswitch` branches to their bootstrap methods, and generated the
+genuine CMake file-API codemodel from upstream's own v0.16.0 CMakeLists, showing seven executables
+present (including one carrying `EXCLUDE_FROM_ALL`). It predicted the build would *likely fail*,
+noting honestly that it could not run AGP. **Run 1903 falsified the prediction**: green APK, quickjs
+compiled in, JS symbol verified in the shipped library, published — all without the fix. So
+`targets += "lcarsnative"` is a smaller/faster/explicit build graph, not a repair, and the source
+comment now records the measurement rather than the fear.
+
+**Three comments corrected in `dc6dd6c`** for exactly the reason the same review flagged the stale
+`QJS_ENABLE_INSTALL` note: in this tree a comment that overstates its own justification is a defect,
+because the comments are what the next session reasons from.
+
+⚠️ **CI ROUND SHAPE, measured — the note above saying 20–35 minutes was wrong.** A full green round
+with all three native trees is **~13 minutes**: unit tests 2m54s, `Build release APK` 8m29s, the
+rest packaging and publishing. Anything under ~15 minutes is ordinary; a frozen `updated_at` on an
+in-progress run is normal, not a stall.
+
+⚠️ **NEW CAPABILITY, and it corrects a standing note in this file.** Direct `curl` to the GitHub
+**API** is still blocked here (proxy 403), but `get_job_logs` returns a **signed blob-storage URL**
+on `productionresultssa2.blob.core.windows.net` which **is** fetchable with `curl`. So a whole job
+log can be downloaded and grepped locally instead of paged through the MCP tool — which is how the
+green-run evidence above was checked. The URL is short-lived, so fetch it promptly.

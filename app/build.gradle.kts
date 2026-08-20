@@ -67,8 +67,14 @@ android {
         // `api-test`, `lre-test` and `function_source`, none of which upstream ever compiles for
         // Android and none of which this app has any use for.
         //
-        // The lower bound on getting this wrong is a slower build; the upper bound is a CLI tool
-        // failing to cross-compile and taking the whole APK with it. One line removes the question.
+        // ⚠️ **MEASURED AFTERWARDS: this is hygiene, not a repair, and the record should say so.**
+        // The worry was that one of those tools would fail to cross-compile and take the APK with
+        // it — upstream's own Android CI job builds only `qjs` and sets `QJS_BUILD_LIBC=ON` so the
+        // standalone `qjs-libc` those tools link never exists, so it looked live. It is not: CI run
+        // 1903 built and packaged a green APK from this tree WITHOUT this line, with quickjs
+        // compiled in and the JS symbol verified in the shipped library. Whatever AGP named, it
+        // cross-compiled. So what this buys is a smaller, faster, explicitly-stated build graph —
+        // the same thing `ndkVersion` and the ABI filter above buy — and not a fixed break.
         externalNativeBuild { cmake { targets += "lcarsnative" } }
 
         // Device the app is built exclusively for. The runtime gate matches

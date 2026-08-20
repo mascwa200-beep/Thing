@@ -64,14 +64,23 @@ fun EmbeddedPlayer(
     onSkip: (SponsorSegments.Segment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // ⚠️ **KEYED ON THE ID, and this is a correctness fix rather than a tidy-up.** `AndroidView`'s
-    // `factory` runs ONCE and there is no `update` below, so a changed [videoId] would leave the old
-    // page loaded and playing — the wrong video, with the right title above it and no error anywhere.
-    // Today the view model happens to null `_embedded` before setting a new one, which would usually
-    // dispose this composable in between; "usually" rests on two state writes landing in different
-    // frames, which is not a property to depend on. `key` discards the node subtree AND the
-    // remembered `WebView` handle whenever the id changes, so the old page is released through
-    // `onRelease` and a new one is built from the factory.
+    // ⚠️ **BELT AND BRACES, NOT A REPAIR — and that wording is deliberate, because a first draft of
+    // this comment claimed otherwise and was wrong.** The hazard is real in the abstract:
+    // `AndroidView`'s `factory` runs ONCE and there is no `update` below, so a [videoId] that changed
+    // under a live composable would leave the old page loaded and playing — the wrong video, under
+    // the right title, with no error anywhere.
+    //
+    // But no path reaches it. Every entry point that starts playback goes through
+    // `ViewscreenViewModel.beginPlayback()`, whose FIRST statement is `closeEmbedded()` — a plain
+    // synchronous `_embedded.value = null`. That removes this composable from the tree (running
+    // `onRelease`) before any new `Embedded` can be published, so the transition is always
+    // non-null -> null -> non-null and never non-null -> non-null. The one theoretical exception was
+    // a double-tap racing `playEmbedded`'s suspending section, and that is closed separately by its
+    // generation guard.
+    //
+    // So this costs one composable layer and buys immunity from a future caller that publishes a new
+    // id without going through `beginPlayback`. It is kept for that reason alone; nothing observable
+    // changes today.
     key(videoId) {
         Player(videoId, startAtS, segments, skippingOn, onSkip, modifier)
     }

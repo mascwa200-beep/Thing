@@ -157,11 +157,15 @@ if setup_error is None:
 
             The `path` is descriptive rather than real, for the same reason: nothing execs it.
 
-            ⚠️ Answered from a module-level cache. Every input is a process constant — the library
-            either loaded at class-init or did not, and `JsRuntime.available()` is a Kotlin `by
-            lazy` — but this is a PROPERTY the director reads through `is_available()`, so an
-            uncached version pays two JNI round trips and re-parses the version string on each
-            read. Caching costs nothing and cannot go stale.
+            ⚠️ Answered from a module-level cache, which is a tidy-up rather than a fix — the
+            honest framing, because a first draft of this note implied otherwise. Uncached, each
+            read pays two JNI round trips and re-parses the version string, and `is_available()`
+            reads it every time. That is real but trivial, and it is also what upstream itself
+            does: `EJSBaseJCP.runtime_info` is likewise a plain uncached property, and yt-dlp
+            memoises only the genuinely expensive half (`JsRuntime.info`, which spawns a
+            subprocess to read `--version`). Ours has no subprocess to spawn. The cache cannot go
+            stale because every input is a process constant — the library either loaded at
+            class-init or did not, and `JsRuntime.available()` is a Kotlin `by lazy` over that.
             """
             return _runtime_info()
 
