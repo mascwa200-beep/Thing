@@ -6233,3 +6233,216 @@ FULL_PAGE_BASELINE 8440 → 9214.**
 - **Standing:** the KB engine continues toward 10,000 full pages (9214/10,000 now) and the lore toward
   150–200 (102 now) — both are multi-session, dispatched as Fable ultracode mega-waves against pending
   manifest topics when subagent budget allows.
+
+### THE DESKTOP BECOMES THE PHONE — `:core:feeds`, and the switches that did nothing (this session, PR #449 cont., branch `claude/loving-edison-bd65oa`)
+
+Owner: make the desktop **visually and feature-wise the same as the mobile version**, apart from the
+YouTube half and the settings, *"but it has to have some settings"* — and, verbatim, **everything but
+the assistant**: *"seriously f*** the assistant I absolutely hate using it and I never use it… just
+everything else."* Plus: make the desktop more capable than the phone where a tower PC can be, and do
+not waste SSD space. Standing plan: `robust-baking-dewdrop.md`, Parts A–G. **Zero subagent spend.**
+
+**`:core:feeds` — the unlock, and it was one parameter.** The plan assumed sixteen adapted desktop
+copies of the world-data repositories. Measuring first showed **16 of them import `android.*` exactly
+zero times**; the only Android dependency in the whole plumbing was `DiskCache` taking a `Context` to
+read `filesDir`. Changing that one constructor to take a `File` freed the entire layer. A new plain
+Kotlin/JVM module now holds the HTTP client, the disk cache, `Async`/`AsyncLoader`, `Geo`,
+`Formatters`, `SecretScrub` and 22 repositories, and **both applications depend on it directly**.
+
+⚠️ **Package names were kept identical on the move**, so `:app` needed no import churn at all — 7
+call sites changed, all of them in `AppContainer`. This is the same shape as the 53 deleted mirrors:
+*measure the actual Android surface before writing a second copy.*
+
+⚠️ **`SettingsRepository` does not move and must not.** The two applications keep preferences in
+entirely different places (DataStore vs a JSON file), so repositories take `suspend () -> X` lambdas
+for the values they want. `FeedPreferences.kt` holds the six feed-facing value types.
+
+**⚠️ THE CROSS-MODULE SMART CAST — three CI failures in one arc, now closed as a class.** Kotlin will
+NOT smart-cast a public property declared in a *different* module, so `if (q.low != null) use(q.low)`
+compiles inside a core module and fails in `:app`. The fix is always a local `val`. Nothing local
+caught it: the parse-only pass does not type-check, and `android_resolve_check.sh` differences
+*unresolved names*, which a smart cast failure is not.
+
+**`tools/kotlin_jvm_check.sh`** now type-checks `:app` files that touch no Android API against the
+**compiled** core modules. ⚠️ **The load-bearing detail: the cores go on the classpath as CLASSES,
+never as sources.** Passing their sources puts them in one compilation unit, which makes them one
+module, which makes the error vanish — the check would then pass on code CI rejects. Negative-tested
+in both modes; `--all` still finds a planted defect among 1855 unrelated resolution errors. Coverage
+is reported rather than implied: 26 of 81 qualifying files resolve fully.
+
+A textual sweep over every nullable cross-module property found 19 further candidates, **all false
+positives**, and the shapes are worth recognising: an explicit `?:`/`!!`/`?.let`, a nullable local
+assignment (`val sw = state.data`), a parameter that genuinely accepts null (`Formatters.number`
+does), a **platform type** (`setTextViewText` takes `CharSequence!`), or a same-named property
+declared in `:app`.
+
+**CI diagnostics fixed while diagnosing that.** Gradle's "What went wrong" says only *"Compilation
+error. See log for more details"*; the `e:` lines naming file, line and symbol are hundreds of stack
+frames earlier and a tail never reaches them. The workflow's diagnostic step now greps the compiler
+errors FIRST. It paid for itself on the very next failure.
+
+**Desktop screens shipped this session** (each reads the shared repositories, each says "this machine
+does not know where it is" as an ordinary state rather than an error — a tower PC has no GPS):
+Social · Space Weather · Observatory · Radar · Nearby danger · Nearest help · Wildlife · Markets ·
+Weather · Economy · **Fuel** · **Radio** · **Advisories** · **Home**. `WorldFeed`/`WorldPanel` is the
+shared "fetch one thing for one coordinate" shape.
+
+- **ADVISORIES** runs the same 23-rule `Oracle` over what this machine can actually sense, and
+  **names the domains it cannot** at the foot of the page rather than leaving somebody to wonder why
+  the departure reminders they know from the phone never appear. ⚠️ **No learning layer,
+  deliberately** — the phone re-ranks by which advisories it has acted on, which it can do because it
+  timestamps every screen visit; nothing here does, and inventing an attribution signal would teach
+  the ranking something untrue. ⚠️ `movement` left at rest is a MEASUREMENT, not a default — a tower
+  PC is not going anywhere, which is why the "are you settled" study rules can fire here at all.
+- **HOME** leads with that same read, sharing the one view model: two Oracle snapshots seconds apart
+  would rank differently and the two pages would disagree about one machine.
+- **`Oracle.urgencyArgb`** moved the five urgency colours into the shared core beside the rules that
+  produce them, because three surfaces now draw this stream.
+- **`screenForRoute`** translates the phone's deep-link vocabulary at the one place the desktop
+  consumes it. Null is the ordinary answer and the card then offers no action.
+- **RADIO**: the five files behind internet radio import `android.*` zero times, so the desktop gets
+  it by moving them into `:core:feeds` too. `RadioPlayer` mirrors `LivePlayer` but is **audio only**
+  — no `MediaView`, so nothing ties a station to a surface and it keeps playing across screens.
+  ⚠️ **JavaFX cannot decode Ogg Vorbis or Opus**, which many community stations use; a failure names
+  the codec, because "this machine cannot decode Opus" and "that station is down" are different facts
+  that look identical otherwise. ⚠️ Volume is held on the player object, not only on the
+  `MediaPlayer`, which is destroyed and rebuilt on every tune.
+- **FUEL** says what it cannot show: the World Bank retired both pump-price indicators, so the only
+  free replacement is the EIA's US-only keyed series.
+
+**⚠️ SEVEN DESKTOP SETTINGS WERE WRITTEN TO DISK AND READ BY NOTHING.** Not a missing feature — a
+page of switches a person can flip that change absolutely nothing. `fahrenheit`, `miles` and
+`twelveHourClock` now reach the code that draws numbers (via `DesktopUnits` + a `LocalUnits`
+composition local, following the arrangement the shell already uses for the location readout and the
+stardate); `refreshMinutes`/`refreshOnOpen` reach the live news feed. `bootSequence` and
+`consoleSounds` are **removed**, because this machine has neither subsystem — they come back with
+them.
+
+⚠️ **Wiring the units exposed a trap that had to close in the same change.** Open-Meteo returns
+**visibility in FEET** under an imperial request (25240 metric against 82808 imperial for one place
+and moment, which its own documentation denies), so the desktop's `/1000` "kilometres" line would
+have reported a fifteen-mile view as eighty kilometres the moment the switch worked. It reads the
+canonical `visibilityMetres` through `WeatherUnits.describeVisibility` now.
+
+⚠️ **Two clamps on one value:** `setRefreshMinutes` allowed 1..240 while `intervalMs` clamped 1..60,
+so a stored 120 would have been accepted and silently honoured as 60. Bounds now match.
+
+⚠️ `distance()` existed **three times identically** in Places, Radar and Safety — converged onto
+`DesktopUnits`. ⚠️ `listOfNotNull` is NOT an inline composable scope, so a card reading
+`LocalUnits.current` inside one must hoist it to a local first.
+
+**Verification this arc, all free:** `./gradlew :desktop:build --configure-on-demand
+--no-configuration-cache` (the real gate — CI runs `build`, not `test`), `:core:feeds:test`, the
+local kotlinc gates, and CI. Desktop **90 → 98 tests**. Load-bearing rules negative-tested: returning
+a bare `WeatherPreferences()` fails exactly the two tests asserting the switches reach the request.
+
+**⚠️ Operational notes.** `list_workflow_runs` exceeds the MCP token limit even at `per_page: 1` —
+save the result and parse it with python; `list_workflow_jobs` with a run id is small and gives
+per-step status. **"Run unit tests" is the `:app` compile gate**; `Build release APK` takes ~7 more
+minutes and is packaging. Hold each push until the previous run's test step reports, or
+`concurrency: cancel-in-progress` destroys the signal.
+
+### PART D FINISHED, AND PART E's SUB-PAGES — the map, the crash console, the sibling rail
+
+Same arc, continued. **Zero subagent spend** throughout, as with every arc since the credit
+directive: local kotlinc + JUnit, `./gradlew :desktop:build`, `javap` against shipped jars, live
+`curl` probes, and CI.
+
+**The instrument kit reaches the desktop.** ⚠️ The port is a rewrite of exactly one thing: Compose's
+`drawText` positions by TOP-LEFT and `android.graphics.Paint` positions by an ANCHOR at a BASELINE,
+and the phone's kit draws every axis label through `nativeCanvas` + `Paint`. A naive port compiles
+and puts every tick label slightly wrong. `trimNumber` moved to `Formatters.axisLabel` so two chart
+kits cannot drift, and got its first test — the scientific tail is not decoration, an X-ray flux
+axis runs over decades and rounding 4e-08 to "0.00" makes every tick identical.
+⚠️ **`roundToInt` breaks ties towards POSITIVE infinity**, so -1234.5 rounds to -1234. My assertion
+was wrong where the code was right; pinned as shipped behaviour.
+
+**The desktop gets a map** (`core:telemetry/WebMercator` + `TileStore` + `MapScreen`). MapLibre is
+Android-only at every version, so this is raster tiles on a canvas. The phone never needed the
+projection because MapLibre does it internally and never exposes it.
+- ⚠️ **The property the whole core rests on is that `tiles()` and `offsetX/Y()` agree.** A marker is
+  placed by one and the ground under it drawn by the other; different arithmetic would put every
+  aircraft, earthquake and hospital slightly off where it is, and the map would still look
+  plausible. A test relates them directly.
+- Expectations came from an independent Python twin, and the Brandenburg Gate case is the OSM wiki's
+  own published worked example — the one fixture that survives a mistake in my twin.
+- ⚠️ **`1 shl z` shifts by `z and 31` on the JVM**, so an unclamped zoom of 32 yields ONE tile rather
+  than overflowing: a map that silently draws the whole world when asked for a street. Pinned.
+- ⚠️ **All five tile services were probed live before a line was written** (OpenTopoMap, EOX
+  satellite, OSM standard, Carto, AWS terrarium DEM — all 200). The attribution line is a licence
+  obligation, not a courtesy; it moves with the basemap because the terms do.
+- ⚠️ `TileStore` keeps its OWN client with its own bounded 96 MB cache. One 4K view is ~250 tiles;
+  sharing the feeds' 16 MB cache would evict news, weather and quotes on every pan — nothing would
+  break, they would simply refetch everything forever. Four requests at a time; a failed tile is not
+  retried until a person asks. The decoded LRU is bounded by COUNT because a decoded 256px tile is
+  256 KB of pixels whatever it arrived as.
+- Four overlays (aircraft, incidents, nearest help, night), each a network fetch, so **all four start
+  OFF** and nothing behind them is asked for until switched on. They read the SAME repositories the
+  Radar/Safety/Places screens do, so a layer costs nothing those screens already fetched.
+
+⚠️ **A defect caught before it shipped, and it is a whole class:** `HttpClient.getBytes` first used
+`readNBytes`, which is Java 9 but only reached **Android in API 33** — and `:core:feeds` is shared
+with an app whose **minSdk is 31 with desugaring off**. It compiles cleanly and throws
+`NoSuchMethodError` on an Android 12 device, and **no gate in this project would catch it**: the
+module is plain JVM so Android Lint never sees it, and `android_compile_check.sh` builds against
+API 35. Hand-rolled loop instead; a sweep found no other instance in either shared module.
+**Any late-added JDK API in `core/feeds` or `core/telemetry` is in this class — check the Android
+API level it landed in before using one.**
+
+**The desktop can say what went wrong** (`diagnostics/CrashReporter` + screen). ⚠️ It earns a screen
+for a reason particular to a desktop program: on Android an uncaught exception kills the process and
+the OS says so; here an exception thrown while drawing goes to AWT's event loop, which logs it and
+**keeps pumping events** — a panel fails, the window stays open looking fine, and the honest
+description is "it just stopped working".
+⚠️ **One handler covers everything, and that inverted my recollection.** In JDK 21
+`EventDispatchThread.processException` calls `getUncaughtExceptionHandler()` on the thread, falling
+through to the process-wide default — **verified by disassembling the shipped class**, where the
+legacy `sun.awt.exception.handler` property no longer appears at all.
+Two rules worth keeping: a millisecond is not a unique file name (one failure brings down several
+threads and the second report overwrote the first), and the cap orders by the **parsed timestamp**,
+not the file name — name-sorting agrees only while every millisecond value is thirteen digits, and
+the test crosses a power-of-ten boundary deliberately. The self-reference guard's test carries a
+**JUnit timeout** so a regression fails instead of wedging CI, which is what made its perturbation a
+clean failure rather than an infinite loop.
+
+**Part E2 — the console rail starts doing work on twenty-nine screens.** E1 (the two-pane explorer)
+had already shipped; every page reached FROM the directory still looked as it did, because all
+twenty-nine draw the same frame and that frame spends a quarter of the width on blocks that mean
+nothing. Those blocks are now the screens filed beside this one, the current one lit.
+- ⚠️ **One change, twenty-nine screens, none of them edited.** `LcarsScreenFrame` gained a rail
+  SLOT (not a flag — the kit knows what a rail looks like and nothing about directories);
+  `PulseScaffold` makes the decision one level up; `PulseApp` provides `LocalSiblingRail` once
+  around the NavHost, exactly as the section readout and the stardate are.
+- ⚠️ `remember(currentRoute)` on the provided value: without it every recomposition mints a fresh
+  context object, and a composition local whose value is never equal to its last invalidates all its
+  readers every frame — here the whole NavHost.
+- ⚠️ **Weights, not fixed heights**, and that is correctness. Seven entries at a comfortable fixed
+  height is 373dp: fits a phone upright, does NOT fit one on its side, where the last blocks clip
+  away silently. Weighted it cannot overflow at any height.
+- ⚠️ The current screen is **not clickable** — navigating to where you already are pushes a second
+  copy, so back then returns you to the same page: the exact shape of "the back button is broken".
+- 96dp was measured (JetBrainsMono is 0.6 em; the longest label is 22 characters, needing 14 a line
+  over two lines). The map and the radar scope already pass `rail = false` and keep the full width.
+- **Desktop tandem: nothing to do**, and worth saying rather than implying work — that shell has
+  drawn a persistent directory column beside every screen since it was built. This is the phone
+  adopting the companion's arrangement, so the two converge.
+
+⚠️ **`tools/android_resolve_check.sh` gained `:core:feeds` as COMPILED CLASSES** (never as sources —
+sources fold the module into the same compilation unit and a cross-module smart-cast error then
+vanishes, so the gate would pass on code CI rejects). It had been reporting `Formatters` unresolved
+while the real build compiled clean. Negative-tested with a planted typo. **A new false-positive
+mechanism recorded: a NEW file has no baseline, so the tool prints every unresolved name including
+platform noise — use the mechanical use-vs-import audit for those instead.**
+
+**Still open on the plan:** **Music** is the one Part D item not built — Spotify's Web API behind an
+authorization-code flow this machine has no equivalent of (a loopback server plus the system
+browser), and playback control needs Premium. Then **Part F** (Interrogator: output the evidence,
+not verdict labels) and **Part G** (desktop power — pop-out windows, ops wall, global hotkeys, and
+deep analysis as a switch inside each panel, **default off, never on open, never on a timer**).
+**Excluded and said plainly** on the desktop: the assistant and all of it, SOS, Field Tools,
+Compass, Environment Scanner, Device Health, Security Check, Theater.
+
+⚠️ **Owner-verify throughout — CI compiles, it does not draw.** On the Pixel: the sibling rail on any
+menu page (does the column read, does tapping a sibling land right, does back still behave). On
+Windows: the new charts, the map (pan, scroll-zoom, the three basemaps, the four layers, the scale
+bar and the MGRS readout), and the crash console.
