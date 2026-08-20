@@ -29,6 +29,33 @@ data class MediaItem(
     val streamUrl: String = "",
     /** Audio-only address when the source offers one separately, for listening without the video. */
     val audioUrl: String = "",
+    /**
+     * The headers [streamUrl] must be fetched with.
+     *
+     * ⚠️ **Carrying these is not politeness, it is the difference between playing and a 403.** A
+     * signed media address is minted for the client that asked for it, and a later request with a
+     * different User-Agent — or missing the Accept and Sec-Fetch values the extractor sent — is
+     * refused. The extractor reports exactly what it used; before this existed the app discarded it
+     * and playback failed with a bad HTTP status that named no status.
+     */
+    val streamHeaders: Map<String, String> = emptyMap(),
+    /**
+     * The headers [audioUrl] must be fetched with.
+     *
+     * ⚠️ Separate from [streamHeaders] because they genuinely differ per track. One shared header
+     * set is the obvious shortcut and it half-works, which is the worst kind of wrong.
+     */
+    val audioHeaders: Map<String, String> = emptyMap(),
+    /**
+     * True when [streamUrl] carries video ONLY and [audioUrl] is its other half, so the player has
+     * to merge them.
+     *
+     * ⚠️ Not the same question as "are both set". A muxed stream can sit beside a separate
+     * audio-only rendition — which is what LISTEN plays — and merging those would play the audio
+     * twice. The extractor decides this from whether it made an adaptive selection; nothing
+     * downstream should try to infer it.
+     */
+    val isAdaptive: Boolean = false,
     val uploader: String = "",
     val thumbnailUrl: String = "",
     /** The human-facing page, for handing off to a browser. */

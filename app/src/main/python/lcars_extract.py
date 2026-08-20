@@ -18,10 +18,23 @@ import json
 import re
 from urllib.parse import parse_qs, urlparse
 
-# Prefer a single muxed stream. Separate video and audio would need a merging media source on the
-# player side — real machinery for a first pass — and every site that offers adaptive formats also
-# offers something progressive. The last fallback is "whatever you have".
-FORMAT = "best[ext=mp4][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]/best"
+# Adaptive first, muxed as the fallback.
+#
+# ⚠️ This used to ask only for a muxed stream, on the reasoning that separate tracks would need a
+# merging media source on the player side and "every site that offers adaptive formats also offers
+# something progressive". The second half of that has stopped being true: sites have been retiring
+# muxed formats, and the one that survives is well below the best available — so the app was quietly
+# playing a much worse picture than it could. The player now merges, so ask for the good one.
+#
+# The chain degrades rather than failing: best video + best audio, then a muxed mp4, then anything
+# muxed, then whatever exists at all. A site with no adaptive formats lands on exactly what it landed
+# on before.
+FORMAT = (
+    "bestvideo+bestaudio/"
+    "best[ext=mp4][acodec!=none][vcodec!=none]/"
+    "best[acodec!=none][vcodec!=none]/"
+    "best"
+)
 
 # Matched against the failure text ONLY when the exception type did not already settle it. Ordered,
 # and each is a phrase rather than a word: "private" alone matches "privately owned".
@@ -102,22 +115,77 @@ def _classify(exc) -> str:
     return "FAILED"
 
 
+def _headers(f: dict) -> dict:
+    """The headers yt-dlp says this format's address must be fetched with.
+
+    ⚠️ **Not optional, and dropping them is what made playback fail with a bad HTTP status.** A signed
+    media URL is minted for the client that asked for it; a later request carrying a different
+    User-Agent — or missing the Accept/Sec-Fetch values the extractor sent — gets refused. yt-dlp
+    knows exactly what it used and puts it in `http_headers`; this app used to throw that away and
+    then wonder why the address it had just been handed came back 403.
+
+    Values are coerced to strings because they cross into Kotlin as JSON and a stray non-string would
+    fail to decode into a Map<String, String> at the far end.
+    """
+    raw = f.get("http_headers") or {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items() if k and v}
+
+
 def _pick(info: dict) -> dict:
-    """The chosen stream, plus an audio-only address when one is separately available."""
+    """The chosen video and audio tracks, each with the headers its address needs.
+
+    Three shapes come back from yt-dlp and all three are handled:
+
+    * a **muxed** selection — one `url` on `info` carrying both, with no separate audio;
+    * an **adaptive** selection — `requested_formats` holding a video half and an audio half, which
+      the player merges;
+    * neither, in which case the best audio-only format in the list is offered on its own so LISTEN
+      still works even when nothing playable as video was found.
+    """
     stream = info.get("url") or ""
+    stream_headers = _headers(info) if stream else {}
     audio = ""
-    for f in info.get("formats") or []:
-        if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none"):
-            # Formats arrive worst-first, so the last audio-only one is the best available.
-            audio = f.get("url") or audio
-    if not stream and info.get("requested_formats"):
-        # A merged selection: take the video half as the stream and the audio half beside it.
+    audio_headers = {}
+    # ⚠️ Tracked, rather than asking "is requested_formats set" at the end. That question is one step
+    # removed from the one that matters, which is whether BOTH halves in front of the player came out
+    # of an adaptive pair. If the video half carried no address, `stream` is still the muxed fallback
+    # — and merging THAT with a separate audio track plays the audio twice.
+    video_from_pair = False
+    audio_from_pair = False
+
+    if info.get("requested_formats"):
+        # An adaptive selection. Take the video half as the stream and the audio half beside it, and
+        # keep each one's OWN headers — yt-dlp emits them per format and the two genuinely differ.
         for f in info["requested_formats"]:
             if f.get("vcodec") not in (None, "none"):
-                stream = f.get("url") or stream
+                if f.get("url"):
+                    stream, stream_headers = f["url"], _headers(f)
+                    video_from_pair = True
             elif f.get("acodec") not in (None, "none"):
-                audio = f.get("url") or audio
-    return {"stream": stream, "audio": audio}
+                if f.get("url"):
+                    audio, audio_headers = f["url"], _headers(f)
+                    audio_from_pair = True
+
+    if not audio:
+        for f in info.get("formats") or []:
+            if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none"):
+                # Formats arrive worst-first, so the last audio-only one is the best available.
+                if f.get("url"):
+                    audio, audio_headers = f["url"], _headers(f)
+
+    return {
+        "stream": stream,
+        "audio": audio,
+        "stream_headers": stream_headers,
+        "audio_headers": audio_headers,
+        # ⚠️ Whether the player has to MERGE, decided here rather than inferred there. "Both fields
+        # are set" is not the same question: a muxed stream can sit beside a separate audio-only
+        # rendition for LISTEN, and merging those would play the audio twice. True only when both
+        # addresses came out of the same adaptive pair.
+        "adaptive": video_from_pair and audio_from_pair,
+    }
 
 
 def resolve(url: str) -> str:
@@ -176,6 +244,9 @@ def resolve(url: str) -> str:
         "duration": float(info.get("duration") or 0),
         "stream": picked["stream"],
         "audio": picked["audio"],
+        "stream_headers": picked["stream_headers"],
+        "audio_headers": picked["audio_headers"],
+        "adaptive": picked["adaptive"],
         "uploader": info.get("uploader") or info.get("channel") or "",
         "thumbnail": info.get("thumbnail") or "",
         "page": info.get("webpage_url") or url,

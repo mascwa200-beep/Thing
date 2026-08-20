@@ -79,6 +79,9 @@ class MediaExtractor(private val python: PythonRuntime) {
             durationS = wire.duration.takeIf { it.isFinite() && it > 0 } ?: 0.0,
             streamUrl = wire.stream,
             audioUrl = wire.audio,
+            streamHeaders = wire.stream_headers,
+            audioHeaders = wire.audio_headers,
+            isAdaptive = wire.adaptive,
             uploader = wire.uploader,
             thumbnailUrl = wire.thumbnail,
             pageUrl = wire.page.ifBlank { key },
@@ -112,6 +115,21 @@ class MediaExtractor(private val python: PythonRuntime) {
     suspend fun videoId(url: String): String =
         python.callString(MODULE, "video_id", url.trim())?.trim().orEmpty()
 
+    /**
+     * Forget the cached address for one page, so the next [resolve] genuinely re-resolves.
+     *
+     * ⚠️ For the case the freshness check cannot catch: an address the source refuses *before* its
+     * stated expiry. [MediaItem.isFresh] believes what the extractor said about lifetime, and a
+     * signed URL can be invalidated early — so when playback comes back with a bad HTTP status, the
+     * entry has to be thrown out explicitly or the retry would be handed the same dead address it
+     * just failed on.
+     */
+    suspend fun evict(url: String) {
+        val key = url.trim()
+        if (key.isEmpty()) return
+        mutex.withLock { cache.remove(key) }
+    }
+
     /** Forget every cached address, e.g. when the user wipes state. */
     suspend fun clear() {
         mutex.withLock { cache.clear() }
@@ -131,6 +149,18 @@ class MediaExtractor(private val python: PythonRuntime) {
         val duration: Double = 0.0,
         val stream: String = "",
         val audio: String = "",
+        /**
+         * The headers each address must be fetched with, as the extractor reported them.
+         *
+         * ⚠️ Snake case because these are the Python side's own key names, and the whole point of
+         * this type is to be the literal wire shape rather than a translated one. Defaulted like
+         * every other field, so an older extractor that does not send them still decodes — it just
+         * yields a `MediaItem` with no headers, which is exactly the behaviour that was there before.
+         */
+        val stream_headers: Map<String, String> = emptyMap(),
+        val audio_headers: Map<String, String> = emptyMap(),
+        /** True when [stream] is video-only and [audio] is its other half. See `MediaItem.isAdaptive`. */
+        val adaptive: Boolean = false,
         val uploader: String = "",
         val thumbnail: String = "",
         val page: String = "",
