@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -69,6 +70,28 @@ class InterrogatorCascade(
 
     private val _lastTrace = MutableStateFlow<Trace?>(null)
     val lastTrace: StateFlow<Trace?> = _lastTrace.asStateFlow()
+
+    /** One finding, and when it was made. */
+    data class Finding(val response: Rebuttal.Response, val atMs: Long)
+
+    private val _log = MutableStateFlow<List<Finding>>(emptyList())
+
+    /**
+     * Every finding this process has made, newest first.
+     *
+     * ⚠️ [findings] replays exactly one, so before this existed the second finding erased the first —
+     * a day of transcript was kept and the conclusions drawn from it lasted until the next sentence.
+     * A conversation produces several and the useful thing is to look back over them.
+     *
+     * ⚠️ **In memory only, and deliberately.** A finding is derived from speech; writing it down
+     * would be a second copy of what somebody said, in a second place, with its own retention to get
+     * wrong — against the invariant that this subsystem keeps exactly one bounded, encrypted, purgeable
+     * record. It goes when the process does, and [reset] clears it with the transcript.
+     */
+    val log: StateFlow<List<Finding>> = _log.asStateFlow()
+
+    /** Enough to look back over a conversation; not so many that the screen becomes a scroll. */
+    private val LOG_MAX = 30
 
     /**
      * Run one captured utterance all the way through.
@@ -145,8 +168,16 @@ class InterrogatorCascade(
             modelDraft = judged?.question,
             grounding = grounding,
             timesSeen = decision.timesSeen,
+            // The sentence itself, not only the words that matched. Without it the surface can show
+            // a finding about "everyone knows" with no way to tell a real appeal to popularity from
+            // somebody introducing a fact everyone does in fact know.
+            heard = text,
         )
         _findings.emit(response)
+        // ⚠️ `update`, not the cascade's Mutex. The read-modify-write has to be atomic, and this
+        // project has already shipped one deadlock from taking a non-reentrant Mutex that a caller
+        // further up the stack was holding. `update` is a CAS loop and takes nothing.
+        _log.update { (listOf(Finding(response, at)) + it).take(LOG_MAX) }
         return response
     }
 
@@ -154,5 +185,6 @@ class InterrogatorCascade(
     suspend fun reset() = lock.withLock {
         state = Discourse.CascadeState()
         _lastTrace.value = null
+        _log.value = emptyList()
     }
 }

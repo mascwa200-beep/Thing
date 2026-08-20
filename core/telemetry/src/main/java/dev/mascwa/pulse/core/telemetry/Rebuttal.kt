@@ -65,6 +65,13 @@ object Rebuttal {
      * @param note one line on why the move does not support the conclusion.
      * @param quote the words that tripped the screen, so the reader can see what was matched and
      *   dismiss it instantly when the match was silly.
+     * @param heard the whole utterance the finding is about.
+     *
+     *   ⚠️ Added because [quote] is a few matched words and is NOT what was said. A reader shown
+     *   "everyone knows" cannot tell whether the screen caught a real appeal to popularity or
+     *   somebody introducing a fact everyone does in fact know — which is the commonest way this
+     *   keyword screen misfires, and the case the reader most needs to be able to dismiss at a
+     *   glance. The evidence is the sentence; the trigger is only where the match landed.
      * @param citation present only when [Grounding] was supplied.
      * @param provenance derived, never passed in.
      * @param repeatNote set when this move has been screened before in the same conversation.
@@ -74,6 +81,7 @@ object Rebuttal {
         val question: String,
         val note: String,
         val quote: String,
+        val heard: String,
         val citation: String?,
         val provenance: Provenance,
         val repeatNote: String?,
@@ -87,10 +95,19 @@ object Rebuttal {
          */
         fun speakable(): String = question
 
-        /** The full form, for the screen. Ordered so the useful line is first. */
+        /**
+         * The full form, for the screen. Ordered so the useful line is first.
+         *
+         * ⚠️ [heard] comes second, before the label. It is the evidence, and reading the sentence is
+         * what lets somebody dismiss a silly match in one glance rather than puzzling over a label.
+         * Omitted rather than shown blank when the caller did not supply it.
+         */
         fun display(): String = buildString {
             append(question)
             append("\n\n")
+            if (heard.isNotEmpty()) {
+                append("“").append(heard).append("”\n")
+            }
             append(label)
             append(" · ")
             append(note)
@@ -115,6 +132,7 @@ object Rebuttal {
         modelDraft: String? = null,
         grounding: Grounding? = null,
         timesSeen: Int = 1,
+        heard: String = "",
     ): Response {
         val draft = modelDraft?.trim()?.takeIf { it.isNotEmpty() }
         val provenance = when {
@@ -130,6 +148,7 @@ object Rebuttal {
             question = question,
             note = candidate.fallacy.why,
             quote = candidate.trigger,
+            heard = heard.trim(),
             citation = grounding?.cite(),
             provenance = provenance,
             repeatNote = repeatNote(timesSeen),
