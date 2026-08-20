@@ -433,6 +433,43 @@ jobs:
             exit 1
           fi
           echo "the extractor is in $ext"
+
+          # ⚠️ **AND THE JS SOLVER LIBRARY, WHICH IS A SEPARATE WHEEL AND A HARD REQUIREMENT.**
+          # `yt-dlp-ejs` is its own pip requirement, so the `yt_dlp/` probe above does NOT cover it —
+          # measured: that pattern has a trailing slash and `yt_dlp_ejs/` does not contain it.
+          #
+          # Why its absence would be invisible rather than loud: yt-dlp vendors only the solver's
+          # CORE. Measured against the pinned 2026.07.04, its `_builtin/vendor` holds
+          # `yt.solver.core.js` (12,607 bytes) plus `yt.solver.deno.lib.js` (245 bytes) and
+          # `yt.solver.bun.lib.js` (237 bytes) — NPM shims for two runtimes that are not ours. The
+          # real library is `yt_dlp_ejs/yt/solver/lib.min.js`, **151,561 bytes**, and it ships in no
+          # other package. So without this wheel the QuickJS provider still registers, still reports
+          # `javascript: quickjs 0.16.0` in the notes, and has no solver to run — a silent, total
+          # loss of the feature behind a status line that says it is working.
+          #
+          # ⚠️ **THE FULL PATH, not the bare filename, and the reason is subtler than it looks.**
+          # `yt_dlp` itself contains the literal string `lib.min.js` — twice in
+          # `jsc/_builtin/ejs.py` (`ScriptType.LIB: 'yt.solver.lib.min.js'`) and again in its
+          # `.pyc`. Measured, a bare-filename probe does NOT match that today, because those entries
+          # are stored DEFLATED and only entry NAMES sit uncompressed in the header. But that is an
+          # accident of compression, not a property: the day Chaquopy stores one entry uncompressed,
+          # a bare probe starts matching yt-dlp's own source and the gate silently stops failing.
+          # The full path is an entry name no other package has, so it does not rest on that.
+          #
+          # It is also the file rather than the package directory, because a package that shipped
+          # its metadata and not its data files would satisfy the weaker check.
+          lib=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${SOLVER}" /tmp/pyasset.bin; then lib="$entry"; break; fi
+          done
+          if [ -z "$lib" ]; then
+            echo "FAIL: ${SOLVER} is not in any Python asset — yt-dlp-ejs did not ship, so YouTube"
+            echo "      extraction has a JavaScript engine and nothing for it to run."
+            echo "$listing" | grep "assets/chaquopy/" || true
+            exit 1
+          fi
+          echo "the JS solver library is in $lib"
           echo "Python runtime packaged."
 
           # ⚠️ Reported on every build because it is paid on every UPDATE, not once: the APK goes to
@@ -446,6 +483,8 @@ jobs:
         env:
           PROBE: lcars_probe.py
           EXTRACTOR: yt_dlp/
+          # The library file itself, not the package directory — see the assertion above.
+          SOLVER: yt_dlp_ejs/yt/solver/lib.min.js
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
