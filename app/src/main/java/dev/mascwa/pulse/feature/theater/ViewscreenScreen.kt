@@ -95,6 +95,7 @@ fun ViewscreenScreen(
     val results by vm.searchResults.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
     val searchNote by vm.searchNote.collectAsStateWithLifecycle()
+    val embedded by vm.embedded.collectAsStateWithLifecycle()
 
     // A `viewscreen?play=` deep-link (a feed's play affordance, a shared address) starts playback
     // ONCE. ⚠️ A LaunchedEffect key survives recomposition but NOT leaving and re-entering the
@@ -154,8 +155,28 @@ fun ViewscreenScreen(
                     // The lines the picture cannot say for itself, in the order they matter.
                     skipNote?.let { StatusLine(it, c.amber) }
                     floorNote?.let { StatusLine(it, c.muted) }
-                    playback.detail?.takeIf { playback.status == OnDemandController.Status.ERROR }?.let {
+                    val playbackFailed = playback.status == OnDemandController.Status.ERROR
+                    playback.detail?.takeIf { playbackFailed }?.let {
                         StatusLine("Playback failed: $it", c.negative)
+                    }
+                    // ---- The last resort, offered under whatever went wrong ------------------
+                    //
+                    // ⚠️ It appears BELOW the failure and its reason, never instead of them. A
+                    // fault that silently becomes a different player is a fault nobody can report,
+                    // and the extractor's own words above are the diagnostic this whole change
+                    // exists to surface. One tap gets the video; nothing is hidden to do it.
+                    val failed = resolve is ViewscreenViewModel.Resolve.Refused || playbackFailed
+                    val onScreen = embedded
+                    if (onScreen != null) {
+                        EmbeddedFallback(vm = vm, embedded = onScreen)
+                    } else if (failed && vm.fallbackVideoId().isNotBlank()) {
+                        StatusLine("Our player cannot get this one. YouTube's own still can.", c.muted)
+                        LcarsButton(
+                            "PLAY IT ANOTHER WAY",
+                            onClick = { vm.playEmbedded(context) },
+                            color = c.amber,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
                     HarvestLine(harvestState)
                 }
@@ -466,6 +487,52 @@ private fun PlayerPanel(
     }
 
     Spacer(Modifier.height(10.dp))
+}
+
+/**
+ * The embedded player, with everything it cannot do said out loud.
+ *
+ * ⚠️ **HARVEST is stated as impossible rather than left to fail.** There is no file and no media
+ * address here — only YouTube's player — so the button would have nothing to hand the downloader.
+ * Saying so is the honest form; offering a control that always fails is not. Same for the transport:
+ * the ±10s buttons, LISTEN and the timeline all belong to our own player and are simply not here,
+ * which is better admitted in one line than discovered by hunting for them.
+ */
+@Composable
+private fun EmbeddedFallback(
+    vm: ViewscreenViewModel,
+    embedded: ViewscreenViewModel.Embedded,
+) {
+    val c = Pulse.colors
+    Column {
+        StatusLine("Playing through YouTube's own player — ads may appear.", c.amber)
+        EmbeddedPlayer(
+            videoId = embedded.videoId,
+            startAtS = embedded.startAtS,
+            segments = embedded.segments,
+            skippingOn = embedded.skippingOn,
+            onSkip = { OnDemandController.noteSkip(it) },
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        StatusLine(
+            if (embedded.skippingOn && embedded.segments.isNotEmpty()) {
+                "Sponsor skipping is on: ${embedded.segments.size} to skip."
+            } else if (embedded.skippingOn) {
+                "Sponsor skipping is on: nothing flagged on this one."
+            } else {
+                "Sponsor skipping is off."
+            },
+            c.muted,
+        )
+        StatusLine("HARVEST cannot save this one — there is a player here, not a file.", c.muted)
+        LcarsButton(
+            "CLOSE",
+            onClick = { vm.closeEmbedded() },
+            color = c.violet,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+    }
 }
 
 @Composable

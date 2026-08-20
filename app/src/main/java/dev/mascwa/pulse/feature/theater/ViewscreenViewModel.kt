@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.theater
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.MediaFloor
 import dev.mascwa.pulse.core.telemetry.MediaItem
 import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
@@ -10,6 +11,7 @@ import dev.mascwa.pulse.core.telemetry.TheaterModel
 import dev.mascwa.pulse.data.media.MediaBrowser
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.di.AppContainer
+import dev.mascwa.pulse.feature.media.AudioFloor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,6 +91,29 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
 
     private val _resolve = MutableStateFlow<Resolve>(Resolve.Idle)
     val resolve: StateFlow<Resolve> = _resolve.asStateFlow()
+
+    /**
+     * The video being played through YouTube's own embedded player instead of ours.
+     *
+     * ⚠️ **This is the last resort, and it is offered rather than substituted.** Extraction hands
+     * back a direct media address, and a direct address can be refused — a 403 on a URL yt-dlp had
+     * just minted is exactly what the owner reported. When that happens there is no picture to
+     * show. The embedded player does not depend on extraction at all, so it is the one route that
+     * cannot be broken by a signature, a client string or an expiry.
+     *
+     * Non-null means it is on screen; the failure and its reason stay above it, because a fault
+     * that silently becomes a different player is a fault nobody can report.
+     */
+    data class Embedded(
+        val videoId: String,
+        val title: String,
+        val startAtS: Double,
+        val segments: List<SponsorSegments.Segment>,
+        val skippingOn: Boolean,
+    )
+
+    private val _embedded = MutableStateFlow<Embedded?>(null)
+    val embedded: StateFlow<Embedded?> = _embedded.asStateFlow()
 
     private val _shelves = MutableStateFlow(Shelves())
     val shelves: StateFlow<Shelves> = _shelves.asStateFlow()
@@ -331,8 +356,67 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         playUrl(context, url, audioOnly = false)
     }
 
+    /**
+     * The address currently on the viewscreen, whether it played or not — what the fallback needs.
+     *
+     * A blank id means the address is not a YouTube video, and there is no embedded player for
+     * anything else, so the caller offers nothing rather than a button that cannot work.
+     */
+    fun fallbackVideoId(): String = TheaterModel.videoId(_input.value.trim())
+
+    /**
+     * Play the current address through YouTube's own player.
+     *
+     * ⚠️ **Stops our player and takes the floor first, in that order.** The ordinary player is
+     * usually in ERROR by the time anyone taps this, but it may merely have been refused a *format*
+     * while still holding the speaker — and two things playing at once is the failure
+     * [dev.mascwa.pulse.feature.media.AudioFloor] exists to prevent. Claiming as ONDEMAND is
+     * correct rather than convenient: this IS on-demand playback, so the radio stops and says so,
+     * exactly as it would for the ordinary path.
+     */
+    fun playEmbedded(context: Context) {
+        val id = fallbackVideoId()
+        if (id.isBlank()) return
+        supersedePlays() // any in-flight resolve must not publish over this
+        OnDemandController.stop()
+        AudioFloor.claim(context, MediaFloor.Owner.ONDEMAND)
+        val ready = resolve.value as? Resolve.Ready
+        val title = ready?.item?.title.orEmpty().ifBlank { "Embedded player" }
+        viewModelScope.launch {
+            // Suspending, and nullable when this video has never been watched — a fresh start is 0.
+            val resumeAt = c.viewingLedger.positionOf(id) ?: 0L
+            val skippingOn = c.settingsRepository.current().sponsorSkip
+            // The setting gates the REQUEST, not just the seeks — the same rule as the ordinary
+            // path, and the reason that rule is written down there.
+            val segments = if (skippingOn) {
+                val raw = runCatching { c.sponsorBlockRepository.segments(id) }.getOrDefault(emptyList())
+                SponsorSegments.usable(raw, SponsorSegments.Policy())
+            } else {
+                emptyList()
+            }
+            _embedded.value = Embedded(
+                videoId = id,
+                title = title,
+                startAtS = resumeAt / 1000.0,
+                segments = segments,
+                skippingOn = skippingOn,
+            )
+        }
+    }
+
+    /** Take the embedded player off screen and give the speaker back. */
+    fun closeEmbedded() {
+        if (_embedded.value == null) return
+        _embedded.value = null
+        AudioFloor.released(MediaFloor.Owner.ONDEMAND)
+    }
+
     private fun playUrl(context: Context, url: String, audioOnly: Boolean) {
         if (url.isBlank()) return
+        // ⚠️ Anything the user starts supersedes the fallback. Without this, tapping a card while
+        // the embedded player is on screen leaves it there, playing, over the top of the new
+        // resolve — two pictures and two soundtracks, and the floor arbiter cannot see the WebView.
+        closeEmbedded()
         val gen = supersedePlays()
         _resolve.value = Resolve.Working
         viewModelScope.launch {
@@ -464,6 +548,10 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         // point, and the service's notification carries their Stop.
         val pb = playback.value
         if (pb.item != null && !pb.audioOnly) OnDemandController.stop(c.applicationContext)
+        // The WebView dies with the composition, so its audio stops on its own — but the audio
+        // floor does not know that, and a floor left claimed makes the radio believe something is
+        // still using the speaker forever after.
+        closeEmbedded()
         super.onCleared()
     }
 

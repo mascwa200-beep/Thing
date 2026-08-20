@@ -398,6 +398,19 @@ object OnDemandController {
     }
 
     /**
+     * Say that a segment was skipped, in the words this player already uses.
+     *
+     * ⚠️ Exists for the embedded fallback, which does its own seeking through YouTube's IFrame API
+     * and so cannot reach the private note above. Sharing the sentence rather than writing a second
+     * one is the point: two phrasings for the same event is a small thing that reads as a bug the
+     * first time somebody notices they differ.
+     */
+    fun noteSkip(segment: SponsorSegments.Segment) {
+        val length = (segment.endS - segment.startS).toInt()
+        _skipNote.value = "Skipped ${SponsorSegments.label(segment.category)} · ${length}s"
+    }
+
+    /**
      * An HTTP source that identifies itself the way the extractor did.
      *
      * ⚠️ **The User-Agent is split out and set through `setUserAgent`; everything else goes to

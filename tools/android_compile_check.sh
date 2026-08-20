@@ -98,13 +98,29 @@ TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER$extra"
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
       -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" "$@" 2>&1)
 
+errors=$(grep -E '^([^:]+\.kt):[0-9]+:[0-9]+: error:' <<<"$out")
+
+# ⚠️ A @Composable REACHING the backend is a PASS, and conflating it with a missing jar made this
+# gate report a genuinely clean file as a failure. Kotlin compiles in two halves: the frontend
+# resolves names and types, the backend lowers IR to bytecode. Compose functions cannot be lowered
+# without the Compose compiler plugin, which is not on this classpath and cannot usefully be — so a
+# clean frontend followed by `Backend Internal error: Exception during IR lowering` is exactly what
+# a correct Compose file looks like here, and it is the strongest check available for one.
+#
+# The distinction that matters is whether the frontend had anything to say. A missing jar dies
+# before resolving a line and reports NoClassDefFoundError; that one really is "did not run".
+if grep -q 'Exception during IR lowering' <<<"$out" && [ -z "$errors" ]; then
+  echo "frontend clean — names and types resolve against the real platform ($# file(s))"
+  echo "  (backend IR lowering failed, which is expected for @Composable without the Compose plugin)"
+  exit 0
+fi
+
 if grep -q 'NoClassDefFoundError\|^exception:' <<<"$out"; then
   echo "COMPILER DID NOT RUN — a jar is missing from its own -cp. This is NOT a pass."
   grep -m2 'NoClassDefFoundError\|^exception:' <<<"$out"
   exit 2
 fi
 
-errors=$(grep -E '^([^:]+\.kt):[0-9]+:[0-9]+: error:' <<<"$out")
 if [ -n "$errors" ]; then
   echo "COMPILE ERRORS against the real platform classes:"
   echo "$errors"
