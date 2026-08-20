@@ -65,6 +65,8 @@ import dev.mascwa.pulse.desktop.feature.world.MarketsViewModel
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryScreen
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
+import dev.mascwa.pulse.desktop.feature.world.MapScreen
+import dev.mascwa.pulse.desktop.feature.world.MapViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
 import dev.mascwa.pulse.desktop.feature.world.RadarScreen
 import dev.mascwa.pulse.desktop.feature.world.RadarViewModel
@@ -240,6 +242,19 @@ fun PulseDesktopApp(
         }
         val safetyVm = remember { SafetyViewModel(scope, SafetyRepository(http, cache), settings) }
         val placesVm = remember { PlacesViewModel(scope, OverpassRepository(http, cache), settings) }
+        val mapVm = remember {
+            MapViewModel(
+                scope = scope,
+                settings = settings,
+                // ⚠️ The SAME repositories the Radar, Nearby-danger and Nearest-help screens read.
+                // They cache to disk by coordinate, so a layer switched on here costs nothing beyond
+                // what those screens already fetched, and the two never disagree about what is out there.
+                radar = RadarRepository(http, cache, TleRepository(http, cache)),
+                safety = SafetyRepository(http, cache),
+                overpass = OverpassRepository(http, cache),
+                cacheDir = AppPaths.dataDir.toFile(),
+            )
+        }
         val wildlifeVm = remember { WildlifeViewModel(scope, settings) }
         val marketsVm = remember { MarketsViewModel(scope, marketsRepository) }
         val weatherVm = remember { WeatherViewModel(scope, weatherRepository, settings) }
@@ -334,6 +349,7 @@ fun PulseDesktopApp(
                                         SpaceWeatherScreen(spaceWeatherVm, Modifier.fillMaxWidth())
                                     Screen.OBSERVATORY ->
                                         ObservatoryScreen(observatoryVm, Modifier.fillMaxWidth())
+                                    Screen.MAP -> MapScreen(mapVm, Modifier.fillMaxWidth())
                                     Screen.RADAR -> RadarScreen(radarVm, Modifier.fillMaxWidth())
                                     Screen.SAFETY -> SafetyScreen(safetyVm, Modifier.fillMaxWidth())
                                     Screen.PLACES -> PlacesScreen(placesVm, Modifier.fillMaxWidth())

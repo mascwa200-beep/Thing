@@ -152,6 +152,55 @@ class HttpClient(
         }
     }
 
+    /**
+     * GET raw bytes. Throws on non-2xx or transport failure.
+     *
+     * For a response that is an image rather than text or JSON — a map tile, chiefly. [download]
+     * already existed but writes to a file, which is the wrong shape for something decoded straight
+     * into memory and never kept.
+     *
+     * @param maxBytes a ceiling, because the caller has no way to know what a host will send and a
+     *   map asks a lot of different hosts. A tile is tens of kilobytes; anything past this is a
+     *   mistake or an error page, and reading it into memory would be the wrong response to either.
+     */
+    suspend fun getBytes(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        maxBytes: Long = 8L * 1024 * 1024,
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .headers(defaultHeaders(headers).toHeaders())
+            .get()
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
+            val body = resp.body ?: throw IOException("empty response")
+            val declared = body.contentLength()
+            if (declared > maxBytes) throw IOException("response of $declared bytes exceeds the limit")
+            // ⚠️ A hand-rolled loop rather than `readNBytes`, which is Java 9 but only reached Android
+            // in API 33 — and this module is shared with an app whose minSdk is 31 and which has core
+            // library desugaring switched off. That call compiles cleanly and throws NoSuchMethodError
+            // on an Android 12 device, which no gate in this project would catch.
+            //
+            // The limit is enforced here as well as against the header because a chunked response
+            // declares no length at all, so the header check cannot be the only one.
+            val out = java.io.ByteArrayOutputStream(if (declared > 0) declared.toInt() else 32 * 1024)
+            body.byteStream().use { input ->
+                val buf = ByteArray(1 shl 15)
+                var n = input.read(buf)
+                while (n >= 0) {
+                    if (out.size() + n > maxBytes) {
+                        throw IOException("response exceeds the ${maxBytes / 1024} KB limit")
+                    }
+                    out.write(buf, 0, n)
+                    n = input.read(buf)
+                }
+            }
+            out.toByteArray()
+        }
+    }
+
     /** POST raw [body] with [contentType], returning the response bytes. Throws on non-2xx / transport failure. */
     suspend fun postBinary(
         url: String,
@@ -195,7 +244,16 @@ class HttpClient(
         var USER_AGENT: String =
             "PulseApp/1.0 (Android; Pixel 10 Pro XL; +https://localhost) okhttp"
 
-        fun create(json: Json, cacheDir: File? = null): HttpClient {
+        /**
+         * @param cacheBytes how much disk the HTTP cache may use.
+         *
+         * ⚠️ A parameter rather than a constant because a map is not like a feed. One 4K view is
+         * roughly 250 tiles at tens of kilobytes each, so a map sharing the feeds' cache would evict
+         * the news, the weather and the markets on every pan — the other screens would still work,
+         * they would simply refetch everything, forever. A caller that draws tiles builds its own
+         * client with its own bounded cache instead.
+         */
+        fun create(json: Json, cacheDir: File? = null, cacheBytes: Long = 16L * 1024 * 1024): HttpClient {
             // Allow more concurrent requests per host so parallel fan-outs
             // (e.g. Hacker News item fetches) aren't throttled to 5 at a time.
             val dispatcher = Dispatcher().apply {
@@ -214,7 +272,7 @@ class HttpClient(
                 .dispatcher(dispatcher)
             if (cacheDir != null) {
                 runCatching {
-                    builder.cache(Cache(File(cacheDir, "http_cache"), 16L * 1024 * 1024))
+                    builder.cache(Cache(File(cacheDir, "http_cache"), cacheBytes))
                 }
             }
             return HttpClient(builder.build(), json)

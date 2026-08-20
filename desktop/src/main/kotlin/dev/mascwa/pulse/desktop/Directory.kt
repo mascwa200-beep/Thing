@@ -45,7 +45,7 @@ enum class Screen {
     LIBRARY, SEARCH, STUDY, PACKS,
     ADVISORIES,
     NEWS, LIVE,
-    SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
+    MAP, SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
     MARKETS, WEATHER, ECONOMY, FUEL,
     RADIO,
     NOTES, DIARY,
@@ -91,6 +91,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("oil", "petrol", "gasoline", "diesel", "crude", "brent", "wti", "natural gas", "pump")),
     )),
     DeskGroup("MAPS & SKY", { it.positive }, listOf(
+        DeskEntry(Screen.MAP, "Map", "Where everything is — aircraft, incidents, help, and the night",
+            listOf("atlas", "terrain", "satellite", "streets", "where", "location", "coordinates", "mgrs", "navigate")),
         DeskEntry(Screen.SPACE_WEATHER, "Space weather", "What the Sun is doing, and what it is doing to us",
             listOf("solar", "aurora", "kp", "flare", "sunspot", "radio", "hf", "geomagnetic")),
         DeskEntry(Screen.OBSERVATORY, "Observatory", "The station, the Sun and Moon, what is passing, what is launching",
@@ -140,9 +142,12 @@ fun screenForRoute(route: String): Screen? = when (route) {
     "space_wx" -> Screen.SPACE_WEATHER
     "study" -> Screen.STUDY
     "settings" -> Screen.SETTINGS
-    // "nav", "jarvis", "objectives", "sensorium" — a map, the assistant, a task board and the ambient
-    // sensors. None of them exist here, and none of the rules that emit them can fire on this machine
-    // either, so this is a belt-and-braces null rather than a gap.
+    // The phone's positional route. It used to be a null here because this machine had no map; it has
+    // one now, so an advisory about where something is can actually be acted on.
+    "nav" -> Screen.MAP
+    // "jarvis", "objectives", "sensorium" — the assistant, a task board and the ambient sensors. None
+    // of them exist here, and none of the rules that emit them can fire on this machine either, so
+    // this is a belt-and-braces null rather than a gap.
     else -> null
 }
 
