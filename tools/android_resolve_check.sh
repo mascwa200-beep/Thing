@@ -79,8 +79,35 @@ mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --i
 
 [ $# -ge 1 ] || { echo "usage: $0 <file.kt> [more.kt ...]"; exit 64; }
 
-# Unresolved names for a given set of files, one per line, sorted and deduplicated.
-unresolved() {
+# Every compiler complaint, LOCATION STRIPPED, one per line, sorted and deduplicated.
+#
+# It used to extract only "unresolved reference", which is blind to arity, argument-type,
+# exhaustiveness and smart-cast errors — exactly the errors an edit to a CALL SITE produces. Taking
+# every message widens it. Verified by perturbation: a wrong arity gives
+# `too many arguments for 'fun videoId(url: String): String'.` and a wrong type gives
+# `argument type mismatch: actual type is 'kotlin.Int', but 'kotlin.String' was expected.`, and
+# neither was visible before.
+#
+# ⚠️ **BUT IT ONLY WORKS WHERE THE CALLEE RESOLVES, AND THAT IS A SMALL PART OF `:app`.** This was
+# widened after `OnDemandController.stop()` reached CI against a declaration reading
+# `stop(context: Context)` — and the widening does NOT catch that one. `OnDemandController.kt`
+# cannot compile here at all (its androidx/media3 imports are absent), so `stop` is simply an
+# unresolved name and the compiler never learns its signature to check it against. Confirmed by
+# perturbing that exact line and watching the gate stay silent.
+#
+# So: arity and type errors are caught against `core:telemetry`, `core:feeds` and the Kotlin stdlib,
+# and NOT against app-module, androidx or platform symbols. For those there is no local gate, and
+# the only defence is the discipline CLAUDE.md already records — open the real declaration before
+# writing the call.
+#
+# The location MUST come off. Differencing is the whole mechanism, and a message keyed by file:line
+# never cancels — every line below an insertion shifts, so the entire file would read as new.
+#
+# ⚠️ Second limit, the same one the name-based version always had: the key is the message text, so
+# if HEAD *already* produces an identical message somewhere in these files, a second one your edit
+# introduces is masked. Platform noise cancelling is the same property that causes this. It is a
+# filter for what changed, not a compile.
+complaints() {
   local out
   out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
         -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" "${CORE[@]}" "$@" 2>&1)
@@ -89,7 +116,19 @@ unresolved() {
     grep -m2 'NoClassDefFoundError\|^exception:' <<<"$out" >&2
     return
   fi
-  grep -oiE "unresolved reference '[A-Za-z_][A-Za-z0-9_]*'" <<<"$out" | sort -u
+  # ⚠️ **TWO FORMATS, AND PICKING THE WRONG ONE MAKES THIS MATCH NOTHING.** The K2JVMCompiler CLI
+  # invoked directly — which is what this script does — writes
+  #     path/File.kt:LINE:COL: error: message
+  # while GRADLE's Kotlin plugin writes
+  #     e: file:///abs/path/File.kt:LINE:COL message
+  # A first cut of this took the pattern from a CI log, so it matched only the Gradle form, extracted
+  # zero lines here, and reported "no new complaints" for every possible edit. A check that cannot
+  # fail is worse than no check, and it passed its own smoke test by looking clean. Both forms are
+  # handled; the count assertion below is what would catch a third.
+  grep -E '^([^ ]+\.kt:[0-9]+:[0-9]+: error: |e: )' <<<"$out" \
+    | sed -E 's|^[^ ]+\.kt:[0-9]+:[0-9]+: error: ||; s|^e: file://[^ ]*:[0-9]+:[0-9]+ ||; s|^e: ||' \
+    | sed -E 's/[[:space:]]+$//' \
+    | sort -u
 }
 
 work=$(mktemp -d)
@@ -101,24 +140,37 @@ for f in "$@"; do
   if git show "HEAD:$f" > "$dst" 2>/dev/null; then baseline+=("$dst"); fi
 done
 
-now=$(unresolved "$@")
+now=$(complaints "$@")
 if grep -q '!!COMPILER-DID-NOT-RUN' <<<"$now"; then
   echo "COMPILER DID NOT RUN — a jar is missing from its own -cp. This is NOT a pass."
   exit 2
 fi
 
 if [ ${#baseline[@]} -eq 0 ]; then
-  echo "No committed baseline for these files; showing every unresolved name (platform noise included):"
+  echo "No committed baseline for these files; showing every complaint (platform noise included):"
   echo "$now"
   exit 0
 fi
 
-then_=$(unresolved "${baseline[@]}")
+then_=$(complaints "${baseline[@]}")
+
+# ⚠️ **THE EXTRACTOR MUST HAVE FOUND SOMETHING.** These are Android files compiled with no Android
+# SDK on the classpath, so the baseline ALWAYS produces unresolved-reference errors — every
+# `android.*` and `androidx.*` import is missing. Zero means the message pattern above stopped
+# matching, not that the code is clean, and the difference would then be empty for any edit whatsoever.
+# That exact failure shipped in a first cut of this widening, so it is asserted rather than trusted.
+if [ -z "$then_" ]; then
+  echo "EXTRACTOR MATCHED NOTHING — the compiler's message format changed. This is NOT a pass."
+  echo "  An Android file with no SDK must produce unresolved-reference errors; zero means the"
+  echo "  grep/sed in complaints() no longer matches. Print the raw output and fix the pattern."
+  exit 2
+fi
+
 new=$(comm -23 <(echo "$now") <(echo "$then_"))
 
 if [ -n "$new" ]; then
-  echo "NEW unresolved names since HEAD — these are almost certainly real:"
+  echo "NEW compiler complaints since HEAD — these are almost certainly real:"
   echo "$new"
   exit 1
 fi
-echo "no new unresolved names since HEAD ($(echo "$then_" | wc -l) platform names unresolved either way)"
+echo "no new compiler complaints since HEAD ($(echo "$then_" | wc -l) present either way)"

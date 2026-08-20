@@ -378,7 +378,10 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         val id = fallbackVideoId()
         if (id.isBlank()) return
         supersedePlays() // any in-flight resolve must not publish over this
-        OnDemandController.stop()
+        // ⚠️ The context is REQUIRED and not merely to satisfy the signature: `stop` also tears down
+        // the keep-alive foreground service, and an audio-only session left running would otherwise
+        // keep its notification and its claim on the speaker while this plays over the top.
+        OnDemandController.stop(context)
         AudioFloor.claim(context, MediaFloor.Owner.ONDEMAND)
         val ready = resolve.value as? Resolve.Ready
         val title = ready?.item?.title.orEmpty().ifBlank { "Embedded player" }
