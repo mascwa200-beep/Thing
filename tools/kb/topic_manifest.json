@@ -94,7 +94,7 @@
    "id": "t00016",
    "topic": "Vacuoles and Cell Storage",
    "category": "Biology",
-   "guideId": null
+   "guideId": "vacuoles-and-cell-storage"
   },
   {
    "id": "t00017",
@@ -3070,7 +3070,7 @@
    "id": "t00512",
    "topic": "Predation and Predator-Prey Dynamics",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "predation-and-predator-prey-dynamics"
   },
   {
    "id": "t00513",
@@ -4354,7 +4354,7 @@
    "id": "t00726",
    "topic": "Periodic Trends: Atomic Radius, Ionization Energy and Electronegativity",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "periodic-trends-atomic-radius-ionization-energy-and-electron"
   },
   {
    "id": "t00727",
@@ -7684,7 +7684,7 @@
    "id": "t01281",
    "topic": "History of Microsoft",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-microsoft"
   },
   {
    "id": "t01282",
@@ -11788,7 +11788,7 @@
    "id": "t01965",
    "topic": "Turquoise, Malachite and Lapis Lazuli",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "turquoise-malachite-and-lapis-lazuli"
   },
   {
    "id": "t01966",
@@ -13222,7 +13222,7 @@
    "id": "t02204",
    "topic": "Extreme Weather in a Warming World",
    "category": "Climate",
-   "guideId": null
+   "guideId": "extreme-weather-in-a-warming-world"
   },
   {
    "id": "t02205",
@@ -15052,7 +15052,7 @@
    "id": "t02509",
    "topic": "Structural dynamics and vibration of buildings",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "structural-dynamics-and-vibration-of-buildings"
   },
   {
    "id": "t02510",
@@ -17044,7 +17044,7 @@
    "id": "t02841",
    "topic": "Electrical safety practices",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "electrical-safety-practices"
   },
   {
    "id": "t02842",
@@ -18292,7 +18292,7 @@
    "id": "t03049",
    "topic": "Geography of Côte d'Ivoire",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-c-te-d-ivoire"
   },
   {
    "id": "t03050",
@@ -23362,7 +23362,7 @@
    "id": "t03894",
    "topic": "Experimental Archaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "experimental-archaeology"
   },
   {
    "id": "t03895",
@@ -24322,7 +24322,7 @@
    "id": "t04054",
    "topic": "The History of Money and Coinage",
    "category": "History",
-   "guideId": null
+   "guideId": "the-history-of-money-and-coinage"
   },
   {
    "id": "t04055",
@@ -30010,7 +30010,7 @@
    "id": "t05002",
    "topic": "Psychoanalytic Literary Criticism",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "psychoanalytic-literary-criticism"
   },
   {
    "id": "t05003",
@@ -32200,7 +32200,7 @@
    "id": "t05367",
    "topic": "Sociolinguistics — Language in Society",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "sociolinguistics-language-in-society"
   },
   {
    "id": "t05368",
@@ -33370,7 +33370,7 @@
    "id": "t05562",
    "topic": "Order of Operations and Arithmetic Conventions",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "order-of-operations-and-arithmetic-conventions"
   },
   {
    "id": "t05563",
@@ -36454,7 +36454,7 @@
    "id": "t06076",
    "topic": "Red Blood Cells and Oxygen Transport",
    "category": "Medical",
-   "guideId": null
+   "guideId": "red-blood-cells-and-oxygen-transport"
   },
   {
    "id": "t06077",
@@ -39592,7 +39592,7 @@
    "id": "t06599",
    "topic": "Gum Disease: Gingivitis and Periodontitis",
    "category": "Health",
-   "guideId": null
+   "guideId": "gum-disease-gingivitis-and-periodontitis"
   },
   {
    "id": "t06600",
@@ -48916,7 +48916,7 @@
    "id": "t08153",
    "topic": "Democracy: Theory & Practice",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "democracy-theory-practice"
   },
   {
    "id": "t08154",
@@ -50644,7 +50644,7 @@
    "id": "t08441",
    "topic": "Soil Microbiology and the Rhizosphere",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "soil-microbiology-and-the-rhizosphere"
   },
   {
    "id": "t08442",
@@ -55162,7 +55162,7 @@
    "id": "t09194",
    "topic": "Italian Neorealism",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "italian-neorealism"
   },
   {
    "id": "t09195",
@@ -82852,7 +82852,7 @@
    "id": "t13809",
    "topic": "Tycho Brahe: Life and Work",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "tycho-brahe-life-and-work"
   },
   {
    "id": "t13810",
@@ -90250,7 +90250,7 @@
    "id": "t15042",
    "topic": "Choosing and Using an Angle Grinder",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "choosing-and-using-an-angle-grinder"
   },
   {
    "id": "t15043",
@@ -94570,7 +94570,7 @@
    "id": "t15762",
    "topic": "Plywood, MDF and Sheet Goods Explained",
    "category": "Making",
-   "guideId": null
+   "guideId": "plywood-mdf-and-sheet-goods-explained"
   },
   {
    "id": "t15763",
@@ -98878,7 +98878,7 @@
    "id": "t16480",
    "topic": "Sole Proprietorship Advantages and Risks",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "sole-proprietorship-advantages-and-risks"
   },
   {
    "id": "t16481",
@@ -104668,7 +104668,7 @@
    "id": "t17445",
    "topic": "Elasticity and Total Revenue",
    "category": "Economics",
-   "guideId": null
+   "guideId": "elasticity-and-total-revenue"
   },
   {
    "id": "t17446",
@@ -107536,7 +107536,7 @@
    "id": "t17923",
    "topic": "Intrinsic, Extraneous and Germane Load",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "intrinsic-extraneous-and-germane-load"
   },
   {
    "id": "t17924",
@@ -110416,7 +110416,7 @@
    "id": "t18403",
    "topic": "Competitive Microflora and Spoilage Organisms",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "competitive-microflora-and-spoilage-organisms"
   },
   {
    "id": "t18404",
@@ -116848,7 +116848,7 @@
    "id": "t19475",
    "topic": "Caramelization Versus Maillard Browning",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "caramelization-versus-maillard-browning"
   },
   {
    "id": "t19476",
@@ -120370,7 +120370,7 @@
    "id": "t20062",
    "topic": "Sittuyin: The Chess of Myanmar",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "sittuyin-the-chess-of-myanmar"
   },
   {
    "id": "t20063",
@@ -133732,7 +133732,7 @@
    "id": "t22289",
    "topic": "Emergency Shelter Site Triage at Dusk",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "emergency-shelter-site-triage-at-dusk"
   },
   {
    "id": "t22290",
@@ -134866,7 +134866,7 @@
    "id": "t22478",
    "topic": "Standard Operating Procedures for Emergencies",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "standard-operating-procedures-for-emergencies"
   },
   {
    "id": "t22479",
@@ -136012,7 +136012,7 @@
    "id": "t22669",
    "topic": "Vehicle Hazards in Moving Floodwater",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "vehicle-hazards-in-moving-floodwater"
   },
   {
    "id": "t22670",
@@ -141034,7 +141034,7 @@
    "id": "t23506",
    "topic": "Adjusting Pole Length for Terrain",
    "category": "Movement",
-   "guideId": null
+   "guideId": "adjusting-pole-length-for-terrain"
   },
   {
    "id": "t23507",
