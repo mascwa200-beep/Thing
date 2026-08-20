@@ -43,6 +43,7 @@ enum class Screen {
     REMOTE, ABOUT, SETTINGS,
     LIBRARY, SEARCH, STUDY, PACKS,
     NEWS, LIVE,
+    NOTES, DIARY,
 }
 
 val DESK_GROUPS: List<DeskGroup> = listOf(
@@ -61,6 +62,12 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("headlines", "stories", "press", "wire")),
         DeskEntry(Screen.LIVE, "Live", "Television news, in a window of its own",
             listOf("tv", "channels", "broadcast", "watch")),
+    )),
+    DeskGroup("YOUR THINGS", { it.violet }, listOf(
+        DeskEntry(Screen.NOTES, "Notes", "Filed snippets, by category",
+            listOf("memo", "write", "jot", "library")),
+        DeskEntry(Screen.DIARY, "Diary", "Your daily log",
+            listOf("journal", "entries", "log")),
     )),
     DeskGroup("THIS MACHINE", { it.muted }, listOf(
         DeskEntry(Screen.REMOTE, "Remote", "Pair with your phone and control it over the local network",

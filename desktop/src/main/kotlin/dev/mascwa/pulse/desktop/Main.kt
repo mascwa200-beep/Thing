@@ -9,6 +9,8 @@ import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.notes.DiaryStore
+import dev.mascwa.pulse.desktop.notes.NotesStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import kotlinx.coroutines.runBlocking
 
@@ -35,6 +37,12 @@ private val studyStore = StudyStore(libraryRepository)
  * with nothing able to reach it to let go.
  */
 private val livePlayer = LivePlayer()
+
+// ⚠️ Owned here for the same reason every other store is: `exitApplication()` calls `System.exit(0)`
+// immediately, so a write still sitting in the debounce window when the window closes is simply lost.
+// These hold what a person actually typed, which makes losing one worse than losing a cached feed.
+private val notesStore = NotesStore()
+private val diaryStore = DiaryStore()
 
 fun main() {
     // A local file read, not a network call — a one-time blocking read at startup to seed the initial
@@ -65,6 +73,8 @@ fun main() {
                     // The schedule is the whole point of the study feature; losing the last answer to
                     // a debounce window would make it quietly unreliable.
                     studyStore.flushNow()
+                    notesStore.flushNow()
+                    diaryStore.flushNow()
                 }
                 // Nothing to save here — this is releasing a native decoder and a live socket before
                 // the process is killed out from under them.
@@ -80,6 +90,8 @@ fun main() {
                 packStore,
                 studyStore,
                 livePlayer,
+                notesStore,
+                diaryStore,
                 // Handing over to the installer. Flushed the same way the close button does, because an
                 // upgrade that lost the last answered study card would be a poor trade for being current.
                 onQuitForInstall = {
@@ -87,6 +99,8 @@ fun main() {
                         settingsStore.flushNow()
                         studyStore.closeSession()
                         studyStore.flushNow()
+                        notesStore.flushNow()
+                        diaryStore.flushNow()
                     }
                     livePlayer.dispose()
                     exitApplication()

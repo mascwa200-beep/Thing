@@ -38,6 +38,10 @@ import dev.mascwa.pulse.desktop.feature.live.LiveScreen
 import dev.mascwa.pulse.desktop.feature.live.LiveViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsScreen
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel
+import dev.mascwa.pulse.desktop.feature.notes.DiaryScreen
+import dev.mascwa.pulse.desktop.feature.notes.DiaryViewModel
+import dev.mascwa.pulse.desktop.feature.notes.NotesScreen
+import dev.mascwa.pulse.desktop.feature.notes.NotesViewModel
 import dev.mascwa.pulse.desktop.feature.packs.PacksScreen
 import dev.mascwa.pulse.desktop.feature.packs.PacksViewModel
 import dev.mascwa.pulse.desktop.feature.remote.RemoteScreen
@@ -88,6 +92,8 @@ fun PulseDesktopApp(
     packStore: PackStore,
     studyStore: StudyStore,
     livePlayer: LivePlayer,
+    notesStore: dev.mascwa.pulse.desktop.notes.NotesStore,
+    diaryStore: dev.mascwa.pulse.desktop.notes.DiaryStore,
     onQuitForInstall: () -> Unit = {},
 ) {
     PulseDesktopTheme {
@@ -135,6 +141,8 @@ fun PulseDesktopApp(
         val aboutVm = remember {
             AboutViewModel(scope, DesktopUpdater(HttpClient.create(json), settings), settings)
         }
+        val notesVm = remember { NotesViewModel(scope, notesStore) }
+        val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
         val settingsVm = remember {
             SettingsViewModel(scope, settings, IpLocationService(HttpClient.create(json)))
         }
@@ -174,6 +182,8 @@ fun PulseDesktopApp(
                                     Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
                                     Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
                                     Screen.SETTINGS -> SettingsScreen(settingsVm, Modifier.fillMaxWidth())
+                                    Screen.NOTES -> NotesScreen(notesVm, Modifier.fillMaxWidth())
+                                    Screen.DIARY -> DiaryScreen(diaryVm, Modifier.fillMaxWidth())
                                     Screen.STUDY -> StudyScreen(
                                         studyVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth(),
                                     )
