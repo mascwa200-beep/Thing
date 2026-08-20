@@ -43,6 +43,7 @@ enum class Screen {
     REMOTE, ABOUT, SETTINGS,
     LIBRARY, SEARCH, STUDY, PACKS,
     NEWS, LIVE,
+    SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
     NOTES, DIARY,
 }
 
@@ -59,9 +60,23 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
     )),
     DeskGroup("THE WORLD", { it.sky }, listOf(
         DeskEntry(Screen.NEWS, "News", "Headlines, refreshed while you watch",
-            listOf("headlines", "stories", "press", "wire")),
+            listOf("headlines", "stories", "press", "wire", "lemmy", "mastodon", "hacker news")),
         DeskEntry(Screen.LIVE, "Live", "Television news, in a window of its own",
             listOf("tv", "channels", "broadcast", "watch")),
+        DeskEntry(Screen.SAFETY, "Nearby danger", "Earthquakes, disasters and official warnings near you",
+            listOf("emergency", "alerts", "quake", "warning", "incident", "crime")),
+        DeskEntry(Screen.PLACES, "Nearest help", "Hospitals, shelters and food banks, with how to reach them",
+            listOf("hospital", "shelter", "clinic", "food bank", "a&e", "emergency room")),
+        DeskEntry(Screen.WILDLIFE, "Wildlife", "What lives around here and what to do about it",
+            listOf("animals", "snake", "bear", "bite", "sting", "fauna")),
+    )),
+    DeskGroup("MAPS & SKY", { it.positive }, listOf(
+        DeskEntry(Screen.SPACE_WEATHER, "Space weather", "What the Sun is doing, and what it is doing to us",
+            listOf("solar", "aurora", "kp", "flare", "sunspot", "radio", "hf", "geomagnetic")),
+        DeskEntry(Screen.OBSERVATORY, "Observatory", "The station, the Sun and Moon, what is passing, what is launching",
+            listOf("iss", "satellite", "moon", "sunrise", "sunset", "planets", "asteroid", "launch", "rocket")),
+        DeskEntry(Screen.RADAR, "Radar", "Aircraft and earthquakes within range",
+            listOf("planes", "flights", "aviation", "adsb", "quake", "seismic")),
     )),
     DeskGroup("YOUR THINGS", { it.violet }, listOf(
         DeskEntry(Screen.NOTES, "Notes", "Filed snippets, by category",

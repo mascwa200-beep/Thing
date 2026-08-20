@@ -239,6 +239,13 @@ jobs:
           for f in /tmp/gradle-tests.log /tmp/gradle-build.log; do
             [ -f "$f" ] || continue
             echo "===== $f ====="
+            # ⚠️ The COMPILER's own messages first. "What went wrong" says only "Compilation error.
+            # See log for more details", which is exactly as useless as it sounds — the `e:` lines
+            # naming the file, line and symbol are hundreds of stack frames earlier and a tail of the
+            # log never reaches them. That cost a whole round trip to diagnose a one-line fix.
+            echo "----- compiler errors -----"
+            grep -E "^(e|w): .*: error:|^e: " "$f" | head -40 || true
+            echo "----- gradle's summary -----"
             awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
             echo "----- failing tests, if any -----"
             grep -E "FAILED$|^[A-Za-z].*> .* FAILED" "$f" | head -20 || true

@@ -132,14 +132,19 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
  * old row, not like a row with a blank where the important part goes.
  */
 private fun placeKindLine(place: Place): String? {
-    val kind = when (place.kind) {
+    // ⚠️ Hoisted to a local. `Place` lives in `:core:feeds` now, and Kotlin will not smart-cast a
+    // public property declared in a DIFFERENT module — the null branch below no longer narrows the
+    // type for the `else`. Same trap this repository has hit twice before (a delegated `by` property
+    // and a cross-module `val`); the fix is always a local val.
+    val rawKind = place.kind
+    val kind = when (rawKind) {
         "hospital" -> "Hospital"
         "clinic" -> "Clinic"
         "doctors" -> "Doctors' surgery"
         "pharmacy" -> "Pharmacy"
         "shelter" -> "Shelter"
         null, "" -> null
-        else -> place.kind.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        else -> rawKind.replace('_', ' ').replaceFirstChar { it.uppercase() }
     }
     // `emergency=yes` on a hospital is the difference between somewhere that can take you now and
     // somewhere that cannot, so it earns its place on the row rather than a detail view.

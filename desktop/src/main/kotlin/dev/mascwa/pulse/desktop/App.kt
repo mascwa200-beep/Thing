@@ -49,6 +49,18 @@ import dev.mascwa.pulse.desktop.feature.remote.RemoteViewModel
 import dev.mascwa.pulse.desktop.feature.search.SearchScreen
 import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
 import dev.mascwa.pulse.desktop.feature.settings.SettingsScreen
+import dev.mascwa.pulse.desktop.feature.world.ObservatoryScreen
+import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
+import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
+import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
+import dev.mascwa.pulse.desktop.feature.world.RadarScreen
+import dev.mascwa.pulse.desktop.feature.world.RadarViewModel
+import dev.mascwa.pulse.desktop.feature.world.SafetyScreen
+import dev.mascwa.pulse.desktop.feature.world.SafetyViewModel
+import dev.mascwa.pulse.desktop.feature.world.SpaceWeatherScreen
+import dev.mascwa.pulse.desktop.feature.world.SpaceWeatherViewModel
+import dev.mascwa.pulse.desktop.feature.world.WildlifeScreen
+import dev.mascwa.pulse.desktop.feature.world.WildlifeViewModel
 import dev.mascwa.pulse.desktop.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.desktop.feature.study.StudyScreen
 import dev.mascwa.pulse.desktop.feature.study.StudyViewModel
@@ -61,7 +73,14 @@ import dev.mascwa.pulse.desktop.location.IpLocationService
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.reader.ReaderRepository
+import dev.mascwa.pulse.data.orbital.LaunchRepository
+import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.TleRepository
+import dev.mascwa.pulse.data.places.OverpassRepository
+import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.social.SocialRepository
+import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
@@ -151,6 +170,30 @@ fun PulseDesktopApp(
         val aboutVm = remember {
             AboutViewModel(scope, DesktopUpdater(http, settings), settings)
         }
+        // The world screens. Each takes the ONE client and ONE cache above, and each reads the
+        // coordinate out of settings for itself — a tower PC has no GPS, so "we do not know where you
+        // are" is an ordinary state on all of them rather than an error.
+        val spaceWeatherVm = remember {
+            SpaceWeatherViewModel(scope, SpaceWeatherRepository(http, cache), settings)
+        }
+        val observatoryVm = remember {
+            ObservatoryViewModel(
+                scope,
+                // The NASA key: the desktop has no settings field for one yet, so it uses the shared
+                // demo key the repository falls back to. Said here rather than left to be discovered
+                // when the close-approach list starts returning nothing.
+                OrbitalRepository(http, cache) { "DEMO_KEY" },
+                LaunchRepository(http, cache),
+                settings,
+            )
+        }
+        val radarVm = remember {
+            RadarViewModel(scope, RadarRepository(http, cache, TleRepository(http, cache)), settings)
+        }
+        val safetyVm = remember { SafetyViewModel(scope, SafetyRepository(http, cache), settings) }
+        val placesVm = remember { PlacesViewModel(scope, OverpassRepository(http, cache), settings) }
+        val wildlifeVm = remember { WildlifeViewModel(scope, settings) }
+
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
         val settingsVm = remember {
@@ -192,6 +235,14 @@ fun PulseDesktopApp(
                                     Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
                                     Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
                                     Screen.SETTINGS -> SettingsScreen(settingsVm, Modifier.fillMaxWidth())
+                                    Screen.SPACE_WEATHER ->
+                                        SpaceWeatherScreen(spaceWeatherVm, Modifier.fillMaxWidth())
+                                    Screen.OBSERVATORY ->
+                                        ObservatoryScreen(observatoryVm, Modifier.fillMaxWidth())
+                                    Screen.RADAR -> RadarScreen(radarVm, Modifier.fillMaxWidth())
+                                    Screen.SAFETY -> SafetyScreen(safetyVm, Modifier.fillMaxWidth())
+                                    Screen.PLACES -> PlacesScreen(placesVm, Modifier.fillMaxWidth())
+                                    Screen.WILDLIFE -> WildlifeScreen(wildlifeVm, Modifier.fillMaxWidth())
                                     Screen.NOTES -> NotesScreen(notesVm, Modifier.fillMaxWidth())
                                     Screen.DIARY -> DiaryScreen(diaryVm, Modifier.fillMaxWidth())
                                     Screen.STUDY -> StudyScreen(
