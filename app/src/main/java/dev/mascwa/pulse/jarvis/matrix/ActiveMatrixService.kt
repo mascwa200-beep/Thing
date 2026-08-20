@@ -21,7 +21,7 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
-import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.device.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.VoiceMachine
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.console

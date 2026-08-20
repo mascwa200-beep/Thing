@@ -212,7 +212,12 @@ jobs:
         # that mattered was unreachable. pipefail keeps gradle's exit code across the pipe.
         run: |
           set -o pipefail
-          ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
+          # ⚠️ `:core:telemetry:test`, NOT `testDebugUnitTest`. That module is a plain Kotlin/JVM
+          # module now (it is what lets :desktop depend on it directly instead of copying 53 files),
+          # and a JVM module has no build variants — so the Android task name simply does not exist
+          # there any more. Getting this wrong does not fail loudly: gradle would report an unknown
+          # task, and 1,322 core tests would stop being a gate.
+          ./gradlew :core:telemetry:test :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured

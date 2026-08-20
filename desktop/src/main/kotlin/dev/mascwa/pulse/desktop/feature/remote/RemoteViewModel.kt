@@ -1,10 +1,10 @@
 package dev.mascwa.pulse.desktop.feature.remote
 
+import dev.mascwa.pulse.core.telemetry.Handshake
+import dev.mascwa.pulse.core.telemetry.RemoteCommand
+import dev.mascwa.pulse.core.telemetry.RemoteRequest
 import dev.mascwa.pulse.desktop.remote.DesktopIdentity
-import dev.mascwa.pulse.desktop.remote.Handshake
 import dev.mascwa.pulse.desktop.remote.RemoteClient
-import dev.mascwa.pulse.desktop.remote.RemoteCommand
-import dev.mascwa.pulse.desktop.remote.RemoteRequest
 import dev.mascwa.pulse.desktop.remote.RemoteStatus
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.PairedPhone

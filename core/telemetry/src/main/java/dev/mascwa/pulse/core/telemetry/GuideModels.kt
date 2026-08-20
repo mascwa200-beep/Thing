@@ -1,7 +1,5 @@
-// MIRROR OF app/src/main/java/dev/mascwa/pulse/data/survival/GuideModels.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
-package dev.mascwa.pulse.desktop.library
+package dev.mascwa.pulse.core.telemetry
 
-import dev.mascwa.pulse.desktop.telemetry.GuideSearch
 import kotlinx.serialization.Serializable
 
 @Serializable

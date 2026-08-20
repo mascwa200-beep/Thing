@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.Guide
 import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.LibraryConsult
 

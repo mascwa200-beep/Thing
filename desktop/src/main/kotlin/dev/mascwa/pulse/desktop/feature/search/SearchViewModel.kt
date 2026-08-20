@@ -3,8 +3,8 @@ package dev.mascwa.pulse.desktop.feature.search
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.search.DesktopSearchIndex
 import dev.mascwa.pulse.desktop.study.StudyStore
-import dev.mascwa.pulse.desktop.telemetry.DeviceSearch
-import dev.mascwa.pulse.desktop.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.DeviceSearch
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

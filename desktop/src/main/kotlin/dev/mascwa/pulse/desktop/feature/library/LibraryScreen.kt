@@ -25,9 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.desktop.library.Guide
-import dev.mascwa.pulse.desktop.library.GuideIndexEntry
-import dev.mascwa.pulse.desktop.library.GuideSection
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.GuideSection
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono

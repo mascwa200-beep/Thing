@@ -1,6 +1,6 @@
 package dev.mascwa.pulse.desktop.live
 
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels.LiveChannel
+import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension

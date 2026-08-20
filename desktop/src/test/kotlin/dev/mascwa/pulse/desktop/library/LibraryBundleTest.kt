@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.desktop.library
 
+import dev.mascwa.pulse.core.telemetry.CATEGORY_SUPERGROUP
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json

@@ -4,7 +4,7 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.BuildConfig
-import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.device.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.OperatorDossier
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task

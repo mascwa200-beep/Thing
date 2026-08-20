@@ -1,10 +1,15 @@
-// MIRROR OF app/src/main/java/dev/mascwa/pulse/data/live/LiveCatalogRepository.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
+// ADAPTED PORT of app/src/main/java/dev/mascwa/pulse/data/live/LiveCatalogRepository.kt — the
+// PARSING is shared (`M3uCatalog` in :core:telemetry, one copy, used by both), but the fetching is not:
+// this reads through the desktop's own HttpClient and DiskCache, and the phone reads through :app's.
+// :desktop cannot depend on :app — that is an Android application module — so the ~20 lines of plumbing
+// around the shared parser stay duplicated. That is the whole remaining duplication after Part B, and it
+// is plumbing rather than logic: nothing here decides anything about a channel.
 package dev.mascwa.pulse.desktop.live
 
 import dev.mascwa.pulse.desktop.cache.DiskCache
 import dev.mascwa.pulse.desktop.network.HttpClient
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels.LiveChannel
-import dev.mascwa.pulse.desktop.telemetry.M3uCatalog
+import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
+import dev.mascwa.pulse.core.telemetry.M3uCatalog
 import kotlinx.serialization.builtins.serializer
 
 /**

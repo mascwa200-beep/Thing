@@ -11,21 +11,21 @@ on:
   push:
     paths:
       - "desktop/**"
-      # The desktop bundles the app's Knowledge Base assets and mirrors its pure cores, so a content
-      # wave or a core change alters what this module ships. Without these, the bundle and mirror
-      # guards would only run when desktop/ itself happened to change.
+      # The desktop bundles the app's Knowledge Base assets, so a content wave alters what this module
+      # ships and has to re-verify it. Without this, the bundle guards would only run when desktop/
+      # itself happened to change.
       - "app/src/main/assets/survival/**"
-      - "app/src/main/java/dev/mascwa/pulse/data/survival/**"
-      # ⚠️ And the live-TV catalogue repository, which is mirrored from the app too and was missing
-      # here — so editing it and forgetting to regenerate would not have run this workflow at all,
-      # and the drift guard that would have caught it never fires. Found by checking every mirror
-      # source against this list mechanically rather than reading it; MirrorDriftTest now asserts it.
+      # ⚠️ The live-TV catalogue repository is the ONE file still copy-adapted from :app (its fetching
+      # goes through :app's own HttpClient/DiskCache, which :desktop cannot reach). Everything else that
+      # used to be mirrored now comes from :core:telemetry directly, so those entries are gone with the
+      # mirrors themselves rather than left here to look load-bearing.
       - "app/src/main/java/dev/mascwa/pulse/data/live/**"
       # It bundles the typefaces out of the app's resource directory too, so removing or renaming
       # one there would break the desktop at render time with nothing in this workflow to catch it.
       - "app/src/main/res/font/**"
-      - "core/telemetry/src/**"
-      - "tools/mirror_desktop_cores.py"
+      # The module's own build file too, not just its sources — :desktop depends on this project
+      # now, so a dependency change there changes what the desktop compiles against.
+      - "core/telemetry/**"
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle/libs.versions.toml"

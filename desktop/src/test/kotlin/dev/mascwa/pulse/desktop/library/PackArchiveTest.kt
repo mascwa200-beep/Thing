@@ -1,6 +1,10 @@
 package dev.mascwa.pulse.desktop.library
 
-import dev.mascwa.pulse.desktop.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -9,9 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.ByteArrayOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class PackArchiveTest {
 

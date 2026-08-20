@@ -1,5 +1,13 @@
 package dev.mascwa.pulse.desktop.remote
 
+import dev.mascwa.pulse.core.telemetry.Handshake
+import dev.mascwa.pulse.core.telemetry.PROTOCOL_VERSION
+import dev.mascwa.pulse.core.telemetry.PairingProof
+import dev.mascwa.pulse.core.telemetry.RemoteCommand
+import dev.mascwa.pulse.core.telemetry.RemoteCrypto
+import dev.mascwa.pulse.core.telemetry.RemoteReply
+import dev.mascwa.pulse.core.telemetry.RemoteRequest
+import dev.mascwa.pulse.core.telemetry.RemoteWire
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress

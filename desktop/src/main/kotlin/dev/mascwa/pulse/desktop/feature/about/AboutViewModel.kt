@@ -1,7 +1,7 @@
 package dev.mascwa.pulse.desktop.feature.about
 
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
-import dev.mascwa.pulse.desktop.telemetry.UpdatePolicy
+import dev.mascwa.pulse.core.telemetry.UpdatePolicy
 import dev.mascwa.pulse.desktop.update.BuildInfo
 import dev.mascwa.pulse.desktop.update.DesktopUpdate
 import dev.mascwa.pulse.desktop.update.DesktopUpdater

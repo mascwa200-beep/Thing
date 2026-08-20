@@ -1,15 +1,17 @@
 package dev.mascwa.pulse.desktop.library
 
+import dev.mascwa.pulse.core.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.desktop.AppPaths
-import dev.mascwa.pulse.desktop.telemetry.ContentPack
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Expansion packs on disk.

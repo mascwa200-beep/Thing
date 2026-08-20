@@ -5,7 +5,7 @@ import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
-import dev.mascwa.pulse.desktop.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.Readability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

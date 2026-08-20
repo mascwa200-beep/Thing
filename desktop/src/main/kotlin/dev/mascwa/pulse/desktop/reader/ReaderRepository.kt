@@ -1,15 +1,15 @@
 // ADAPTED PORT of app/src/main/java/dev/mascwa/pulse/data/reader/ReaderRepository.kt
 //
-// ⚠️ Not a strict mirror and not listed in MirrorDriftTest: the two differ only in which
-// HttpClient they name, but they name a different one, so byte-equality is not the goal here.
-// The judgement they share lives in Readability, which IS a strict mirror.
+// ⚠️ The two differ only in which HttpClient they name — but they DO name a different one, and
+// :desktop cannot reach :app's, so this plumbing stays duplicated. The judgement they share lives in
+// Readability, which is not duplicated at all: both compile the same file out of :core:telemetry.
 package dev.mascwa.pulse.desktop.reader
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.network.HttpException
-import dev.mascwa.pulse.desktop.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.Readability
 
 /**
  * Fetches a page and hands it to the decimator.

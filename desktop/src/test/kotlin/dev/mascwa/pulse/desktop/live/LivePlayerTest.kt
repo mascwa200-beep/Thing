@@ -1,6 +1,6 @@
 package dev.mascwa.pulse.desktop.live
 
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels
+import dev.mascwa.pulse.core.telemetry.LiveChannels
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test

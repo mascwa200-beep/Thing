@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.PulseApplication
-import dev.mascwa.pulse.data.survival.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar

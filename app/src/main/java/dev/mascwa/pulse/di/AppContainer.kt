@@ -373,8 +373,8 @@ class AppContainer(private val appContext: Context) {
         )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */
-    val deviceContextProvider: dev.mascwa.pulse.core.telemetry.DeviceContextProvider by lazy {
-        dev.mascwa.pulse.core.telemetry.DeviceContextProvider(appContext)
+    val deviceContextProvider: dev.mascwa.pulse.core.device.DeviceContextProvider by lazy {
+        dev.mascwa.pulse.core.device.DeviceContextProvider(appContext)
     }
     val banterEngine: dev.mascwa.pulse.core.telemetry.BanterContextEngine by lazy {
         dev.mascwa.pulse.core.telemetry.BanterContextEngine()

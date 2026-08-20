@@ -1,4 +1,9 @@
-package dev.mascwa.pulse.core.telemetry
+package dev.mascwa.pulse.core.device
+
+import dev.mascwa.pulse.core.telemetry.DayPart
+import dev.mascwa.pulse.core.telemetry.DeviceContext
+import dev.mascwa.pulse.core.telemetry.NetworkKind
+import dev.mascwa.pulse.core.telemetry.PowerSource
 
 import android.app.ActivityManager
 import android.content.BroadcastReceiver
@@ -20,7 +25,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.util.Calendar
 
 /**
- * Reads a [DeviceContext] from system services. Provides a one-shot [snapshot] and a cold
+ * Reads a [DeviceContext] from system services.
+ *
+ * ⚠️ This class lives in `:app`, not beside [DeviceContext] in `:core:telemetry`, and that is the whole
+ * reason `:core:telemetry` is a plain Kotlin/JVM module: it was the ONE file of 110 in that module that
+ * imported `android.*`, and one Android import is the difference between a core the desktop can depend on
+ * and 53 files copied into it by a script. The shape it reads — [DeviceContext], [PowerSource],
+ * [NetworkKind], [DayPart] — stays in the core, where it is platform-free and testable; only the reading
+ * of system services is here. Provides a one-shot [snapshot] and a cold
  * [updates] flow that re-emits whenever power or connectivity changes. All the broadcasts
  * it listens to are protected system broadcasts, so no exported-receiver flag is required.
  */

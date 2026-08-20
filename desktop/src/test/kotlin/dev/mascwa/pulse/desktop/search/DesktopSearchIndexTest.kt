@@ -2,8 +2,8 @@ package dev.mascwa.pulse.desktop.search
 
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
-import dev.mascwa.pulse.desktop.telemetry.DeviceSearch
-import dev.mascwa.pulse.desktop.telemetry.DeviceSearch.RecordKind
+import dev.mascwa.pulse.core.telemetry.DeviceSearch
+import dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

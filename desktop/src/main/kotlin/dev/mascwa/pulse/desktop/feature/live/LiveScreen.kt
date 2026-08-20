@@ -45,9 +45,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.ChannelLineup
+import dev.mascwa.pulse.core.telemetry.LiveChannels
 import dev.mascwa.pulse.desktop.live.LivePlayer
-import dev.mascwa.pulse.desktop.telemetry.ChannelLineup
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsButton

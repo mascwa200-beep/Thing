@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.desktop.remote
 
+import dev.mascwa.pulse.core.telemetry.Handshake
+import dev.mascwa.pulse.core.telemetry.RemoteCrypto
 import dev.mascwa.pulse.desktop.AppPaths
 import java.io.File
 import java.math.BigInteger

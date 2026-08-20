@@ -16,9 +16,9 @@ import dev.mascwa.pulse.core.telemetry.Recall
 import dev.mascwa.pulse.core.telemetry.Refresher
 import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.core.telemetry.StudyQuestions
-import dev.mascwa.pulse.data.survival.CATEGORY_SUPERGROUP
+import dev.mascwa.pulse.core.telemetry.CATEGORY_SUPERGROUP
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
-import dev.mascwa.pulse.data.survival.toSearchEntry
+import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

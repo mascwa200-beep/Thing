@@ -2,11 +2,13 @@ package dev.mascwa.pulse.data.survival
 
 import dev.mascwa.pulse.core.telemetry.Fallacies
 import dev.mascwa.pulse.core.telemetry.FallacyReference
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertTrue
-import org.junit.Test
 import org.junit.Assert.fail
-import java.io.File
+import org.junit.Test
 
 /**
  * Every fallacy reference must land on a section that actually exists in the shipped library.

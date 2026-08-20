@@ -2,7 +2,7 @@ package dev.mascwa.pulse.data.search
 
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
 import dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind
-import dev.mascwa.pulse.data.survival.toSearchEntry
+import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import dev.mascwa.pulse.di.AppContainer
 
 /**

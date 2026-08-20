@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.data.study.StudyStore
-import dev.mascwa.pulse.data.survival.Guide
-import dev.mascwa.pulse.data.survival.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

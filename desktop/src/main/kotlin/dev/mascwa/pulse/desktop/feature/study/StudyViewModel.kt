@@ -1,14 +1,14 @@
 package dev.mascwa.pulse.desktop.feature.study
 
 import dev.mascwa.pulse.desktop.study.StudyStore
-import dev.mascwa.pulse.desktop.telemetry.CourseMastery
-import dev.mascwa.pulse.desktop.telemetry.Curriculum
-import dev.mascwa.pulse.desktop.telemetry.DailyLesson
-import dev.mascwa.pulse.desktop.telemetry.Hints
-import dev.mascwa.pulse.desktop.telemetry.PracticeSet
-import dev.mascwa.pulse.desktop.telemetry.Recall
-import dev.mascwa.pulse.desktop.telemetry.Refresher
-import dev.mascwa.pulse.desktop.telemetry.StudyProgress
+import dev.mascwa.pulse.core.telemetry.CourseMastery
+import dev.mascwa.pulse.core.telemetry.Curriculum
+import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.Hints
+import dev.mascwa.pulse.core.telemetry.PracticeSet
+import dev.mascwa.pulse.core.telemetry.Recall
+import dev.mascwa.pulse.core.telemetry.Refresher
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

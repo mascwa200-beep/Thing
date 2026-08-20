@@ -4,7 +4,7 @@ import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
 import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.live.LiveWindow
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels.LiveChannel
+import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

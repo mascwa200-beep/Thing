@@ -1,4 +1,4 @@
-package dev.mascwa.pulse.data.survival
+package dev.mascwa.pulse.core.telemetry
 
 /**
  * Groups the Knowledge Base's flat category strings into 5 top-level supergroups, so the browse rail reads

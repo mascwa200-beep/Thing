@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.news.Article
 import dev.mascwa.pulse.desktop.news.NewsCategory
-import dev.mascwa.pulse.desktop.telemetry.Freshness
-import dev.mascwa.pulse.desktop.telemetry.NewsInsights
-import dev.mascwa.pulse.desktop.telemetry.NewsSummary
-import dev.mascwa.pulse.desktop.telemetry.Readability
-import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
+import dev.mascwa.pulse.core.telemetry.Freshness
+import dev.mascwa.pulse.core.telemetry.NewsInsights
+import dev.mascwa.pulse.core.telemetry.NewsSummary
+import dev.mascwa.pulse.core.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsBusyBar

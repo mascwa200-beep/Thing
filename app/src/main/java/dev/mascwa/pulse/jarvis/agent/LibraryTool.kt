@@ -3,11 +3,11 @@ package dev.mascwa.pulse.jarvis.agent
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.StudyProgress
-import dev.mascwa.pulse.data.survival.Guide
-import dev.mascwa.pulse.data.survival.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.data.study.StudyStore
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
-import dev.mascwa.pulse.data.survival.toSearchEntry
+import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 

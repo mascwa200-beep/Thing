@@ -1,5 +1,9 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.CATEGORY_SUPERGROUP
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import dev.mascwa.pulse.core.telemetry.GuideIndex
+import dev.mascwa.pulse.core.telemetry.GuideSection
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
