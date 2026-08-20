@@ -37,6 +37,8 @@ import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
 import dev.mascwa.pulse.desktop.feature.library.LibraryViewModel
 import dev.mascwa.pulse.desktop.feature.live.LiveScreen
 import dev.mascwa.pulse.desktop.feature.live.LiveViewModel
+import dev.mascwa.pulse.desktop.feature.radio.RadioScreen
+import dev.mascwa.pulse.desktop.feature.radio.RadioViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsScreen
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel
 import dev.mascwa.pulse.desktop.feature.notes.DiaryScreen
@@ -94,6 +96,7 @@ import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.places.OverpassRepository
+import dev.mascwa.pulse.data.radio.RadioBrowserRepository
 import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.social.SocialRepository
@@ -135,6 +138,7 @@ fun PulseDesktopApp(
     packStore: PackStore,
     studyStore: StudyStore,
     livePlayer: LivePlayer,
+    radioPlayer: dev.mascwa.pulse.desktop.radio.RadioPlayer,
     notesStore: dev.mascwa.pulse.desktop.notes.NotesStore,
     diaryStore: dev.mascwa.pulse.desktop.notes.DiaryStore,
     onQuitForInstall: () -> Unit = {},
@@ -245,6 +249,9 @@ fun PulseDesktopApp(
             // nowhere to put the setting; there is now.
             EconomyViewModel(scope, EconomyRepository(worldBank, cache) { settings.current().countryCode })
         }
+        val radioVm = remember {
+            RadioViewModel(scope, settings, RadioBrowserRepository(http), radioPlayer)
+        }
         val fuelVm = remember {
             FuelViewModel(
                 scope,
@@ -335,6 +342,7 @@ fun PulseDesktopApp(
                                     Screen.WEATHER -> WeatherScreen(weatherVm, Modifier.fillMaxWidth())
                                     Screen.ECONOMY -> EconomyScreen(economyVm, Modifier.fillMaxWidth())
                                     Screen.FUEL -> FuelScreen(fuelVm, Modifier.fillMaxWidth())
+                                    Screen.RADIO -> RadioScreen(radioVm, Modifier.fillMaxWidth())
                                     Screen.HOME -> HomeScreen(
                                         vm = homeVm,
                                         // The SAME advisories view model the ADVISORIES screen reads,

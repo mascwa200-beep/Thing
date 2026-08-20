@@ -138,6 +138,15 @@ data class DesktopSettings(
      */
     val eiaKey: String = "",
 
+    /**
+     * Starred radio stations.
+     *
+     * ⚠️ Whole stations, not identifiers, and matched by [dev.mascwa.pulse.data.radio.RadioStation.sameStation]
+     * — the directory's stable uuid where there is one, the stream URL otherwise. Storing only an id
+     * would mean a starred station could not be listed at all until the directory answered.
+     */
+    val favoriteRadio: List<dev.mascwa.pulse.data.radio.RadioStation> = emptyList(),
+
     // ----- Data & refresh ---------------------------------------------------------------------
 
     /** How often a live feed re-fetches while its screen is open, in minutes. ⚠️ Only while OPEN —

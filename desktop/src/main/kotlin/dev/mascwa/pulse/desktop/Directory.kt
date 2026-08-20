@@ -47,6 +47,7 @@ enum class Screen {
     NEWS, LIVE,
     SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
     MARKETS, WEATHER, ECONOMY, FUEL,
+    RADIO,
     NOTES, DIARY,
 }
 
@@ -72,6 +73,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("headlines", "stories", "press", "wire", "lemmy", "mastodon", "hacker news")),
         DeskEntry(Screen.LIVE, "Live", "Television news, in a window of its own",
             listOf("tv", "channels", "broadcast", "watch")),
+        DeskEntry(Screen.RADIO, "Radio", "Internet radio — near you, starred, and always on",
+            listOf("music", "stream", "station", "listen", "fm", "somafm", "audio")),
         DeskEntry(Screen.SAFETY, "Nearby danger", "Earthquakes, disasters and official warnings near you",
             listOf("emergency", "alerts", "quake", "warning", "incident", "crime")),
         DeskEntry(Screen.PLACES, "Nearest help", "Hospitals, shelters and food banks, with how to reach them",

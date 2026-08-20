@@ -39,6 +39,13 @@ private val studyStore = StudyStore(libraryRepository)
  */
 private val livePlayer = LivePlayer()
 
+/**
+ * ⚠️ Hoisted above the composition for the same reason as the stores and the live player: a station
+ * has to keep playing while you move between screens, and `onCloseRequest` has to be able to reach it
+ * to let go of the native decoder before the process dies.
+ */
+private val radioPlayer = dev.mascwa.pulse.desktop.radio.RadioPlayer()
+
 // ⚠️ Owned here for the same reason every other store is: `exitApplication()` calls `System.exit(0)`
 // immediately, so a write still sitting in the debounce window when the window closes is simply lost.
 // These hold what a person actually typed, which makes losing one worse than losing a cached feed.
@@ -85,6 +92,7 @@ fun main() {
                 // Nothing to save here — this is releasing a native decoder and a live socket before
                 // the process is killed out from under them.
                 livePlayer.dispose()
+                radioPlayer.dispose()
                 exitApplication()
             },
             title = "LCARS",
@@ -96,6 +104,7 @@ fun main() {
                 packStore,
                 studyStore,
                 livePlayer,
+                radioPlayer,
                 notesStore,
                 diaryStore,
                 // Handing over to the installer. Flushed the same way the close button does, because an
@@ -109,6 +118,7 @@ fun main() {
                         diaryStore.flushNow()
                     }
                     livePlayer.dispose()
+                    radioPlayer.dispose()
                     exitApplication()
                 },
             )
