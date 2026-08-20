@@ -4979,6 +4979,49 @@ Markets/Weather tab persistence, and "Computer, open the radar" by voice with th
 **Open:** B10b (News onto LcarsTabRow + masthead rebuild — its own slice + review); the B-arc
 review's findings (triage on arrival); the PR #449 batch merge to main once CI is green on the tip.
 
+#### B10b + the two review triages (this session cont. — the arc COMPLETE, all pushed)
+- **B10b (`b1c1623`):** News joins the standard LCARS frame — the LAST stock-Material screen
+  (TopAppBar/ScrollableTabRow/TextField) falls; only Home keeps `topBarOverride` now (the
+  PulseScaffold comment was corrected — it named two screens). LcarsTabRow rewritten Row→LazyRow +
+  scroll-selected-into-view (~19 News tabs); search = LcarsField + a labelled CANCEL; BackHandler
+  gated on the search sub-state.
+- **B10b's own adversarial review** (3 lenses, 14 agents, 11 raw → 6 confirmed → fixed in
+  `55c96c7`): ⚠️ **the search-surface state desync** — search chrome in plain `remember{}` while
+  searchMode/query/results live in the entry-scoped VM, so opening the reader from a result and
+  coming back showed the tab rail highlighting BREAKING over a list of search hits. Fix pattern
+  worth keeping: **key the local remembers on the VM's mode** (`remember(state.searchMode)`) so a
+  TRANSITION re-derives them and typing never re-initialises. Also: `search()` committed results
+  with NO ownership check (unlike `selectTab`'s guarded commit) — an abandoned search stomped the
+  reloaded tab seconds later with no healing write (now commits only while `searchMode && same
+  query`); `animateScrollToItem` START-ALIGNS unconditionally → scroll only when the chip isn't
+  fully visible (LazyListItemInfo members verified via javap on foundation 1.7.6); the magnifier
+  stayed tappable-but-inert while the field was open (gated).
+- **The B-arc review** (resumed run — the first attempt's `{"confirmed":[]}` was 4× API-500 agent
+  deaths, NOT a clean bill; `resumeFromRunId` re-ran them live): 4 lenses, 21 agents, 13 confirmed
+  (MENU-recents found by ALL FOUR lenses) → all fixed in `7e27436`:
+  (1) **MENU RECENT strip frozen at first open** — one-shot `usage.snapshot()` in VM `init` while
+  the VM survives every flow the strip exists for; `refresh()` now re-fires on every composition
+  ENTRY (a pushed destination's composable leaves composition, so `LaunchedEffect(Unit)` re-runs on
+  return). (2) **LcarsField's dead Done key** — ⚠️ a present-but-empty KeyboardActions handler
+  SWALLOWS `defaultKeyboardAction` (which is what hides the keyboard on Done); with no callback the
+  actions must be `KeyboardActions.Default`. (3) **the Oracle's ACT path bypassed openApp** — a
+  second plain-navigate lambda survived B3; tab-route insights plain-pushed a second copy of a tab
+  (now delegates). (4) SearchScreen's result cards emitted 3 siblings into LcarsFrame's **Box**
+  (the recorded NeonPanel lesson) → Column. (5) the SEISMIC list's `corners = selected` — the app's
+  ONE conditional corners call site — was erased by B8's corners-ignoring shim → the border is the
+  selection channel now. (6) Home recommendations read the UNFILTERED snapshot ("Your go-to is
+  Home" ON Home; raw `reader` key as user copy whose tap opened a Reader with an empty address) →
+  menu-listed routes only. (7) Settings' selected category in plain `remember{}` died on tab-away →
+  VM-hoisted, **seeded once** so a restore never re-applies a stale deep-link arg. (8)
+  `settings?cat=` had ZERO producers (the recorded computed-and-never-used class) → device search
+  now indexes every SettingsCategory as a FEATURE record (`settings?cat=<name>` — a FEATURE id IS a
+  route, and openApp carries the arg). (9) ⚠️ **OpenScreenTool's subscriptionCount guard misses a
+  STOPPED Activity** — the collector is a composition-lifetime LaunchedEffect, which survives
+  onStop, so "open the radar" with the screen off navigated an invisible NavController and claimed
+  success. New `AppContainer.appForeground` StateFlow (MainActivity onStart/onStop) is the visible
+  half; the tool checks both. Refuted findings recorded in the commit messages.
+- **Tip `7e27436` pushed; PR #449 title/body updated to B1–B13.** Merge to main once CI is green.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
