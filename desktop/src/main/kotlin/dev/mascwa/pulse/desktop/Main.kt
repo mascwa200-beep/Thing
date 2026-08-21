@@ -15,6 +15,11 @@ import dev.mascwa.pulse.desktop.notes.DiaryStore
 import dev.mascwa.pulse.desktop.notes.NotesStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.update.BuildInfo
+import dev.mascwa.pulse.desktop.update.DesktopAutoUpdater
+import dev.mascwa.pulse.desktop.update.DesktopUpdater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 
 private val settingsStore = DesktopSettingsStore()
@@ -72,6 +77,30 @@ private val crashReporter = CrashReporter(AppPaths.dataDir.toFile())
  */
 private val consoleKeys = ConsoleKeys()
 
+/**
+ * Keeps this machine on the newest green build with nothing to click.
+ *
+ * ⚠️ Owned here for the usual reason and one more. The usual: anything that must outlive a screen
+ * cannot live in a `remember`, and until now the update system was driven only by the ABOUT screen,
+ * so a machine left on the news page never learned an update existed. The extra reason: the install
+ * itself has to happen in `onCloseRequest`, which is a `Window` parameter and can reach nothing
+ * inside the composition. See [DesktopAutoUpdater] for why closing is the only moment Windows
+ * Installer can actually replace this program's own files.
+ *
+ * ⚠️ Its HTTP client is its own and deliberately has **no disk cache**. Two OkHttp caches over one
+ * directory corrupt each other, the shell builds its own client for the feeds, and a release check
+ * plus a one-off installer download are exactly the two requests that gain nothing from caching.
+ */
+private val autoUpdaterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+private val autoUpdater = DesktopAutoUpdater(
+    scope = autoUpdaterScope,
+    updater = DesktopUpdater(
+        HttpClient.create(HttpClient.defaultJson(), cacheDir = null),
+        settingsStore,
+    ),
+    autoCheckEnabled = { runCatching { settingsStore.current().autoCheckUpdates }.getOrDefault(true) },
+)
+
 fun main() {
     crashReporter.install(BuildInfo.display)
 
@@ -83,6 +112,10 @@ fun main() {
     // A local file read, not a network call — a one-time blocking read at startup to seed the initial
     // window size is negligible and keeps main() simple; every later access goes through the coroutine API.
     val initial = runBlocking { settingsStore.current() }
+
+    // Starts a slow background poll; it downloads quietly and installs on close. Nothing it does can
+    // reach the screen, so a failure here costs a build's delay rather than a working launch.
+    autoUpdater.start()
 
     application {
         val state = rememberWindowState(size = DpSize(initial.windowWidth.dp, initial.windowHeight.dp))
@@ -115,6 +148,13 @@ fun main() {
                 // the process is killed out from under them.
                 livePlayer.dispose()
                 radioPlayer.dispose()
+                // ⚠️ Last, and after every save: this hands a staged upgrade to Windows and returns
+                // immediately, because msiexec was launched detached so it outlives this process.
+                // It has to be here rather than anywhere else — Windows Installer cannot replace
+                // files a running program holds open, so closing is the only moment the upgrade can
+                // actually happen. Nothing is shown and nothing is asked; the next launch is simply
+                // the newer build.
+                autoUpdater.installOnExit()
                 exitApplication()
             },
             title = "LCARS",

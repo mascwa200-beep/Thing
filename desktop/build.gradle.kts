@@ -166,7 +166,20 @@ compose.desktop {
                 upgradeUuid = "6f3a1c48-9b2e-4d77-a1f0-2c5b8e94d310"
                 menuGroup = "LCARS"
                 shortcut = true
-                dirChooser = true
+                // ⚠️ **A per-user install is what makes an unattended upgrade possible at all.** A
+                // per-machine MSI lands under Program Files and therefore needs elevation, and
+                // `msiexec /qn` cannot suppress a UAC prompt — it only fails behind one. Installing
+                // under %LOCALAPPDATA% needs no elevation, so `DesktopUpdater.launchInstaller` can
+                // run the upgrade with no window and no click.
+                //
+                // ⚠️ ONE-TIME COST: this is a different install context, so the first per-user MSI
+                // will NOT upgrade an existing per-machine copy — it installs beside it. The owner
+                // uninstalls LCARS once, exactly as the phone needed one uninstall after the signing
+                // change. After that every upgrade is silent.
+                perUserInstall = true
+                // Dropped deliberately: an unattended upgrade must not be able to ask where to go,
+                // and a fixed location is what lets it land on top of what is already installed.
+                dirChooser = false
             }
         }
     }

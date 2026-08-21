@@ -464,9 +464,24 @@ data class AppSettings(
      *  everything up to it is automatic. Default ON — the user asked for "as soon as it's green, install
      *  it, show the installer thing so I can tap." Off = never check. */
     val autoUpdate: Boolean = true,
-    /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
-     *  installer on every open after the user dismisses it). */
+    /** Highest build number we've already auto-installed (dedupe, so one build is only ever offered
+     *  once however many times the app is opened). */
     val lastAutoUpdateCode: Int = 0,
+    /**
+     * A build whose install was committed but which has not yet been followed by a successful
+     * launch. Zero means nothing is outstanding.
+     *
+     * ⚠️ **The loop-breaker for a self-installing app.** Since the install now completes with no
+     * confirmation, a failure that is invisible — a refused session, a build that dies before it can
+     * draw — would otherwise be met by downloading and committing again on the next check, forever.
+     * While this is set the automatic path stands down; it is cleared the first time the app reaches
+     * a successful resume, whichever build that turns out to be, so a merely-failed install costs
+     * one cycle rather than the feature. The manual UPDATE control is never gated by it.
+     *
+     * It is deliberately NOT a claim that the build is bad — nothing here can know that — only that
+     * one install is already in flight and a second should wait for evidence.
+     */
+    val unconfirmedUpdateCode: Int = 0,
     /** Offer live TV channels from the volunteer-maintained iptv-org catalogue alongside the handful
      *  of broadcasters' own feeds the app ships with. **Default OFF, and it is a switch rather than a
      *  silent merge on purpose**: that catalogue is of mixed origin and includes unauthorised

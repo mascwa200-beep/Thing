@@ -138,28 +138,47 @@ class DesktopUpdater(
     }
 
     /**
-     * Hand the installer to Windows.
+     * Hand the installer to Windows and expect no questions.
      *
-     * ⚠️ This is where the honesty about "automatic" lives. An application cannot replace its own files
-     * while they are open, and Windows Installer will not silently elevate — so the floor is: launch
-     * msiexec, let it prompt, and quit so the upgrade can proceed. That is one confirmation, the same
-     * floor the sideloaded phone build has, and no amount of code removes it.
+     * ⚠️ **`/qn` is only possible because the MSI is a PER-USER install** — see `perUserInstall` in
+     * `desktop/build.gradle.kts`. A per-machine MSI writes under Program Files and therefore needs
+     * elevation, and `/qn` cannot suppress a UAC prompt; it can only fail behind one. Installing
+     * under `%LOCALAPPDATA%` needs no elevation, so the upgrade genuinely runs with no window and no
+     * click. That change costs the owner one manual uninstall, once, because a per-user MSI is a
+     * different install context and will not upgrade a per-machine copy — it would sit beside it.
      *
-     * Returns false if the process could not be started at all, so the caller can say so rather than
-     * quitting into nothing.
+     * ⚠️ **Detached, because this process is about to die.** The MSI replaces files the JVM holds
+     * open, so it cannot run over a live app; `cmd /c start` hands msiexec to the shell and lets it
+     * outlive us. The caller quits immediately afterwards.
+     *
+     * Returns false if nothing could be started, so the caller can say so rather than quitting into
+     * nothing.
      */
-    fun launchInstaller(installer: File): Boolean = runCatching {
-        ProcessBuilder("msiexec", "/i", installer.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-        true
-    }.getOrElse {
-        // Not Windows, or msiexec is not on the path. Opening the file lets the desktop environment
-        // decide, which at worst shows it in a file manager rather than doing nothing at all.
-        runCatching {
-            java.awt.Desktop.getDesktop().open(installer)
+    fun launchInstaller(installer: File, silent: Boolean = true): Boolean {
+        val path = installer.absolutePath
+        if (silent && runCatching {
+                // `start` needs an empty title argument first, or it reads a quoted path as the title.
+                ProcessBuilder("cmd", "/c", "start", "", "msiexec", "/i", path, "/qn", "/norestart")
+                    .redirectErrorStream(true)
+                    .start()
+                true
+            }.getOrDefault(false)
+        ) {
+            return true
+        }
+        // Fallback: the ordinary interactive install. A broken unattended path should degrade to the
+        // behaviour this replaced, not to nothing.
+        return runCatching {
+            ProcessBuilder("msiexec", "/i", path).redirectErrorStream(true).start()
             true
-        }.getOrDefault(false)
+        }.getOrElse {
+            // Not Windows, or msiexec is not on the path. Opening the file lets the desktop
+            // environment decide, which at worst shows it in a file manager rather than doing nothing.
+            runCatching {
+                java.awt.Desktop.getDesktop().open(installer)
+                true
+            }.getOrDefault(false)
+        }
     }
 
     private fun describe(e: Throwable): String = when {
