@@ -14,6 +14,15 @@ import kotlinx.coroutines.launch
 class CrashLogViewModel(
     private val reporter: CrashReporter,
     private val uploader: DebugUploader,
+    /**
+     * Read straight through for its last report — no state of its own here.
+     *
+     * ⚠️ The extraction report belongs on THIS screen rather than a new one. It answers the same
+     * question the console already exists to answer ("what went wrong?"), and splitting that
+     * across two places is how a diagnosis ends up half-read. The console is also already labelled
+     * shareable, which is the right handling for a report someone will send on.
+     */
+    private val extractor: dev.mascwa.pulse.data.media.MediaExtractor,
 ) : ViewModel() {
 
     private val _entries = MutableStateFlow<List<CrashEntry>>(emptyList())
@@ -25,6 +34,9 @@ class CrashLogViewModel(
     init { refresh() }
 
     fun refresh() { _entries.value = reporter.entries() }
+
+    /** The last extraction's own account of itself, untruncated, or null if nothing has resolved. */
+    fun extractionReport(): String? = extractor.lastReport
 
     fun read(entry: CrashEntry): String = reporter.read(entry)
 

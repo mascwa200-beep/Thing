@@ -130,9 +130,21 @@ class _Notes:
     """
 
     #: More than this many distinct notes is noise, not a diagnosis.
-    MAX = 12
-    #: yt-dlp writes some very long lines; the first sentence is where the meaning is.
-    MAX_CHARS = 300
+    #:
+    #: ⚠️ Raised from 12 with `jsc_trace` on, which adds a few lines of its own. The point of the
+    #: cap is to stop an unbounded log becoming the payload, not to ration a dozen useful facts.
+    MAX = 20
+    #: ⚠️ **Raised from 300, and that number cost a real diagnosis.**
+    #:
+    #: A device report arrived cut off mid-URL at exactly this boundary, and the truncation is what
+    #: hid the engine-status line the whole investigation turned on. 300 was chosen when these
+    #: lines only had to fit a compact failure message under the player; the director's own trace
+    #: is longer than that and is precisely the line worth reading in full.
+    #:
+    #: The trade, stated: a non-YouTube failure with no fallback now shows a longer message under
+    #: the player. That is a failure state where more information is the right answer, and under
+    #: the silent auto-switch the common case shows no message at all.
+    MAX_CHARS = 1200
 
     def __init__(self):
         self.notes = []
@@ -421,6 +433,20 @@ def resolve(url: str) -> str:
         # inside the extractor is a confusing way to lose a resolve.
         "cachedir": False,
         "extract_flat": False,
+        # ⚠️ **Makes the JS challenge director state its own case, which is the fastest possible
+        # answer to "is our provider there, and is it available".** Read out of `_director.py`,
+        # this logs `JS Challenge Providers: …` with per-provider availability and the computed
+        # preference scores — captured by the logger above and shown in the Crash Console.
+        #
+        # It is on permanently and deliberately: the whole reason this fault took forensics is
+        # that the evidence was not being collected when it happened. A trace line costs nothing
+        # and is worthless if it has to be switched on AFTER the failure you wanted it for.
+        #
+        # ⚠️ NOT `js_runtimes` — that key would be actively harmful here. `_clean_js_runtimes`
+        # strips any name outside deno/node/bun/quickjs and warns about it, so naming our provider
+        # there would emit a misleading "unsupported runtime" line while changing nothing. Our
+        # `runtime_info` override already bypasses that gate correctly.
+        "extractor_args": {"youtube": {"jsc_trace": ["true"]}},
     }
     try:
         with YoutubeDL(opts) as ydl:

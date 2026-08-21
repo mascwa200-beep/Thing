@@ -172,28 +172,38 @@ fun ViewscreenScreen(
                     skipNote?.let { StatusLine(it, c.amber) }
                     floorNote?.let { StatusLine(it, c.muted) }
                     val playbackFailed = playback.status == OnDemandController.Status.ERROR
-                    playback.detail?.takeIf { playbackFailed }?.let {
-                        StatusLine("Playback failed: $it", c.negative)
-                    }
-                    // ---- The last resort, offered under whatever went wrong ------------------
-                    //
-                    // ⚠️ It appears BELOW the failure and its reason, never instead of them. A
-                    // fault that silently becomes a different player is a fault nobody can report,
-                    // and the extractor's own words above are the diagnostic this whole change
-                    // exists to surface. One tap gets the video; nothing is hidden to do it.
                     val failed = resolve is ViewscreenViewModel.Resolve.Refused || playbackFailed
+                    val canFallBack = vm.fallbackVideoId().isNotBlank()
+
+                    // ---- The failure text, shown ONLY when nothing can be done about it -------
+                    //
+                    // ⚠️ **Owner's call, and the tradeoff is real.** They chose a silent switch:
+                    // when the video can still be played another way it just plays, with no error.
+                    // The cost is that a future extraction fault becomes invisible here — which is
+                    // exactly what would have made THIS bug unreportable. The mitigation is that
+                    // the reason is not destroyed, only unshown: the full untruncated report goes
+                    // to the Crash Console, which is why that surface got the extraction section.
+                    //
+                    // When there is NO fallback the message stays, because silence plus a dead
+                    // player would leave nothing at all to go on.
+                    if (failed && !canFallBack) {
+                        playback.detail?.takeIf { playbackFailed }?.let {
+                            StatusLine("Playback failed: $it", c.negative)
+                        }
+                    }
                     // ⚠️ The player itself is NOT drawn here — see the pinned Box above the list.
                     // A `LazyColumn` disposes an item once it scrolls out of the viewport, and
                     // disposing this one destroys the WebView: playback stops dead and, on scrolling
-                    // back, restarts from the original offset. Only the OFFER lives in the list.
-                    if (embedded == null && failed && vm.fallbackVideoId().isNotBlank()) {
-                        StatusLine("Our player cannot get this one. YouTube's own still can.", c.muted)
-                        LcarsButton(
-                            "PLAY IT ANOTHER WAY",
-                            onClick = { vm.playEmbedded(context) },
-                            color = c.amber,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
+                    // back, restarts from the original offset.
+                    //
+                    // ⚠️ Keyed on the VIDEO ID, not on a boolean. A flag would latch: dismissing the
+                    // embedded player and hitting the same failure again would never re-arm, and a
+                    // failing embedded player could re-trigger the switch on itself. Keying on the
+                    // id means each video auto-switches exactly once, and `LaunchedEffect` cancels
+                    // itself the moment the id changes.
+                    val autoId = if (failed && canFallBack) vm.fallbackVideoId() else ""
+                    LaunchedEffect(autoId, embedded == null) {
+                        if (autoId.isNotBlank() && embedded == null) vm.playEmbedded(context)
                     }
                     HarvestLine(harvestState)
                 }

@@ -90,6 +90,34 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
                 }
             }
 
+            // ---- What the extractor said last time, in full ---------------------------------
+            //
+            // ⚠️ Untruncated on purpose. The compact version under the player caps each line, and a
+            // device report arrived cut off mid-URL with the engine-status line missing — which is
+            // what turned a one-glance answer into an investigation. The `javascript: …` line here
+            // names the engine or the precise reason it is unreachable.
+            //
+            // Addresses are already stripped on the Python side by `_redact` before any of this
+            // crosses the bridge, which matters because this console is meant to be shared.
+            vm.extractionReport()?.let { report ->
+                NeonPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = c.accent.copy(alpha = 0.6f),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "◢ LAST EXTRACTION",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            letterSpacing = 1.sp, color = c.accent,
+                        )
+                        Text(
+                            report,
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                }
+            }
+
             if (BuildConfig.DEBUG) {
                 NeonPanel(
                     modifier = Modifier

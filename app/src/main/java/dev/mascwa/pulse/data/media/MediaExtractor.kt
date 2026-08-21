@@ -38,6 +38,22 @@ class MediaExtractor(private val python: PythonRuntime) {
     private val cache = LinkedHashMap<String, MediaItem>()
 
     /**
+     * The last extraction's own account of itself, **untruncated**, for the Crash Console.
+     *
+     * ⚠️ **This exists because the compact on-screen text hid the one line that mattered.** The
+     * player folds the extractor's notes into a failure line capped at 300 characters per note,
+     * and a device report arrived cut off mid-URL with the engine status missing entirely —
+     * turning a one-glance diagnosis into forensics. The same data, uncapped, lands here.
+     *
+     * Kept in memory only, and only the most recent one: it is a diagnostic, not a history, and
+     * writing viewing activity to disk is not a trade worth making for it. Every string in it has
+     * already been through `_redact` on the Python side, which strips resolved media addresses.
+     */
+    @Volatile
+    var lastReport: String? = null
+        private set
+
+    /**
      * Resolve [url] to a playable item.
      *
      * Returns a cached item when one is still fresh, so pressing play again on something already
@@ -66,6 +82,15 @@ class MediaExtractor(private val python: PythonRuntime) {
                 MediaResolution.Reason.FAILED,
                 "The extractor returned something unreadable.",
             )
+        }
+        // ⚠️ Recorded HERE — the one point every resolve reaches, success or refusal — rather than
+        // at each outcome. The engine-status note rides on a SUCCESSFUL resolve too, and that is
+        // exactly the case worth reading: extraction that "worked" while quietly missing formats
+        // is what a dead JavaScript engine looks like from the outside.
+        lastReport = buildString {
+            append("verdict: ").append(wire.kind ?: "ready")
+            wire.error?.takeIf { it.isNotBlank() }?.let { append("\nerror: ").append(it) }
+            wire.notes.forEach { append('\n').append(it) }
         }
         if (wire.kind != null) {
             return MediaResolution.Refused(reasonOf(wire.kind), wire.error.orEmpty(), wire.notes)
