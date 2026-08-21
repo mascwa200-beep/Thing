@@ -295,42 +295,28 @@ class RefreshWorker(
     }
 
     /**
-     * Push every placed widget, so none of them is left waiting on the OS's 30-minute floor.
+     * Push the widget, so it is not left waiting on the OS's thirty-minute floor.
      *
-     * ⚠️ Only the feed was ever nudged, and even that only from the bottom of `doWork` — the lock
-     * and Computer widgets had no in-app refresh path at all. The feed needs
-     * `notifyAppWidgetViewDataChanged` because its rows come from a collection adapter; the other
-     * two render in `onUpdate`, so they need the broadcast instead.
+     * ⚠️ Hoisted ABOVE the notification master switch and quiet hours, and it stays there: a widget
+     * is not a notification and should not be silenced by one. Turning notifications off used to
+     * freeze it.
      */
     private fun refreshWidgets() {
         runCatching {
             val mgr = android.appwidget.AppWidgetManager.getInstance(applicationContext)
-
-            val feedIds = mgr.getAppWidgetIds(
-                android.content.ComponentName(
-                    applicationContext, dev.mascwa.pulse.widget.FeedWidgetProvider::class.java,
-                ),
+            val component = android.content.ComponentName(
+                applicationContext, dev.mascwa.pulse.widget.LockWidgetProvider::class.java,
             )
-            if (feedIds.isNotEmpty()) {
-                mgr.notifyAppWidgetViewDataChanged(feedIds, dev.mascwa.pulse.R.id.widget_feed_flipper)
-            }
-
-            listOf(
-                dev.mascwa.pulse.widget.LockWidgetProvider::class.java,
-                dev.mascwa.pulse.widget.ComputerWidget::class.java,
-            ).forEach { cls ->
-                val component = android.content.ComponentName(applicationContext, cls)
-                val ids = mgr.getAppWidgetIds(component)
-                if (ids.isNotEmpty()) {
-                    applicationContext.sendBroadcast(
-                        android.content.Intent(
-                            android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE,
-                        ).apply {
-                            setComponent(component)
-                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-                        },
-                    )
-                }
+            val ids = mgr.getAppWidgetIds(component)
+            if (ids.isNotEmpty()) {
+                applicationContext.sendBroadcast(
+                    android.content.Intent(
+                        android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE,
+                    ).apply {
+                        setComponent(component)
+                        putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    },
+                )
             }
         }
     }

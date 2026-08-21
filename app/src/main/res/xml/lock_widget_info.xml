@@ -1,12 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Compact glanceable widget. widgetCategory includes `keyguard` so systems/launchers that support
-     lock-screen widget placement (newer Android / lock-screen widget apps) offer it there; everywhere
-     else it's a small home-screen widget. previewLayout is the same static layout (no collection), so
-     the picker can always render it. -->
+<!--
+  The app's only widget.
+
+  ⚠️ **The resize range is load-bearing, not decoration.** The provider ships four `RemoteViews`
+  keyed on `SizeF` — 120×90, 180×165, 250×275 and 300×385 — and the HOST picks between them. A range
+  that never reaches a breakpoint means that variant can never be drawn, however carefully it was
+  built, and nothing would report it: the widget would simply look like it had one layout. So the
+  floor here is exactly the smallest breakpoint, and the ceiling is comfortably past the largest.
+
+  `targetCellWidth`/`targetCellHeight` are the size it is PLACED at (API 31+, and minSdk is 31 so
+  there is no legacy fallback to keep in step). Four by three lands a fresh placement around the third
+  variant — rich enough to be worth having on sight, with room left to grow, which is the behaviour
+  the resize range exists to reward.
+
+  `widgetCategory` keeps `keyguard`. ⚠️ Whether that does anything on this device is genuinely open:
+  the platform dropped lock-screen widgets in 5.0 and reintroduced them in 15 QPR1+, and launchers
+  differ. It costs nothing where it is ignored.
+
+  `previewLayout` is the real layout rather than a bitmap, so the picker renders the actual thing.
+  It shows empty rows there — the picker has no data — which is why `description` carries the pitch.
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_lock_description"
     android:minWidth="180dp"
     android:minHeight="110dp"
-    android:targetCellWidth="3"
+    android:minResizeWidth="120dp"
+    android:minResizeHeight="90dp"
+    android:maxResizeWidth="500dp"
+    android:maxResizeHeight="640dp"
+    android:targetCellWidth="4"
     android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_lock"

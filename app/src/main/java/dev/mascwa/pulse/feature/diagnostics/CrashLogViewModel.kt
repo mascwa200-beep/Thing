@@ -38,6 +38,17 @@ class CrashLogViewModel(
     /** The last extraction's own account of itself, untruncated, or null if nothing has resolved. */
     fun extractionReport(): String? = extractor.lastReport
 
+    /**
+     * What happened the last time the widget drew itself, or null if it has not tried in this
+     * process.
+     *
+     * Read straight off [dev.mascwa.pulse.widget.WidgetDiagnostics] rather than injected: it is a
+     * process-wide record with no dependencies, exactly like the alert condition the widget reads
+     * for its accent, and threading it through the container would buy nothing.
+     */
+    fun widgetReport(): String? =
+        dev.mascwa.pulse.widget.WidgetDiagnostics.report(dev.mascwa.pulse.widget.WidgetDiagnostics.last)
+
     fun read(entry: CrashEntry): String = reporter.read(entry)
 
     /** Upload a scrubbed debug report (latest crash + diagnostics) to the repo for remote reading. */

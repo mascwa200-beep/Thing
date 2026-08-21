@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shared attributes for every line the widget draws.
+
+  ⚠️ These exist because the widget layout was thirteen near-identical TextViews, each repeating the
+  same eight attributes, and the widget now ships FOUR size variants. Hand-copying that would be
+  fifty-odd blocks where a single drifted `shadowRadius` or `textColor` is invisible in review and
+  obvious on a wallpaper. One definition per role; the variants differ only in which rows they carry
+  and how big the headline is.
+
+  The drop shadow is not decoration. The widget draws with no background plate so it sits on the
+  user's own wallpaper, and the shadow is the only thing guaranteeing contrast against a light one —
+  the widget equivalent of the compat text appearances the notification uses.
+-->
+<resources>
+
+    <!-- Every row shares this. Nothing here is size-specific. -->
+    <style name="WidgetLine">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:shadowColor">@color/nw_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">4</item>
+    </style>
+
+    <!--
+      Every row in the widget uses this ONE style, and everything that distinguishes a headline from
+      a footnote — size, colour, tap target — is applied at render time instead.
+
+      ⚠️ That is not laziness, it is what makes the widget adaptive. Roles baked into XML would mean
+      a fixed running order at every size; set from Kotlin, the same sixteen slots can be a
+      four-line summary on a small widget and a full dashboard on a tall one.
+
+      `maxLines` is a CAP, not a floor: a short row still occupies one line, and a recommendation
+      that needs two gets them rather than ellipsising halfway through the advice.
+    -->
+    <style name="WidgetLine.Row">
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textColor">@color/nw_ink</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+</resources>

@@ -40,13 +40,12 @@
          now fails the build on any raw hex in a widget file, so this is the last copy rather than
          the fifth.
 
-         nw_faint is deliberately used ONLY on widgets that draw their own dark panel
-         (@drawable/widget_bg). The lock widget is transparent over an arbitrary wallpaper, so its
-         dimmest line takes nw_muted instead: text that has to survive a light wallpaper cannot
-         also be the darkest grey in the set. -->
+         There is no third text tier here, and that is deliberate. The widget draws with no
+         background over an arbitrary wallpaper, so its dimmest line takes nw_muted: text that has
+         to survive a light wallpaper cannot also be the darkest grey in the set. Only
+         @drawable/widget_bg paints a panel, and it backs the fault card alone. -->
     <color name="nw_ink">#F4F4F6</color>
     <color name="nw_muted">#ACACB6</color>
-    <color name="nw_faint">#63636E</color>
     <color name="nw_panel">#121216</color>
     <color name="nw_line">#3C3C44</color>
     <!-- Semantic, and the reason the drift mattered: these carry market direction. -->

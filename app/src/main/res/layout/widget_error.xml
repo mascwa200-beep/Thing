@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the widget shows instead of failing to draw.
+
+  ⚠️ **This layout is deliberately tiny, and that is its whole function.** It is applied on the
+  path where building the real widget threw — including the case where the rich `RemoteViews` was
+  itself the problem (too large for the binder transaction, an un-whitelisted view type). A fallback
+  that could fail for the same reason as the thing it is replacing would be worthless, so this is
+  three TextViews, no styles indirection at render-critical points, no images, and no collection.
+
+  It exists because the launcher draws its own "Can't load widget" whenever `updateAppWidget` is
+  never called — and that message names nothing, so it cannot be acted on or usefully photographed.
+  This app cannot replace that string; it can only make sure the host never has to reach for it.
+
+  ⚠️ Unlike the widget proper, this card paints an opaque panel. The widget is transparent on
+  purpose — it belongs to the wallpaper — but this card exists to be READ and PHOTOGRAPHED, and a
+  drop shadow is a good enough guarantee for a one-word row and not for four lines of exception
+  text over an unknown background. Being visibly a different object from a normal render is the
+  second reason: a fault should not be mistakable for the widget merely being quiet.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_error_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="10dp">
+
+    <TextView
+        android:id="@+id/widget_error_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="@string/widget_fault_title"
+        android:textColor="@color/nw_negative"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:letterSpacing="0.06"
+        android:shadowColor="@color/nw_shadow"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <!--
+      The reason, written by WidgetDiagnostics. Four lines rather than one: an exception class plus
+      its message is the entire point of this card, and a truncated one sends the reader back for a
+      second screenshot.
+    -->
+    <TextView
+        android:id="@+id/widget_error_reason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="4"
+        android:ellipsize="end"
+        android:textColor="@color/nw_ink"
+        android:textSize="11sp"
+        android:shadowColor="@color/nw_shadow"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/widget_error_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="@string/widget_fault_hint"
+        android:textColor="@color/nw_muted"
+        android:textSize="10sp"
+        android:shadowColor="@color/nw_shadow"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+</LinearLayout>

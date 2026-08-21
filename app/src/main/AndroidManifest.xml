@@ -253,9 +253,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- Compact glanceable widget, lock-screen-eligible (widgetCategory keyguard|home_screen).
-             Twelve lines, each hidden when it has nothing to say: greeting and date, objective,
-             weather, market mover and breadth, space weather, fuel, economy, news, task, power. -->
+        <!--
+          The one widget. It reads how much room it has been given and draws a different layout for
+          each size rather than the same rows stretched, so there is nothing left for a picker to
+          ask about — which is why the other two receivers and the configure activity are gone.
+
+          ⚠️ The class name and the `widget_lock` layout id are IDENTITY, not copy. Renaming either
+          orphans every instance already placed on a home screen, which is why they survived a
+          consolidation that changed everything else about this widget.
+        -->
         <receiver
             android:name=".widget.LockWidgetProvider"
             android:exported="true"
@@ -267,48 +273,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/lock_widget_info" />
         </receiver>
-
-        <!-- Live data-feed widget: auto-cycles markets · fuel · economy/inflation · news. Backed by a
-             RemoteViewsService collection; the AdapterViewFlipper auto-advances. -->
-        <receiver
-            android:name=".widget.FeedWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_feed_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/feed_widget_info" />
-        </receiver>
-        <service
-            android:name=".widget.FeedRemoteViewsService"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
-
-        <!-- The Computer widget. What it shows (status / objective / finding / brief) and how it
-             looks (panel / transparent) are both per-instance choices made in the configure
-             activity — this was four separate receivers differing in nothing else, two of which had
-             drifted to the same title and the same tap route. -->
-        <receiver
-            android:name=".widget.ComputerWidget"
-            android:exported="true"
-            android:label="@string/widget_computer">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/computer_widget_info" />
-        </receiver>
-
-        <!-- Asks what the widget should show and how it should look, then renders and finishes. -->
-        <activity
-            android:name=".widget.ComputerWidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Pulse">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
 
         <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
              the service picks the matching type at runtime. -->
