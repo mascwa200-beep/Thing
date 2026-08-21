@@ -6934,3 +6934,120 @@ template mutable with an empty fill-in would be a security loosening that bought
 
 **Open:** whether `widgetCategory="keyguard"` does anything on this device (removed in Android 5.0,
 re-added in 15 QPR1+ — the widget is named for it, so worth knowing either way).
+
+### BOTH APPS UPDATE THEMSELVES, and the image sourcer stops picking the wrong article (this session, `4bb1d2c` + `2c97d12`)
+
+Owner, verbatim: *"the phone app and the desktop app automatically update once the new update is out
+— you don't even need user input to update it, it just automatically updates."* Standing alongside
+it: **be very conscious of token spend** (the owner has until Wednesday noon on the weekly limiter),
+so **zero subagent spend** — local kotlinc, `javap` against the real platform jar, live probes, CI.
+
+#### Part B — the tap is gone, and the note in this file that said it could not be was stale
+
+⚠️ **CORRECTION: "Auto-update's one tap is the hard Android floor (documented)" — recorded twice
+above — is no longer true, and that is what made this possible.** It was written before the
+GrapheneOS arc provisioned Pulse as a **Device Owner**, and a device owner installing through
+`PackageInstaller` is not shown the confirmation. `DevicePolicyController.isDeviceOwner()` already
+existed and is exactly the gate.
+
+Both halves already did everything except the last step. The phone checked on every launch and
+return, green-gated, deduped and downloaded — then handed the file to the system installer.
+`DesktopUpdater` did the same and ran `msiexec /i` with its UI, its own comment conceding *"let it
+prompt"*.
+
+- **`ApkInstaller`** — a `PackageInstaller` session with **three rungs, none assumed**: device owner
+  + `INSTALL_REASON_POLICY`; `setRequireUserAction(USER_ACTION_NOT_REQUIRED)` + the manifest
+  permission; then `STATUS_PENDING_USER_ACTION`, whose receiver launches the confirmation.
+  ⚠️ **Rung 2 arms itself one update late** — the platform grants it only to the **installer of
+  record**, and every install so far came through the system UI, so the first session we commit is
+  what makes us one. ⚠️ **Rung 3 is exactly the behaviour this replaced**, so an unprovisioned device
+  is no worse off rather than silently broken. Both the automatic path and the manual UPDATE button
+  route through `Links.installApk`, so they cannot drift.
+- ⚠️ **The commit happens in `onStop`, and that is correctness, not politeness.** Android tears the
+  process down while its own package is replaced; installing in the foreground makes the app vanish
+  mid-sentence, which reads as a crash and is worse than the tap. It sits **after the store flushes**
+  inside the same coroutine — `commit()` returns before the replacement, but the margin is seconds
+  rather than a design, and every flush is on-device learning that cannot be refetched.
+- **`AppSettings.unconfirmedUpdateCode` is the loop-breaker.** Set at commit, cleared the first time
+  the app reaches the foreground (whichever build that is); while set, the automatic path stands
+  down. ⚠️ It is deliberately **not** a claim that a build is bad — nothing here can know that — only
+  that one install is in flight. A merely-failed install costs one cycle, not the feature.
+  ⚠️ The clear and the check share **one coroutine, in that order**: as two launches the clear could
+  land *after* a fresh download had set it, wiping the guard at the moment it was needed.
+- **Desktop: `perUserInstall = true` is the single line the rest rests on.** A per-machine MSI lands
+  under Program Files and needs elevation, and `/qn` cannot suppress UAC — it only fails behind it.
+  `%LOCALAPPDATA%` needs none, so the upgrade runs with no window and no click. `dirChooser` dropped.
+  ⚠️ **ONE-TIME COST the owner must be told rather than discover: a per-user MSI is a different
+  install context and will NOT upgrade an existing per-machine copy — it installs beside it.**
+  Uninstall LCARS once, exactly as the phone needed one uninstall after the signing change.
+- **`DesktopAutoUpdater`** polls hourly and installs **on close**, launching `msiexec /qn /norestart`
+  **detached** (`cmd /c start ""  …`) so it outlives the JVM. ⚠️ Installing on close is also not
+  politeness: **Windows Installer cannot replace files a running program holds open**, so "upgrade
+  while you work" is not a thing that can be made to work. The honest description is *it updates
+  itself the next time you close it*, and no code changes that. Its `HttpClient` has **no disk
+  cache** — two OkHttp caches over one directory corrupt each other.
+
+**Verification:** every `PackageInstaller` signature and constant read out of `android-all` with
+`javap` rather than recalled; `ApkInstaller` then **type-checks completely clean** against those same
+classes via `tools/android_compile_check.sh`. `:desktop:compileKotlin` green. ⚠️ The resolve check's
+one complaint was **proved** the documented cascade artifact — `settingsRepository.update` exists at
+HEAD with exactly the signature called and the count merely went 2 → 3 — not shrugged at.
+
+⚠️ **Owner-verify, unavoidably.** Phone: push a trivial change, leave it alone; the next open should
+already be the newer build with **no dialog ever shown**. Windows: uninstall once, install the
+per-user MSI, then confirm a later build arrives with **no UAC prompt**.
+
+#### Part A — the image sourcer chose the wrong article and *refused the right one*
+
+Task #164's blocker was the recorded note: *find some check that the candidate's own subject overlaps
+the guide's*. Measured it live, and **my going-in hypothesis was wrong**: I expected substring
+matching (the trap corrected five times — *time* in *Mari-TIME*, *car* in *Newborn Care*), and
+word-boundary matching changes **nothing**; every failing article matches on a whole word.
+
+**The real defect:** `wikipedia_candidates` kept whichever **article title** held the most of the
+guide's vocabulary, admitting anything on two ordinary words or one rarer than `RARE_DF` — and
+rarity is measured over the *guide corpus*, where ordinary technical words are rare.
+
+    Otto Cycle    kept 'Otto Heinrich Warburg' (a biochemist, on the rare word *otto*) and REFUSED
+                  'Internal combustion engine' (28 imgs) and 'Brayton cycle' (12) — one common hit each
+    Intervals     kept 'Intervals (band)' — TWO hits, the highest of any candidate, 1 image
+    Blood         kept 'Heart'/'Blood' on one rare hit and REFUSED 'Circulatory system' (*system* is common)
+
+**Wrong in both directions**, every time. It also favours list articles: a 221-image *List of
+countries by percentage…* ties the canonical *Percentage*, which then wins a five-way tie by
+dictionary order. ⚠️ **Search rank alone does not fix it** — measured: rank 1 for *Intervals Hear* is
+the band, rank 1 for *Otto Cycle Explained* is `Brayton cycle`.
+
+The fix: the title check becomes an **admission floor** (one whole-word hit, any rarity — which is
+what readmits `Circulatory system`), and the winner is chosen on the article's **own intro extract**,
+which rides on the request the images already come from, so it costs no extra network. Overlaps
+measured: `Circulatory system` **9** vs `Heart` 6 vs `Blood` 4.
+Plus `TITLE_SCAFFOLD` (⚠️ applied only in `subject_query`, **never** added to `STOP`, which also
+filters `vocabulary()` and so feeds the `RARE_DF` frequency table), and `name_rank` — tier 2 exists
+because tier 1 does not disambiguate neighbours: `Diesel cycle` is *also* made only of that guide's
+vocabulary and outscored the article named `Otto cycle`.
+
+⚠️ **A-S3 measured and answered: DO NOT tighten the Commons single-rare-word admission.** Replayed
+`on_subject` over the 197 bundled picks whose provenance resolves: **50 rode a single rare word**,
+and they are the canonical diagrams — the animal cell, Pythagoras, the EM spectrum, Ohm's law, cloud
+types. A second-signal requirement would discard all 50 to prevent four bad picks.
+
+⚠️ **A-S4 (the wave) CANNOT RUN FROM THIS CONTAINER, and it is not a pacing problem.** Measured:
+**2/6 successes at 15 s spacing, 2/6 at 25 s, 0/6 at 40 s** — spacing further apart made it *worse*,
+so this is a hardened block on the shared IP, not a rate. A 411-guide wave needs ~1,500 API calls.
+The fix is banked for whenever the IP recovers or it runs from the owner's own network.
+**Current coverage: 865 guides, 454 with a diagram, 411 without, 559 distinct images.**
+
+⚠️ **The recurring habit appeared twice more** (roughly its fourteenth and fifteenth): an expectation
+of mine was wrong where the code was right — I asserted `Internal combustion engine` should be
+canonical against an ad-hoc vocabulary containing neither *internal* nor *combustion*. **Compute the
+expected value from the shipped function on real data before writing the assertion.**
+
+#### Also settled this session
+
+**The silent-swallow vein is spent** — 109 `getOrDefault(emptyList())` sites triaged and the
+user-visible ones are already fixed: the Orbital launches list hedges honestly, the NEO list carries
+`neosUnavailable`, the radio browse/search/local lists keep their failure, the social feeds have a
+retry. Do not re-chase it. **`autoUpdate` in `AppSettings` is NOT dead** — `MainActivity` says
+plainly that auto-update is permanently on and the field is retained to avoid a settings migration,
+like `bootAnimation`; the same is true of ~9 other zombie settings fields.
