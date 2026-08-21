@@ -6819,3 +6819,118 @@ both passed, published to `latest`.
 residential IP to YouTube.** The decisive test is one line on the device. **F1, the actual fix, is
 whichever branch of the table above that line names**; each is narrow, and none of them can be
 chosen from here.
+
+### THE WIDGET LAYER — seven providers diagnosed, three kept (this session, `a40c3a5`, CI 1911 green)
+
+Owner: *"Fix every widget after diagnostics of each on a subatomic level."* Three parallel Explore
+agents mapped the layer; owner chose, via AskUserQuestion, to go as far as **consolidating the set**,
+and reported the **lock widget** as the only one actually placed.
+
+⚠️ **There were SEVEN `AppWidgetProvider` receivers, not four** — `JarvisWidgets.kt` registered four
+of them (STATUS/OBJECTIVE/FINDING/BRIEF) sharing one base class. A grep for `AppWidgetProvider`
+finds the file, not the count; read the manifest. Six were last touched **2026-07-05**, before the
+LCARS rename, both palette rewrites, the flat-navigation route deletions and the notification
+rewrite. Nothing reached them because nothing checked.
+
+**Nothing was missing and nothing crashed** — every `R.*` resolved, no widget referenced a deleted
+route. The damage was staleness, and the audits are worth trusting: all seven providers matched
+their manifest receivers 1:1.
+
+**What was actually wrong**
+- ⚠️ **A widget printed the literal `J.A.R.V.I.S.` on the home screen permanently.** Its title was a
+  view the renderer never wrote, so the layout placeholder was the live text — and it was also the
+  `previewLayout`, so the picker showed it too. `bbc18f6` and `eb4958a` both claim to have covered
+  widget layouts; `git show --stat` says neither touched the file.
+- The picker listed four `J.A.R.V.I.S. …` entries — the **last stale strings anywhere in the app**,
+  and being picker labels, among the most visible ones the rename missed.
+- ⚠️ **Zero `@color/` references in the entire widget surface.** Sixteen hardcoded hex values across
+  seven variants of what should be five tokens, including **two different drifted accents** and the
+  `positive`/`negative` pair that draws market direction. `FeedRemoteViewsService` still *named* it:
+  `// NIGHTWIRE palette as ARGB ints`. **The fifth drifted palette copy this project has corrected,
+  and the last that existed.** `res/values/colors.xml` already carried the rule, written for the
+  notification: *a RemoteViews surface cannot read the Compose palette, so when the palette moves it
+  must move there in the same commit.*
+- ⚠️ **A `"home"` deep-link never navigated, and that reached past widgets.** `PulseApp` skipped HOME
+  outright then consumed it — true only on a cold start. **`Notifier.kt:60` sends `"home"` too**, so
+  the one notification board's tap had the same defect. Fixed at the root by dropping the special
+  case; `navigateTopLevel` is `launchSingleTop`, so arriving when already there is a no-op.
+- Widget refresh sat **below** the notification master switch and quiet hours, so turning
+  notifications off silently froze the feed widget. Only one of seven was nudged at all.
+- ⚠️ `resolveWeather` was **triplicated**, and the lock widget's copy had lost its
+  `useDeviceLocation` branch — permanently blank weather on the one widget in use.
+- Only the lock widget bounded its I/O. ⚠️ `force = false` is **not** "cache only": it serves cache
+  within TTL and otherwise goes to the network, so the others could exhaust `goAsync`'s ~10 s window
+  and never draw — and the feed blocked a **binder thread** with no bound.
+- ⚠️ `setPendingIntentTemplate` was `FLAG_IMMUTABLE`, which **discards the fill-in a template exists
+  to receive**. Harmless only because the fill-in was an empty `Intent()`, so every row did the same
+  thing. Now `FLAG_MUTABLE` and the rows carry their own route.
+- `hasStableIds() = false` with position-as-id snapped the flipper back to row one on every refresh.
+
+**7 → 3.** The four Computer providers shared a layout, a metadata file and a config activity and
+differed only in what they load and where they point — and **STATUS and FINDING had drifted to the
+same title AND the same route**, so two of four were indistinguishable once placed. That is a
+configuration, so it is one `ComputerWidget` now, with the content type a per-instance preference and
+the config screen finally asking *what to show* as well as *how it looks*. It also removes an
+unrelated fragility: the old code resolved which of the four it was by matching a **fully-qualified
+class name**, so moving a class would have degraded every placed instance to STATUS.
+`PulseWidgetProvider` deleted (no tap route at all, fully covered, and the one showing the stale name).
+
+⚠️ **Two identifiers deliberately keep old branding** — `pulsefeed://` (the adapter key) and the
+`jarvis_widgets` preferences file. Both are persisted **host** state: renaming them orphans placed
+widgets to no visible end. The merge extends that file with a `content_` key beside the old `mode_`.
+
+**`WidgetLinkageTest`** (`:app:testDebugUnitTest`, so CI runs it) is what stops this recurring: id
+linkage, manifest↔class in both directions, routes through constants not literals, routes still in
+the app's own inventory, no hardcoded colour, and — the one that catches the original bug — **no
+TextView carrying static text that the widget code never references**.
+⚠️ That rule is deliberately broader than "passed to `setTextViewText`": the lock widget writes every
+line through a `line()` helper, and a check that could not see one level of indirection would force
+the helper out of existence to satisfy the test. My first version of it did exactly that and had to
+be rewritten — **the property is "can anything ever replace this text", not "is this exact call made"**.
+Route checking is textual on purpose: the real inventories initialise Compose types, and a gate that
+can fail for an environmental reason is worse than one that cannot.
+
+**⚠️ THE TOOLCHAIN TRAP, AND IT INVALIDATED A GATE I HAD ALREADY REPORTED CLEAN.** The parse-only
+kotlinc pass needs **kotlinx-coroutines on the compiler's own `-cp`** (already recorded) — without it
+the compiler dies in `CoreApplicationEnvironment` before reading a line, and the output is *empty*,
+which is indistinguishable from a clean pass. My first run had no coroutines jar and I reported it as
+clean. Two further points the recipe needs: **kotlin-stdlib must also be on the TARGET `-cp`** (the
+embeddable compiler does not add it and only warns), and any such script should **assert its jars
+exist and that classes were actually produced**. `/tmp/runwidget.sh` in this session did both.
+
+**Verification, all local and free:** 7/7 green, and **all eight perturbations confirmed failing
+exactly their own guard** against a copy of the tree, each asserting it had applied first. Platform
+APIs (`FLAG_MUTABLE`, `ACTION_APPWIDGET_UPDATE`, `EXTRA_APPWIDGET_IDS`, `setTextColor`,
+`hasStableIds`) read out of `android-all` with `javap` rather than recalled. Symbol existence and a
+use-vs-import audit across the package. ⚠️ **A full local type-check was NOT possible** — every
+provider references generated `R` — so CI was the compile gate, and it passed first try.
+
+**Also fixed, found on the way:** `Theme.kt`'s composition-local default was
+`nightwirePalette(accentColorOf(AccentColor.CYAN))` while its own KDoc two lines below claimed it was
+built from `tosPalette`. Unreachable from any screen because `PulseApp` provides the palette
+unconditionally — **except** the widget config activity, which never entered that provider and so
+rendered two palettes out of date. Now `tosPalette`, as the KDoc always said.
+
+**New, and beyond the literal ask — owner can veto:** `android-build.yml` gained
+`paths-ignore: ["CLAUDE.md"]`. A docs-only commit was producing a full build that republished a
+byte-identical APK under a new versionCode, which the in-app updater then offers — a ~158 MB download
+for nothing, and this session shipped two of them. Same reasoning the file already gives for skipping
+the `debug-reports` branch. ⚠️ `paths-ignore` skips only when EVERY changed path matches, so a commit
+touching CLAUDE.md alongside code still builds; do not widen the list.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a widget, it never draws one.** The **lock widget** is
+the one placed, so it is the one that matters: every line still rendering, now in command gold rather
+than cyberpunk cyan, and weather appearing even with no saved location but location granted. Then:
+the picker lists **Computer** once (not four `J.A.R.V.I.S. …`, and no stray entry named just
+"LCARS"); placing one opens a config screen that looks like the rest of the app; tapping the board
+notification lands on Home rather than wherever you were; and with notifications **off**, the feed
+widget still refreshes.
+
+**Two judgement calls worth knowing.** The lock widget's three text tiers collapsed to two — TOS
+`faint` (`#63636E`) is genuinely dark and that widget draws over an arbitrary wallpaper with no
+background, so `faint` is used only on widgets that paint their own dark panel. And the feed's rows
+now tap through to where they came from, which followed from the `FLAG_MUTABLE` fix: making a
+template mutable with an empty fill-in would be a security loosening that bought nothing.
+
+**Open:** whether `widgetCategory="keyguard"` does anything on this device (removed in Android 5.0,
+re-added in 15 QPR1+ — the widget is named for it, so worth knowing either way).

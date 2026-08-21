@@ -8,6 +8,17 @@ on:
     branches:
       - "**"
       - "!debug-reports"
+    # Same reasoning as the branch skip above, applied to a file. CLAUDE.md is the session-handoff
+    # document and carries no code, so a commit touching only it produced a full build that
+    # republished a byte-identical app under a new versionCode — which the in-app updater then
+    # offers as an update, costing a ~158 MB download for nothing. Two of those shipped this
+    # session before it was noticed.
+    #
+    # ⚠️ `paths-ignore` skips a run only when EVERY changed path matches, so a commit that touches
+    # CLAUDE.md alongside real code still builds. That is the property this depends on; do not
+    # widen the list to anything a build could actually depend on.
+    paths-ignore:
+      - "CLAUDE.md"
   workflow_dispatch:
 
 permissions:
