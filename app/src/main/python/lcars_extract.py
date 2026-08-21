@@ -175,6 +175,30 @@ class _Notes:
 
 _js_status = None
 
+#: Bump when this file changes in a way worth telling apart on a device.
+#:
+#: ⚠️ **This exists because "which code is actually running" turned out to be unanswerable.** A
+#: device report showed an extraction warning with no `javascript:` line at all, while the owner's
+#: Settings screen read a build that certainly has one. Two explanations fit — an older screenshot,
+#: or Chaquopy serving Python it extracted from a PREVIOUS install into the app's data directory,
+#: so a new APK would run old Python and every note would describe code that never shipped.
+#: Distinguishing them took forensic work on a character count. This makes it a glance instead.
+_PY_SOURCE = "s2"
+
+
+def _apk_build() -> str:
+    """The APK's build number, or '?' off-device. Paired with [_PY_SOURCE] to expose staleness.
+
+    Read from `BuildConfig` (package `dev.mascwa.pulse` — the namespace; the `.debug`
+    applicationId suffix does not move the class). If the Python is stale its `_PY_SOURCE` will
+    lag while this number moves, and the mismatch is the whole tell.
+    """
+    try:
+        from java import jclass
+        return str(jclass('dev.mascwa.pulse.BuildConfig').VERSION_CODE)
+    except Exception:  # noqa: BLE001 - off-device, or the class moved; neither is worth raising
+        return "?"
+
 
 def _enable_js_runtime() -> str:
     """Register the in-process JavaScript engine with yt-dlp, and report what happened.
@@ -197,14 +221,21 @@ def _enable_js_runtime() -> str:
     if _js_status is None:
         try:
             import lcars_jsi
-            if lcars_jsi.available():
-                _js_status = "javascript: quickjs {}".format(lcars_jsi.engine_version() or "?")
-            else:
-                _js_status = "javascript: NONE ({})".format(
-                    lcars_jsi.setup_error or "engine not in this build")
+            # ⚠️ The reason comes from `lcars_jsi.status()`, which names ONE cause per branch —
+            # never re-worded here. A first cut rendered every failure as "engine not in this
+            # build", which CI disproves (it asserts the engine's symbol is in the shipped
+            # library), and that wrong sentence cost a real diagnosis.
+            _js_status = "javascript: {}".format(
+                lcars_jsi.status() if lcars_jsi.available()
+                else "NONE ({})".format(lcars_jsi.status()))
         except Exception as exc:  # noqa: BLE001
             _js_status = "javascript: NONE (provider failed: {}: {})".format(
                 type(exc).__name__, exc)
+        # ⚠️ Stamped so a stale-Python install is visible rather than inferred. Chaquopy extracts
+        # the app's Python to the data directory; if that copy ever survived an app update, the
+        # new APK would run the OLD extractor and every note would describe code that is not what
+        # shipped. This line makes that state self-announcing instead of a forensic exercise.
+        _js_status += " · py {}/apk {}".format(_PY_SOURCE, _apk_build())
     return _js_status
 
 

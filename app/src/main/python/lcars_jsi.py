@@ -67,6 +67,35 @@ def available() -> bool:
         return False
 
 
+def status() -> str:
+    """One line naming the engine, or precisely why it is unreachable.
+
+    ⚠️ **EVERY BRANCH NAMES A DIFFERENT INVESTIGATION, and that is the whole reason this exists.**
+    The previous version collapsed all of these into `"engine not in this build"` — a sentence CI
+    disproves, since the workflow asserts the `JsRuntime_nativeVersion` symbol is in the shipped
+    library. A diagnostic that confidently states the opposite of a proven fact is worse than
+    silence: it sends the next person looking in the one place the fault cannot be.
+
+    The order matters. Registration is checked before the engine, because a provider that never
+    registered is invisible to yt-dlp's director no matter how healthy QuickJS is — and the
+    director's availability scan is exactly what decides whether YouTube extraction gets a JS
+    runtime at all.
+    """
+    if jclass is None:
+        return setup_error or 'not running under Chaquopy'
+    if setup_error:
+        return setup_error
+    if not registered:
+        return 'the provider did not register'
+    try:
+        # Delegates to the Kotlin taxonomy, which distinguishes "library did not load" from
+        # "engine not compiled in" from "the probe threw". Never re-worded here: two independent
+        # wordings of one fact drift, and this one is load-bearing.
+        return str(_runtime().status())
+    except Exception as e:  # noqa: BLE001
+        return 'the JsRuntime lookup failed: {}: {}'.format(type(e).__name__, e)
+
+
 def engine_version() -> str | None:
     """The engine's version, for the extractor's notes. None when there is no engine."""
     if jclass is None:

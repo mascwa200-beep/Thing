@@ -51,21 +51,52 @@ object JsRuntime {
     const val DEFAULT_TIMEOUT_MS: Int = 120_000
 
     /**
-     * True when the shared library loaded **and** QuickJS is actually in it.
+     * What the probe found: whether the engine is usable, and — the part that was missing — WHY
+     * not when it is not.
      *
-     * ⚠️ The second half is not redundant. `nativeAvailable` is compiled in both CMake branches, so
-     * it answers honestly; what it must never do is throw. `nativeVersion` exists only in the real
-     * branch, which is what the CI symbol check asserts against — see the workflow.
+     * ⚠️ **ONE computation feeds both [available] and [status], and that is the point.** A first
+     * cut had `available()` return a bare boolean while the Python side rendered its false branch
+     * as *"engine not in this build"*. CI **proves** that sentence wrong: the workflow asserts the
+     * `JsRuntime_nativeVersion` symbol is in the shipped library, so QuickJS is unambiguously
+     * compiled in. The app was stating the opposite of a proven fact, which sent a real diagnosis
+     * looking in the wrong place. Deriving both answers from one result makes it impossible for
+     * the verdict and the reason to disagree.
      */
-    @JvmStatic
-    fun available(): Boolean = availableLazy
+    private data class Probe(val usable: Boolean, val detail: String)
 
-    private val availableLazy: Boolean by lazy {
-        NativeBridge.available && runCatching { nativeAvailable() }.getOrElse {
-            Log.w(TAG, "JavaScript engine probe failed: ${it.message}")
-            false
+    private val probe: Probe by lazy {
+        when {
+            // The library itself never loaded — nothing about QuickJS is implicated. This is the
+            // case that was being misreported, and it is a completely different investigation.
+            !NativeBridge.available -> Probe(false, "the native library did not load")
+            else -> runCatching {
+                if (!nativeAvailable()) {
+                    // Compiled in BOTH CMake branches, so it answers honestly rather than throwing;
+                    // a false here really does mean the engine was left out of this build.
+                    Probe(false, "no JavaScript engine compiled into this build")
+                } else {
+                    Probe(true, "quickjs " + (runCatching { nativeVersion() }.getOrNull() ?: "?"))
+                }
+            }.getOrElse {
+                Log.w(TAG, "JavaScript engine probe failed: ${it.message}")
+                Probe(false, "the engine probe threw: ${it.javaClass.simpleName}: ${it.message}")
+            }
         }
     }
+
+    /** True when the shared library loaded **and** QuickJS is actually in it. */
+    @JvmStatic
+    fun available(): Boolean = probe.usable
+
+    /**
+     * One line naming what the engine is, or precisely why it is unreachable.
+     *
+     * This is the sentence the extractor puts in its notes and the diagnostics screen shows. It is
+     * the whole diagnosis for a class of failure that is otherwise invisible, so it must never
+     * guess: every branch above states something the code actually established.
+     */
+    @JvmStatic
+    fun status(): String = probe.detail
 
     /**
      * The engine's own version string, or null when there is no engine.
@@ -75,7 +106,7 @@ object JsRuntime {
      */
     @JvmStatic
     fun version(): String? =
-        if (!availableLazy) null else runCatching { nativeVersion() }.getOrNull()
+        if (!probe.usable) null else runCatching { nativeVersion() }.getOrNull()
 
     /**
      * Run [script] and return everything it printed, throwing if it failed.
@@ -93,7 +124,8 @@ object JsRuntime {
     @JvmOverloads
     @Throws(IllegalStateException::class)
     fun evalOrThrow(script: String, timeoutMs: Int = DEFAULT_TIMEOUT_MS): String {
-        check(availableLazy) { "no JavaScript engine in this build" }
+        // The reason, not a generic refusal: this message reaches Python as the provider error.
+        check(probe.usable) { "no usable JavaScript engine: ${probe.detail}" }
         val box = arrayOfNulls<String>(1)
         val out = nativeEval(script, timeoutMs, box)
         return out ?: throw IllegalStateException(box[0] ?: "JavaScript failed")

@@ -61,6 +61,19 @@ def install_fake_java(engine: str | None) -> None:
             return ENGINE_VERSION if engine else None
 
         @staticmethod
+        def status() -> str:
+            """Mirrors `JsRuntime.status()`'s taxonomy, copied from the real declaration.
+
+            ⚠️ The point of the real method is that one computation feeds both the verdict and
+            the reason, so they can never disagree. A stub that returned a cheerful string while
+            `available()` said False would assert exactly the bug the taxonomy exists to prevent —
+            so this derives from the same `engine` value that `available()` does.
+
+            Off-device there is no native library at all, which is the honest no-engine branch.
+            """
+            return f"quickjs {ENGINE_VERSION}" if engine else "the native library did not load"
+
+        @staticmethod
         def evalOrThrow(script: str, timeout_ms: int) -> str:  # noqa: N802 - mirrors the JVM name
             if engine is None:
                 raise RuntimeError("no JavaScript engine in this build")
