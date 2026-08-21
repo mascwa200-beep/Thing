@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shared layout for all four J.A.R.V.I.S. widgets. The background is set at runtime by the renderer
-     (panel for HIGH contrast, none for TRANSPARENT), so the same layout serves both modes. -->
+<!-- The Computer widget. One layout serves every content type and both looks: the renderer sets the
+     background (panel for HIGH contrast, none for TRANSPARENT) and writes all four TextViews.
+
+     ⚠️ The static text here is PREVIEW text — this file is its own previewLayout, so what is written
+     below is what the widget picker shows. Every one of these views is overwritten at runtime, which
+     is the difference between preview text and a dead view: the widget this replaced had a title its
+     renderer never wrote, so the hardcoded string was what the home screen showed forever.
+     `WidgetLinkageTest` now fails the build on a TextView no Kotlin writes. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -12,8 +18,8 @@
         android:id="@+id/widget_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="J.A.R.V.I.S."
-        android:textColor="#2DE2E6"
+        android:text="COMPUTER"
+        android:textColor="@color/nw_accent"
         android:textStyle="bold"
         android:textSize="14sp"
         android:letterSpacing="0.1" />
@@ -25,7 +31,8 @@
         android:layout_marginTop="6dp"
         android:maxLines="2"
         android:ellipsize="end"
-        android:textColor="#E6EFFA"
+        android:text="Good evening."
+        android:textColor="@color/nw_ink"
         android:textSize="13sp" />
 
     <TextView
@@ -35,7 +42,8 @@
         android:layout_marginTop="3dp"
         android:maxLines="2"
         android:ellipsize="end"
-        android:textColor="#A9B8CE"
+        android:text="Battery 82% · Wi-Fi"
+        android:textColor="@color/nw_muted"
         android:textSize="11sp" />
 
     <TextView
@@ -44,6 +52,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="Tap to open"
-        android:textColor="#5E708C"
+        android:textColor="@color/nw_faint"
         android:textSize="10sp" />
 </LinearLayout>

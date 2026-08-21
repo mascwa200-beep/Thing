@@ -529,18 +529,24 @@ fun PulseApp(
     }
 
     // Deep-link from a notification tap or a launcher shortcut.
+    //
+    // ⚠️ HOME used to be special-cased out of this entirely — the route was recognised, skipped, and
+    // consumed. The reasoning was presumably "the app is already there", which is only true on a
+    // cold start: on a warm one you are wherever you last were, so a deep link to HOME left you on
+    // Settings or MENU and looked like a dead tap. That is not a widget bug, though it is where it
+    // was found — **the one notification board sends `"home"` too**, so its tap had the same
+    // defect. HOME now takes the ordinary top-destination path like every other tab; arriving when
+    // already there is a no-op, because `navigateTopLevel` is `launchSingleTop`.
     LaunchedEffect(startRoute) {
         if (!startRoute.isNullOrBlank()) {
-            if (startRoute != Routes.HOME) {
-                when {
-                    // Legacy "tacnet" deep-links (old shortcuts/notifications) land on the MENU directory.
-                    startRoute.substringBefore('?') == "tacnet" -> navigateTopLevel(Routes.MENU)
-                    TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
-                    // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
-                    // or an argumented one like "survival?guide=fire" — match on the base route).
-                    startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
-                        runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
-                }
+            when {
+                // Legacy "tacnet" deep-links (old shortcuts/notifications) land on the MENU directory.
+                startRoute.substringBefore('?') == "tacnet" -> navigateTopLevel(Routes.MENU)
+                TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
+                // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
+                // or an argumented one like "survival?guide=fire" — match on the base route).
+                startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
+                    runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
             }
             // Consume it so re-tapping the SAME shortcut after navigating away fires again.
             onStartRouteConsumed()

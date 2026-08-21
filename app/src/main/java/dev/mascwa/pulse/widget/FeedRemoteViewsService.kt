@@ -4,10 +4,14 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
+import androidx.core.content.ContextCompat
+import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
 import dev.mascwa.pulse.data.news.NewsCategory
+import dev.mascwa.pulse.navigation.Routes
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /**
@@ -20,14 +24,28 @@ class FeedRemoteViewsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory = FeedFactory(applicationContext)
 }
 
-private data class FeedRow(val category: String, val value: String, val color: Int)
-
-// NIGHTWIRE palette as ARGB ints (top-level `val`, not `const` — `.toInt()` isn't a compile-time constant).
-private val INK = 0xFFE6EFFA.toInt()
-private val POSITIVE = 0xFF46F9A0.toInt()
-private val NEGATIVE = 0xFFFF4D6D.toInt()
+/**
+ * One line of the feed.
+ *
+ * [route] is where tapping this row lands. It exists because the fill-in intent was empty and could
+ * not have carried it anyway — see [FeedWidgetProvider] for the template flag that made every row
+ * in the widget do the same thing.
+ */
+private data class FeedRow(
+    val category: String,
+    val value: String,
+    val color: Int,
+    val route: String,
+)
 
 private class FeedFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
+
+    // Resolved once per factory. Colours now come from the shared widget tokens; these used to be
+    // hardcoded ARGB ints under a comment that named them as the retired NIGHTWIRE palette, which
+    // meant market direction on the home screen was drawn in a green and a red the app had dropped.
+    private val ink by lazy { ContextCompat.getColor(context, R.color.nw_ink) }
+    private val positive by lazy { ContextCompat.getColor(context, R.color.nw_positive) }
+    private val negative by lazy { ContextCompat.getColor(context, R.color.nw_negative) }
 
     @Volatile private var rows: List<FeedRow> = emptyList()
 
@@ -49,8 +67,19 @@ private class FeedFactory(private val context: Context) : RemoteViewsService.Rem
 
     override fun getCount(): Int = rows.size
     override fun getViewTypeCount(): Int = 1
-    override fun getItemId(position: Int): Long = position.toLong()
-    override fun hasStableIds(): Boolean = false
+
+    /**
+     * ⚠️ Stable, and keyed on the row rather than its index.
+     *
+     * With `hasStableIds() = false` and the position as the id, the host had no way to tell that
+     * the row it was showing still existed after a refresh, so the flipper snapped back to the
+     * first row every time the background worker ran — which is every refresh interval, all day.
+     */
+    override fun getItemId(position: Int): Long =
+        rows.getOrNull(position)?.let { (it.category + it.value).hashCode().toLong() }
+            ?: position.toLong()
+
+    override fun hasStableIds(): Boolean = true
     override fun getLoadingView(): RemoteViews? = null
 
     override fun getViewAt(position: Int): RemoteViews {
@@ -59,63 +88,83 @@ private class FeedFactory(private val context: Context) : RemoteViewsService.Rem
         view.setTextViewText(R.id.feed_item_cat, row.category)
         view.setTextViewText(R.id.feed_item_value, row.value)
         view.setTextColor(R.id.feed_item_value, row.color)
-        view.setOnClickFillInIntent(R.id.feed_item_root, Intent())
+        // The fill-in carries the row's own destination, which is the whole point of a template.
+        view.setOnClickFillInIntent(
+            R.id.feed_item_root,
+            Intent().putExtra(MainActivity.EXTRA_ROUTE, row.route),
+        )
         return view
     }
 
     private fun loadRows(): List<FeedRow> {
         val app = context.applicationContext as? PulseApplication ?: return emptyList()
         val c = app.container
+        // ⚠️ Bounded, like every other widget load. `force = false` is not "cache only" — on a cold
+        // or expired cache it goes to the network, and this is a **binder thread** blocked by
+        // `runBlocking`, so an unbounded wait here holds a framework thread rather than just this
+        // widget. On timeout the previous rows stand.
         return runBlocking {
-            val out = mutableListOf<FeedRow>()
+            withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
+                val out = mutableListOf<FeedRow>()
 
-            // Markets — top movers by absolute % change.
-            runCatching {
-                c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
-                    .filter { it.changePercent != null }
-                    .sortedByDescending { abs(it.changePercent ?: 0.0) }
-                    .take(3)
-                    .forEach { q ->
-                        val pct = q.changePercent ?: 0.0
-                        out += FeedRow("MARKETS", "${q.label}   ${signed(pct)}%", if (pct >= 0) POSITIVE else NEGATIVE)
-                    }
-            }
-            // Fuel / energy benchmark (crude futures).
-            runCatching {
-                c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
-                    val pct = b.changePercent ?: 0.0
-                    val price = b.price?.let { "%.2f".format(it) }.orEmpty()
-                    out += FeedRow(
-                        "FUEL", "${b.label}   $price   ${signed(pct)}%".trim(),
-                        if (pct >= 0) POSITIVE else NEGATIVE,
-                    )
-                }
-            }
-            // Economy / inflation indicators (float an inflation/CPI series first if present).
-            runCatching {
-                c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
-                    .sortedByDescending {
-                        it.indicatorTitle.contains("inflation", true) || it.indicatorTitle.contains("CPI", true)
-                    }
-                    .take(2)
-                    .forEach { s ->
-                        s.latest?.let { pt ->
-                            val cat = if (s.indicatorTitle.contains("inflation", true)) "INFLATION" else "ECONOMY"
-                            out += FeedRow(cat, "${s.indicatorTitle}: ${"%.1f".format(pt.value)} ${s.unit}".trim(), INK)
+                // Markets — top movers by absolute % change.
+                runCatching {
+                    c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
+                        .filter { it.changePercent != null }
+                        .sortedByDescending { abs(it.changePercent ?: 0.0) }
+                        .take(3)
+                        .forEach { q ->
+                            val pct = q.changePercent ?: 0.0
+                            out += FeedRow(
+                                "MARKETS", "${q.label}   ${signedPercent(pct)}%",
+                                if (pct >= 0) positive else negative, Routes.MARKETS,
+                            )
                         }
+                }
+                // Fuel / energy benchmark (crude futures).
+                runCatching {
+                    c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
+                        val pct = b.changePercent ?: 0.0
+                        val price = b.price?.let { "%.2f".format(it) }.orEmpty()
+                        out += FeedRow(
+                            "FUEL", "${b.label}   $price   ${signedPercent(pct)}%".trim(),
+                            if (pct >= 0) positive else negative, Routes.FUEL,
+                        )
                     }
-            }
-            // Top news headlines.
-            runCatching {
-                c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data.orEmpty()
-                    .take(3)
-                    .forEach { a -> out += FeedRow("NEWS · ${a.source.uppercase()}".take(28), a.title, INK) }
-            }
+                }
+                // Economy / inflation indicators (float an inflation/CPI series first if present).
+                runCatching {
+                    c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
+                        .sortedByDescending {
+                            it.indicatorTitle.contains("inflation", true) || it.indicatorTitle.contains("CPI", true)
+                        }
+                        .take(2)
+                        .forEach { s ->
+                            s.latest?.let { pt ->
+                                val cat = if (s.indicatorTitle.contains("inflation", true)) "INFLATION" else "ECONOMY"
+                                out += FeedRow(
+                                    cat, "${s.indicatorTitle}: ${"%.1f".format(pt.value)} ${s.unit}".trim(),
+                                    ink, Routes.ECONOMY,
+                                )
+                            }
+                        }
+                }
+                // Top news headlines.
+                runCatching {
+                    c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data.orEmpty()
+                        .take(3)
+                        .forEach { a ->
+                            out += FeedRow(
+                                "NEWS · ${a.source.uppercase()}".take(28), a.title, ink, Routes.NEWS,
+                            )
+                        }
+                }
 
-            if (out.isEmpty()) out += FeedRow("LCARS", "Open LCARS to load the live feed", INK)
-            out
+                if (out.isEmpty()) {
+                    out += FeedRow("LCARS", "Open LCARS to load the live feed", ink, Routes.HOME)
+                }
+                out.toList()
+            } ?: rows
         }
     }
 }
-
-private fun signed(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)

@@ -13,10 +13,17 @@ import dev.mascwa.pulse.data.settings.AccentColor
 import dev.mascwa.pulse.notifications.AlertCondition
 import dev.mascwa.pulse.notifications.AlertStatus
 
-/** Access the NIGHTWIRE palette anywhere: `Pulse.colors.accent`. */
-val LocalNightwire = staticCompositionLocalOf {
-    nightwirePalette(accentColorOf(AccentColor.CYAN), amoled = false)
-}
+/**
+ * Access the console palette anywhere: `Pulse.colors.accent`.
+ *
+ * ⚠️ The default is [tosPalette], which is what the KDoc on [NightwireTheme] below has claimed all
+ * along — it said "both the composition-local default here and the Material3 scheme are built from
+ * tosPalette directly", and only the second half was true. `PulseApp` provides the real palette
+ * unconditionally, so the stale default was unreachable from any screen; the one place that DID
+ * reach it was the widget config activity, which never entered that provider and so rendered in a
+ * cyberpunk cyan two palettes out of date.
+ */
+val LocalNightwire = staticCompositionLocalOf { tosPalette }
 
 /**
  * The rail block colours in force.

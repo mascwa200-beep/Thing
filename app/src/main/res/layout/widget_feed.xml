@@ -7,11 +7,14 @@
     android:background="@drawable/widget_bg"
     android:padding="14dp">
 
+    <!-- Given an id so the provider can tint it with the ship's condition; it was an anonymous view
+         nothing could reach. -->
     <TextView
+        android:id="@+id/widget_feed_header"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="LCARS · LIVE FEED"
-        android:textColor="#5AD1FF"
+        android:textColor="@color/nw_accent"
         android:textStyle="bold"
         android:textSize="11sp"
         android:letterSpacing="0.12" />
@@ -38,7 +41,7 @@
             android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:text="Open LCARS to load the live feed"
-            android:textColor="#5E708C"
+            android:textColor="@color/nw_faint"
             android:textSize="12sp" />
     </FrameLayout>
 </LinearLayout>

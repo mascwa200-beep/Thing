@@ -10,7 +10,7 @@
         android:id="@+id/feed_item_cat"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#5E708C"
+        android:textColor="@color/nw_faint"
         android:textSize="9sp"
         android:letterSpacing="0.15"
         android:textStyle="bold" />
@@ -22,6 +22,6 @@
         android:layout_marginTop="3dp"
         android:maxLines="2"
         android:ellipsize="end"
-        android:textColor="#E6EFFA"
+        android:textColor="@color/nw_ink"
         android:textSize="15sp" />
 </LinearLayout>

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.view.View
 import android.widget.RemoteViews
+import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
@@ -63,7 +64,8 @@ class LockWidgetProvider : AppWidgetProvider() {
         val wx: String = "",
         val wx2: String = "",
         val market: String = "",
-        val marketColor: Int = 0xFFE9F4FF.toInt(),
+        /** Null means "leave the layout's own colour alone" — see [render]. */
+        val marketColor: Int? = null,
         val breadth: String = "",
         val space: String = "",
         val fuel: String = "",
@@ -76,11 +78,14 @@ class LockWidgetProvider : AppWidgetProvider() {
     private fun render(context: Context, manager: AppWidgetManager, id: Int, g: Glance) {
         val v = RemoteViews(context.packageName, R.layout.widget_lock)
         line(v, R.id.lock_header, g.header)
+        // The header carries the ship's condition, so the lock screen goes red when the console does.
+        v.setTextColor(R.id.lock_header, ContextCompat.getColor(context, widgetAccentRes()))
         line(v, R.id.lock_objective, g.objective)
         line(v, R.id.lock_wx, g.wx)
         line(v, R.id.lock_wx2, g.wx2)
         line(v, R.id.lock_market, g.market)
-        v.setTextColor(R.id.lock_market, g.marketColor)
+        // Only override when there is a direction to show; otherwise the layout's own ink stands.
+        g.marketColor?.let { v.setTextColor(R.id.lock_market, it) }
         line(v, R.id.lock_breadth, g.breadth)
         line(v, R.id.lock_space, g.space)
         line(v, R.id.lock_fuel, g.fuel)
@@ -112,7 +117,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         val wx: String = "",
         val wx2: String = "",
         val market: String = "",
-        val marketColor: Int = 0xFFE9F4FF.toInt(),
+        val marketColor: Int? = null,
         val breadth: String = "",
         val space: String = "",
         val fuel: String = "",
@@ -147,12 +152,17 @@ class LockWidgetProvider : AppWidgetProvider() {
 
         // --- Network-capable fields: parallel + bounded, so a cold cache / slow link / no-network
         //     (GrapheneOS per-app denial) can't blow goAsync's window. On timeout we render what we have. ---
-        val n = withTimeoutOrNull(6_000L) {
+        val positive = ContextCompat.getColor(context, R.color.nw_positive)
+        val negative = ContextCompat.getColor(context, R.color.nw_negative)
+
+        val n = withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
             coroutineScope {
                 val wxJob = async {
                     runCatching {
-                        val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
-                        val wd = saved?.let { c.weatherRepository.fetch(it.latitude, it.longitude, it.name, force = false).data }
+                        // ⚠️ Shared with the Computer widget now. This copy had quietly lost the
+                        // `useDeviceLocation` branch, so with location granted but no saved place
+                        // the weather lines were permanently blank and nothing said why.
+                        val wd = resolveWeather(c, s)
                         val cur = wd?.current
                         if (wd != null && cur != null) {
                             val u = wd.tempUnitSymbol
@@ -172,18 +182,18 @@ class LockWidgetProvider : AppWidgetProvider() {
                     runCatching {
                         val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty().filter { it.changePercent != null }
                         var m = ""
-                        var col = 0xFFE9F4FF.toInt()
+                        var col: Int? = null
                         var br = ""
                         quotes.maxByOrNull { abs(it.changePercent ?: 0.0) }?.let { mover ->
                             val pct = mover.changePercent ?: 0.0
-                            m = "MKT  ${mover.label}  ${signed(pct)}%"
-                            col = if (pct >= 0) POSITIVE else NEGATIVE
+                            m = "MKT  ${mover.label}  ${signedPercent(pct)}%"
+                            col = if (pct >= 0) positive else negative
                         }
                         MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let { mood ->
-                            br = "${mood.headline.uppercase()}  ·  NET ${signed(mood.netChangePct)}%  ·  ${mood.up}▲ ${mood.down}▼"
+                            br = "${mood.headline.uppercase()}  ·  NET ${signedPercent(mood.netChangePct)}%  ·  ${mood.up}▲ ${mood.down}▼"
                         }
                         Triple(m, col, br)
-                    }.getOrDefault(Triple("", 0xFFE9F4FF.toInt(), ""))
+                    }.getOrDefault(Triple("", null, ""))
                 }
                 val spaceJob = async {
                     runCatching {
@@ -194,7 +204,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                     runCatching {
                         c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
                             val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
-                            val pct = b.changePercent?.let { " ${signed(it)}%" }.orEmpty()
+                            val pct = b.changePercent?.let { " ${signedPercent(it)}%" }.orEmpty()
                             "FUEL  ${b.label} $price$pct".trim()
                         }.orEmpty()
                     }.getOrDefault("")
@@ -247,9 +257,4 @@ class LockWidgetProvider : AppWidgetProvider() {
         )
     }
 
-    private companion object {
-        val POSITIVE = 0xFF46F9A0.toInt()
-        val NEGATIVE = 0xFFFF4D6D.toInt()
-        fun signed(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)
-    }
 }

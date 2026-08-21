@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="LCARS · LIVE FEED"
-        android:textColor="#5AD1FF"
+        android:textColor="@color/nw_accent"
         android:textStyle="bold"
         android:textSize="11sp"
         android:letterSpacing="0.12" />
@@ -29,7 +29,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="MARKETS"
-            android:textColor="#5E708C"
+            android:textColor="@color/nw_faint"
             android:textStyle="bold"
             android:textSize="9sp"
             android:letterSpacing="0.15" />
@@ -39,7 +39,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="Live movers, fuel, economy &amp; headlines"
-            android:textColor="#E6EFFA"
+            android:textColor="@color/nw_ink"
             android:textSize="14sp" />
 
         <TextView
@@ -47,7 +47,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="NEWS"
-            android:textColor="#5E708C"
+            android:textColor="@color/nw_faint"
             android:textStyle="bold"
             android:textSize="9sp"
             android:letterSpacing="0.15" />
@@ -57,7 +57,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="Auto-cycling on your home screen"
-            android:textColor="#E6EFFA"
+            android:textColor="@color/nw_ink"
             android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

@@ -233,20 +233,9 @@
             </intent-filter>
         </receiver>
 
-        <!-- Glanceable home-screen widget: active objective + weather; taps to the J.A.R.V.I.S. console. -->
-        <receiver
-            android:name=".widget.PulseWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pulse_widget_info" />
-        </receiver>
-
-        <!-- Compact glanceable widget, lock-screen-eligible (widgetCategory keyguard|home_screen):
-             active objective + weather + top market mover. -->
+        <!-- Compact glanceable widget, lock-screen-eligible (widgetCategory keyguard|home_screen).
+             Twelve lines, each hidden when it has nothing to say: greeting and date, objective,
+             weather, market mover and breadth, space weather, fuel, economy, news, task, power. -->
         <receiver
             android:name=".widget.LockWidgetProvider"
             android:exported="true"
@@ -277,49 +266,23 @@
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
-        <!-- Four J.A.R.V.I.S. widgets (STATUS / OBJECTIVE / FINDING / BRIEF). Each opens a config screen on
-             placement to choose HIGH-contrast or TRANSPARENT (text-only) mode. They share one layout +
-             provider info; the renderer derives the content from the receiver class. -->
+        <!-- The Computer widget. What it shows (status / objective / finding / brief) and how it
+             looks (panel / transparent) are both per-instance choices made in the configure
+             activity — this was four separate receivers differing in nothing else, two of which had
+             drifted to the same title and the same tap route. -->
         <receiver
-            android:name=".widget.JarvisStatusWidget"
+            android:name=".widget.ComputerWidget"
             android:exported="true"
-            android:label="@string/widget_jarvis_status">
+            android:label="@string/widget_computer">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisObjectiveWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_objective">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisFindingWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_finding">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisBriefWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_brief">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/computer_widget_info" />
         </receiver>
 
-        <!-- Per-instance look picker for the J.A.R.V.I.S. widgets (high-contrast / transparent). -->
+        <!-- Asks what the widget should show and how it should look, then renders and finishes. -->
         <activity
-            android:name=".widget.JarvisWidgetConfigActivity"
+            android:name=".widget.ComputerWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.Pulse">
             <intent-filter>

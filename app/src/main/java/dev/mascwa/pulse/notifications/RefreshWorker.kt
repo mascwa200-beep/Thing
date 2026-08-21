@@ -48,6 +48,14 @@ class RefreshWorker(
             runCatching { EmergencyWatchService.start(applicationContext) }
         }
 
+        // ⚠️ Widgets refresh ABOVE the notification gates, for the same reason the two services do:
+        // a home-screen widget is not a notification, and it should not go stale because you turned
+        // notifications off or because it is the middle of the night. It used to sit at the very
+        // bottom of this method, below both gates — so with the master switch off the feed widget
+        // simply stopped updating, silently, and the only other thing that could refresh it was the
+        // OS's 30-minute floor.
+        refreshWidgets()
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 
@@ -283,18 +291,48 @@ class RefreshWorker(
         runCatching {
             dev.mascwa.pulse.shortcuts.UnreadBadge.publish(applicationContext, container.findingStore.unseenCount())
         }
-        // Nudge the live-feed widget to reload from this fetch (its own update period is the 30-min floor).
+        return Result.success()
+    }
+
+    /**
+     * Push every placed widget, so none of them is left waiting on the OS's 30-minute floor.
+     *
+     * ⚠️ Only the feed was ever nudged, and even that only from the bottom of `doWork` — the lock
+     * and Computer widgets had no in-app refresh path at all. The feed needs
+     * `notifyAppWidgetViewDataChanged` because its rows come from a collection adapter; the other
+     * two render in `onUpdate`, so they need the broadcast instead.
+     */
+    private fun refreshWidgets() {
         runCatching {
             val mgr = android.appwidget.AppWidgetManager.getInstance(applicationContext)
-            val ids = mgr.getAppWidgetIds(
-                android.content.ComponentName(applicationContext, dev.mascwa.pulse.widget.FeedWidgetProvider::class.java),
+
+            val feedIds = mgr.getAppWidgetIds(
+                android.content.ComponentName(
+                    applicationContext, dev.mascwa.pulse.widget.FeedWidgetProvider::class.java,
+                ),
             )
-            if (ids.isNotEmpty()) {
-                mgr.notifyAppWidgetViewDataChanged(ids, dev.mascwa.pulse.R.id.widget_feed_flipper)
+            if (feedIds.isNotEmpty()) {
+                mgr.notifyAppWidgetViewDataChanged(feedIds, dev.mascwa.pulse.R.id.widget_feed_flipper)
+            }
+
+            listOf(
+                dev.mascwa.pulse.widget.LockWidgetProvider::class.java,
+                dev.mascwa.pulse.widget.ComputerWidget::class.java,
+            ).forEach { cls ->
+                val component = android.content.ComponentName(applicationContext, cls)
+                val ids = mgr.getAppWidgetIds(component)
+                if (ids.isNotEmpty()) {
+                    applicationContext.sendBroadcast(
+                        android.content.Intent(
+                            android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE,
+                        ).apply {
+                            setComponent(component)
+                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                        },
+                    )
+                }
             }
         }
-
-        return Result.success()
     }
 
     private suspend fun resolveWeather(settings: AppSettings): WeatherData? {
