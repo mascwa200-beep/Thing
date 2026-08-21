@@ -6704,3 +6704,20 @@ in-progress run is normal, not a stall.
 on `productionresultssa2.blob.core.windows.net` which **is** fetchable with `curl`. So a whole job
 log can be downloaded and grepped locally instead of paged through the MCP tool — which is how the
 green-run evidence above was checked. The URL is short-lived, so fetch it promptly.
+
+**Both follow-ups green, and the new gate is proven against the real artifact.** Run 1905
+(`29c2463`) and run 1906 (`7f8e395`) both passed every step and published. The solver assertion
+did not merely fail to break the build — the log shows it ran and resolved:
+`the JS solver library is in assets/chaquopy/requirements-common.imy`. So Chaquopy stores
+`yt_dlp_ejs/yt/solver/lib.min.js` as a contiguous entry name, which was the one assumption in it
+that no local test could settle. ⚠️ Checking that line rather than accepting the green is the
+point: a gate that silently skipped would look identical from the run's conclusion alone.
+
+⚠️ **APK SIZE, measured from run 1906: 158 MB (166,483,594 bytes).** The figure repeated
+throughout the notes above is ~144 MB and is now stale — CPython, yt-dlp, yt-dlp-ejs, whisper,
+llama and QuickJS have all landed since it was written. This is paid on **every update**, not once,
+because the rolling `latest` release is what the in-app updater pulls in full. The build prints it
+on every run for exactly this reason; it is the number to watch before adding another native tree.
+
+**Timing, now confirmed across three runs:** 13m11s (1905), 11m38s (1906), 13m06s (1903). Unit
+tests ~2m30-2m55s, the APK 6m52s-8m41s. Anything under ~15 minutes is ordinary.
