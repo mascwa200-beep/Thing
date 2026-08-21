@@ -184,6 +184,24 @@ STOP = set(
 )
 RARE_DF = 25               # a single matching word may carry a match only if it is this rare
 
+# How much of a Wikipedia article's own opening paragraph to read, and how much of the guide's
+# vocabulary must appear in it before the article is believed to be ABOUT the guide's subject.
+# See [wikipedia_candidates] for why the article's intro decides and its title only admits.
+#
+# ⚠️ Both are calibrated against the real corpus, not asserted: `INTRO_CHARS` is the length the live
+# probe measured good separation at, and a longer extract is not automatically better — it gives a
+# long list-article more room to accumulate generic words. `MIN_INTRO_OVERLAP` sits below the lowest
+# overlap any known-good article scored (measured: 6, 7, 9 for the right articles against 1-3 for
+# the homonyms that were being preferred).
+INTRO_CHARS = 420
+MIN_INTRO_OVERLAP = 3
+
+# How many words a Wikipedia title may carry and still count as the name of the subject rather than a
+# sentence about it. `Otto cycle`, `Circulatory system` and `Percentage` pass; `List of countries by
+# percentage of population living in poverty` does not, and neither should it. Three is generous
+# enough for `Internal combustion engine` and short enough that no list article reaches it.
+CANONICAL_MAX_WORDS = 3
+
 # ── gate 4: teaches, not depicts ────────────────────────────────────────────────────────────────
 DIAGRAM_WORDS = re.compile(
     r"\b(diagram|schematic|scheme|chart|cross[- ]?section|cutaway|labell?ed|anatomy|illustration|"
@@ -346,10 +364,21 @@ def vocabulary(guide) -> set[str]:
     return {w for w in re.findall(r"[a-z][a-z'-]{3,}", text.lower()) if w not in STOP}
 
 
+# Words this corpus puts in titles that describe the WRITING rather than the subject. Measured
+# over all 865 titles: `explained` in 8, `actually` in 6. Searching for "Otto Cycle Explained"
+# never surfaces the article literally named *Otto cycle*.
+#
+# ⚠️ **Deliberately NOT added to [STOP], and the distinction is load-bearing.** STOP also filters
+# [vocabulary], which feeds the corpus-wide document-frequency counter that [RARE_DF] is measured
+# against — widening it there would shift the rarity calculus for every guide in a wave whose picks
+# are being judged. Two effects, one edit, and only one of them wanted.
+TITLE_SCAFFOLD = {"explained", "explaining", "explainer", "actually"}
+
+
 def subject_query(guide) -> str:
     """What to ask Wikipedia. The title, minus the scaffolding words that carry no subject."""
     words = [w for w in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", guide.get("title", ""))
-             if w.lower() not in STOP]
+             if w.lower() not in STOP and w.lower() not in TITLE_SCAFFOLD]
     return " ".join(words[:6]) or guide.get("title", "")
 
 
@@ -648,21 +677,122 @@ def wikipedia_candidates(query: str, vocab: set[str], freq: collections.Counter,
     own name shares the guide's vocabulary, and an article is discarded here even on a perfect title
     match if it carries no images. Widening the pool cannot admit anything the vocabulary check
     refuses — every extra candidate faces exactly the same test — it only stops giving up early.
+
+    ⚠️ **THE CHOICE IS MADE ON THE ARTICLE'S OWN INTRO, NOT ON ITS TITLE, AND THAT REPLACES A RULE
+    THAT WAS WRONG IN BOTH DIRECTIONS.** The previous version kept whichever title contained the
+    most of the guide's vocabulary, admitting anything on two ordinary words or one rarer than
+    [RARE_DF] — and rarity is measured over the *guide corpus*, where ordinary technical words are
+    rare. Probed live against the picks a hand re-read had already rejected:
+
+        The Otto Cycle Explained   kept 'Otto Heinrich Warburg' (a biochemist, on the rare word
+                                   *otto*) and REFUSED 'Internal combustion engine' (28 images) and
+                                   'Brayton cycle' (12) — one *common* hit each
+        Intervals and How to …     kept 'Intervals (band)', which scores TWO hits (interval,
+                                   intervals) — the highest of any candidate — and has 1 image
+        How Blood Circulates       kept 'Heart' / 'Blood' on one rare hit and REFUSED
+                                   'Circulatory system', whose only hit (*system*) is common
+
+    In every case the correct article was in the results and was rejected while a homonym was
+    preferred. It also systematically favours long list-articles: for *Percentages*, `List of
+    countries by percentage of population living in poverty` (221 images) ties the canonical
+    `Percentage` (7), which then has to win a five-way tie by dictionary order.
+
+    So the title check is demoted to an ADMISSION FLOOR — one whole-word hit, any rarity, which is
+    what readmits `Circulatory system` and `Internal combustion engine` — and the winner is the
+    admitted article whose *own opening paragraph* shares the most of the guide's vocabulary. On
+    the three cases above that yields `Six-stroke engine` (overlap 7), `Fifteenth (interval)` (6)
+    and `Circulatory system` (9, and 17 images). The extract rides on the request the images
+    already come from, so this costs no extra network.
+
+    ⚠️ Search rank alone does not fix it and was measured too: rank 1 for *Intervals Hear* is
+    `Intervals (band)`, and rank 1 for *Otto Cycle Explained* is `Brayton cycle`. Rank is a weak
+    signal and is used only to break a genuine tie.
+
+    ⚠️ Word boundaries on the intro, unlike the title floor, because a paragraph is long enough for
+    substrings to collide by accident — the trap this project has corrected five times (*time*
+    inside *Mari-TIME*, *car* inside *Newborn Care*, *trans* inside *trans-fats*).
+
+    Returns the article's images, its title, and the overlapping words — the last so the run log can
+    say WHY an article was chosen. The hand re-read is done from that log, and "article: Heart"
+    tells a reader far less than "article: Heart (6: blood body heart pump system vessels)".
     """
     doc = api(WIKIPEDIA, generator="search", gsrsearch=query, gsrlimit=8,
-              prop="images", imlimit="max")
-    best, best_hits, best_title = [], 0, ""
-    for page in (doc or {}).get("query", {}).get("pages", {}).values():
+              prop="images|extracts", imlimit="max",
+              exintro=1, explaintext=1, exchars=INTRO_CHARS, exlimit=20)
+    pages = list((doc or {}).get("query", {}).get("pages", {}).values())
+
+    # ⚠️ If the API delivered no intros at all — a changed parameter, a partial response — fall back
+    # to ranking on the title rather than resolving nothing. Every candidate would score 0 overlap
+    # and the floor would refuse the lot, which is a silent total failure of the primary source.
+    have_intros = any(p.get("extract") for p in pages)
+
+    best, best_key, best_title, best_words = [], None, "", []
+    for rank, page in enumerate(pages):
         article = page.get("title", "")
-        hits = {w for w in vocab if len(w) >= 4 and w in article.lower()}
-        rare = any(freq.get(h, 10 ** 6) < RARE_DF for h in hits)
-        if not (len(hits) >= 2 or rare or (len(hits) == 1 and len(vocab) <= 3)):
-            continue                       # this article is not about the guide's subject
+        low = article.lower()
+        hits = {w for w in vocab if len(w) >= 4 and w in low}
+        if not hits:
+            continue                       # not even plausibly named for this subject
+        intro = (page.get("extract") or "").lower()
+        words = sorted(w for w in vocab
+                       if len(w) >= 4 and re.search(r"\b" + re.escape(w), intro))
+        if have_intros and len(words) < MIN_INTRO_OVERLAP:
+            continue                       # named for the subject, but not about it
         images = [im["title"] for im in page.get("images", [])
                   if not WIKI_CHROME.search(file_key(im["title"]))]
-        if images and len(hits) > best_hits:
-            best, best_hits, best_title = images[:limit], len(hits), article
-    return best, best_title
+        if not images:
+            continue
+        # ⚠️ An article NAMED for the subject outranks one that merely discusses it at length, and
+        # that tier exists because overlap alone gets the adjacent subject. Measured: with the query
+        # scaffolding fixed, *Otto Cycle* resolves `Diesel cycle` — a real engine-cycle article with
+        # a high overlap, and the wrong cycle. Likewise `Percentage`, which IS the article, ties on
+        # overlap with `List of countries by percentage of population living in poverty`.
+        #
+        # "Named for the subject" is deliberately strict: the whole title, minus scaffolding, inside
+        # the guide's own vocabulary, and short. `Intervals (band)` fails it (nothing in a music
+        # theory guide's vocabulary is *band*) while `Octave` and `Percentage` pass. It cannot
+        # readmit anything: the overlap floor is applied above, so a canonical name with no subject
+        # overlap never reaches here.
+        canonical = name_rank(article, query, vocab)
+        # Overlap decides within a tier. A genuine tie goes to the article with more to offer, then
+        # to whichever the search itself ranked higher; `index` is the search position when present.
+        key = (canonical, len(words) if have_intros else len(hits), len(images), -page.get("index", rank))
+        if best_key is None or key > best_key:
+            best, best_key, best_title, best_words = images[:limit], key, article, words
+    return best, best_title, best_words
+
+
+def name_rank(article: str, query: str, vocab: set[str]) -> int:
+    """
+    How strongly [article]'s NAME says it is the page for this subject. 2 beats 1 beats 0.
+
+    * **2 — it is literally the subject.** The title reduces to the same words as the search query.
+      ⚠️ This tier exists because tier 1 does not disambiguate near neighbours, which a measurement
+      caught: for *The Otto Cycle Explained*, `Diesel cycle` is ALSO made only of that guide's own
+      vocabulary (the guide compares the two, so *diesel* is in its headings) and scored a higher
+      intro overlap than the article actually named `Otto cycle`. An exact name cannot misfire in
+      that way.
+    * **1 — it is named for the subject.** A short title made entirely of the guide's vocabulary:
+      `Octave`, `Percentage`, `Circulatory system`. This is what beats a long list-article that
+      merely uses the same words a great deal.
+    * **0 — everything else.** `Intervals (band)` (nothing in a music-theory guide is *band*),
+      `Otto Heinrich Warburg`, `List of countries by percentage of population living in poverty`.
+
+    None of this can admit an article: the intro-overlap floor is applied before ranking, so a
+    perfectly-named page that says nothing about the subject never reaches here.
+    """
+    def bare(text: str) -> list[str]:
+        return [w.lower() for w in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text)
+                if w.lower() not in STOP and w.lower() not in TITLE_SCAFFOLD]
+
+    words = bare(article)
+    if not words:
+        return 0
+    if words == bare(query):
+        return 2
+    if len(words) <= CANONICAL_MAX_WORDS and all(w in vocab for w in words):
+        return 1
+    return 0
 
 
 def commons_category_search(query: str, limit: int = 6) -> list[str]:
@@ -923,9 +1053,12 @@ def choose(guide, freq, taken=None, verbose=True):
     taken = taken if taken is not None else set()
     vocab = vocabulary(guide)
     query = subject_query(guide)
-    wiki_titles, article = wikipedia_candidates(query, vocab, freq)
+    wiki_titles, article, overlap = wikipedia_candidates(query, vocab, freq)
     if verbose and article:
-        print(f"      · article: {article}")
+        # The overlap is printed because the hand re-read is done from this log: it is the whole
+        # reason the article was believed, so a reader can judge the pick without re-running anything.
+        why = f" ({len(overlap)}: {' '.join(overlap[:8])})" if overlap else ""
+        print(f"      · article: {article}{why}")
 
     found, seen_cats = survivors("wikipedia", wiki_titles, 0, vocab, freq, taken)
     if not found:
