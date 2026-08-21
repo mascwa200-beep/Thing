@@ -6721,3 +6721,101 @@ on every run for exactly this reason; it is the number to watch before adding an
 
 **Timing, now confirmed across three runs:** 13m11s (1905), 11m38s (1906), 13m06s (1903). Unit
 tests ~2m30-2m55s, the APK 6m52s-8m41s. Anything under ~15 minutes is ordinary.
+
+### THE ENGINE SAYS WHAT IT IS — D1/D2/D3, and a forensic case of mine that was wrong (this session)
+
+Owner sent one screenshot, no text: THEATER resolving a video correctly (title, duration,
+`2 skips queued · 71s`, full transport) and then failing with `Playback failed: 403` followed by
+yt-dlp's own *"No supported JavaScript runtime could be found. Only deno is enabled by default"*.
+Then, standing: **be very conscious of tokens until next Wednesday noon.** So: **zero subagents,
+zero workflows, no exploratory sweeps** — targeted greps over file reads, and D2+D3 in one commit
+and one CI round.
+
+**What the yt-dlp source settles, read against the exact pinned 2026.07.04 rather than recalled.**
+The warning fires from `_video.py:2983-2988` under exactly one condition, computed at `:2961`:
+`js_runtime_available = any(p.is_available() for p in self._jsc_director.providers.values())`.
+It **never consults `params['js_runtimes']`**, and *"Only deno is enabled by default"* is a
+hard-coded hint string, not evidence that a filter rejected us. So the warning is an unambiguous
+statement that `is_available()` returned False — nothing else.
+⚠️ **Do NOT "fix" it with `js_runtimes: {'lcars-quickjs': {}}`.** `_clean_js_runtimes`
+(`YoutubeDL.py:871-876`) strips any name outside deno/node/bun/quickjs and emits a misleading
+*"Ignoring unsupported JavaScript runtime(s)"*. It would look like progress and be a regression.
+The enablement gate lives **inside** `EJSBaseJCP.runtime_info` (`ejs.py:311`) — the exact property
+`lcars_jsi.py` overrides — so our provider correctly bypasses it and needs no option at all.
+
+- **D1 (`2e5522c`) — honest engine status.** `available()` collapsed several distinct failures into
+  one boolean and `_enable_js_runtime()` rendered the false branch as *"engine not in this build"*
+  — a sentence **CI disproves**, since the `JsRuntime_nativeVersion` symbol assertion means QuickJS
+  is demonstrably in the shipped library. ⚠️ **One `Probe(usable, detail)` behind a lazy feeds both
+  the verdict and the reason**, so they cannot disagree; a separate `status()` reading the world a
+  second time is how a diagnostic starts contradicting the behaviour it describes. Four causes:
+  library didn't load / no engine compiled in / the probe threw (with its own message) /
+  `quickjs <version>`. `lcars_jsi.py` mirrors it with six branches (no `java` module, setup error,
+  not registered, delegate to Kotlin, lookup failed).
+- **D1 also stamps `py <src>/apk <n>`** on the same line. Not decoration — see the contradiction below.
+- **D2 (`31ab164`) — the report survives, in the console that already exists.**
+  `MediaExtractor.lastReport` holds the whole thing untruncated. ⚠️ **Recorded at the one point
+  every resolve reaches** (after wire decode, before the `kind` branch) rather than at each outcome,
+  because the status note rides on a **successful** resolve too — and that is the case worth reading:
+  extraction that "worked" while quietly missing formats is what a dead JS engine looks like from
+  outside. ⚠️ It went into the **Crash Console**, not a new screen: that console already exists, is
+  already in MENU, already answers "what went wrong?" and is already labelled shareable — splitting
+  one question across two places is how a diagnosis ends up half-read. `_redact` runs before any of
+  it crosses the bridge, so viewing history does not ride along on something meant to be sent on.
+- **`jsc_trace` is on permanently**, so the challenge director states its own per-provider
+  availability and preference scores. Permanent deliberately: the reason this took forensics is that
+  the evidence was not being collected when it happened, and a trace you must switch on *after* the
+  failure you wanted it for is worthless. ⚠️ **`_Notes.MAX_CHARS` 300 → 1200** — the device report
+  arrived cut off **mid-URL at exactly that boundary**, and that truncation is what hid the line the
+  whole investigation turned on. 300 was sized for a compact failure line under the player.
+- **D3 — the failure stops being shown when something can be done about it.** ⚠️ **Owner's call, and
+  I advised against it**: a permanent failure with a fallback now switches silently. The cost is that
+  a future extraction fault becomes invisible there, which is *exactly* what would have made this bug
+  unreportable. Only defensible because the reason is not destroyed, only unshown — hence D2 shipping
+  in the same commit. With no fallback the message stays. ⚠️ **Keyed on the video id, not a boolean**:
+  a flag would latch, so dismissing the embedded player and hitting the same failure again would never
+  re-arm, and a failing embedded player could re-trigger the switch on itself.
+
+**⚠️ THE CORRECTION I OWE THE RECORD, and it is the lesson of the arc.** I built a three-signal
+forensic case that the screenshot came from build **#1899** (predating QuickJS, where the warning
+would be expected and there would be no bug at all) — the `javascript:` note absent, the text 297
+characters against a 300 cap, and no `PLAY IT ANOTHER WAY` button. The owner said they were on
+**#1907**. I told them my case was stronger. **They were right and I was wrong, and it is checkable
+in one command**: `#1907` is `9fc7d99`, and `git merge-base --is-ancestor` puts `58c3476` (the
+`javascript:` note), `56c23ab` (the button) and `8dc0852` (the cap) **all inside it**.
+Two distinct errors, worth separating:
+1. **I treated "not visible in a screenshot" as "not rendered."** The button draws *below* the
+   failure text, at the bottom of a scrolling column — a crop explains its absence completely, and
+   signal #3 rested entirely on the screenshot being complete. It was not evidence.
+2. **Signal #1 is still not explained**, and cropping cannot explain it: the `javascript:` note is
+   added *before* extraction (it registers the provider), so it precedes yt-dlp's warning, and a crop
+   cuts the bottom rather than the middle. That anomaly is real and is now the leading hypothesis:
+   **Chaquopy serving the previous install's extracted Python inside the new APK** — new Kotlin, old
+   `lcars_extract.py`. Which is why D1 stamps `py <src>/apk <n>`: rather than argue about which of us
+   was wrong, the build now states both versions side by side and settles it on sight.
+**Do not re-run my forensics. Read the stamp.**
+
+**What the next reading means** — play any YouTube item, then read the failure line *or*
+MENU → Crash Console → **LAST EXTRACTION**:
+
+| line | cause | where to look |
+|---|---|---|
+| `quickjs 0.16.0 · py s2/apk 1909` | engine is live | the 403 is something else |
+| `the native library did not load` | `System.loadLibrary("lcarsnative")` | the interrogator shares that library — free cross-check |
+| `jclass lookup failed …` | classloader / `@JvmStatic` dispatch | R8 is off, so the name survives |
+| no `javascript:` line, no `py s2` | **stale Chaquopy Python** | new Kotlin over an old extraction module |
+
+**Verification, all local and free:** `py_compile`; `tools/check_jsi.py --engine /tmp/qjs16/runscript`
+driving the shipped provider through real QuickJS (now reporting
+`javascript: quickjs 0.16.0 · py s2/apk ?`); `tools/android_resolve_check.sh` over all five Kotlin
+files. ⚠️ Its one complaint, `mediaExtractor`, is the documented `AppContainer` cascade — **proved
+rather than shrugged at** by swapping in `sponsorBlockRepository`, a definitely-valid pre-existing
+member, which reports identically. A **new false-positive shape for that tool: a newly-added member
+access on a type the core-only classpath cannot resolve has nothing at HEAD to cancel against.**
+CI run **1909** fully green in 9m40s (tests 2m02s, APK 5m52s), native and Python packaging assertions
+both passed, published to `latest`.
+
+⚠️ **Owner-verify, unavoidably — nothing here can load a native library on a Pixel or present a
+residential IP to YouTube.** The decisive test is one line on the device. **F1, the actual fix, is
+whichever branch of the table above that line names**; each is narrow, and none of them can be
+chosen from here.
