@@ -5029,6 +5029,85 @@ open a draft PR → `main`, verify green, merge.
 Honor the constraints above (human-gate for self-code, protected paths, commit trailers, no model id in
 artifacts, on-device verification for anything CI can't prove — esp. R8, the HUD-on-glasses, and voice).
 
+### ONE WIDGET, AND IT SAYS WHY (this session, `8daebdd`)
+
+Owner: some widgets show **"Can't load widget"**; the one that works is *"smaller and less
+informative … no other information for some reason"*. Then: **one widget only**, made hugely more
+capable, and a failure must **name its own reason** so a screenshot or the crash console carries it
+back here. Standing alongside it, stated twice: **be very conscious of plan usage, no unnecessary
+agents** — so **zero subagent spend**, overriding the ultracode directive, as with every arc since.
+
+⚠️ **"Can't load widget" is drawn by the LAUNCHER and this app cannot replace that string.** It
+appears when the host fails to apply our `RemoteViews`, or when `updateAppWidget` is never called —
+and the old `onUpdate` caught its throwable and applied **nothing**, which is precisely how the host
+ends up reaching for it. The only real fix is that every path now ends in a *successful*
+`updateAppWidget`, applying a deliberately tiny `widget_error` card when the rich one could not be
+built. That card is the one surface in the app that paints an opaque panel: it exists to be read and
+photographed over an unknown wallpaper, where a drop shadow is enough for a one-word row and not for
+four lines of exception text.
+
+**Both complaints were real defects with exact causes**, found by reading the provider rather than
+guessing:
+- **Why it shrank.** `load()` ran seven sources in parallel inside **one** `withTimeoutOrNull`
+  wrapping the whole `coroutineScope`, then `?: Net()`. One slow source therefore discarded **all
+  seven** results — including the six that finished instantly — and each blank line then hid itself
+  via `View.GONE`. Per-source budgets now; the outer bound is a backstop rather than the thing that
+  fires.
+- **Why it said nothing.** Every source was `runCatching{}.getOrDefault("")`, so a feed that threw
+  and a feed with genuinely nothing to say rendered **identically**. Same class as the safety and
+  social feeds. `WidgetDiagnostics` keeps them apart (ok / empty / failed(reason) / timed-out /
+  skipped(why)) and that distinction is the entire file.
+
+A reason reaches three places with **no new plumbing**: the card, MENU ▸ Crash Console (`LAST WIDGET
+RENDER`), and GitHub — `usageRepository.log()` is already embedded in `DebugUploader`'s bundle and
+already passes the central credential scrub.
+
+**Seven providers became one.** ⚠️ There were **seven** `AppWidgetProvider` receivers, not the four a
+grep for the class suggests — `JarvisWidgets.kt` registered four sharing one base class. Read the
+manifest, not the file list. `LockWidgetProvider`'s class name and the `widget_lock` layout id are
+**identity** and survive the rewrite: renaming either orphans an instance already placed.
+
+**Overpowered means it adapts.** Four `RemoteViews` keyed on `SizeF` (API 31, our floor). ⚠️ Each
+breakpoint height is **derived** from its row count (~16dp of 12sp text plus a 2dp margin, over 20dp
+of padding: 4→90, 9→165, 14→275, 20→385), and `lock_widget_info.xml`'s resize range reaches every
+one — **a breakpoint the range cannot reach is a variant that can never be drawn, and nothing would
+report it**; the widget would simply look as though it had one layout. The rows are **generic slots**
+(`widget_row_0…19`), not one view per feed, which is what lets one layout serve a four-row summary
+and a twenty-row dashboard. The Oracle leads: `OracleEngine.read()` ranks cross-signal insights over
+~18 domains and reached the home screen **not at all**.
+
+⚠️ **Wiring the last three feeds closed three enum constants and one `Outcome` branch that were
+declared and never constructed** — the computed-and-never-used class this project keeps correcting,
+and I was about to ship a fresh instance of it. Check every new enum's constants against their call
+sites before committing. Their shared location rule was extracted to `widgetPlace()` rather than
+copied: the last time that rule lived in three places, one copy had silently dropped its
+`useDeviceLocation` branch and the widget in actual use had permanently blank weather.
+
+**Verification, all local and free.** `WidgetLinkageTest` 7/7 with four guards negative-tested (a raw
+literal, a hardcoded hex, a phantom manifest class, an orphaned route — each failing exactly its own
+test); new `WidgetDiagnosticsTest` 10/10 with **six** rules negative-tested; and a **typed probe**
+compiling every new core expression against the real `Incident`, `Geodesy` and `SatellitePasses`
+types, which is what proved the resolve-check's remaining twenty complaints were its documented
+app-module cascade rather than defects. ⚠️ That probe needed **jsoup on the compiler classpath** —
+`:core:telemetry` depends on it now, and without it the whole core fails and every core member
+cascades. `tools/android_resolve_check.sh` already handles this; a hand-rolled probe does not.
+
+⚠️ **A python edit script writes at the END: an assertion failing on the second replacement means
+NEITHER was written**, even though the first `replace` succeeded in memory. Check the file, not the
+exit message.
+
+**Also closed while in there:** `widget_bg.xml` was orphaned by the deletions (its only remaining
+mention was a comment); it now backs the fault card, which is a better use than deleting it.
+`nw_faint` was genuinely dead and is gone, with the comment that named it corrected.
+`WidgetLinkageTest` still referenced `widget_feed_preview.xml` in three places after that file was
+deleted.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a widget, it never draws one.** Resize it through
+several sizes and confirm it shows **more** rather than the same rows stretched; check the picker
+lists **LCARS** once with a real description. Then the decisive one: if anything fails it should name
+the reason **on the widget itself** — screenshot that, or MENU ▸ Crash Console ▸ Send report, and it
+reaches `debug-reports`.
+
 ### THE GATES THAT COULD NOT FIRE (this session, PR on `claude/loving-edison-bd65oa`)
 
 Owner: *"recomplete the image wave and then ensure that everything for Android build and desktop
