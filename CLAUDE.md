@@ -7919,3 +7919,18 @@ weight → keep it → search for it tomorrow. Everything above is CI-compile-ga
 **Open / steerable:** saved *meals* (a group logged as several entries, distinct from a recipe's one)
 were considered and not built — `Recipes` already carries the arithmetic, so it is a `kind` field and
 a branch at the log site whenever the owner wants it. A `health` CSV import has no counterpart.
+
+**All four items green on `49a3515` (build #1949).** Android: unit tests 3m01s, release APK 9m43s,
+both packaging assertions and the R8 keep gate passing with their evidence printed —
+`kept: dev.mascwa.pulse.BuildConfig`, `kept: dev.mascwa.pulse.data.media.JsRuntime`, sentinel
+correctly absent. Desktop: build plus a real Windows MSI packaged and published. ⚠️ **APK now 160 MB
+(168,355,541 bytes)** — the 158 MB figure recorded under run 1906 above is that run's number and
+stays as written; this is the current one, and it is still paid in full on every automatic update.
+
+⚠️ **A verification note from the wait itself.** The relayed `check_suite.completed` events read
+*"No check in this GitHub App's check suite failed … if you were waiting on CI, continue"* — and the
+first one arrived while the Android job was still building, because this repo runs **two workflows
+per push** and each completes its own suite. Acting on it would have been acting on the desktop
+result. The suite event is a prompt to look, never the verdict; `pull_request_read` with
+`get_check_runs` is the verdict, and `actions_get`/`get_workflow_job` gives the step-level detail
+that says *which* gate has actually passed.
