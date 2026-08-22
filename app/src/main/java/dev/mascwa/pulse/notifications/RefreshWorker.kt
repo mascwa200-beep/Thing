@@ -63,6 +63,17 @@ class RefreshWorker(
         // and the check that does sit below these gates only ever posted a note about it.
         val buildWaiting = installNewestBuild(settings)
 
+        // ⚠️ Above the notification gates for the same reason as everything else up here, and AFTER
+        // the app update on purpose: both want the same Wi-Fi, and being on the newest build matters
+        // more than having one more optional payload. The provisioner takes at most one item per
+        // pass, so this cannot become a long job that starves the rest of the worker.
+        runCatching {
+            container.payloadProvisioner.runPass(
+                unmetered = container.connectivityObserver.isUnmetered.value,
+                interrogatorOn = settings.sensing.interrogator,
+            )
+        }
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 

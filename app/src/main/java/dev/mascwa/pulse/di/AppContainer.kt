@@ -306,6 +306,19 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * The large optional payloads, fetching themselves on Wi-Fi rather than waiting to be pressed.
+     *
+     * ⚠️ A lazy, so a phone that never reaches an unmetered pass never constructs it — and, more to
+     * the point, never touches [llamaEngine], whose own construction is what a device with no
+     * interest in the interrogator should be spared.
+     */
+    val payloadProvisioner: dev.mascwa.pulse.data.provision.PayloadProvisioner by lazy {
+        dev.mascwa.pulse.data.provision.PayloadProvisioner(
+            appContext, packRepository, llamaEngine, usageRepository,
+        )
+    }
+
+    /**
      * What the reader is learning from the bundled library, and when they are next due to be asked.
      *
      * Separate from [libraryLookup]: that one answers a question, this one decides what to teach and
