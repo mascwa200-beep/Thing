@@ -7790,9 +7790,14 @@ appearing (that path has never once run); and, after a fortnight of real logging
 targets feel sane. Expenditure needs 2–3 weeks before it is trustworthy and the surface says so
 rather than printing a confident number on day two.
 
-**Open, in the plan (`robust-baking-dewdrop.md`):** H8 the barcode scanner (⚠️ **ZXing core, not ML
-Kit** — the unbundled variant needs Play Services, which is the wrong bet on GrapheneOS, and the
-bundled one adds 2–3 MB to an APK the auto-updater re-downloads in full on every build); H12 Health
-Connect behind a capability check (⚠️ its availability on this GrapheneOS build is **unverified**, so
-the whole integration degrades to manual entry), progress photos and CSV export; and saved meals and
-custom foods, which the recipe store's shape already accommodates.
+**Open, in the plan (`robust-baking-dewdrop.md`):** H12 Health Connect behind a capability check
+(⚠️ its availability on this GrapheneOS build is **unverified**, so the whole integration degrades to
+manual entry), progress photos and CSV export; and saved meals and custom foods, which the recipe
+store's shape already accommodates.
+
+⚠️ **The plan's "remaining" list is stale on H8 — the barcode scanner is DONE.** ZXing core is a real
+dependency, `androidx.camera.view` is implemented, `BarcodeScannerScreen.kt` is 250 lines, and
+`FindAFood` calls it. Checked rather than assumed, after I repeated the plan's claim in a commit
+message. ZXing core was the right call over ML Kit for the reasons the plan gives: the unbundled ML
+Kit variant needs Play Services, which is the wrong bet on GrapheneOS, and the bundled one adds
+2–3 MB to an APK the auto-updater re-downloads in full on every build.
