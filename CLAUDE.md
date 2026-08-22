@@ -16,9 +16,13 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
   `app-release.apk` to the rolling **`latest`** GitHub release, and deletes the stale `app-debug.apk`.
   `concurrency: cancel-in-progress` (a new push supersedes the in-flight run).
 - The **shipped build is `release`** but configured to keep the **debug identity**: `applicationIdSuffix=".debug"`
-  (package `dev.mascwa.pulse.debug`) signed with the **committed `app/debug.keystore`**, `isMinifyEnabled=false`
-  (R8 OFF — deliberate; PGO ≠ R8, R8 is a risky opt-in needing verified keep-rules). Non-debuggable so the
-  **baseline profile** (`app/src/main/baseline-prof.txt` + `androidx.profileinstaller`) gives PGO-style AOT.
+  (package `dev.mascwa.pulse.debug`) signed with the **committed `app/debug.keystore`**. ⚠️ **`isMinifyEnabled
+  = true` — R8 is ON**, and has been since `39418b5` (PR #328). ~~R8 OFF — deliberate; PGO ≠ R8, R8 is a
+  risky opt-in needing verified keep-rules~~ was true once and is long stale; leaving it here cost a whole
+  session of misdiagnosis, because it made an R8 symptom look impossible. Keep rules live in
+  `app/proguard-rules.pro`, and the CI step **"Verify Python's Java lookups survived R8"** is what stops a
+  missing one shipping silently. Non-debuggable so the **baseline profile**
+  (`app/src/main/baseline-prof.txt` + `androidx.profileinstaller`) gives PGO-style AOT.
 - `versionCode = github.run_number` (each build out-versions the last). In-app updater
   (`data/update/UpdateRepository.kt`) reads the private repo with the GitHub token, picks the **newest** `.apk`
   asset, installs via FileProvider (user confirms). "App not installed" = signature mismatch → one-time
@@ -6881,7 +6885,7 @@ MENU → Crash Console → **LAST EXTRACTION**:
 |---|---|---|
 | `quickjs 0.16.0 · py s2/apk 1909` | engine is live | the 403 is something else |
 | `the native library did not load` | `System.loadLibrary("lcarsnative")` | the interrogator shares that library — free cross-check |
-| `jclass lookup failed …` | classloader / `@JvmStatic` dispatch | R8 is off, so the name survives |
+| `jclass lookup failed …` | ⚠️ **R8 renamed the class** — this WAS the bug | ~~R8 is off, so the name survives~~ — flatly wrong, see below |
 | no `javascript:` line, no `py s2` | **stale Chaquopy Python** | new Kotlin over an old extraction module |
 
 **Verification, all local and free:** `py_compile`; `tools/check_jsi.py --engine /tmp/qjs16/runscript`

@@ -497,6 +497,96 @@ jobs:
           # The library file itself, not the package directory — see the assertion above.
           SOLVER: yt_dlp_ejs/yt/solver/lib.min.js
 
+      - name: Verify Python's Java lookups survived R8
+        # ⚠️ THIS STEP EXISTS BECAUSE ITS ABSENCE SHIPPED A BROKEN THEATER FOR MONTHS.
+        #
+        # `proguard-rules.pro` predicted the failure in writing — "R8 renames or removes classes the
+        # native interpreter resolves BY NAME at runtime, so the build goes green, the APK ships, and
+        # Python fails on the device. Nothing in CI could catch that" — and then it happened, to a
+        # class its own keeps did not cover. `jclass('dev.mascwa.pulse.data.media.JsRuntime')` threw
+        # NoClassDefFoundError on every release build, so yt-dlp had no JavaScript runtime, so
+        # YouTube's `n` parameter was never transformed, so every media URL came back 403.
+        #
+        # It went unnoticed for five rounds of debugging because the native gate above passes
+        # CORRECTLY the whole time: `nm -D` reads the C++ JNI symbol, which R8 cannot touch. The
+        # engine really was in the .so. The Kotlin class binding to it was not in the DEX.
+        #
+        # "Nothing in CI could catch that" was true and did not have to be. This is the catch.
+        #
+        # ⚠️ THE NAMES ARE DERIVED FROM THE PYTHON, NEVER LISTED HERE. A hand-kept list is a second
+        # statement of the same fact and only one of the two ever gets updated — the exact drift this
+        # repo has already corrected in NotifId, WidgetLinkageTest and the desktop mirror map. Add a
+        # `jclass('...')` to the Python without a keep rule and this fails on the next build.
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "inspecting $apk"
+
+          names=$(grep -rhoE "jclass\(['\"][A-Za-z0-9_.]+['\"]\)" app/src/main/python/ \
+                  | sed -E "s/jclass\(['\"]([A-Za-z0-9_.]+)['\"]\)/\1/" | sort -u)
+
+          # ⚠️ A grep that matched nothing looks exactly like a gate that passed. If the Python moves
+          # or the call style changes, this must fail loudly rather than silently verify an empty set.
+          if [ -z "$names" ]; then
+            echo "FAIL: extracted no jclass() names from app/src/main/python/ — either the sources"
+            echo "      moved or the call style changed, and this gate is no longer checking anything."
+            exit 1
+          fi
+          echo "Python resolves these by name:"
+          echo "$names" | sed 's/^/  /'
+
+          # ⚠️ THE DEX FILES ONLY, NEVER THE WHOLE APK. `lcars_jsi.py` ships as an asset, so an
+          # APK-wide grep would match the Python source's own string literal and pass no matter what
+          # R8 did to the class — a gate that cannot fail, which is worse than no gate.
+          rm -rf /tmp/dex && mkdir -p /tmp/dex
+          for d in $(unzip -l "$apk" | awk '/ classes[0-9]*\.dex$/ {print $4}'); do
+            unzip -p "$apk" "$d" > "/tmp/dex/$(basename "$d")"
+          done
+          if [ -z "$(ls -A /tmp/dex)" ]; then
+            echo "FAIL: no classes*.dex extracted from the APK."
+            exit 1
+          fi
+          echo "checking $(ls /tmp/dex | wc -l) dex file(s)"
+
+          # The DEX type descriptor, not the dotted name. That distinction is the check: a dotted
+          # string could survive as an ordinary constant somewhere while the class itself was
+          # renamed, whereas `Ldev/mascwa/pulse/…/JsRuntime;` exists only if the class does.
+          descriptor() { printf 'L%s;' "$(echo "$1" | tr '.' '/')"; }
+
+          missing=""
+          for n in $names; do
+            if grep -qa -- "$(descriptor "$n")" /tmp/dex/*.dex; then
+              echo "  kept: $n"
+            else
+              echo "  GONE: $n"
+              missing="$missing $n"
+            fi
+          done
+
+          # ⚠️ Two-sided, so the run itself shows the matcher discriminates. A grep that finds
+          # everything is indistinguishable from a passing gate, and this project has now shipped
+          # four different flavours of "green for the wrong reason". A name that certainly does not
+          # exist must come back absent.
+          if grep -qa -- "$(descriptor "$SENTINEL")" /tmp/dex/*.dex; then
+            echo "FAIL: the sentinel $SENTINEL was 'found' in the DEX. This check matches anything,"
+            echo "      so its passes mean nothing. Fix the matcher before trusting this step."
+            exit 1
+          fi
+          echo "  (sentinel correctly absent — the check can fail)"
+
+          if [ -n "$missing" ]; then
+            echo "FAIL: R8 removed or renamed these, and Python resolves them BY NAME at runtime:"
+            for n in $missing; do echo "        $n"; done
+            echo "      Add a keep to app/proguard-rules.pro beside the Chaquopy block:"
+            for n in $missing; do echo "        -keep class $n { *; }"; done
+            echo "      Shipping without it would look completely fine here and fail on the device."
+            exit 1
+          fi
+          echo "Python's Java lookups survived R8."
+        env:
+          # Deliberately absurd, and never referenced by any source, so its presence in the DEX could
+          # only mean the matcher is broken.
+          SENTINEL: dev.mascwa.pulse.ThisClassDoesNotExist_R8GateSentinel
+
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:

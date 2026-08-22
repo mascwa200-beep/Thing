@@ -117,11 +117,20 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             // R8 code shrinking ON (owner-approved). It tree-shakes unused code — most notably the large
-            // material-icons-extended library — for a real APK/DEX win. The keep + dontwarn rules in
-            // proguard-rules.pro cover everything reflection/JNI/serialization-driven (MediaPipe, Vosk/JNA,
-            // MapLibre, Spotify/Gson, luaj, Room, kotlinx.serialization) that R8 can't see. R8 fullMode is
-            // disabled (gradle.properties) for a conservative first enablement. NEEDS on-device
-            // verification. Resource shrinking is the next step once this is confirmed working on the Pixel.
+            // material-icons-extended library — for a real APK/DEX win. R8 fullMode is disabled
+            // (gradle.properties) for a conservative enablement.
+            //
+            // ⚠️ THE KEEP RULES ARE LOAD-BEARING AND THIS LIST HAS ALREADY BEEN INCOMPLETE ONCE. It used
+            // to read "cover everything reflection/JNI/serialization-driven (MediaPipe, Vosk/JNA, MapLibre,
+            // Spotify/Gson, luaj, Room, kotlinx.serialization)" — third-party libraries, every one of them,
+            // and it omitted the direction that actually broke: OUR OWN classes reached by name from the
+            // bundled Python. R8 renamed `data.media.JsRuntime` away, so YouTube extraction had no
+            // JavaScript engine and every media URL came back 403, on every release build, for months.
+            //
+            // The gap is closed twice over: the keeps in proguard-rules.pro, and the CI step "Verify
+            // Python's Java lookups survived R8", which derives the class names from the Python sources and
+            // asserts each survived into the shipped DEX. A missing keep now fails the build instead of the
+            // device. Resource shrinking stays off until the owner confirms this build on the Pixel.
             isMinifyEnabled = true
             isShrinkResources = false
             proguardFiles(

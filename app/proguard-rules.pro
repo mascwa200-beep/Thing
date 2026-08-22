@@ -73,6 +73,33 @@
 -keepclassmembers class * implements com.chaquo.python.PyProxy { *; }
 -dontwarn com.chaquo.python.**
 
+# ---- OUR OWN classes the bundled Python resolves BY NAME (app/src/main/python/*.py) ----
+#
+# ⚠️ THIS IS THE GAP THE BLOCK ABOVE LEFT OPEN, AND IT SHIPPED BROKEN FOR MONTHS. Those rules keep
+# Chaquopy's runtime and anything extending PyObject / implementing PyProxy. They do NOT cover an
+# ordinary app class that Python reaches through `jclass('fully.qualified.Name')` — which is
+# neither. R8 saw no Kotlin reference to `JsRuntime` (only Python names it, in a string, in an
+# asset) so it renamed the class away, and on the device the lookup threw NoClassDefFoundError.
+#
+# The consequence was not subtle and was not obvious: no JS runtime meant yt-dlp could not
+# transform YouTube's `n` parameter, so every signed media URL came back 403 and THEATER could not
+# play anything. CI passed throughout — its native gate reads `nm -D` for the C++ JNI symbol, which
+# R8 cannot touch, so the engine really was in the .so while the class binding to it was not in the
+# DEX. Five rounds of debugging went past it.
+#
+# `{ *; }` is load-bearing at BOTH ends: Python calls the @JvmStatic
+# available()/status()/version()/evalOrThrow(), and JNI binds nativeEval/nativeAvailable/
+# nativeVersion by name from C++. Renaming either half breaks the bridge.
+-keep class dev.mascwa.pulse.data.media.JsRuntime { *; }
+# Same failure, second instance: lcars_extract.py reads VERSION_CODE off this reflectively for the
+# build stamp in the diagnostics, and R8 removes BuildConfig by default once its constants are
+# inlined. That is why the stamp printed `apk ?` rather than a number.
+-keep class dev.mascwa.pulse.BuildConfig { *; }
+#
+# ⚠️ Adding a `jclass('...')` lookup to the Python WITHOUT a keep here is the same bug again. The
+# "Verify Python's Java lookups survived R8" step in android-build.yml exists to catch exactly
+# that: it derives the names from the Python sources and asserts each one is in the shipped DEX.
+
 # ---- Vosk + JNA (native STT; JNA binds native via reflection/proxies) ----
 -keep class org.vosk.** { *; }
 -keep class com.sun.jna.** { *; }
