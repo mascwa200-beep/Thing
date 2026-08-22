@@ -8076,7 +8076,7 @@ expected value from the shipped function before writing the assertion.**
 press **SHOW THE REPORT**. It opens the crash console *and* leaves the failing page. The top entry's
 full trace names the composable, and that is the whole of what is still missing.
 
-### THE CLAMP, AND THE CENSUS THAT SAYS WHY IT IS ONLY A CONTAINMENT (this session cont., PR #456)
+### THE CLAMP, AND THE CENSUS THAT SAYS WHY IT IS ONLY A CONTAINMENT (PR #456, merged `1d7a736`)
 
 Owner chose, via AskUserQuestion and against my stated advice, **"diagnostics + a defensive
 clamp"**. Their call; I built it, but designed so it **reports when it fires** rather than
