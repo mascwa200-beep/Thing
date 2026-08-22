@@ -156,6 +156,28 @@ class WorldLedger(private val root: Path = AppPaths.dataDir.resolve(DIR_NAME)) {
         Files.list(root).use { s -> s.filter { Files.isDirectory(it) }.map { it.fileName.toString() }.sorted().toList() }
     }
 
+    /**
+     * Whether [metricId] has already had a provider's history poured into it.
+     *
+     * ⚠️ A marker file inside the metric's own directory rather than a preference, so it travels with
+     * the data it describes: clearing the ledger clears the memory of having filled it, which is the
+     * only behaviour that leaves a wiped ledger able to fill itself again. A preference would remember
+     * a backfill whose rows no longer exist and refuse to do it a second time.
+     */
+    suspend fun isBackfilled(metricId: String): Boolean = withContext(Dispatchers.IO) {
+        Files.exists(root.resolve(requireSafeId(metricId)).resolve(BACKFILL_MARKER))
+    }
+
+    /** Record that [metricId] has been backfilled, whether or not any rows survived the judging. */
+    suspend fun markBackfilled(metricId: String) {
+        val id = requireSafeId(metricId)
+        withContext(Dispatchers.IO) {
+            val dir = root.resolve(id)
+            Files.createDirectories(dir)
+            runCatching { Files.write(dir.resolve(BACKFILL_MARKER), ByteArray(0)) }
+        }
+    }
+
     suspend fun sizeBytes(): Long = withContext(Dispatchers.IO) {
         if (!Files.exists(root)) return@withContext 0L
         Files.walk(root).use { s -> s.filter { Files.isRegularFile(it) }.mapToLong { Files.size(it) }.sum() }
@@ -316,6 +338,15 @@ class WorldLedger(private val root: Path = AppPaths.dataDir.resolve(DIR_NAME)) {
         const val DAILY_FILE = "daily.csv"
         const val FULL_SUFFIX = ".csv"
         const val BACKFILL_FLAG = "b"
+
+        /**
+         * Empty marker written beside a metric's month files once its history has been fetched.
+         *
+         * ⚠️ Deliberately not `.csv`-shaped: [MONTH_FILE] matches only `yyyy-MM.csv`, so this is
+         * invisible to every reader. Naming it something a reader might parse is how a stray file
+         * became a 1970 observation in every distribution once already.
+         */
+        const val BACKFILL_MARKER = ".backfilled"
 
         /** How long observations are kept at the cadence they were taken. See the retention note above. */
         const val FULL_RESOLUTION_DAYS = 365L

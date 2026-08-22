@@ -60,20 +60,25 @@ object LongWatch {
         weather: WeatherRepository,
         space: SpaceWeatherRepository,
         markets: MarketsRepository,
-    ): Collector = Collector(
-        ledger = WorldLedger(),
-        settings = settings,
-        weather = weather,
-        space = space,
-        markets = markets,
-        radar = RadarRepository(http, cache, TleRepository(http, cache)),
-        safety = SafetyRepository(http, cache),
-        orbital = OrbitalRepository(http, cache) { NASA_DEMO_KEY },
-    )
+    ): Collector {
+        val ledger = WorldLedger()
+        return Collector(
+            ledger = ledger,
+            settings = settings,
+            weather = weather,
+            space = space,
+            markets = markets,
+            radar = RadarRepository(http, cache, TleRepository(http, cache)),
+            safety = SafetyRepository(http, cache),
+            orbital = OrbitalRepository(http, cache) { NASA_DEMO_KEY },
+            backfill = Backfill(ledger, http),
+        )
+    }
 
-    private fun build(settings: DesktopSettingsStore, http: HttpClient, cache: DiskCache): Collector =
-        Collector(
-            ledger = WorldLedger(),
+    private fun build(settings: DesktopSettingsStore, http: HttpClient, cache: DiskCache): Collector {
+        val ledger = WorldLedger()
+        return Collector(
+            ledger = ledger,
             settings = settings,
             weather = WeatherRepository(http, cache) { DesktopUnits.weatherPreferences(settings.current()) },
             space = SpaceWeatherRepository(http, cache),
@@ -85,7 +90,9 @@ object LongWatch {
             radar = RadarRepository(http, cache, TleRepository(http, cache)),
             safety = SafetyRepository(http, cache),
             orbital = OrbitalRepository(http, cache) { NASA_DEMO_KEY },
+            backfill = Backfill(ledger, http),
         )
+    }
 
     /**
      * Run exactly one pass and describe it — the whole of what `--collect` does.

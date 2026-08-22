@@ -44,14 +44,23 @@ class Collector(
     private val radar: RadarRepository,
     private val safety: SafetyRepository,
     private val orbital: OrbitalRepository,
+    private val backfill: Backfill? = null,
 ) {
 
     /** What a pass did, in one sentence, for the log and the diagnostics line. */
-    data class Pass(val recorded: Int, val domains: List<String>, val skipped: List<String>) {
-        fun describe(): String = when {
-            recorded == 0 && domains.isEmpty() -> "nothing was due"
-            recorded == 0 -> "nothing came back from ${domains.joinToString(", ")}"
-            else -> "$recorded readings from ${domains.joinToString(", ")}"
+    data class Pass(
+        val recorded: Int,
+        val domains: List<String>,
+        val skipped: List<String>,
+        val backfilled: Backfill.Report? = null,
+    ) {
+        fun describe(): String {
+            val collected = when {
+                recorded == 0 && domains.isEmpty() -> "nothing was due"
+                recorded == 0 -> "nothing came back from ${domains.joinToString(", ")}"
+                else -> "$recorded readings from ${domains.joinToString(", ")}"
+            }
+            return backfilled?.let { "$collected; backfill: ${it.describe()}" } ?: collected
         }
     }
 
@@ -81,6 +90,14 @@ class Collector(
         val place = settings.here()
         val placeKey = place?.let { MetricRegistry.placeKey(it.first, it.second) }
 
+        // ⚠️ Before the live readings, and inside the same lock. Before, because a metric filled from
+        // history is scoreable on this very pass rather than the next one; inside the lock, because a
+        // year of hourly weather appended twice would double every sample count in it. Its own marker
+        // files mean this is a no-op on all but the first pass at a given place.
+        val backfilled = place?.let { (lat, lon) ->
+            runCatching { backfill?.runOnce(lat, lon, placeKey, nowMs) }.getOrNull()
+        }
+
         var recorded = 0
         val read = mutableListOf<String>()
         val skipped = mutableListOf<String>()
@@ -108,7 +125,7 @@ class Collector(
             }
         }
 
-        return Pass(recorded, read, skipped)
+        return Pass(recorded, read, skipped, backfilled)
     }
 
     /**
