@@ -7644,4 +7644,17 @@ plausible movers; then close it overnight and check the window reads in days rat
 a fresh install expect the "too little recent history" line to dominate until the collector has run
 for a couple of weeks, which is the honest state rather than a fault.
 
+⚠️ **AN ORDERING MISTAKE WORTH NOT REPEATING, and it is a consequence of the `paths-ignore` rule
+added a few sessions back.** The handoff commit was pushed *last*, so a docs-only commit became the
+PR head — and `android-build.yml` ignores `CLAUDE.md` while `desktop-build.yml` has an allowlist it
+does not match, so **the head carried no check runs at all** and `get_check_runs` on the PR returned
+zero. It did not block anything (`mergeable_state` was `clean`, so no required checks are
+configured), but it makes the PR read as untested and the compact CI poll useless. **Push the docs
+commit first, or bundle it with the code.**
+
+**Merged to `main` as `8a36b81` (PR #453), both suites green at `0604c55`** — Android unit tests,
+release APK, the native/Python packaging assertions and the R8 keep-rule gate, plus the desktop
+build and a real Windows MSI packaged and published to `desktop-latest`. The dev branch is re-synced
+by merging `origin/main` back (my authorship, never a fast-forward onto GitHub's squash commit).
+
 **The LONG WATCH plan is now complete** except slice 10, declined above with its reasoning.
