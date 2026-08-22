@@ -149,6 +149,7 @@ private val TOP_LEVEL: Map<String, String> = mapOf(
     Routes.MARKETS to "MAIN",
     Routes.WEATHER to "MAIN",
     Routes.JARVIS to "MAIN",
+    Routes.HEALTH to "MAIN",
     Routes.MENU to "MAIN",
 )
 

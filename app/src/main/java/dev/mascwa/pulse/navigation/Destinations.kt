@@ -41,6 +41,9 @@ object Routes {
     const val RADIO = "radio"
     const val MUSIC = "music"
 
+    // HEALTH — what you eat, what your body does about it, and what to do next.
+    const val HEALTH = "health"
+
     // Personal logs
     const val NOTES = "notes"
     const val DIARY = "diary"
@@ -109,5 +112,10 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.MARKETS, "MARKETS", LcarsIcons.ShowChart, LcarsIcons.ShowChart),
     TopDestination(Routes.WEATHER, "WEATHER", LcarsIcons.WbSunny, LcarsIcons.WbSunny),
     TopDestination(Routes.JARVIS, "COMPUTER", LcarsIcons.AutoAwesome, LcarsIcons.AutoAwesome),
+    // ⚠️ The seventh slot, between COMPUTER and MENU. Measured before adding it: at 9sp Antonio
+    // with 0.6 tracking, seven tabs on a 411dp screen leave 43.7dp of text room per slot and the
+    // widest label — COMPUTER, not MARKETS — needs 39.3dp. HEALTH needs 26.7dp. It fits with room;
+    // an eighth would not.
+    TopDestination(Routes.HEALTH, "HEALTH", LcarsIcons.Vitals, LcarsIcons.Vitals),
     TopDestination(Routes.MENU, "MENU", LcarsIcons.GridView, LcarsIcons.GridView),
 )
