@@ -18,9 +18,11 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
 import java.io.File
+import java.awt.Dimension
 
 /**
  * Rung C — the standby display as an always-on-top panel, and the screensaver window.
@@ -39,7 +41,7 @@ import java.io.File
 fun StandbyHudWindow(session: StandbySession, onClose: () -> Unit) {
     val state by session.state.collectAsState()
     val windowState = rememberWindowState(
-        size = DpSize(HUD_W.dp, HUD_H.dp),
+        size = DpSize(StandbyHudSize.first, StandbyHudSize.second),
         position = WindowPosition(Alignment.TopEnd),
     )
     Window(
@@ -50,6 +52,14 @@ fun StandbyHudWindow(session: StandbySession, onClose: () -> Unit) {
         alwaysOnTop = true,
         resizable = true,
     ) {
+        // ⚠️ A floor on how small this can be dragged. It is `undecorated` AND `resizable`, which is
+        // the one configuration with no title bar to stop at — the panel can be pulled down to a few
+        // pixels, and a layout asked to fit in nothing is how a window ends up throwing rather than
+        // just looking bad. `rememberWindowState` has no minimumSize, so it is set on the AWT window.
+        LaunchedEffect(window) {
+            window.minimumSize = Dimension(HUD_MIN_EDGE, HUD_MIN_EDGE)
+        }
+
         PulseDesktopTheme {
             // ⚠️ The whole panel is the drag handle. An undecorated window has no title bar, so
             // without this it can be placed once and never moved — and a panel pinned over whatever
@@ -120,5 +130,5 @@ fun StandbyScreenSaverWindow(picture: File, onExit: () -> Unit) {
 }
 
 /** The HUD's opening size — the canvas the display was laid out at. */
-const val HUD_W = 460
-const val HUD_H = 620
+/** How small the HUD may be dragged, in pixels. Below roughly this it has nothing to say. */
+private const val HUD_MIN_EDGE = 220

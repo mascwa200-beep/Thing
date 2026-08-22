@@ -26,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -58,10 +59,18 @@ class WorldFeed<T>(
     private val _state = MutableStateFlow(Async<T>())
     val state: StateFlow<Async<T>> = _state.asStateFlow()
 
-    private val _located = MutableStateFlow(true)
+    /**
+     * ⚠️ **Null means "nobody has looked yet", and that is the whole point of the type.**
+     *
+     * This used to be a `Boolean` initialised to `true`, written only from inside the launched
+     * coroutine. So "we have a coordinate" and "nothing has run" were the same value, and a feed that
+     * never started was indistinguishable on screen from one that had checked and was fine. That
+     * ambiguity is exactly what made a real fault read as an ordinary empty page for as long as it did.
+     */
+    private val _located = MutableStateFlow<Boolean?>(null)
 
-    /** False when settings hold no coordinate, which is a different thing from a failed fetch. */
-    val located: StateFlow<Boolean> = _located.asStateFlow()
+    /** True with a coordinate, false without one, **null when the question has not been asked yet**. */
+    val located: StateFlow<Boolean?> = _located.asStateFlow()
 
     private var job: Job? = null
 
@@ -74,12 +83,20 @@ class WorldFeed<T>(
     fun refresh(force: Boolean = true) {
         job?.cancel()
         job = scope.launch {
+            // ⚠️ Marked busy BEFORE the first suspension point. Reading the settings file can block on
+            // a lock held across disk IO, and until this line existed that whole window rendered as
+            // "nothing loaded yet" with the busy bar off — a page that looks finished while it is in
+            // fact still starting.
+            _state.update { it.copy(loading = true) }
             val here = settings.here()
             _located.value = here != null
             if (here == null) {
                 // ⚠️ Explicitly cleared rather than left spinning. A screen that says "loading" forever
                 // because nobody ever entered a location is the least helpful thing it could do.
-                _state.value = _state.value.copy(loading = false, error = null)
+                //
+                // `update` rather than `value = value.copy(...)`: that form is a read-modify-write, and a
+                // superseded job taking this branch could otherwise clobber a newer one's state.
+                _state.update { it.copy(loading = false, error = null) }
                 return@launch
             }
             _state.load(force) { f -> fetch(here.first, here.second, f) }
@@ -99,7 +116,8 @@ fun <T> WorldPanel(
     title: String,
     feed: WorldFeed<T>,
     state: Async<T>,
-    located: Boolean,
+    /** True with a coordinate, false without one, null when the feed has not looked yet. */
+    located: Boolean?,
     trailing: String? = null,
     /** Shown when there is a coordinate and a payload but the payload holds nothing. */
     emptyMessage: String = "Nothing to report.",
@@ -114,7 +132,7 @@ fun <T> WorldPanel(
         }
         LcarsBusyBar(active = state.loading, modifier = Modifier.fillMaxWidth())
 
-        if (!located) {
+        if (located == false) {
             LcarsFrame(Modifier.fillMaxWidth().padding(top = 10.dp), accent = c.amber) {
                 Text(
                     "This machine does not know where it is. Open SETTINGS and either let it guess " +
@@ -154,8 +172,16 @@ fun <T> WorldPanel(
         val data = state.data
         if (data == null) {
             if (!state.loading && state.error == null) {
+                // ⚠️ Three different situations, said differently. "Nothing loaded yet." was printed for
+                // all of them, including the one where the feed had never run at all — so a screen that
+                // was quietly broken read exactly like a screen that was merely empty.
+                val (line, tone) = when (located) {
+                    null -> "Waiting to start." to c.muted
+                    else -> "Nothing came back, and nothing reported a reason. " +
+                        "Press REFRESH; if this persists, MENU \u2192 CRASH CONSOLE will say why." to c.amber
+                }
                 LcarsFrame(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                    Text("Nothing loaded yet.", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
+                    Text(line, fontFamily = JetBrainsMono, fontSize = 12.sp, lineHeight = 17.sp, color = tone)
                 }
             }
         } else if (isEmpty(data)) {

@@ -1,13 +1,18 @@
 package dev.mascwa.pulse.desktop
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.diagnostics.CrashReporter
+import dev.mascwa.pulse.desktop.diagnostics.WindowFaultHandler
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.live.LivePlayer
@@ -93,6 +98,25 @@ private val consoleKeys = ConsoleKeys()
  */
 private var startOnSettings = false
 
+/**
+ * A window dimension this program is willing to use.
+ *
+ * ⚠️ A window smaller than its own title bar and borders has a **negative content height**, and a
+ * negative dimension is one of the few things Compose's layout refuses outright rather than clamps.
+ * Nothing in this round-trip had a floor: the value is read from a JSON file a previous run wrote,
+ * and `Float.NaN.toInt()` is `0` — which is exactly how a zero gets recorded without anything looking
+ * wrong at the moment it happens.
+ *
+ * The ceiling exists for the same reason in the other direction: a corrupted file should not be able
+ * to ask for a window larger than any display, which on some setups is simply an invisible program.
+ */
+private fun saneWindowSize(value: Int): Int =
+    if (value < MIN_WINDOW_EDGE || value > MAX_WINDOW_EDGE) DEFAULT_WINDOW_EDGE else value
+
+private const val MIN_WINDOW_EDGE = 480
+private const val MAX_WINDOW_EDGE = 16_000
+private const val DEFAULT_WINDOW_EDGE = 1_000
+
 /** How often the console looks for an upgrade asking it to stand down. */
 private const val QUIT_POLL_MS = 2_000L
 
@@ -149,6 +173,7 @@ private val autoUpdater = DesktopAutoUpdater(
  * **hourly update pass** (with `--update-only`, see [ScheduledUpdate]). Neither of those wants a
  * console window, and both must return quickly, so they are answered before anything else is built.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
     crashReporter.install(BuildInfo.display)
 
@@ -236,7 +261,19 @@ fun main(args: Array<String>) {
     }
 
     application {
-        val state = rememberWindowState(size = DpSize(initial.windowWidth.dp, initial.windowHeight.dp))
+        // ⚠️ Ours, not the framework's. Compose's default shows one line of `throwable.message` with
+        // no stack trace and then closes the window — see [WindowFaultHandler], which explains what
+        // that cost and what this does instead. Provided around every window this application owns.
+        val faults = remember { WindowFaultHandler(crashReporter, BuildInfo.display) }
+
+        // ⚠️ Clamped on the way IN as well as on the way out, and the read side is the half that
+        // matters. A bad number may already be sitting in the settings file from an earlier run, so a
+        // write-side guard alone would never rescue a machine that had already recorded one — it would
+        // faithfully restore the bad size on every launch, forever. `Dp.Unspecified.value` is `NaN`,
+        // whose `.toInt()` is 0, which is exactly how a zero gets written without anything looking wrong.
+        val state = rememberWindowState(
+            size = DpSize(saneWindowSize(initial.windowWidth).dp, saneWindowSize(initial.windowHeight).dp),
+        )
 
         // ⚠️ The console closing itself so an upgrade can proceed — the half of the hourly update
         // pass that lives inside the app. Windows Installer cannot replace a file this process holds
@@ -259,67 +296,69 @@ fun main(args: Array<String>) {
             }
         }
 
-        Window(
-            onCloseRequest = {
-                // Blocking, not fire-and-forget: Compose Desktop's exitApplication() calls
-                // System.exit(0) right after this returns, with no shutdown hook to wait for a
-                // background save — a fire-and-forget write would race the process dying. The
-                // write is a few bytes of local JSON, so blocking the AWT event thread for it
-                // here is negligible.
-                runBlocking {
-                    settingsStore.update {
-                        it.copy(
-                            windowWidth = state.size.width.value.toInt(),
-                            windowHeight = state.size.height.value.toInt(),
-                        )
+        CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides faults) {
+            Window(
+                onCloseRequest = {
+                    // Blocking, not fire-and-forget: Compose Desktop's exitApplication() calls
+                    // System.exit(0) right after this returns, with no shutdown hook to wait for a
+                    // background save — a fire-and-forget write would race the process dying. The
+                    // write is a few bytes of local JSON, so blocking the AWT event thread for it
+                    // here is negligible.
+                    runBlocking {
+                        settingsStore.update {
+                            it.copy(
+                                windowWidth = saneWindowSize(state.size.width.value.toInt()),
+                                windowHeight = saneWindowSize(state.size.height.value.toInt()),
+                            )
+                        }
                     }
-                }
-                flushEverything()
-                // Nothing to save here — this is releasing a native decoder and a live socket before
-                // the process is killed out from under them.
-                livePlayer.dispose()
-                radioPlayer.dispose()
-                SingleInstance.release()
-                // ⚠️ Last, and after every save: this hands a staged upgrade to Windows and returns
-                // immediately, because msiexec was launched detached so it outlives this process.
-                // It has to be here rather than anywhere else — Windows Installer cannot replace
-                // files a running program holds open, so closing is the only moment the upgrade can
-                // actually happen. Nothing is shown and nothing is asked; the next launch is simply
-                // the newer build.
-                autoUpdater.installOnExit()
-                exitApplication()
-            },
-            title = "LCARS",
-            state = state,
-            // ⚠️ `onKeyEvent`, NOT `onPreviewKeyEvent`. Preview runs from the root DOWN to whatever has
-            // focus, so a handler here would see every keystroke before a text field could — which is
-            // the exact bug this project already shipped once, where typing a digit into a filter box
-            // changed the television channel instead. Bubbling means a focused field keeps what it
-            // handles and only the combinations nothing wanted reach the console.
-            onKeyEvent = { consoleKeys.handle(it) },
-        ) {
-            PulseDesktopApp(
-                settingsStore,
-                libraryRepository,
-                packStore,
-                studyStore,
-                livePlayer,
-                radioPlayer,
-                notesStore,
-                diaryStore,
-                crashReporter,
-                consoleKeys,
-                // Handing over to the installer. Flushed the same way the close button does, because an
-                // upgrade that lost the last answered study card would be a poor trade for being current.
-                onQuitForInstall = {
                     flushEverything()
+                    // Nothing to save here — this is releasing a native decoder and a live socket before
+                    // the process is killed out from under them.
                     livePlayer.dispose()
                     radioPlayer.dispose()
                     SingleInstance.release()
+                    // ⚠️ Last, and after every save: this hands a staged upgrade to Windows and returns
+                    // immediately, because msiexec was launched detached so it outlives this process.
+                    // It has to be here rather than anywhere else — Windows Installer cannot replace
+                    // files a running program holds open, so closing is the only moment the upgrade can
+                    // actually happen. Nothing is shown and nothing is asked; the next launch is simply
+                    // the newer build.
+                    autoUpdater.installOnExit()
                     exitApplication()
                 },
-                startOn = if (startOnSettings) Screen.SETTINGS else null,
-            )
+                title = "LCARS",
+                state = state,
+                // ⚠️ `onKeyEvent`, NOT `onPreviewKeyEvent`. Preview runs from the root DOWN to whatever has
+                // focus, so a handler here would see every keystroke before a text field could — which is
+                // the exact bug this project already shipped once, where typing a digit into a filter box
+                // changed the television channel instead. Bubbling means a focused field keeps what it
+                // handles and only the combinations nothing wanted reach the console.
+                onKeyEvent = { consoleKeys.handle(it) },
+            ) {
+                PulseDesktopApp(
+                    settingsStore,
+                    libraryRepository,
+                    packStore,
+                    studyStore,
+                    livePlayer,
+                    radioPlayer,
+                    notesStore,
+                    diaryStore,
+                    crashReporter,
+                    consoleKeys,
+                    // Handing over to the installer. Flushed the same way the close button does, because an
+                    // upgrade that lost the last answered study card would be a poor trade for being current.
+                    onQuitForInstall = {
+                        flushEverything()
+                        livePlayer.dispose()
+                        radioPlayer.dispose()
+                        SingleInstance.release()
+                        exitApplication()
+                    },
+                    startOn = if (startOnSettings) Screen.SETTINGS else null,
+                )
+            }
         }
     }
 }

@@ -463,5 +463,12 @@ private fun SkyPanel(state: StandbyState, layout: StandbyLayout, modifier: Modif
 private fun signed(v: Double): String = (if (v >= 0) "+" else "") + String.format(Locale.US, "%.2f", v)
 
 
-/** Kept so a caller can size a HUD from the same numbers the display lays out at. */
-val StandbyHudSize: Pair<Dp, Dp> = 460.dp to 560.dp
+/**
+ * The size a HUD window should open at — **the one definition, and now actually used.**
+ *
+ * ⚠️ There used to be two. This said 460x560 and claimed to be the number a caller should size a HUD
+ * from; `StandbyWindows` declared its own `HUD_W`/`HUD_H` at 460x620 and used those, so this one had
+ * no consumers at all and the pair silently disagreed about the height. The window's number is kept
+ * (it is what has actually been shipping) and the duplicate is gone, so they cannot drift again.
+ */
+val StandbyHudSize: Pair<Dp, Dp> = 460.dp to 620.dp
