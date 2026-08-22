@@ -40,8 +40,14 @@ import kotlin.math.roundToLong
  * cannot claim a 1-in-5000 event — the empirical tail simply does not reach that far. The tail estimate
  * `(count + 1) / (n + 1)` enforces this by construction: with nothing in the tail it bottoms out at
  * `1/(n+1)`, so surprisal can never exceed [ceilingBitsFor]. A reading pinned there reports
- * [Novelty.cappedAtCeiling] and the caller must say so rather than implying precision the sample
+ * [Reading.cappedAtCeiling] and the caller must say so rather than implying precision the sample
  * cannot support.
+ *
+ * ⚠️ And the `n` in that ceiling is [effectiveSampleSize], **not** the number of rows. Several metrics
+ * update far less often than they are polled — the solar F10.7 flux is measured once a day and sampled
+ * every fifteen minutes, so a year of it is 35,000 rows and 365 readings. Repetition leaves the median,
+ * the MAD and every percentile exactly where they were and multiplies the row count by ninety-six, so a
+ * ceiling taken from rows would claim to resolve a 1-in-17,000 event out of one year of daily data.
  *
  * **4 · Like-for-like before quantity.** A backfilled observation and a self-recorded one are not the
  * same measurement — reanalysis is modelled and gridded and will not agree exactly with a live endpoint
@@ -102,7 +108,14 @@ object Novelty {
         /** +1 above the median, −1 below, 0 exactly on it. */
         val direction: Int,
         val basis: Basis,
+        /** Rows compared. Useful for saying how much was looked at; **never** for claiming precision. */
         val n: Int,
+        /**
+         * Independent readings among those rows — see [effectiveSampleSize]. This is what
+         * [ceilingBits] is derived from, and on a metric polled faster than it updates it is very much
+         * smaller than [n].
+         */
+        val effectiveN: Int,
         /**
          * When the history was last this extreme **in this direction**, or null when it never was —
          * which is what makes a reading a record rather than merely a high one.
@@ -194,6 +207,26 @@ object Novelty {
         return log2(((n + 1).toDouble() / 2.0).coerceAtLeast(1.0))
     }
 
+    /**
+     * How many **independent** readings a series really contains: the number of runs of equal values.
+     *
+     * ⚠️ This exists because several metrics update far less often than they are sampled. The solar
+     * F10.7 flux is measured once a day at Penticton, so polling it every fifteen minutes records the
+     * same number ninety-six times. Uniform repetition leaves the median, the MAD and every percentile
+     * exactly where they were — but it multiplies `n` by ninety-six, and `n` is what sets the
+     * [ceilingBitsFor] ceiling. The scoring would then claim to resolve a one-in-seventeen-thousand
+     * event from three hundred and sixty-five actual observations.
+     *
+     * Counting runs costs nothing on a series that genuinely varies — every consecutive pair differs,
+     * so this equals the sample size and the ceiling is unchanged. It only bites where it should.
+     */
+    fun effectiveSampleSize(values: List<Double>): Int {
+        if (values.isEmpty()) return 0
+        var runs = 1
+        for (i in 1 until values.size) if (values[i] != values[i - 1]) runs++
+        return runs
+    }
+
     // ---------------------------------------------------------------- scoring
 
     /**
@@ -218,17 +251,28 @@ object Novelty {
     ): Score {
         val history = series
             .filter { it.atMs < latest.atMs && it.value.isFinite() }
+            // ⚠️ Chronological, because [effectiveSampleSize] counts runs and a run is only meaningful
+            // in time order. Callers hand this whatever order their store happened to read in.
+            .sortedBy { it.atMs }
             .let { if (diurnal) sameTimeOfDay(it, latest.atMs, utcOffsetSeconds) else it }
 
         // Choice 4: prefer a like-for-like comparison, fall back only when it is too thin to use.
+        // Thinness is measured in independent readings, for the same reason the ceiling is.
         val recorded = history.filter { !it.backfilled }
-        val compared = if (recorded.size >= MIN_SAMPLES) recorded else history
+        val compared = if (effectiveSampleSize(recorded.map { it.value }) >= MIN_SAMPLES) recorded else history
         val basis = basisOf(compared)
 
-        if (compared.size < MIN_SAMPLES) {
-            val need = MIN_SAMPLES - compared.size
+        val values = compared.map { it.value }
+        val nEff = effectiveSampleSize(values)
+
+        // ⚠️ The refusal floor counts independent readings too. A metric polled every fifteen minutes
+        // clears twenty-four ROWS in six hours and knows nothing about the world; judging it then would
+        // report a genuine record as "right in its usual range", because the floor below caps its
+        // surprisal at almost nothing. Refusing is the honest answer until the readings are really there.
+        if (nEff < MIN_SAMPLES) {
+            val need = MIN_SAMPLES - nEff
             return Score.TooLittleHistory(
-                have = compared.size,
+                have = nEff,
                 need = MIN_SAMPLES,
                 sentence = if (diurnal) {
                     "Not enough history for this hour yet — $need more reading${plural(need)} needed."
@@ -239,7 +283,6 @@ object Novelty {
         }
 
         val dist = describe(compared) ?: return Score.TooLittleHistory(0, MIN_SAMPLES, "No history yet.")
-        val values = compared.map { it.value }
         val n = values.size
         val v = latest.value
 
@@ -249,9 +292,14 @@ object Novelty {
         val pLower = (atOrBelow + 1).toDouble() / (n + 1).toDouble()
         // Two-sided: a reading is unusual whether it is high or low, and testing both tails without
         // paying for both would report every metric as twice as surprising as it is.
-        val p = (2.0 * minOf(pUpper, pLower)).coerceAtMost(1.0)
+        //
+        // ⚠️ Floored at what the *independent* sample can resolve, and floored HERE rather than capping
+        // the bits afterwards, because `p` is also what the sentence turns into "a 1-in-340 reading".
+        // Capping only the number would leave the two halves of one verdict contradicting each other.
+        val pFloor = (2.0 / (nEff + 1).toDouble()).coerceAtMost(1.0)
+        val p = (2.0 * minOf(pUpper, pLower)).coerceIn(pFloor, 1.0)
         val bits = -log2(p)
-        val ceiling = ceilingBitsFor(n)
+        val ceiling = ceilingBitsFor(nEff)
 
         val direction = when {
             v > dist.median -> 1
@@ -268,17 +316,22 @@ object Novelty {
         return Score.Scored(
             Reading(
                 bits = bits,
-                cappedAtCeiling = extremeUp || extremeDown,
+                // ⚠️ Read off the number, not off "was it the highest ever". Once `p` has a floor those
+                // two come apart: a reading above all but one of 2,880 rows drawn from 30 independent
+                // readings is pinned at the ceiling without being a record, and reporting it as an
+                // unpinned measurement would be exactly the overclaim the ceiling exists to prevent.
+                cappedAtCeiling = bits >= ceiling - 1e-9,
                 ceilingBits = ceiling,
                 percentile = below.toDouble() / n.toDouble(),
                 robustZ = z,
                 direction = direction,
                 basis = basis,
                 n = n,
+                effectiveN = nEff,
                 extremeSinceMs = since,
                 sentence = sentence(
                     p = p,
-                    n = n,
+                    n = nEff,
                     direction = direction,
                     extreme = extremeUp || extremeDown,
                     diurnal = diurnal,
@@ -436,6 +489,7 @@ object Novelty {
 
     private fun sentence(
         p: Double,
+        /** Independent readings, not rows — the sentence must not quote a sample it did not really have. */
         n: Int,
         direction: Int,
         extreme: Boolean,
@@ -484,13 +538,21 @@ object Novelty {
     private fun spanPhrase(ms: Long): String {
         val v = abs(ms)
         return when {
-            v < 90L * 60L * 1000L -> "${(v.toDouble() / (60L * 1000L)).roundToLong()} minutes"
-            v < 36L * HOUR_MS -> "${(v.toDouble() / HOUR_MS).roundToLong()} hours"
-            v < 25L * DAY_MS -> "${(v.toDouble() / DAY_MS).roundToLong()} days"
-            v < 320L * DAY_MS -> "${(v.toDouble() / (30L * DAY_MS)).roundToLong()} months"
-            else -> "${(v.toDouble() / (365L * DAY_MS)).roundToLong()} years"
+            v < 90L * 60L * 1000L -> unitPhrase((v.toDouble() / (60L * 1000L)).roundToLong(), "minute")
+            v < 36L * HOUR_MS -> unitPhrase((v.toDouble() / HOUR_MS).roundToLong(), "hour")
+            v < 25L * DAY_MS -> unitPhrase((v.toDouble() / DAY_MS).roundToLong(), "day")
+            v < 320L * DAY_MS -> unitPhrase((v.toDouble() / (30L * DAY_MS)).roundToLong(), "month")
+            else -> unitPhrase((v.toDouble() / (365L * DAY_MS)).roundToLong(), "year")
         }
     }
+
+    /**
+     * ⚠️ "Highest in 1 months" is reachable and was being said: anything from 26 to 44 days rounds to
+     * one month, and 320 to 547 days rounds to one year. The band boundaries make "1 day" and "1 hour"
+     * unreachable, but writing this once is cheaper than knowing which bands can and cannot round to
+     * one every time a boundary moves.
+     */
+    private fun unitPhrase(n: Long, unit: String): String = "$n $unit" + if (n == 1L) "" else "s"
 
     /** The "1-in-N" a tail probability describes, rounded the way a person would say it. */
     private fun oneIn(p: Double): Long {

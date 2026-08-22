@@ -197,14 +197,18 @@ class NoveltyTest {
     // ------------------------------------------------------------------ the sentence
 
     /**
-     * 59 daily readings of 10 and one of 50, sixty days back. A reading of 40 is beaten only by that
-     * one, so it is not a record — but nothing has matched it for two months, which is worth saying.
-     * p = 2 × (1 + 1)/(59 + 1 + 1) = 0.0656, and 1/0.0656 ≈ 15.
+     * 59 daily readings around 10 and one of 50, sixty days back. A reading of 40 is beaten only by
+     * that one, so it is not a record — but nothing has matched it for two months, which is worth
+     * saying. p = 2 × (1 + 1)/(59 + 1 + 1) = 0.0656, and 1/0.0656 ≈ 15.
+     *
+     * ⚠️ The 59 cycle 10/11/12 rather than sitting at exactly 10, because a dead-flat run is one
+     * independent reading however many rows it occupies — see [Novelty.effectiveSampleSize]. A
+     * constant fixture would be refused before it ever reached the sentence this test is about.
      */
     @Test
     fun aLongUnmatchedHighSaysHowLongItHasBeen() {
         val history = listOf(obs(midnightUtc, 50.0)) +
-            (1..59).map { obs(midnightUtc + it * day, 10.0) }
+            (1..59).map { obs(midnightUtc + it * day, 10.0 + (it % 3)) }
         val r = reading(Novelty.score(history, obs(midnightUtc + 60 * day, 40.0)))
 
         assertTrue("not a record — one earlier reading beat it", !r.cappedAtCeiling)
@@ -257,10 +261,20 @@ class NoveltyTest {
         assertEquals("Unusually high — a 1-in-15 reading.", r.sentence)
     }
 
-    /** A perfectly flat history has no MAD to divide by, and must not produce a NaN or an infinity. */
+    /**
+     * A history with no MAD to divide by must not produce a NaN or an infinity.
+     *
+     * ⚠️ The fixture cannot simply be one repeated number, however tempting: that is a single
+     * independent reading and [Novelty.score] refuses it before the division is ever reached, so the
+     * test would pass without exercising anything. Instead, 65 readings where 52 are 5.0 and every
+     * fifth is 7.0 — 26 runs, comfortably past the floor, and with more than half the values sitting
+     * exactly on the median the median absolute deviation is still zero.
+     */
     @Test
     fun aFlatHistoryDoesNotDivideByZero() {
-        val history = (1..30).map { obs(it * hour, 5.0) }
+        val history = (0..64).map { obs(it * hour, if (it % 5 == 0) 7.0 else 5.0) }
+        assertEquals("13 isolated 7s and 13 runs of 5s", 26, Novelty.effectiveSampleSize(history.map { it.value }))
+        assertEquals(0.0, Novelty.describe(history)!!.mad, 1e-12)
 
         val same = reading(Novelty.score(history, obs(100 * hour, 5.0)))
         assertEquals(0.0, same.robustZ, 1e-12)
@@ -270,6 +284,139 @@ class NoveltyTest {
         assertEquals("still zero, because there is no spread to measure against", 0.0, different.robustZ, 1e-12)
         assertTrue("but the empirical tail still reports it as a record", different.cappedAtCeiling)
         assertTrue(different.bits.isFinite())
+        // ceilingBitsFor(26) = log2(27/2) = log2(13.5) = 3.7549 — what 26 readings can resolve, not
+        // the log2(66/2) = 5.04 that 65 rows would have claimed.
+        assertEquals(3.7549, different.bits, 1e-3)
+    }
+
+    // ------------------------------------------------------------------ polling faster than the world
+
+    @Test
+    fun effectiveSampleSizeCountsRunsNotRows() {
+        assertEquals(0, Novelty.effectiveSampleSize(emptyList()))
+        assertEquals(1, Novelty.effectiveSampleSize(listOf(5.0)))
+        assertEquals("a whole day of polling one daily figure", 1, Novelty.effectiveSampleSize(List(96) { 5.0 }))
+        assertEquals(
+            "a series that genuinely varies pays nothing at all",
+            4,
+            Novelty.effectiveSampleSize(listOf(1.0, 2.0, 3.0, 4.0)),
+        )
+        assertEquals(
+            "a value coming back later is a new reading, not the old one",
+            3,
+            Novelty.effectiveSampleSize(listOf(1.0, 1.0, 2.0, 2.0, 1.0)),
+        )
+    }
+
+    /**
+     * ⚠️ THE OTHER LOAD-BEARING ONE, and the reason [Novelty.effectiveSampleSize] exists.
+     *
+     * The solar F10.7 flux is measured once a day at Penticton and the collector polls it every fifteen
+     * minutes, so forty days of it is 3,840 rows describing forty readings. Repetition leaves the
+     * median, the MAD and every percentile exactly where they were and multiplies the row count by
+     * ninety-six — so a ceiling taken from rows would report the same spike as a 1-in-1,900 event
+     * instead of the 1-in-20 that forty readings can actually resolve.
+     *
+     * Both series below contain the same forty numbers, so they must produce the same verdict, word
+     * for word.
+     */
+    @Test
+    fun pollingFasterThanTheMetricUpdatesBuysNoPrecision() {
+        val quarterHour = 15L * 60L * 1000L
+        val daily = (0 until 40).map { obs(it * day, 100.0 + it) }
+        val polled = (0 until 40).flatMap { d ->
+            (0 until 96).map { s -> obs(d * day + s * quarterHour, 100.0 + d) }
+        }
+
+        val a = reading(Novelty.score(daily, obs(40 * day, 500.0)))
+        val b = reading(Novelty.score(polled, obs(40 * day, 500.0)))
+
+        assertEquals(40, a.n)
+        assertEquals("ninety-six times the rows", 3840, b.n)
+        assertEquals("but the same forty readings", 40, a.effectiveN)
+        assertEquals(40, b.effectiveN)
+
+        assertEquals("so the same verdict", a.bits, b.bits, 1e-12)
+        assertEquals(a.ceilingBits, b.ceilingBits, 1e-12)
+        assertEquals(a.sentence, b.sentence)
+
+        // ceilingBitsFor(40) = log2(41/2) = log2(20.5) = 4.3576.
+        assertEquals(4.3576, b.bits, 1e-3)
+        assertEquals(4.3576, b.ceilingBits, 1e-3)
+        assertTrue(b.cappedAtCeiling)
+        // ⚠️ And the sentence quotes the readings, not the rows. "as rare as 3840 readings can show"
+        // would be the same overclaim in words.
+        assertEquals("Highest on record — as rare as 40 readings can show.", b.sentence)
+    }
+
+    /**
+     * ⚠️ The refusal floor counts readings too. Six hours of a fifteen-minute poll clears twenty-four
+     * ROWS and knows nothing whatever about the world; scoring it would floor the surprisal at almost
+     * nothing and report a genuine record as "right in its usual range", which is worse than refusing.
+     */
+    @Test
+    fun theRefusalFloorCountsReadingsNotRows() {
+        val quarterHour = 15L * 60L * 1000L
+        val unchanged = (0 until 24).map { obs(it * quarterHour, 77.0) }
+        val refused = Novelty.score(unchanged, obs(day, 900.0))
+        assertTrue("24 rows is not 24 readings, got $refused", refused is Novelty.Score.TooLittleHistory)
+        assertEquals(1, (refused as Novelty.Score.TooLittleHistory).have)
+
+        val real = (0 until 24).map { obs(it * quarterHour, 77.0 + it) }
+        assertTrue(Novelty.score(real, obs(day, 900.0)) is Novelty.Score.Scored)
+    }
+
+    /**
+     * ⚠️ Pinned at the ceiling **without** being a record — the case that separates "is this the
+     * highest ever" from "is this number a measurement or a floor", and the reason `cappedAtCeiling` is
+     * read off the arithmetic rather than off extremeness.
+     *
+     * Thirty readings, but the one high day was only polled twenty times because the machine was off
+     * for the rest of it — so 2,804 rows. A reading of 300 is beaten by those twenty, which makes it no
+     * record at all, yet 2 × 21/2805 = 0.0150 is far under the 2/31 = 0.0645 that thirty readings can
+     * resolve, so the floor takes hold and the surprisal reported is the most this history can express.
+     * Announcing that as a measurement would be exactly the overclaim the ceiling exists to prevent.
+     */
+    @Test
+    fun aReadingCanBePinnedAtTheCeilingWithoutBeingARecord() {
+        val quarterHour = 15L * 60L * 1000L
+        val history =
+            (0 until 20).map { obs(it * quarterHour, 400.0) } +
+                (1..29).flatMap { d -> (0 until 96).map { s -> obs(d * day + s * quarterHour, 100.0 + d) } }
+
+        val r = reading(Novelty.score(history, obs(30 * day, 300.0)))
+
+        assertEquals(2804, r.n)
+        assertEquals(30, r.effectiveN)
+        assertTrue("twenty earlier rows beat it, so it is not a record", r.extremeSinceMs != null)
+        // log2(31/2) = log2(15.5) = 3.9542, and the floor has taken hold, so bits sits exactly there.
+        assertEquals(3.9542, r.ceilingBits, 1e-3)
+        assertEquals(3.9542, r.bits, 1e-3)
+        assertTrue("a floor is not a measurement and must be reported as one", r.cappedAtCeiling)
+        // Thirty days back rounds to one month, which the phrasing has to be able to say properly.
+        assertTrue("got '${r.sentence}'", r.sentence.startsWith("Highest in 1 month —"))
+    }
+
+    /**
+     * ⚠️ A run only means anything in time order, and a caller hands over whatever order its store read
+     * in. Shuffled, the 2,880 rows below look like 2,880 changes rather than thirty.
+     */
+    @Test
+    fun readingsAreCountedInTimeOrderWhateverOrderTheyArriveIn() {
+        val quarterHour = 15L * 60L * 1000L
+        val polled = (0 until 30).flatMap { d ->
+            (0 until 96).map { s -> obs(d * day + s * quarterHour, 200.0 + d) }
+        }
+        // A deterministic hash order — nothing like chronological, and nothing like reversed either
+        // (reversing a run-length sequence preserves its run count, so it would prove nothing).
+        val jumbled = polled.sortedBy { (it.atMs * 2_654_435_761L) % 1_000_003L }
+
+        val ordered = reading(Novelty.score(polled, obs(30 * day, 900.0)))
+        val shuffled = reading(Novelty.score(jumbled, obs(30 * day, 900.0)))
+
+        assertEquals(30, ordered.effectiveN)
+        assertEquals("sorting inside score is what makes this hold", 30, shuffled.effectiveN)
+        assertEquals(ordered.bits, shuffled.bits, 1e-12)
     }
 
     // ------------------------------------------------------------------ rate of change
@@ -370,6 +517,7 @@ class NoveltyTest {
         direction = 1,
         basis = Novelty.Basis.RECORDED,
         n = 100,
+        effectiveN = 100,
         extremeSinceMs = null,
         sentence = "",
     )
