@@ -240,7 +240,7 @@ private fun WeekPanel(week: IntakeWeek.Week, targetKcal: Int) {
                                 // A day with nothing logged still draws a hairline, so the slot is
                                 // visibly a slot rather than blank space at the end of the row.
                                 .fillMaxHeight(if (d == null) 0.02f else frac.coerceAtLeast(0.02f))
-                                .background(tint, lcarsBlockShape(2.dp, LcarsCorner.NONE)),
+                                .background(tint),
                         )
                     }
                 }

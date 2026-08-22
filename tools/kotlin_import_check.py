@@ -59,8 +59,13 @@ import sys
 
 OWN = "dev.mascwa.pulse."
 
+# ⚠️ TEST roots as well as main ones, and that is not thoroughness — it is the same
+# "a package can span source trees" rule as the :app/:core:feeds case below. A test sits in the
+# package it tests, so `RecipesTest.kt` needs no import for `Recipes`; with only main roots
+# discovered, every test file reported every type it exercises as unimported and the gate emitted
+# about seventy findings, none of them real. A gate that floods is worse than no gate.
 SRC_ROOTS = sorted(
-    d for pattern in ("*/src/main/*", "*/*/src/main/*")
+    d for pattern in ("*/src/main/*", "*/*/src/main/*", "*/src/test/*", "*/*/src/test/*")
     for d in pathlib.Path(".").glob(pattern)
     if d.is_dir() and d.name in ("java", "kotlin")
 )
@@ -248,6 +253,104 @@ def duplicate_companions(text: str) -> list:
     return out
 
 
+def enum_constants(raw: str) -> dict:
+    """
+    Every `enum class Foo { A, B }` in this text, mapped to everything `Foo.` can legally name.
+
+    ⚠️ Reads the COMMENT-STRIPPED text. The first version read the raw source and silently truncated
+    every enum whose constants carry KDoc — the entry then begins with `/`, the identifier match
+    fails, and the constant vanishes. `HapticCue` came back declaring exactly one of its thirteen
+    values, and the check then reported the other twelve as errors. An under-read declaration is
+    worse than none, because it turns a gate into a generator of false findings.
+
+    ⚠️ The returned set is CONSTANTS PLUS MEMBERS, not constants alone, and the difference is not
+    cosmetic. `SettingsCategory.FIRST` is a `val` in the enum's companion object and is referenced
+    from thirty call sites; judged against the constants alone it is a finding on every one of them.
+    The members are collected from the whole declaration — after the `;` and inside the companion —
+    because from a call site `Foo.X` cannot distinguish them anyway.
+    """
+    text = strip(raw)
+    out = {}
+    for m in re.finditer(r'\benum class (\w+)[^{]*\{', text):
+        name = m.group(1)
+        # Brace-match the body so a nested class or a constant with its own block cannot end it early.
+        depth, i = 0, m.end() - 1
+        while i < len(text):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        body = text[m.end():i]
+        # Constants run until the first `;` (which begins the members) or the end of the body. Each
+        # is a capitalised identifier at the start of an entry, optionally with its own arguments.
+        head, _, members = body.partition(";")
+        consts = set()
+        for entry in re.split(r",(?![^(]*\))", head):
+            e = entry.strip()
+            # Skip a KDoc or comment line that survived, and anything that is not an identifier.
+            em = re.match(r'^(?:@\w+\s*)*([A-Z][A-Za-z0-9_]*)', e)
+            if em:
+                consts.add(em.group(1))
+        if consts:
+            # Anything declared as a member — including in the companion object, whose braces are
+            # inside `members` — is reachable as `Foo.thing` from outside.
+            consts |= set(re.findall(r'\b(?:val|var|fun)\s+([A-Za-z_]\w*)', members))
+            out[name] = consts
+    return out
+
+
+def bad_enum_constants(text: str, enums: dict) -> list:
+    """
+    `LcarsCorner.NONE` where the enum has no NONE.
+
+    ⚠️ Added after the THIRD time in one session that a call was written from memory rather than from
+    the declaration. This one shipped to CI: the enum has four values, none of them `NONE`, and every
+    local gate passed it — the import check because the TYPE was imported, the parse pass because it
+    type-checks nothing, and the resolve check because that file cascades wholesale without Compose
+    on its classpath.
+
+    `enums` maps a simple name to `(members, {declaring packages})`.
+
+    Textual on purpose, like the rest of this tool. It only judges enums it can SEE declared in the
+    scanned packages, so an unknown type is silently skipped rather than guessed at — a gate that
+    invents findings is one people stop reading.
+
+    ⚠️ **A matching simple name is not the same type, and this is the second collision family.** The
+    caller already drops names whose several declarations DISAGREE about their members. The remaining
+    case is a repo-local name colliding with a THIRD-PARTY one, which no scan of these sources can
+    see: `LiveVideoController` imports `androidx.media3.common.Format` and reads its `NO_VALUE`, while
+    an unrelated local `Format` enum exists elsewhere. An import of the simple name from a package
+    that declares no such enum therefore means this file is talking about something else entirely,
+    and the honest answer is to say nothing.
+    """
+    out = []
+    body = strip(text)
+    imports = dict(
+        (fq.rsplit(".", 1)[1], fq.rsplit(".", 1)[0])
+        for fq in re.findall(r'^import ([\w.]+)$', text, re.M)
+    )
+    for m in re.finditer(r'(?<![\w.])([A-Z]\w*)\.([A-Z][A-Z0-9_]{1,})\b', body):
+        type_name, const = m.group(1), m.group(2)
+        entry = enums.get(type_name)
+        if entry is None:
+            continue
+        known, pkgs = entry
+        from_pkg = imports.get(type_name)
+        if from_pkg is not None and from_pkg not in pkgs:
+            continue
+        # A member function or property in SCREAMING_CASE is legal too, so only complain when the
+        # name appears nowhere in the declaration at all.
+        if const in known:
+            continue
+        if re.search(r'\b(?:val|var|fun)\s+' + re.escape(const) + r'\b', text):
+            continue
+        out.append(f"{type_name}.{const} — {type_name} declares {sorted(known)}")
+    return out
+
+
 def main(pkgdir: pathlib.Path) -> int:
     files = sorted(pkgdir.glob("*.kt"))
     if not files:
@@ -275,6 +378,43 @@ def main(pkgdir: pathlib.Path) -> int:
             if twin.is_dir() and twin.resolve() != pkgdir.resolve():
                 for kt in twin.glob("*.kt"):
                     same_pkg |= declarations(kt.read_text())
+
+    # ⚠️ Enums from EVERY source root, not only this package — a call site names a type it imported
+    # from somewhere else, which is precisely the case that shipped `LcarsCorner.NONE` to CI.
+    #
+    # ⚠️ **AND ONLY NAMES WHOSE DECLARATIONS AGREE.** Short enum names collide heavily in this
+    # codebase: `Status`, `Action`, `Kind`, `Severity`, `Category` and `Event` are each declared in
+    # several unrelated files, so a map keeping the last one seen judges every `Status.X` against an
+    # arbitrary winner. The first version of this check did that and reported about a hundred
+    # findings, every one of them false — `Seismic.Severity.MICRO` against a `Severity` from the
+    # safety feed. A gate that floods is worse than no gate, which this tool's own header says.
+    #
+    # ⚠️ But "declared exactly once" — the first fix — was too strict, and it silently cost the check
+    # the one failure it was written for. `LcarsCorner` is declared TWICE, in `:app` and in
+    # `:desktop`, because this repo deliberately keeps a copy of the UI kit on each side. So the
+    # whole kit was excluded, `LcarsCorner.NONE` was NOT caught, and a negative test proved it.
+    #
+    # What actually matters is not how many declarations there are but whether they DISAGREE. Two
+    # declarations with identical members are safe to judge against whichever one the file means,
+    # which readmits every deliberately-duplicated kit type. Genuine collisions between unrelated
+    # types differ in their members, and those are still skipped rather than guessed at.
+    seen = {}
+    for root in SRC_ROOTS:
+        for kt in root.rglob("*.kt"):
+            raw = kt.read_text(errors="replace")
+            found = enum_constants(raw)
+            if not found:
+                continue
+            pm = re.search(r'^package ([\w.]+)', raw, re.M)
+            pkg = pm.group(1) if pm else ""
+            for name, consts in found.items():
+                agree, pkgs = seen.setdefault(name, [set(), set()])
+                agree.add(frozenset(consts))
+                pkgs.add(pkg)
+    enums = {
+        n: (set(next(iter(agree))), pkgs)
+        for n, (agree, pkgs) in seen.items() if len(agree) == 1
+    }
 
     bad = False
     for f, text in texts.items():
@@ -311,6 +451,9 @@ def main(pkgdir: pathlib.Path) -> int:
         for dup in duplicate_companions(text):
             bad = True
             print(f"  {f.name}: {dup}")
+        for e in bad_enum_constants(text, enums):
+            bad = True
+            print(f"  {f.name}: no such enum constant: {e}")
 
     print("REVIEW THE ABOVE" if bad
           else "clean — every symbol is imported, same-package, or a Kotlin/JDK builtin")
