@@ -466,12 +466,18 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     private companion object {
-        const val DAY_MS = 86_400_000L
         const val MIN_QUERY = 2
         /** Long enough that an ordinary typist fires one search per word, short enough to feel live. */
         const val DEBOUNCE_MS = 280L
     }
 }
+
+/**
+ * ⚠️ File-level rather than in the companion, because [composeHealthReading] is top-level and a
+ * PRIVATE companion const is invisible to it. Kept as one definition rather than two: a day is a day
+ * on both sides of the class boundary, and a second copy is a second thing to get wrong.
+ */
+private const val DAY_MS = 86_400_000L
 
 /**
  * The whole health reading, composed from the raw record by the pure cores.
@@ -549,9 +555,14 @@ internal suspend fun composeHealthReading(
  * the resting-rate floor, the protein reference, the rate cap — would otherwise move by a kilogram
  * or two depending on which morning the scale was stepped on, and a calorie target that changes
  * because of yesterday's salt is exactly what the trend exists to prevent.
- */    private fun person(p: HealthSettings, trendKg: Double?): Body.Person? {
+ *
+ * ⚠️ The zone is read here rather than taken from the view model. Age off a UTC year is wrong for
+ * anyone born in the closing hours of a year and living east of Greenwich — and it feeds the resting
+ * rate, so the error would land on a calorie target rather than on a label.
+ */
+private fun person(p: HealthSettings, trendKg: Double?): Body.Person? {
     if (p.heightCm <= 0.0 || p.birthYear <= 0 || trendKg == null) return null
-    val age = LocalDate.now(zone).year - p.birthYear
+    val age = LocalDate.now(ZoneId.systemDefault()).year - p.birthYear
     val sex = runCatching { Body.Sex.valueOf(p.sex) }.getOrDefault(Body.Sex.UNSPECIFIED)
     val person = Body.Person(trendKg, p.heightCm, age, sex)
     return person.takeIf { Body.isPlausible(it) }
