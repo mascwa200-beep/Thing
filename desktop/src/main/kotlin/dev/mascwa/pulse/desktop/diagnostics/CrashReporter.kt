@@ -54,7 +54,22 @@ class CrashReporter(dataDir: File) {
      *
      * [nowMs] is injectable only so a test can place reports in time; nothing in the program passes it.
      */
-    fun record(thread: Thread, throwable: Throwable, buildLabel: String, nowMs: Long = System.currentTimeMillis()) {
+    fun record(
+        thread: Thread,
+        throwable: Throwable,
+        buildLabel: String,
+        nowMs: Long = System.currentTimeMillis(),
+        /**
+         * Which window, or which subsystem, this came from.
+         *
+         * ⚠️ Every window in this app is declared inside ONE composition — the main pane, the standby
+         * HUD, each torn-off screen, the ops wall — so they all route through the same
+         * [WindowFaultHandler] and, before this, produced byte-identical-looking reports. A fault in
+         * the always-on-top HUD read exactly like a fault in the page you were looking at. Defaulted
+         * so existing callers are unchanged.
+         */
+        where: String? = null,
+    ) {
         runCatching {
             val now = nowMs
             val trace = StringWriter().also { throwable.printStackTrace(PrintWriter(it)) }.toString()
@@ -66,6 +81,7 @@ class CrashReporter(dataDir: File) {
                     .append(" · ").append(System.getProperty("os.arch"))
                     .append(" · Java ").append(System.getProperty("java.version")).append('\n')
                 append("thread: ").append(thread.name).append('\n')
+                where?.let { append("where: ").append(it).append('\n') }
                 append("fault: ").append(summaryOf(throwable)).append("\n\n")
             }
             // ⚠️ A millisecond is not unique enough. One failure commonly brings down several threads

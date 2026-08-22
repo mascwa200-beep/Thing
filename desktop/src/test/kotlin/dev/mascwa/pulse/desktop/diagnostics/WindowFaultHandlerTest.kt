@@ -162,4 +162,80 @@ class WindowFaultHandlerTest {
         assertEquals("a list row carries exactly one frame: $row", 1, row.split(" at ").size - 1)
         assertTrue(FaultTrace.locate(composeConstraintFailure()).size > 1)
     }
+
+    /**
+     * ⚠️ The build number goes on the DIALOG, not only into the file.
+     *
+     * This gets reported by screenshot, and "which build are you actually running" has already cost
+     * a whole session once on the Android side — which is why the Theater status line stamps its
+     * build. The desktop updates itself hourly and installs on close, and a per-user MSI installs
+     * BESIDE a per-machine copy rather than upgrading it, so running an older build than the source
+     * being read is a live possibility. One line settles it on sight.
+     */
+    @Test
+    fun `the dialog carries the build, so a screenshot says which one threw`() {
+        val h = WindowFaultHandler(
+            CrashReporter(Files.createTempDirectory("lcars-build").toFile()),
+            "1.0.42",
+        )
+        val t = composeConstraintFailure()
+        val text = h.body(h.summary(t), h.locate(t))
+        assertTrue("the dialog should name the build: $text", text.contains("1.0.42"))
+    }
+
+    /**
+     * ⚠️ Every window in this app is declared inside ONE composition — the main pane, the standby
+     * HUD, each torn-off screen, the ops wall — so they all reach this same handler. Without a name,
+     * a fault in the always-on-top HUD reads exactly like a fault in the page you were looking at.
+     */
+    @Test
+    fun `the dialog names the window when one is known`() {
+        val h = WindowFaultHandler(
+            CrashReporter(Files.createTempDirectory("lcars-window").toFile()),
+            "1.0.42",
+        )
+        val t = composeConstraintFailure()
+        val named = h.body(h.summary(t), h.locate(t), "LCARS \u2014 standby")
+        assertTrue("the dialog should name the window: $named", named.contains("LCARS \u2014 standby"))
+
+        val anonymous = h.body(h.summary(t), h.locate(t), null)
+        assertTrue(
+            "with no window known it must not print an empty pair of quotes: $anonymous",
+            !anonymous.contains("window \u201c\u201d"),
+        )
+    }
+
+    /** And it reaches the file too, beside the thread, where the crash console reads it. */
+    @Test
+    fun `the recorded report names the window`() {
+        val dir = Files.createTempDirectory("lcars-window-file").toFile()
+        val reporter = CrashReporter(dir)
+        reporter.record(
+            Thread.currentThread(),
+            composeConstraintFailure(),
+            "1.0.42",
+            where = "LCARS \u00b7 OPS WALL",
+        )
+        val body = reporter.read(reporter.entries().single())
+        assertTrue("the report should say which window: $body", body.contains("where: LCARS \u00b7 OPS WALL"))
+    }
+
+    /**
+     * A window with no usable title still gets an identity, because "unknown" and "the main pane"
+     * must not render the same.
+     *
+     * ⚠️ Against the rule, not against a real `java.awt.Frame`: constructing one throws
+     * `HeadlessException` here and on CI's runner alike, so that version of this test could never
+     * have passed anywhere.
+     */
+    @Test
+    fun `a titleless window falls back to its class rather than to nothing`() {
+        val h = WindowFaultHandler(
+            CrashReporter(Files.createTempDirectory("lcars-untitled").toFile()),
+            "1.0.42",
+        )
+        assertEquals("LCARS", h.windowName("LCARS", "ComposeWindow"))
+        assertEquals("a blank title is absent, not an empty name", "ComposeWindow", h.windowName("   ", "ComposeWindow"))
+        assertEquals("ComposeWindow", h.windowName(null, "ComposeWindow"))
+    }
 }

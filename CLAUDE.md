@@ -8075,3 +8075,72 @@ expected value from the shipped function before writing the assertion.**
 ⚠️ **Owner-verify on Windows, and the ask is unchanged and now one click:** when the dialog appears,
 press **SHOW THE REPORT**. It opens the crash console *and* leaves the failing page. The top entry's
 full trace names the composable, and that is the whole of what is still missing.
+
+### THE CLAMP, AND THE CENSUS THAT SAYS WHY IT IS ONLY A CONTAINMENT (this session cont., PR #456)
+
+Owner chose, via AskUserQuestion and against my stated advice, **"diagnostics + a defensive
+clamp"**. Their call; I built it, but designed so it **reports when it fires** rather than
+silencing the bug — which converts the objection into a design constraint instead of a refusal.
+
+**⚠️ PLAN MODE KILLED AN IN-FLIGHT WORKFLOW, exactly as this file warns.** Four hunt lenses were
+dispatched; the concurrency cap meant two started and plan mode ended both mid-run. `journal.jsonl`
+held only `started` markers — but **the agents' own `agent-*.jsonl` transcripts survive and can be
+mined**, which is not recorded here anywhere and saved this arc. Their assistant *text* blocks were
+empty (they were all tool calls); the value was in the **tool results**, which is where the census
+below came from. Recipe: parse the jsonl, pull `type == "user"` records' `tool_result` content.
+
+**THE BYTECODE CENSUS — do not re-derive it.** Across ui / foundation / foundation-layout /
+material3 / ui-graphics there are **86 child `(I)I` intrinsic-width queries; 59 pass the height
+straight through and 27 compute it.** Of the 27, **not one is reachable in the failing tree**:
+the three `DefaultIntrinsicMeasurable.BRTryo0` shims (infrastructure), `HorizontalScrollLayoutModifier`
+and `TextFieldMeasurePolicy`/`OutlinedTextFieldMeasurePolicy` (text fields — absent),
+`ScrollingLayoutNode` (passes a **constant**, `Infinity`), `IntrinsicWidthNode`
+(`Modifier.width(IntrinsicSize)` — the app has none), `ThumbNode` (Slider — absent), and
+`SearchBarLayout` / `CenteredContentMeasurePolicy` / `ListItemMeasurePolicy` / `ScrollableTabRow`
+(Material3, not in this tree). Also re-derived: `RowColumnImplKt.intrinsicCrossAxisSize` **cannot**
+emit a negative on its own — `fixedSpace` starts at `min(spacing*(n-1), availableSize)`, so
+`remaining` stays ≥ 0 for any non-negative input. **The producer is still unidentified**, which is
+the whole reason the clamp reports.
+
+**⚠️ THE FAULT REPRODUCES IN THREE LINES, and nobody had tried.** A `Layout` whose measure policy
+calls `measurable.minIntrinsicWidth(-12)` on a **bare `Box`** throws the exact production message
+under `renderComposeScene`. Every earlier pass assumed it was exotic; it is not, and having a
+known-failing case is what makes the clamp test mean anything.
+
+**⚠️ AND THAT PROBE REFUTED MY OWN LEADING HYPOTHESIS IN THE SAME RUN.** `LcarsDataRow`'s colour tab
+is `Modifier.width(5.dp).fillMaxHeight().padding(vertical = 4.dp)` — 8 dp, which is **exactly 12 px
+at density 1.5**, the commonest Windows scaling, against a reported `-12`. Probed directly it does
+**not** throw: `SizeNode` from the `.width(5.dp)` clamps the query first. A striking coincidence and
+nothing more. Pinned as a test so the refutation is durable rather than a sentence someone doubts.
+
+**What shipped.** `theme/ClampIntrinsics.kt` — a `LayoutModifierNode` overriding all four intrinsic
+methods to `coerceAtLeast(0)` before delegating, layout-transparent in `measure`, placed **outermost**
+on the kit's only two intrinsic-forcing composables (`LcarsDataRow`, `LcarsDialog`) because a
+modifier can only guard a query that travels *through* it. `diagnostics/IntrinsicClampWatch.kt` —
+⚠️ **one report per process, latched before the write**, because the clamp runs inside layout and a
+layout that clamps once clamps every frame after; a file per frame would be far worse than the
+fault. Silent until `install()`, so tests and headless renders cost nothing.
+
+**Two diagnostic gaps closed, both because the owner reports by screenshot.**
+- ⚠️ **The report never said WHICH WINDOW.** Every window here — main pane, standby HUD, each
+  torn-off screen, the ops wall — is declared in ONE composition, so all of them reach the same
+  handler and produced indistinguishable reports; a fault in the always-on-top HUD read exactly like
+  one in the page you were looking at, and the owner has those panels switched on.
+  `CrashReporter.record` gained a defaulted `where`, written beside `thread:`.
+- ⚠️ **The dialog never carried the build.** `buildLabel` was a constructor param used only for
+  `record`. The desktop updates hourly and installs on close, and a per-user MSI lands *beside* a
+  per-machine copy rather than upgrading it — so "you are running older code than I am reading" is
+  live, and one line settles it. This already cost a full session on Android (hence `apk 1919`).
+
+⚠️ **`java.awt.Frame()` throws `HeadlessException` here AND on CI's runner**, so a test built on a
+real window could never pass anywhere. `windowName` was split into the AWT extraction and a pure
+`windowName(title, fallback)` — the rule is what gets tested. Same shape as `TranscriptSeal`.
+
+**Verification:** 266 desktop tests green; **eight rules negative-tested** against a baseline
+asserted green first, each perturbation asserted to have matched the source. Every Compose node API
+(`LayoutModifierNode`'s four intrinsic signatures, `ModifierNodeElement`, `IntrinsicMeasurable`) read
+out of the shipped 1.7.3 jar with `javap` rather than recalled.
+
+⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
+carries the build number and names the window. If the clamp caught it instead, the panel draws and
+MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.

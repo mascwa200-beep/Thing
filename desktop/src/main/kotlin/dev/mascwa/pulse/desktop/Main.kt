@@ -12,6 +12,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.diagnostics.CrashReporter
+import dev.mascwa.pulse.desktop.diagnostics.IntrinsicClampWatch
 import dev.mascwa.pulse.desktop.diagnostics.WindowFaultHandler
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.PackStore
@@ -176,6 +177,10 @@ private val autoUpdater = DesktopAutoUpdater(
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
     crashReporter.install(BuildInfo.display)
+    // The clamp in the LCARS kit reports through the same file the fault dialog does. Installed
+    // here rather than lazily so the very first frame is already covered; before this call it
+    // records nothing at all, which is what keeps tests and headless renders free.
+    IntrinsicClampWatch.install(crashReporter, BuildInfo.display)
 
     // How the shared HTTP client introduces itself. Several feeds answer differently depending on what
     // they think they are talking to, and this is a Windows program rather than a phone — so it is set

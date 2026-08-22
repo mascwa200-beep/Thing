@@ -152,20 +152,26 @@ class WindowFaultHandler(
 
     override fun exceptionHandler(window: Window): WindowExceptionHandler =
         WindowExceptionHandler { throwable ->
-            runCatching { reporter.record(Thread.currentThread(), throwable, buildLabel) }
+            // ⚠️ The window's own title, because every window here lives in ONE composition and so
+            // reaches this same handler. Without it a fault in the always-on-top standby HUD, a
+            // torn-off screen or the ops wall is indistinguishable from one in the page you were
+            // actually looking at — and the owner has the standby panels switched on.
+            val which = runCatching { windowName(window) }.getOrNull()
+            runCatching { reporter.record(Thread.currentThread(), throwable, buildLabel, where = which) }
 
             val root = FaultTrace.rootCause(throwable)
             val key = FaultTrace.summary(root)
             val first = synchronized(announced) { announced.add(key) }
             if (first) {
                 val where = FaultTrace.locate(root)
+                val inWindow = which
                 // Off the current stack: we are mid-throw, and a modal dialog opened from here would
                 // run a nested event loop inside a frame Compose has already given up on.
                 SwingUtilities.invokeLater {
                     runCatching {
                         val choice = JOptionPane.showOptionDialog(
                             window.takeIf { it.isDisplayable },
-                            body(key, where),
+                            body(key, where, inWindow),
                             "LCARS \u00b7 a panel failed",
                             JOptionPane.DEFAULT_OPTION,
                             JOptionPane.ERROR_MESSAGE,
@@ -187,15 +193,49 @@ class WindowFaultHandler(
     /** Where the fault actually happened, as a few lines of stack. */
     internal fun locate(t: Throwable): List<String> = FaultTrace.locate(t)
 
-    internal fun body(key: String, where: List<String>): String = buildString {
+    internal fun body(key: String, where: List<String>, inWindow: String? = null): String = buildString {
         append("A panel could not be drawn. The rest of the console is still running.\n\n")
         append(key).append('\n')
         where.forEach { append("    at ").append(it).append('\n') }
+        // ⚠️ Build and window on the DIALOG, not only in the file. This gets reported by screenshot,
+        // and both facts have already cost a session each: an Android arc lost one to not knowing
+        // which build was installed (hence the `apk 1919` stamp that replaced it), and a fault in a
+        // second window is invisible without a name. One line each ends both arguments on sight.
+        append('\n').append("build ").append(buildLabel)
+        inWindow?.let { append("  \u00b7  window \u201c").append(it).append('\u201d') }
+        append('\n')
         append("\nThe full stack trace has been recorded. \u201c")
         append(SHOW_REPORT)
         append("\u201d opens it and takes you off the page that is failing;\n")
         append("it is also under MENU \u2192 CRASH CONSOLE, and on disk as diagnostics\\fault-*.txt.")
     }
+
+    /**
+     * What to call the window in the report.
+     *
+     * AWT gives a title only on a [java.awt.Frame] or [java.awt.Dialog]; anything else falls back to
+     * the class name, which still separates one window kind from another. A blank title is treated
+     * as absent rather than printed as an empty pair of quotes.
+     */
+    internal fun windowName(window: Window): String = windowName(
+        title = when (window) {
+            is java.awt.Frame -> window.title
+            is java.awt.Dialog -> window.title
+            else -> null
+        },
+        fallback = window.javaClass.simpleName,
+    )
+
+    /**
+     * The rule, separated from the AWT object that carries it.
+     *
+     * ⚠️ Not a stylistic split: constructing a `java.awt.Frame` throws `HeadlessException` in a
+     * container AND on CI's runner, so a test written against a real window could never pass
+     * anywhere. Taking the two facts instead makes the decision testable and leaves the extraction
+     * above trivial enough to read.
+     */
+    internal fun windowName(title: String?, fallback: String): String =
+        title?.takeIf { it.isNotBlank() } ?: fallback
 
     private companion object {
         /**
