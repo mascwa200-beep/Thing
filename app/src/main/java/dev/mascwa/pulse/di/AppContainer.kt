@@ -327,6 +327,23 @@ class AppContainer(private val appContext: Context) {
     val studyStore: dev.mascwa.pulse.data.study.StudyStore by lazy {
         dev.mascwa.pulse.data.study.StudyStore(appContext, json, survivalContentRepository)
     }
+    /**
+     * Weigh-ins and body measurements. The trend, the rate and their intervals are never stored — they
+     * come from the pure [dev.mascwa.pulse.core.telemetry.BodyTrend], so nothing here can disagree with
+     * what the screen draws.
+     */
+    val bodyStore: dev.mascwa.pulse.data.health.BodyStore by lazy {
+        dev.mascwa.pulse.data.health.BodyStore(appContext, json)
+    }
+
+    /**
+     * The food log — monthly shards plus a resident index of daily totals, because this is the one
+     * health dataset that grows for ever and is written several times a day.
+     */
+    val foodLogStore: dev.mascwa.pulse.data.health.FoodLogStore by lazy {
+        dev.mascwa.pulse.data.health.FoodLogStore(appContext, json)
+    }
+
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
