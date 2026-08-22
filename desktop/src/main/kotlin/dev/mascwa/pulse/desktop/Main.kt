@@ -21,6 +21,8 @@ import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.update.BuildInfo
 import dev.mascwa.pulse.desktop.update.DesktopAutoUpdater
 import dev.mascwa.pulse.desktop.update.DesktopUpdater
+import dev.mascwa.pulse.desktop.ledger.LongWatch
+import dev.mascwa.pulse.desktop.ledger.ScheduledCollect
 import dev.mascwa.pulse.desktop.update.ScheduledUpdate
 import dev.mascwa.pulse.desktop.update.SingleInstance
 import kotlinx.coroutines.CoroutineScope
@@ -168,6 +170,15 @@ fun main(args: Array<String>) {
         return
     }
 
+    // The long watch's own task, and it wants no window either. Runs one collection pass and exits;
+    // ⚠️ it takes no instance lock, because the console may well be open and this is not a second
+    // console — [CollectorLock] is what stops two passes overlapping, and it is a different lock for
+    // a different question.
+    if (args.any { it.equals(ScheduledCollect.COLLECT_ONLY_FLAG, ignoreCase = true) }) {
+        runBlocking { LongWatch.runOnce(settingsStore) }
+        return
+    }
+
     when (ScreenSaver.modeOf(args)) {
         // ⚠️ Deliberately nothing. Honouring the preview means parenting a window into the Settings
         // dialog's HWND, which needs a native handle Compose does not expose — so the little monitor
@@ -213,6 +224,16 @@ fun main(args: Array<String>) {
     // once at first run and never refreshed would keep pointing at wherever the app used to be, and
     // an hourly task launching a file that is no longer there fails silently forever.
     autoUpdaterScope.launch { runCatching { ScheduledUpdate.install() } }
+
+    // The long watch's task, refreshed on every launch for the same reason and removed when the
+    // switch is off. ⚠️ Reconciled here rather than only when the switch is touched: a build
+    // installed to a new location leaves a task pointing at a launcher that no longer exists, and
+    // "it has been recording all along" is exactly the belief that must not be allowed to be wrong.
+    autoUpdaterScope.launch {
+        runCatching {
+            if (settingsStore.current().longWatch) ScheduledCollect.install() else ScheduledCollect.uninstall()
+        }
+    }
 
     application {
         val state = rememberWindowState(size = DpSize(initial.windowWidth.dp, initial.windowHeight.dp))

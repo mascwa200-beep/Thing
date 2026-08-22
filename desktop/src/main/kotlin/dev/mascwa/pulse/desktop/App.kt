@@ -229,6 +229,25 @@ fun PulseDesktopApp(
         }
         LaunchedEffect(standby) { standby.start() }
 
+        // The long watch, while the window is open. Between this and the scheduled task the record
+        // has no holes. ⚠️ Built HERE, over the shell's one HTTP client and one disk cache, for the
+        // reason the note above the repositories gives — a second set inside the running process
+        // would fragment the connection pool and the per-host rate gates it exists to keep honest.
+        val longWatch = remember {
+            dev.mascwa.pulse.desktop.ledger.LongWatch.Session(
+                scope = scope,
+                collector = dev.mascwa.pulse.desktop.ledger.LongWatch.inApp(
+                    settings = settings,
+                    http = http,
+                    cache = cache,
+                    weather = weatherRepository,
+                    space = spaceWeatherRepository,
+                    markets = marketsRepository,
+                ),
+            )
+        }
+
+
         val newsVm = remember {
             NewsViewModel(
                 scope = scope,
@@ -440,6 +459,14 @@ fun PulseDesktopApp(
         // one redraws every screen holding a distance or a clock time — see [LocalUnits].
         val prefs by settings.settingsFlow.collectAsState()
         val units = UnitPrefs(miles = prefs.miles, twelveHourClock = prefs.twelveHourClock)
+
+        // Keyed on the switch, so turning the long watch off stops the timer now rather than at the
+        // next launch. ⚠️ Placed here rather than beside the session it drives, because `prefs` is
+        // collected at this point — a second `collectAsState` over the same flow just to read one
+        // boolean would be a duplicate subscription for nothing.
+        LaunchedEffect(prefs.longWatch) {
+            if (prefs.longWatch) longWatch.start() else longWatch.stop()
+        }
         CompositionLocalProvider(
             LocalConsoleSection provides (DESK_SECTION[screen] ?: ""),
             LocalUnits provides units,

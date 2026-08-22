@@ -185,6 +185,17 @@ data class DesktopSettings(
      * what to do about it, the money, the sky, and the wire.
      */
     val opsWall: List<String> = listOf("ADVISORIES", "MARKETS", "WEATHER", "NEWS"),
+
+    /**
+     * Whether the long watch records the world.
+     *
+     * ⚠️ Default ON, unlike the standby rungs beside it. Those change what the machine *shows*, so
+     * asking first is right; this changes what it *remembers*, and a recorder switched off by default
+     * has nothing to show the first time somebody looks for it — which is exactly how a feature that
+     * needs history never earns its place. Switching it off stops the scheduled task and the timer
+     * and leaves what has already been recorded alone.
+     */
+    val longWatch: Boolean = true,
 )
 
 private val defaultJson = Json {
