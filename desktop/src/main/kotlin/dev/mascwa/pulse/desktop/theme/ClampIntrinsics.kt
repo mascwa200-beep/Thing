@@ -18,25 +18,60 @@ import dev.mascwa.pulse.desktop.diagnostics.IntrinsicClampWatch
  * ## Why this exists
  *
  * A panel on the Windows console dies with
- * `IllegalArgumentException: maxHeight(-12) must be >= than minHeight(0)`, thrown out of
- * `androidx.compose.ui.unit.Constraints`. Disassembling `NodeMeasuringIntrinsics` in the shipped
- * `ui-desktop-1.7.3.jar` and reading the default-argument masks pins the shape exactly:
+ * `IllegalArgumentException: maxHeight(-12) must be >= than minHeight(0)`.
+ *
+ * ⚠️ **The word "than" identifies the thrower exactly**, and it is worth one glance before anything
+ * else. Scanning every method in the shipped desktop Compose classpath for that substring finds
+ * exactly two spellings: `ui-unit`'s public `ConstraintsKt.Constraints(minWidth, maxWidth, minHeight,
+ * maxHeight)` factory says **"must be >= than minHeight("**, and `Constraints.copy` says it
+ * **without** the word. So this is the four-argument factory, not a copy.
+ *
+ * The intrinsic path reaches that factory through `NodeMeasuringIntrinsics`, whose default-argument
+ * masks pin the axis:
  *
  * ```
  * minWidth$ui(..., h)  -> Constraints$default(0, 0, 0, h, mask=7)   => Constraints(maxHeight = h)
  * minHeight$ui(..., w) -> Constraints$default(0, w, 0, 0, mask=13)  => Constraints(maxWidth  = w)
  * ```
  *
- * So that message is an intrinsic **width** query run with a negative height, and nothing else in
- * Compose builds a `Constraints` of that shape. A node whose intrinsics are the framework defaults
- * throws the moment it is asked one, which is reproducible in three lines (see
- * `ClampIntrinsicsTest`) — a bare `Box` will do it.
+ * ⚠️ **CORRECTION to what an earlier pass of this file claimed.** It said the message was
+ * *unambiguously* an intrinsic width query because "nothing else in Compose builds a `Constraints`
+ * of that shape". That is too narrow and was asserted with more confidence than the evidence
+ * supported. The public factory has on the order of **91 call sites**, roughly 50 of which supply a
+ * `maxHeight` with `minHeight` zero or defaulted, and most of those are ordinary **measure** paths
+ * (`BoxMeasurePolicy`, `WrapContentNode`, `SizeNode`, `FillNode`, `UnspecifiedConstraintsNode`,
+ * `OrientationIndependentConstraints.toBoxConstraints`) rather than intrinsic ones. Every one of
+ * those reachable here was checked and clamps, so the intrinsic path remains the best candidate —
+ * but "best candidate" is the honest phrasing, not "unambiguously". A measure-path fault would
+ * explain why an intrinsic-focused hunt has now come up empty several times over.
+ * Note also that Row/Column's own `createConstraints` throws a *different* message
+ * (`width() must be >= 0`), so a Row/Column measure is not the producer.
+ *
+ * A node whose intrinsics are the framework defaults throws the moment it is asked a negative one,
+ * which is reproducible in three lines (see `ClampIntrinsicsTest`) — a bare `Box` will do it.
+ *
+ * ## ⚠️ The strongest unchased lead: -12 may be a count, not a length
+ *
+ * `IntrinsicMeasureBlocks.VerticalMaxHeight` accumulates children's intrinsic heights with a bare
+ * `iadd`. **m copies of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — verified arithmetically:
+ * 2 → -2, 4 → -4, 10 → -10, **12 → -12**, 13 → +2147483635. So the reported `-12` is exactly what a
+ * Column of **twelve children each reporting an infinite intrinsic height** produces. That is a
+ * falsifiable prediction and the first thing to check on a populated page. (A second route to the
+ * same number: four zero-height children at `Arrangement.spacedBy((-4).dp)`, which has no
+ * validation.)
  *
  * ## ⚠️ This is a containment, not a diagnosis, and it is built to say so
  *
  * An exhaustive sweep of every `min/maxIntrinsicWidth` caller in the shipped Compose stack found
- * 86 child queries, of which 27 compute their argument rather than passing it through — and **not
- * one of the 27 is reachable in the tree that fails**. The producer has not been identified.
+ * 86 child queries, of which 27 compute their argument rather than passing it through, and none of
+ * the 27 looked reachable in the tree that fails. ⚠️ **That classification is not fully trustworthy
+ * and the caveat matters**: `IntrinsicMeasureBlocks.VerticalMinWidth`/`VerticalMaxWidth` @190 read
+ * as pass-throughs one instruction back and are not — Kotlin's inline lowering hides the arithmetic
+ * six instructions further up. The counts are right; "none reachable" is a weaker claim than it
+ * sounded. What does hold, proved from the bytecode: a Column **sanitises** a negative height
+ * (`fixedSpace = Math.min(spacing*(n-1), availableHeight)` keeps `remaining >= 0` even when
+ * `availableHeight` is itself negative), so it propagates a negative only when a **child** reports a
+ * negative intrinsic height. The producer has not been identified.
  *
  * A clamp that silently absorbed the negative would therefore hide the only evidence there is.
  * So the first time it fires it **records a report** through the same [dev.mascwa.pulse.desktop.diagnostics.CrashReporter]

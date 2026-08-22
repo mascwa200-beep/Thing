@@ -8156,6 +8156,45 @@ files deleted** — 511 lines of unreviewed agent code does not belong in the tr
 plan mode kills a wave, `git status` later — the corpses can still land files**, and one of them may
 be the answer.
 
+**⚠️ THE SURVIVING AGENTS THEN CORRECTED ME TWICE, AND BOTH CORRECTIONS MATTER MORE THAN THE CLAMP.**
+The workflow was not as dead as it looked: two further lenses completed and had to be stopped by hand
+(`TaskStop`) before the 12-agent verify phase fired. Their findings, each re-verified here rather
+than taken on trust:
+
+1. ⚠️ **"Unambiguously an intrinsic width query" was TOO NARROW, and I had written it into the source
+   KDoc, the commit, the PR body and this file.** The message comes from `ui-unit`'s public
+   `ConstraintsKt.Constraints(IIII)` factory, which has ~91 call sites — ~50 supplying a `maxHeight`
+   with `minHeight` zero or defaulted, and **most of those are ordinary MEASURE paths**
+   (`BoxMeasurePolicy`, `WrapContentNode`, `SizeNode`, `FillNode`, `UnspecifiedConstraintsNode`,
+   `OrientationIndependentConstraints.toBoxConstraints`), not intrinsic ones. Every one reachable
+   here clamps, so the intrinsic path is still the best candidate — but that is the honest phrasing.
+   A measure-path fault would explain why an intrinsic-focused hunt has come up empty several times.
+2. ⚠️ **A free discriminator nobody had noticed: the word "than".** Verified by disassembling
+   `ui-unit-desktop-1.7.3.jar` myself — `ConstraintsKt` says **"must be >= than minHeight("**;
+   `Constraints.copy` says it **without "than"**. One glance at the reported string eliminates
+   `copy()` outright. Row/Column's own `createConstraints` throws a different message again
+   (`width() must be >= 0`), so a Row/Column measure is not the producer.
+3. ⚠️ **My census's classifier missed a site.** `IntrinsicMeasureBlocks.VerticalMinWidth`/
+   `VerticalMaxWidth` @190 read as pass-throughs one instruction back and are not — Kotlin's inline
+   lowering hides the arithmetic six instructions up. The 86/59/27 counts hold; **"none of the 27 is
+   reachable" is weaker than it sounded.** What does hold, from the bytecode: a Column *sanitises* a
+   negative height, so it propagates one only when a **child** reports a negative intrinsic height.
+
+**⚠️ THE STRONGEST UNCHASED LEAD, and it is arithmetic anyone can check: `-12` may be a COUNT, not a
+length.** `VerticalMaxHeight` accumulates children's intrinsic heights with a bare `iadd`, and **m
+copies of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — computed here: 2 → -2, 4 → -4,
+10 → -10, **12 → -12**, 13 → +2147483635. So the reported number is exactly what a Column of
+**twelve children each reporting an infinite intrinsic height** produces. Falsifiable, and the first
+thing to check on a POPULATED page. (Second route to the same number: four zero-height children at
+`Arrangement.spacedBy((-4).dp)`, which has no validation at all.)
+
+**Also worth keeping:** the throw-site inventory is **six classes, not one** — `PainterNode`
+(`Image`/`Icon`/`Modifier.paint`) throws with **no `LayoutModifierNode` involved at all**, and
+`MeasurePolicy`'s default catches every custom `Layout {}` that overrides an intrinsic height but
+not an intrinsic width. And the three nested `Window`s (standby HUD, pop-outs, ops wall) are the
+largest subtree the harness cannot reach — `renderComposeScene` cannot host an AWT window — which is
+precisely why the window-name change above earns its place.
+
 ⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
 carries the build number and names the window. If the clamp caught it instead, the panel draws and
 MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.
