@@ -7130,3 +7130,175 @@ user-visible ones are already fixed: the Orbital launches list hedges honestly, 
 retry. Do not re-chase it. **`autoUpdate` in `AppSettings` is NOT dead** — `MainActivity` says
 plainly that auto-update is permanently on and the field is retained to avoid a settings migration,
 like `bootAnimation`; the same is true of ~9 other zombie settings fields.
+
+### THE STANDBY DISPLAY, AND BOTH APPS UPDATING THEMSELVES WITH NOBODY WATCHING (this session, PR #450)
+
+Owner: *"build a widget for the desktop mode that basically makes desktop mode super overpowered
+with that widget and it has to be something that can show up on the lock screen. also both mobile
+and desktop versions have to be able to download and automatically update their systems and stuff
+without having to have any user input whatsoever from any specific page at all."* Standing budget
+directive restated from the previous session (the owner has until Wednesday noon on the weekly
+limiter): **be very plan-conscious, no unnecessary agents** — so **zero subagent spend**, which
+overrides the ultracode directive as it has for every arc since. Four binding AskUserQuestion
+decisions: **all three lock-screen rungs**, **full ops display**, **fully autonomous updating**,
+**every payload self-provisions on Wi-Fi**.
+
+**⚠️ THE CONSTRAINT THAT SHAPED THE WHOLE FEATURE, established before a line was written.**
+**Windows does not let any application draw on the lock screen.** Winlogon owns a separate desktop
+object (the *secure desktop*) and only the credential provider and system components render there.
+It is a security boundary, not a permission that can be requested — no always-on-top window, no
+overlay and no amount of elevation reaches it. Windows 11's own lock-screen widgets come from the
+Widgets platform, which needs an **MSIX-packaged** provider serving Adaptive Cards over COM, and
+jpackage produces an MSI. So the ask is answered by three genuinely different mechanisms, ordered by
+how literally they answer it, **each reporting its own state in words** — because "I do not see it
+on my lock screen" and "the feature was never finished" are indistinguishable from outside, and the
+second rung existing at all is an admission that the first can be refused.
+
+**The architectural unlock, verified rather than assumed.**
+`androidx.compose.ui.renderComposeScene(w, h, density) { }` is public in the pinned Compose Desktop
+1.7.3, returns an `org.jetbrains.skia.Image`, and `encodeToData(EncodedImageFormat.PNG)` is public
+in skiko. It uses a **raster** surface, so it needs no window and **no GL context** — which makes
+the lock-screen render the one desktop-visual thing this container can actually prove. That check
+was done FIRST, deliberately, because everything else rested on it.
+
+**One composable, three surfaces, one picture.** `StandbyDisplay` is a pure function of
+`(StandbyState, StandbyLayout)`. The session renders it once at screen resolution to a single PNG:
+rung A installs *that file* as the Windows lock-screen image, rung B's screensaver displays *that
+file*, rung C's HUD draws the same state live. Sharing the artefact is what makes the saver instant
+— it has to be on screen the moment the machine idles, and a process that started an HTTP client and
+six repositories first would be visibly late — and it is why there is nothing to keep in step.
+
+- **Rung A `LockScreenImage`** — WinRT `LockScreen.SetImageFileAsync` through PowerShell, falling
+  back to the personalisation policy value **only when already elevated**. ⚠️ It never *requests*
+  elevation: a wallpaper is not worth a UAC dialog, and prompting would defeat the no-user-input
+  requirement the feature exists to serve. ⚠️ The PowerShell reflection is not decoration —
+  `SetImageFileAsync` returns `IAsyncAction` while `GetFileFromPathAsync` returns
+  `IAsyncOperation<StorageFile>`, which need **different `AsTask` overloads**, and using one for the
+  other is the classic way that script fails. Success is read from a printed marker, not the exit
+  code, because PowerShell exits 0 on a script whose last statement threw and was caught.
+- **Rung B `ScreenSaver`** — a jpackage launcher forwards its command line to `main(args)`, so **a
+  copy of the launcher named `LCARS.scr` IS a working screensaver**; no second build, no native stub.
+  Registered per-user in `HKCU\Control Panel\Desktop`, so no administrator. ⚠️ `/p <hwnd>` is a
+  **documented no-op** — honouring it means parenting a window into another process's HWND, which
+  needs a handle Compose does not expose, so the preview thumbnail in Windows' own settings stays
+  blank while the saver itself works. Said out loud rather than left to be discovered.
+- **Rung C `StandbyHudWindow`** — undecorated, always on top, dragged by anywhere (an undecorated
+  window has no title bar, and a panel pinned over your work that cannot be moved is worse than no
+  panel). Closing it switches the setting off rather than merely hiding it.
+- **⚠️ The session owns the registration, not the switch.** `StandbySession` collects the settings
+  flow and decides what Windows is actually told, which buys two things: flipping the switch takes
+  effect at once, and the registration is renewed on every launch — the registry value holds the
+  launcher's path, and an upgrade that moved the install would otherwise leave Windows pointing at a
+  file that is no longer there. The diagnostics report **what Windows said**, never what was asked.
+
+**`StandbyLayout` — and the mistake it exists to fix, which no assertion would have caught.** The
+first version scaled everything **linearly** with canvas width, so a 1280 px window drew the 460 px
+HUD arrangement at 2.8× with two of five panels clipped off the bottom. **A bigger surface must show
+MORE, not the same thing bigger** — the same rule the phone's widget follows. Scale is now
+sub-linear (`SCALE_CURVE = 0.55`, about 2× type on a 5× canvas) while the item counts grow with the
+room, and it keys on the **smaller side**, because a display spanning two monitors is enormously wide
+and no taller than one screen.
+⚠️ **Four defects were found ONLY by dumping a render and looking at it.** Multi-line text
+overlapping itself (Compose Desktop derives lineHeight from font metrics and Orbitron/ChakraPetch
+collide — every wrapping `Text` now sets it explicitly); a truncated panel title; two panels clipped
+away entirely; and a fifth line lost because three right-hand panels each guessed their own budget
+while a `Column` clips overflow **silently**. They share one budget now, split. `STACK_COST = 2.4f`
+is **measured off a real render, not reasoned about** — at 2.0 the HUD emitted a panel with room for
+its header and neither of its two lines, which reads as a feed that answered with nothing.
+
+**Both apps now upgrade themselves with nothing to click.**
+
+- **⚠️ CORRECTION to a claim recorded twice above:** *"Auto-update's one tap is the hard Android
+  floor (documented)"* **is no longer true.** It was written before the GrapheneOS arc provisioned
+  Pulse as a **Device Owner**, and a device owner installing through `PackageInstaller` is not shown
+  the confirmation. `ApkInstaller` already had the three-rung ladder; what was missing was a caller.
+- **Android (`RefreshWorker.installNewestBuild`)** — the only caller of the install path was
+  `MainActivity`, so the app updated itself **only if you opened it**. The pass now sits above the
+  notification gates, beside the two service self-heals and the widget refresh. Unmetered only (the
+  APK is ~158 MB and CI publishes on every push; `ConnectivityObserver.isUnmetered` answers false
+  when it cannot classify, which is the safe direction), never while `appForeground` is true, and
+  the foreground is read **twice** because downloading 158 MB takes long enough for the phone to be
+  picked up meanwhile.
+- **⚠️ THE GAP THAT ARC OPENED AND HAD TO CLOSE IN THE SAME COMMIT.** `unconfirmedUpdateCode` is the
+  loop-breaker, and it was cleared **only by MainActivity reaching the foreground** — sufficient
+  while a visit was the one thing that could install. It no longer is: a phone that is never opened
+  would install exactly once and then be blocked for good, which is *precisely the phone the feature
+  exists for*. The evidence the install landed is that the code is running FROM it, so
+  `BuildConfig.VERSION_CODE` is compared against the committed code. A genuinely failed install
+  leaves the running build older, so it stays blocked — the safety property is preserved.
+- **The ops note stopped being a lie.** *"A new app build is ready to install in Settings"* was true
+  when a tap was the only path; now it appears only when a build genuinely **is** waiting and says
+  what for (Wi-Fi, or the phone being put down). It also reuses what the install pass learned rather
+  than calling `check()` again — that call sends `Cache-Control: no-cache` by design, so a second
+  one is a second live request every tick for an answer already in hand.
+- **Desktop (`ScheduledUpdate` + `SingleInstance`)** — a per-user hourly `schtasks` task (no `/ru`,
+  no `/rl HIGHEST`, so no UAC). ⚠️ **The trap that shapes it: the task runs the application's own
+  launcher, and the MSI replaces that exact file.** A running `.exe` is locked, so this process can
+  no more install over itself than the console can — the install is handed to a small **detached
+  batch script that polls `tasklist` for our own PID** and only then runs `msiexec /qn`, relaunching
+  the console if it had been open. That script is the only participant not being replaced.
+- **⚠️ `SingleInstance` uses a FILE LOCK, not a PID file**, because the OS releases a lock however
+  the process dies — the classic PID-file failure is an app that refuses to start believing a
+  long-dead copy is running. And the quit request is **timestamped, deleted on sight, and ignored
+  once stale**: a flag that could outlive the pass that wrote it would quit the app on every launch
+  afterwards, leaving no way in by any means the user has.
+- **`PayloadProvisioner`** — the adjudicator model (~1 GB) and library expansion packs fetch
+  themselves on Wi-Fi. One payload per pass, packs before the model, never for a switched-off
+  feature, never within 2 GB of filling the storage, every attempt logged through
+  `UsageRepository.log` (content-free, scrubbed, already in the diagnostic bundle). ⚠️ **Guide
+  diagrams are deliberately absent** — they are bundled and licence-checked at build time; there is
+  no runtime fetch and inventing one would ship unverified images.
+- **⚠️ `LlamaEngine.prepare()` takes `allowDownload` and it DEFAULTS TO FALSE.** A bare `prepare()`
+  compiles, returns cleanly and fetches nothing — the provisioner would have looked wired and never
+  downloaded a model. Same defect class as the vitals gate whose motion argument was never passed:
+  **a default that quietly means "do not do the thing"**. Caught by reading the declaration.
+- **⚠️ `jdk.management` added to the jlink module list.**
+  `com.sun.management.OperatingSystemMXBean` is reached through a `ServiceLoader` *provides* clause
+  that exists only if that module is in the image (read out of the JDK with `--describe-module`, not
+  recalled), and jlink strips anything unlisted. A miss would surface as the vitals panel saying it
+  could not measure this machine, forever, on every install — never as a build failure.
+
+**Verification, all local and free.** Desktop **159 tests green**; **five load-bearing rules
+negative-tested**, each confirmed to fail exactly its own guard: the staleness window, delete-on-read,
+argv[0]-only screensaver parsing, the stacking height cost, and scale keyed on the smaller side.
+⚠️ **The first screensaver perturbation reported the guard AWAKE when nothing had been tested** — it
+only *touched* the code without removing the property, mechanism #2 of the four recorded ways a green
+test proves nothing. The harness now parses the JUnit XML and names **which** test failed, because
+"the build failed" is not evidence the right guard fired.
+
+**⚠️ NEW FALSE-POSITIVE MECHANISM for `tools/android_resolve_check.sh`, now documented in the script
+itself: a GENERATED class can never resolve locally.** `BuildConfig` and `R` are written by the
+build. The differencing normally cancels that out, but a file using one for the **first** time has no
+baseline complaint to cancel against, so it is reported as new and looks exactly like a real defect.
+Settled in one command — `tools/android_compile_check.sh` on `CrashReporter.kt`, shipping code that
+is green in CI, reports the identical unresolved reference on its own import line.
+
+**⚠️ And one verification result I could NOT explain, recorded as such rather than dressed up.** The
+resolve check flagged `File(context.filesDir.absolutePath).usableSpace`; a standalone typed probe of
+that exact expression against a real `Context` compiled **clean**, so the probe did not reproduce it
+— yet rewriting it as `context.filesDir.usableSpace` silenced the check. The tool was seeing
+something real in a multi-file resolution context that a two-file probe does not have. The direct
+form is better code regardless. **A two-file probe is necessary but not always sufficient.**
+
+**⚠️ Two operational traps that cost real time.**
+- **A regex rewrite across a test file mangled it silently.** A `re.S` pattern swapping JUnit's
+  message-first assertion arguments matched **across test boundaries**, attaching one test's message
+  to another's assertion and leaving a variable referenced out of scope. Both files were deleted and
+  rewritten by hand. **Do not regex-edit code whose structure the pattern cannot see.**
+- **The Bash tool's working directory persists between calls.** A `cd` into
+  `build/test-results/test` in one call made every relative path in the next call resolve inside it,
+  producing a convincing "MISSING" for five test files that were all present. Use absolute paths.
+
+⚠️ **Owner-verify, unavoidably — this container has no Windows machine, no GL context and no phone.**
+On Windows: install the per-user MSI (⚠️ **a one-time uninstall is needed** — a per-user install is a
+different context and will land *beside* an existing per-machine copy rather than upgrading it),
+then Settings → STANDBY DISPLAY, switch each of the three on in turn and read **WHAT ACTUALLY
+HAPPENED**; leave the machine idle to see the screensaver; lock it to see the picture; and leave it
+closed overnight to see the hourly task upgrade it with no window and no click. On the Pixel: leave
+the app unopened for a day on Wi-Fi and confirm it updated anyway, and that the board's ops row no
+longer tells you to install something it has already installed.
+
+**Open / steerable:** the standby display's panel selection and density are one file
+(`StandbyDisplay.kt`) and its sizing one small pure core, both easy to tune from a screenshot; the
+`.scr` is copied from the launcher at registration time rather than shipped as a separate artifact,
+which is simpler but means the screensaver only exists after the switch is first turned on.
