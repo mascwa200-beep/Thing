@@ -355,6 +355,14 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.HealthExporter(appContext, foodLogStore, bodyStore)
     }
 
+    /**
+     * Progress photographs — app-private, never in the camera roll, and in `filesDir` rather than
+     * the cache so the OS cannot reclaim somebody's "before" without telling them.
+     */
+    val progressPhotoStore: dev.mascwa.pulse.data.health.ProgressPhotoStore by lazy {
+        dev.mascwa.pulse.data.health.ProgressPhotoStore(appContext, json)
+    }
+
     /** Dishes made more than once, so a bolognese is one entry rather than eleven. */
     val recipeStore: dev.mascwa.pulse.data.health.RecipeStore by lazy {
         dev.mascwa.pulse.data.health.RecipeStore(appContext, json)

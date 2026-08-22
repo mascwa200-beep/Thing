@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -39,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
@@ -819,6 +823,9 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item { LcarsHeaderBar("MEASUREMENTS") }
         item { Measurements(vm) }
 
+        item { LcarsHeaderBar("PHOTOGRAPHS") }
+        item { ProgressPhotos(vm) }
+
         item { LcarsHeaderBar("READINGS") }
         items(weighins.asReversed().take(40), key = { it.atMs }) { w ->
             ReadingRow(
@@ -1403,6 +1410,108 @@ private fun Measurements(vm: HealthViewModel) {
         }
     }
 }
+
+/**
+ * Photographs, which are the measurement the scale is worst at.
+ *
+ * Weight moves for reasons that have nothing to do with what anybody is changing — water, salt, the
+ * time of day, last night's dinner — and the tape catches only some of the rest. Twelve weeks apart,
+ * a photograph is the one record that shows the thing itself.
+ *
+ * ⚠️ The privacy line is on screen rather than in a KDoc nobody reads, and it says the cost as well
+ * as the benefit: these never enter the camera roll, and uninstalling takes them with it. Both
+ * follow from the same decision to keep them app-private, and somebody should get to know that
+ * before they have a year of them.
+ */
+@Composable
+private fun ProgressPhotos(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val photos by vm.photos.collectAsStateWithLifecycle()
+    var pending by remember { mutableStateOf<String?>(null) }
+    var viewing by remember { mutableStateOf<String?>(null) }
+
+    val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        // ⚠️ Recorded only on success. A cancelled capture leaves a zero-byte file behind, and an
+        // index row pointing at one renders as a thumbnail that can never load.
+        pending?.let { if (ok) vm.photoTaken(it) }
+        pending = null
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            LcarsButton(
+                text = "TAKE A PHOTO",
+                onClick = {
+                    val slot = vm.reservePhoto() ?: return@LcarsButton
+                    pending = slot.first
+                    capture.launch(slot.second)
+                },
+            )
+            if (photos.isEmpty()) {
+                Text(
+                    "None yet. One now and one in twelve weeks is the comparison the scale cannot make.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    items(photos, key = { it.id }) { p ->
+                        Column(
+                            Modifier
+                                .width(PHOTO_W)
+                                .clickable { viewing = if (viewing == p.id) null else p.id },
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            // Coil downsamples to the drawn size, so a row of full-resolution JPEGs
+                            // never reaches memory whole. The shared ImageLoader is the app's.
+                            AsyncImage(
+                                model = vm.photoUri(p.id),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .width(PHOTO_W)
+                                    .height(PHOTO_H)
+                                    .clip(lcarsBlockShape(6.dp, LcarsCorner.TopStart))
+                                    .background(c.raise),
+                            )
+                            Text(
+                                relativeDay(p.atMs),
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                val open = viewing
+                if (open != null && photos.any { it.id == open }) {
+                    AsyncImage(
+                        model = vm.photoUri(open),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth().height(PHOTO_OPEN_H),
+                    )
+                    LcarsButton(
+                        text = "DELETE THIS ONE",
+                        color = c.negative,
+                        onClick = {
+                            vm.forgetPhoto(open)
+                            viewing = null
+                        },
+                    )
+                }
+            }
+            Text(
+                "Kept on this phone only — never in the camera roll and never sent anywhere. That " +
+                    "also means uninstalling takes them with it, and the spreadsheet export does " +
+                    "not include them.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+            )
+        }
+    }
+}
+
+private val PHOTO_W = 92.dp
+private val PHOTO_H = 122.dp
+private val PHOTO_OPEN_H = 360.dp
 
 // =================================================================================== shared
 

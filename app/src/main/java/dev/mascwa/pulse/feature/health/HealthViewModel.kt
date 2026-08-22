@@ -12,6 +12,7 @@ import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.data.health.BodyStore
+import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
 import dev.mascwa.pulse.data.settings.HealthSettings
@@ -205,6 +206,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             // without this the saved-foods list renders as "nothing yet" on a cold screen even
             // though the search behind it can see them.
             c.customFoodStore.load()
+            c.progressPhotoStore.load()
             reloadEntries()
             recompute.value++
         }
@@ -496,6 +498,33 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     fun forgetFood(id: String) {
         viewModelScope.launch { c.customFoodStore.remove(id) }
+    }
+
+    // -------------------------------------------------------------------------- progress photos
+
+    /** Newest first. App-private files, never the camera roll. */
+    val photos: StateFlow<List<ProgressPhotoStore.Photo>> = c.progressPhotoStore.photos
+
+    fun photoUri(id: String): android.net.Uri? = c.progressPhotoStore.uriFor(id)
+
+    /**
+     * Where the camera should write the next photograph, or null if the file cannot be made.
+     *
+     * ⚠️ Reserving does NOT record it. A cancelled capture would otherwise leave an index row
+     * pointing at a zero-byte file, which the store's load-time sweep cannot catch because the file
+     * genuinely exists. [photoTaken] is the half that records, and only on success.
+     */
+    fun reservePhoto(): Pair<String, android.net.Uri>? =
+        c.progressPhotoStore.reserve(System.currentTimeMillis())
+
+    fun photoTaken(id: String) {
+        viewModelScope.launch {
+            c.progressPhotoStore.confirm(id, System.currentTimeMillis())
+        }
+    }
+
+    fun forgetPhoto(id: String) {
+        viewModelScope.launch { c.progressPhotoStore.remove(id) }
     }
 
     fun removeEntry(id: String) {
