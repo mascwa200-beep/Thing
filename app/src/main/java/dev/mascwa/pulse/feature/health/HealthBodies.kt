@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,20 +19,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.health.BodyStore
-import dev.mascwa.pulse.feature.common.ChakraPetch
 import dev.mascwa.pulse.feature.common.ChartSeries
-import dev.mascwa.pulse.feature.common.JetBrainsMono
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsDataRow
@@ -43,6 +42,8 @@ import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.LcarsStatBlock
 import dev.mascwa.pulse.feature.common.LcarsTimeChart
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -187,6 +188,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
+        item { DayStepper(vm) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -245,10 +247,26 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
-        item { LcarsHeaderBar("TODAY", trailing = NutritionDay.summarise(state.eatenToday)) }
+        val day by vm.shownDay.collectAsStateWithLifecycle()
+        val isToday = day == vm.todayStartMs()
+        item {
+            LcarsHeaderBar(
+                if (isToday) "TODAY" else relativeDay(day).uppercase(),
+                trailing = NutritionDay.summarise(state.eatenToday),
+            )
+        }
 
         if (entries.isEmpty()) {
-            item { NotYet("Nothing logged yet today.") }
+            item {
+                NotYet(
+                    if (isToday) "Nothing logged yet today." else "Nothing was logged that day.",
+                )
+            }
+            // ⚠️ Offered only on an EMPTY day, and it is the difference between a shortcut and a
+            // duplication bug. copyDay appends; on a day that already has entries the fastest way to
+            // log a routine becomes the fastest way to log it twice, and the calorie total — which is
+            // what the expenditure measurement reads — would be quietly doubled for that day.
+            item { CopyDay(vm, day) }
         } else {
             NutritionDay.byMeal(entries).forEach { (m, totals) ->
                 item(key = "meal-${m.name}") {
@@ -262,6 +280,85 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     EntryRow(e) { vm.removeEntry(e.id) }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Which day the log is showing.
+ *
+ * ⚠️ It goes back and it does not go past today. Logging a meal into next Thursday is never what
+ * somebody meant, and worse than useless here: [Expenditure] reads the log over a trailing window and
+ * treats an absent day as unknown rather than zero, so a future day carrying entries would enter that
+ * window as a real observation the moment the calendar reached it.
+ */
+@Composable
+private fun DayStepper(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+    val today = vm.todayStartMs()
+    val forward = vm.dayPlus(day, 1)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        StepButton("◀", enabled = true) { vm.showDay(vm.dayPlus(day, -1)) }
+        Text(
+            relativeDay(day).uppercase(),
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+            color = if (day == today) c.accent else c.ink,
+            modifier = Modifier.weight(1f).padding(horizontal = 11.dp),
+        )
+        if (day != today) {
+            Text(
+                "TODAY",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                modifier = Modifier.clickable { vm.showDay(today) }.padding(7.dp),
+            )
+        }
+        StepButton("▶", enabled = forward <= today) { vm.showDay(vm.dayStartOf(forward)) }
+    }
+}
+
+@Composable
+private fun StepButton(glyph: String, enabled: Boolean, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Text(
+        glyph,
+        fontFamily = JetBrainsMono, fontSize = 13.sp,
+        color = if (enabled) c.accent else c.line,
+        modifier = Modifier
+            .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+    )
+}
+
+/** Repeat a previous day onto this one, which is how a routine gets logged in one tap. */
+@Composable
+private fun CopyDay(vm: HealthViewModel, day: Long) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(
+                "OR REPEAT A DAY",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf(1, 2, 7).forEach { back ->
+                    val source = vm.dayPlus(day, -back.toLong())
+                    LcarsChip(
+                        text = when (back) {
+                            1 -> "Day before"
+                            7 -> "A week back"
+                            else -> "$back days back"
+                        },
+                        selected = false,
+                        onClick = { vm.copyFrom(source) },
+                    )
+                }
+            }
+            Text(
+                "Copies everything logged that day onto this one. If there was nothing, it says so and " +
+                    "changes nothing.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
         }
     }
 }
@@ -325,10 +422,20 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text(
-                        "WEIGH IN — ${unit.label.uppercase()}",
-                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
-                    )
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "WEIGH IN — ${unit.label.uppercase()}",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp,
+                            color = c.muted, modifier = Modifier.weight(1f),
+                        )
+                        // ⚠️ Display only. Kilograms are what the record and every core hold, and the
+                        // conversion happens at this boundary — a pound that reached BodyTrend would
+                        // put the trend, the rate cap and the calorie floor all out by a factor of 2.2
+                        // with nothing on screen looking wrong.
+                        BodyTrend.MassUnit.entries.forEach { u ->
+                            LcarsChip(u.label.uppercase(), unit == u, { vm.setMassUnit(u) })
+                        }
+                    }
                     LcarsField(
                         value = entry,
                         onValueChange = { entry = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
@@ -383,6 +490,28 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        // ⚠️ Off the TREND, and off the person the cores were given — not off the last thing the scale
+        // said. A BMI that moves half a point because of yesterday's salt is the same lie the trend
+        // exists to remove, and it is worse here because a band boundary makes it look categorical.
+        val p = state.person
+        if (p != null) {
+            item {
+                val value = Body.bmi(p.kg, p.heightCm)
+                val band = Body.bmiBand(value)
+                LcarsDataRow(
+                    label = "BMI",
+                    value = if (band == null) fmt(value) else "${fmt(value)} · ${band.label}",
+                )
+            }
+            item {
+                Text(
+                    "A ratio of weight to height, and nothing more — it knows nothing about how much " +
+                        "of you is muscle. Useful as one line among several, misleading on its own.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+        }
+
         if (trend.points.size >= 3) {
             item {
                 LcarsHeaderBar("TREND", trailing = "${trend.points.size} readings")
@@ -415,18 +544,28 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
         item { LcarsHeaderBar("READINGS") }
         items(weighins.asReversed().take(40), key = { it.atMs }) { w ->
-            LcarsDataRow(
+            ReadingRow(
                 label = relativeDay(w.atMs),
                 value = fmt(w.kg * unit.perKg) + " " + unit.label,
+                onRemove = { vm.removeWeighin(w.atMs) },
             )
         }
-        if (weighins.size > 40) {
-            item {
-                Text(
-                    "Showing the most recent 40 of ${weighins.size}. Nothing is ever discarded.",
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                )
-            }
+        item {
+            // ⚠️ The reason every row can be deleted, and it is not tidiness. A mistyped 850 is what
+            // the trend filter's outlier suppression was tuned against — it survives one, and it is
+            // deliberately graduated rather than absolute, so a wrong reading still drags the estimate
+            // a little and keeps dragging it for weeks. The person who typed it is the only one who
+            // knows it was a typo, so they have to be able to say so.
+            Text(
+                if (weighins.size > 40) {
+                    "Showing the most recent 40 of ${weighins.size}. Nothing is discarded unless you " +
+                        "remove it — worth doing for a mistyped reading, which pulls the trend for weeks."
+                } else {
+                    "Remove a mistyped reading rather than living with it — one bad number pulls the " +
+                        "trend for weeks."
+                },
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
         }
     }
 }
@@ -501,6 +640,9 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        item { LcarsHeaderBar("WHERE YOU ARE HEADING") }
+        item { GoalField(vm, state) }
+
         item { LcarsHeaderBar("HOW TO SPLIT IT") }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -516,6 +658,7 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                 }
             }
         }
+        item { ProteinPreference(vm, state) }
 
         item { LcarsHeaderBar("HOW ACTIVE, ROUGHLY") }
         item {
@@ -542,9 +685,35 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        item { LcarsHeaderBar("THE PLAN") }
+
+        // ⚠️ A refusal is rendered, not swallowed. The guardrails in MacroTargets were deliberately
+        // built to REFUSE rather than silently clamp — a goal in the underweight range, a body the
+        // cores cannot believe, nothing measured yet — and a surface that only draws Plan.Set turns
+        // every one of those back into the silent clamp they were written to avoid. Amber rather than
+        // red: it is the app declining to answer, not something being wrong with the person.
+        val refused = state.plan as? MacroTargets.Plan.Refused
+        if (refused != null) {
+            item {
+                LcarsFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+                    Text(
+                        refused.sentence,
+                        fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.amber, lineHeight = 17.sp,
+                    )
+                }
+            }
+        }
+        if (state.plan == null) {
+            item {
+                NotYet(
+                    "No plan yet — it needs your height, year of birth and at least one weigh-in, and " +
+                        "then something to burn against.",
+                )
+            }
+        }
+
         val set = state.plan as? MacroTargets.Plan.Set
         if (set != null) {
-            item { LcarsHeaderBar("THE PLAN") }
             item {
                 LcarsFrame(Modifier.fillMaxWidth()) {
                     Text(
@@ -553,6 +722,28 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     )
                 }
             }
+            // ⚠️ Every adjustment, said out loud. These are the guardrails firing — the calorie floor,
+            // the rate cap, the protein bounds, carbs hitting zero — and each one means the returned
+            // plan is NOT what was asked for. Without them the pace chips read as a lie: somebody picks
+            // one kilogram a week, is quietly floored at the resting rate, and the only visible trace
+            // is a rate they never chose in a sentence that does not explain itself.
+            // ⚠️ No key. A duplicate key crashes a LazyColumn, and nothing in MacroTargets promises one
+            // adjustment per kind — a short, wholly static list has nothing to gain from one anyway.
+            if (set.capped) {
+                items(set.adjustments) { a ->
+                    LcarsFrame(
+                        Modifier.fillMaxWidth(),
+                        accent = c.amber,
+                        padding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+                    ) {
+                        Text(
+                            a.sentence,
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber, lineHeight = 16.sp,
+                        )
+                    }
+                }
+            }
+
             val goal = p.goalKg
             if (goal > 0.0 && state.person != null) {
                 val weeks = MacroTargets.weeksToGoal(state.person.kg, goal, set.effectiveRatePerWeekKg)
@@ -564,6 +755,96 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Where you are heading, and how long it takes at the pace you picked.
+ *
+ * ⚠️ Committed on focus loss rather than on every keystroke. The plan is recomputed on every settings
+ * change, and typing "8" on the way to "80" would put a goal of eight kilograms through
+ * [MacroTargets.plan] — which correctly refuses it as underweight, so the screen would flash a refusal
+ * at somebody in the middle of typing a perfectly ordinary number.
+ */
+@Composable
+private fun GoalField(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val unit = state.unit
+    val stored = state.profile.goalKg
+    var text by remember(stored) {
+        mutableStateOf(if (stored > 0.0) fmt(stored * unit.perKg) else "")
+    }
+    var focused by remember { mutableStateOf(false) }
+
+    fun commit() {
+        val typed = text.toDoubleOrNull()
+        when {
+            text.isBlank() -> vm.setGoalKg(0.0)
+            typed != null && typed > 0.0 -> vm.setGoalKg(typed / unit.perKg)
+            else -> text = if (stored > 0.0) fmt(stored * unit.perKg) else ""
+        }
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                "GOAL WEIGHT — ${unit.label.uppercase()}",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+            )
+            LcarsField(
+                value = text,
+                onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                placeholder = "optional",
+                // ⚠️ LcarsField's `modifier` IS the text field's own, so a focus observer here really
+                // sees the field rather than a wrapper around it.
+                modifier = Modifier.onFocusChanged { f ->
+                    if (focused && !f.isFocused) commit()
+                    focused = f.isFocused
+                },
+            )
+            Text(
+                "Optional. It changes nothing about what you eat — the pace does that — it only lets " +
+                    "the plan say how long this takes. Leave it blank and nothing is lost.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+        }
+    }
+}
+
+/**
+ * How much protein, if the diet mode's own figure is not what you want.
+ *
+ * ⚠️ Chips rather than a field, and the range is the core's own. [MacroTargets] clamps anything outside
+ * 1.2–3.0 g/kg and reports the clamp as an adjustment; offering a free number would mean routinely
+ * showing somebody a correction to a value the screen invited them to type.
+ */
+@Composable
+private fun ProteinPreference(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val chosen = state.profile.proteinGPerKg
+    val fromMode = runCatching { MacroTargets.DietMode.valueOf(state.profile.dietMode) }
+        .getOrDefault(MacroTargets.DietMode.BALANCED).proteinGPerKg
+
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            "PROTEIN — GRAMS PER KILOGRAM",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LcarsChip("Mode's own", chosen <= 0.0, { vm.setProteinGPerKg(0.0) })
+            listOf(1.6, 2.0, 2.4).forEach { g ->
+                LcarsChip(fmt(g), abs(chosen - g) < 1e-6, { vm.setProteinGPerKg(g) })
+            }
+        }
+        Text(
+            if (chosen > 0.0) {
+                "Yours, whatever the split says. The mode would have asked for ${fmt(fromMode)}."
+            } else {
+                "Following the split you picked — ${fmt(fromMode)} g per kilogram of a healthy weight " +
+                    "for your height, not of what you weigh now."
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
     }
 }
 
@@ -592,6 +873,30 @@ fun HabitsBody() {
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
             )
         }
+    }
+}
+
+/** A reading, and a way to take it back. Deliberately flatter than [EntryRow] — a list of forty. */
+@Composable
+private fun ReadingRow(label: String, value: String, onRemove: () -> Unit) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2, modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink,
+        )
+        Text(
+            "✕",
+            fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.negative,
+            modifier = Modifier.clickable { onRemove() }.padding(start = 13.dp, top = 3.dp, bottom = 3.dp),
+        )
     }
 }
 

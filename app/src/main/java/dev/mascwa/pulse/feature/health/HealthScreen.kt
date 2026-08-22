@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,14 +22,14 @@ import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
-import dev.mascwa.pulse.feature.common.ChakraPetch
-import dev.mascwa.pulse.feature.common.JetBrainsMono
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsTabRow
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import java.time.LocalDate
 
@@ -58,6 +57,12 @@ fun HealthScreen(vm: HealthViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val idx by vm.tabIndex.collectAsStateWithLifecycle()
     val tab = HealthTab.entries[idx.coerceIn(0, HealthTab.entries.lastIndex)]
+
+    // ⚠️ On every entry, not once. The view model outlives the composition — this app's panel
+    // transitions take a tab's composable out of composition when you leave it — so `LaunchedEffect(Unit)`
+    // genuinely re-runs on return, which is what carries the log across midnight and picks up a
+    // weigh-in recorded from somewhere else since.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     PulseScaffold(title = "Health") { innerPadding ->
         Column(Modifier.padding(innerPadding)) {

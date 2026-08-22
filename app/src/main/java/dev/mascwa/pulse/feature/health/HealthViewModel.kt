@@ -53,6 +53,18 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         java.time.Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
             .atStartOfDay(zone).toInstant().toEpochMilli()
 
+    /**
+     * The day [days] before or after the one starting at [dayStartMs].
+     *
+     * ⚠️ Calendar arithmetic, not `± 86_400_000`. A local day is 23 hours the morning the clocks go
+     * forward and 25 the morning they go back, so adding a fixed day either overshoots into the day
+     * after next or lands back inside the same one — and the visible symptom is a log that skips a day,
+     * or a "next day" button that will not move. `LocalDate.plusDays` has no such failure.
+     */
+    fun dayPlus(dayStartMs: Long, days: Long): Long =
+        java.time.Instant.ofEpochMilli(dayStartMs).atZone(zone).toLocalDate()
+            .plusDays(days).atStartOfDay(zone).toInstant().toEpochMilli()
+
     // -------------------------------------------------------------------------------- the record
 
     val profile: StateFlow<HealthSettings> = c.settingsRepository.settings
@@ -202,8 +214,21 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     // ------------------------------------------------------------------------------------ actions
 
+    /**
+     * True once the reader has deliberately stepped off today.
+     *
+     * ⚠️ It exists for midnight. A view model outlives a day — this one survives navigating away and
+     * back, and a phone left on the counter overnight keeps it alive indefinitely — so `_today`, set
+     * once at construction, would quietly go on filing breakfast under yesterday. [refresh] therefore
+     * snaps forward, but only when nobody chose the day being shown: yanking somebody out of Tuesday
+     * because they happened to reopen the tab after midnight would be a worse bug than the one being
+     * fixed, and far more confusing, because the log would look like it had lost their entries.
+     */
+    private var pinnedDay = false
+
     fun refresh() {
         viewModelScope.launch {
+            if (!pinnedDay) _today.value = todayStartMs()
             c.foodLogStore.load()
             c.bodyStore.all()
             reloadEntries()
@@ -212,6 +237,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun showDay(dayStartMs: Long) {
+        pinnedDay = dayStartMs != todayStartMs()
         _today.value = dayStartMs
         viewModelScope.launch { reloadEntries() }
     }
