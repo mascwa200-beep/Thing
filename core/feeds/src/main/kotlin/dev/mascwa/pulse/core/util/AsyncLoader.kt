@@ -28,6 +28,12 @@ suspend fun <T> MutableStateFlow<Async<T>>.load(
             )
         }
     } catch (e: CancellationException) {
+        // ⚠️ Clear the flag before rethrowing. `loading = true` is set above the `try`, and this branch
+        // used to leave it set forever — a cancelled load left the busy bar spinning with no fetch
+        // behind it, and any caller that guards on "is a load already running" would then refuse to
+        // start another one for the lifetime of the screen. Cancellation still propagates: swallowing
+        // it would break structured concurrency, which is a worse bug than the one being fixed.
+        update { it.copy(loading = false) }
         throw e
     } catch (e: Throwable) {
         update {

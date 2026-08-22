@@ -7934,3 +7934,73 @@ per push** and each completes its own suite. Acting on it would have been acting
 result. The suite event is a prompt to look, never the verdict; `pull_request_read` with
 `get_check_runs` is the verdict, and `actions_get`/`get_workflow_job` gives the step-level detail
 that says *which* gate has actually passed.
+
+### The desktop "Error" dialog on SPACE WEATHER (this session, PR #455)
+
+Owner sent a photograph of the Windows companion showing two faults at once: a Swing box reading
+`maxHeight(-12) must be >= than minHeight(0)`, and SPACE WEATHER stuck on `Nothing loaded yet.`,
+both appearing **the moment that screen is opened**. **Zero subagent spend** except two Explore
+agents for the initial survey.
+
+**They are one fault.** `WorldFeed` prints that sentence only from its pristine, never-entered state:
+`_located` initialised to `true` and was written only *inside* the launched coroutine (so
+`located == true` meant "nothing has looked", not "we have a coordinate"), and `AsyncLoader.load`
+provably cannot exit with no data, no error and not loading. The load was never started, and its only
+trigger is a `LaunchedEffect` on the screen whose first frame threw.
+
+⚠️ **NOT REPRODUCED, and the site is still unnamed.** New `WorldPanelLayoutTest` lays the real chrome
+out at nine sizes × five densities — **225 real layout passes**, including panes shorter than the
+header band and a faithful copy of the two-pane shell (`rail = false`, the directory's `railWidth`,
+the three header `actions`) — and every one passes. What shipped therefore makes the failure legible
+and survivable rather than claiming to cure it. **The owner's crash console has the trace.**
+
+**⚠️ THE CAPABILITY THIS UNLOCKED, and it is the reusable part: desktop LAYOUT bugs ARE reproducible
+here.** `renderComposeScene` composes *and measures and lays out* on a raster surface needing no GL
+context — the same property that makes the standby display testable. Every prior desktop render
+finding in this project was deferred to a real machine; layout does not have to be. Sweep **density
+as well as size** (1.0–2.0): Windows ships at 125–150% scaling and a `dp` is a different pixel count
+at each, so a harness fixed at 1.0 has a blind spot exactly where the reporting machine lives.
+
+**⚠️ THE DIALOG IS COMPOSE'S OWN, AND IT DISCARDS THE USEFUL HALF.** Disassembling
+`ui-desktop-1.7.3.jar`, `DefaultWindowExceptionHandlerFactory.onException` does three things:
+`showErrorDialog` (JOptionPane, title `"Error"`, body = `throwable.message` **only**),
+`window.dispatchEvent(WINDOW_CLOSING)`, then `athrow`. So one bad panel closes the console, and the
+whole trace sits unmentioned in a file the crash screen already reads. New `WindowFaultHandler`
+records it, names where the detail is, and leaves the window open — still rethrowing, deliberately
+(Compose has abandoned the frame either way; letting the event loop unwind it is what makes surviving
+safe), with **one dialog per distinct fault** because a bad frame usually fails again.
+
+**⚠️ Three of my own leads were killed by the bytecode, and the eliminations are worth keeping:**
+`SizeNode.getTargetConstraints` ends in `coerceAtLeast(0)`, so `Modifier.height/width/size` can
+**never** throw this; Row/Column weighted sizes are `Math.max(0, …)` **and** that `createConstraints`
+is wrapped to rethrow with a distinctive *"hard-to-reproduce Compose issue … issuetracker 300280216"*
+prefix, so a bare message did not come from a Row or Column; and
+`ComposeSceneMediator.onComponentSizeChanged` clamps both axes, so window resizing is not it either.
+What survives: `minHeight(0)` with `maxHeight(-12)` is a literal `Constraints(maxHeight = X)`, and the
+only unclamped producer reachable from app code is **`MeasuringIntrinsics.minWidth/maxWidth`** — i.e.
+an intrinsic measurement run with a negative height. Our only intrinsic-forcing sites are the two
+`Modifier.height(IntrinsicSize.Min)` uses (`LcarsGeometry.kt` `LcarsDataRow`, `LcarsFrame.kt`
+`LcarsDialog`), neither of which renders on an empty SPACE WEATHER.
+
+**Definitely wrong, and fixed:**
+- **`AsyncLoader` left a cancelled load marked busy forever** — `loading = true` is set above the
+  `try` and the cancellation branch only rethrew. Callers guard on that flag to avoid stacking
+  fetches, so it becomes a *permanent refusal to load*. 5 new tests; the guard **negative-tested**
+  against a baseline confirmed green first (perturbation asserted to match; exactly the one test
+  naming it failed; green again on restore). Shared core — the phone gets this too.
+- **`WorldFeed.located` is tri-state**, the three situations say different things, and the feed marks
+  itself busy *before* its first suspension point rather than after.
+- **The window size had no floor on read or write** and `Float.NaN.toInt()` is `0`, so one bad reading
+  persists a zero every later launch restores. Clamped **both** ends — a bad value may already be on
+  disk, so a write-side guard alone would never rescue a machine that had recorded one.
+- **The standby HUD** is `undecorated` + `resizable` (the one configuration with no title bar to stop
+  at) with no minimum size, and had **two disagreeing definitions of its own size** — `StandbyHudSize`
+  (460×560, *zero callers*) against `HUD_W`/`HUD_H` (460×620, the ones used). Converged and floored.
+
+**Verified:** `:desktop:build` green at **245 tests** (was 240); `:core:feeds` +5. CI green on
+`2be5502` — desktop 2m14s, Windows MSI packaged, Android 11m08s.
+
+⚠️ **Owner-verify on Windows, and one ask:** clicking into SPACE WEATHER should load, and any
+remaining failure should now name itself and point at the crash console **without closing the
+console**. **The top entry of MENU → CRASH CONSOLE names the site** and turns this from a defensive
+fix into a real one.
