@@ -8141,6 +8141,21 @@ asserted green first, each perturbation asserted to have matched the source. Eve
 (`LayoutModifierNode`'s four intrinsic signatures, `ModifierNodeElement`, `IntrinsicMeasurable`) read
 out of the shipped 1.7.3 jar with `javap` rather than recalled.
 
+**⚠️ THE KILLED WORKFLOW'S FILES TURNED UP AFTERWARDS, AND ONE HELD A REAL RESULT.** Two agent-written
+scratch tests appeared in the tree minutes after plan mode ended — the reproduce lens had finished
+writing before it died. Running its hunt corroborated the bytecode census **from the opposite
+direction**: of 14 candidate shapes (both kit shapes UNGUARDED, nested intrinsics, columns with
+`width(IntrinsicSize.Min)` whose children overflow, `spacedBy` overflow, 40 padded rows in a bounded
+column, `aspectRatio`/`wrapContentHeight`/`requiredHeight` under an intrinsic width, a scrolling
+child inside an intrinsic Row) **not one produced a negative query**, and instrumenting a leaf showed
+the only heights the framework ever passes are **`Infinity` and `0`**. Its thrower set is also worth
+knowing: bare Box, padding, Text, Row, background and verticalScroll all throw on `-12`; `width`,
+`size`, `aspectRatio` and **`Column`** survive (their `SizeNode` clamps first).
+The finding was folded into `ClampIntrinsicsTest` as a compact reviewed guard and **both scratch
+files deleted** — 511 lines of unreviewed agent code does not belong in the tree. ⚠️ **Lesson: after
+plan mode kills a wave, `git status` later — the corpses can still land files**, and one of them may
+be the answer.
+
 ⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
 carries the build number and names the window. If the clamp caught it instead, the panel draws and
 MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.

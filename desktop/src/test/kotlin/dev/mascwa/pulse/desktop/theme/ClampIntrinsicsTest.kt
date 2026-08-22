@@ -4,6 +4,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
@@ -177,5 +186,88 @@ class ClampIntrinsicsTest {
             "the tab shape threw after all, which would make it the leading suspect again",
             outcome.exceptionOrNull(),
         )
+    }
+
+    /**
+     * ⚠️ **No shape this app actually builds produces a negative intrinsic-width query**, and that is
+     * the strongest evidence there is that the clamp is a containment rather than a fix.
+     *
+     * A wider sweep of 14 candidate shapes — both kit shapes UNGUARDED, nested intrinsics, columns
+     * with `width(IntrinsicSize.Min)` whose children overflow, `spacedBy` overflow, a bounded stack
+     * of 40 padded rows, `aspectRatio`/`wrapContentHeight`/`requiredHeight` under an intrinsic width,
+     * a scrolling child inside an intrinsic Row — produced **not one** negative query. Instrumenting
+     * a leaf to record every height the framework passed it showed only two values ever: `Infinity`
+     * and `0`. That agrees, from the opposite direction, with the bytecode census that found none of
+     * the 27 computing producers reachable in this tree.
+     *
+     * The three kept here are the load-bearing ones: if a future edit makes either kit shape start
+     * producing negatives, that is a real regression and this fails.
+     */
+    @Test
+    fun `no shape the kit builds asks for an intrinsic width at a negative height`() {
+        val seen = mutableListOf<Int>()
+        fun record(h: Int) { seen += h }
+
+        // Both intrinsic-forcing kit shapes, deliberately WITHOUT the clamp, plus the overflow case
+        // that looks most likely to underflow.
+        val shapes: List<Pair<String, @Composable () -> Unit>> = listOf(
+            "LcarsDataRow shape, unguarded" to {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    Box(Modifier.width(5.dp).fillMaxHeight().padding(vertical = 4.dp))
+                    Box(Modifier.weight(1f).padding(12.dp))
+                }
+            },
+            "LcarsDialog shape, unguarded" to {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    Box(Modifier.width(28.dp).fillMaxHeight())
+                    Column(Modifier.weight(1f).padding(16.dp)) { Box(Modifier.padding(4.dp)) }
+                }
+            },
+            "a column asked for its intrinsic width whose children overflow" to {
+                Column(Modifier.width(IntrinsicSize.Min).fillMaxHeight()) {
+                    repeat(12) { Box(Modifier.height(40.dp).padding(vertical = 4.dp)) }
+                }
+            },
+        )
+
+        for ((name, shape) in shapes) {
+            seen.clear()
+            val outcome = runCatching {
+                renderComposeScene(width = 300, height = 60, density = Density(1.5f)) {
+                    PulseDesktopTheme {
+                        Box(Modifier.watchIntrinsicWidthQueries(::record)) { shape() }
+                    }
+                }
+            }
+            assertNull("$name threw: ${outcome.exceptionOrNull()?.message}", outcome.exceptionOrNull())
+            val negative = seen.filter { it < 0 }
+            assertTrue("$name asked for an intrinsic width at $negative", negative.isEmpty())
+        }
+    }
+}
+
+/** Records every height the framework passes to an intrinsic-width query below this point. */
+private fun Modifier.watchIntrinsicWidthQueries(onQuery: (Int) -> Unit): Modifier =
+    this.then(WatchElement(onQuery))
+
+private data class WatchElement(val onQuery: (Int) -> Unit) : ModifierNodeElement<WatchNode>() {
+    override fun create() = WatchNode(onQuery)
+    override fun update(node: WatchNode) { node.onQuery = onQuery }
+}
+
+private class WatchNode(var onQuery: (Int) -> Unit) : Modifier.Node(), LayoutModifierNode {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val p = measurable.measure(constraints)
+        return layout(p.width, p.height) { p.place(0, 0) }
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int {
+        onQuery(height)
+        return measurable.minIntrinsicWidth(height)
+    }
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int {
+        onQuery(height)
+        return measurable.maxIntrinsicWidth(height)
     }
 }
