@@ -7306,3 +7306,85 @@ longer tells you to install something it has already installed.
 (`StandbyDisplay.kt`) and its sizing one small pure core, both easy to tune from a screenshot; the
 `.scr` is copied from the launcher at registration time rather than shipped as a separate artifact,
 which is simpler but means the screensaver only exists after the switch is first turned on.
+
+### THE THEATER 403 — R8 renamed away the class Python looks up (this session, PR #451, merged)
+
+Owner sent one screenshot and one line: *"hopefully this actually gave the right information this
+time"*, alongside a standing budget instruction — **be conscious of plan usage, especially in plan
+mode.** So: **zero subagent spend, zero workflows**, one CI round, four files.
+
+The screenshot carried the decisive text, which the D1 diagnostic shipped two sessions earlier
+exists to produce:
+
+```
+javascript: NONE (the JsRuntime lookup failed: NoClassDefFoundError:
+  dev.mascwa.pulse.data.media.JsRuntime ... at v5.c.invokeSuspend ...) · py s2/apk ?
+warning: [youtube] No supported JavaScript runtime could be found.
+```
+
+**The chain, end to end.** `proguard-rules.pro` had no keep for `JsRuntime` → R8 renamed it (`v5.c`,
+`O6.a`, `n7.a$b` are Kotlin coroutine internals under obfuscation) → `jclass(...)` at
+`lcars_jsi.py:56` threw → our JS-runtime provider could never report itself available → yt-dlp found
+no runtime → YouTube's `n` parameter was never transformed → **403**. `apk ?` on the same line is the
+same bug a second time: `lcars_extract.py:210` reads `VERSION_CODE` off `BuildConfig`, which R8
+removes once its constants are inlined.
+
+⚠️ **THE CLASS HAS NEVER ONCE WORKED IN A SHIPPED APK.** `git log` settles it: R8 was enabled at
+`39418b5` (PR #328), long before `JsRuntime.kt` landed at `58c3476`. It was born into an R8 build
+with no keep rule.
+
+⚠️ **WHY FIVE ROUNDS OF DEBUGGING WENT PAST IT, and this is the transferable part.** CI's native
+assertion reads `nm -D` for the **C++ JNI symbol**, which R8 cannot touch — so it passed *correctly*
+on every build while the Kotlin class binding to it was renamed away in the same artifact. **A JNI
+symbol proves the native half and says nothing about the DEX half.** Two independent facts, one
+check.
+
+⚠️ **THREE STALE CLAIMS IN THE TREE ACTIVELY MISLED THE INVESTIGATION, AND ONE OF THEM WAS MINE.**
+This file said `isMinifyEnabled=false (R8 OFF — deliberate)` in two places, and the D1 diagnostic
+table I wrote last session said of this exact symptom *"R8 is off, so the name survives"* — which
+sent that whole session hunting a stale-Chaquopy hypothesis instead. `build.gradle.kts`'s R8 comment
+listed seven third-party libraries the keeps cover and omitted the Python bridge into our own code,
+the one that broke. All three corrected; in this tree a comment that overstates its own justification
+is a defect, and this one demonstrably cost a session.
+
+⚠️ **The irony worth keeping:** `proguard-rules.pro`'s own Chaquopy block already describes this
+failure in writing — *"R8 renames or removes classes the native interpreter resolves BY NAME at
+runtime, so the build goes green, the APK ships, and Python fails on the device. Nothing in CI could
+catch that."* Its keeps cover Chaquopy's **runtime classes** and **`PyProxy` subclasses**.
+`JsRuntime` is an ordinary app class reached by fully-qualified name and is **neither**. A correct
+warning with an incomplete keep reads exactly like a solved problem.
+
+**The gate — "Verify Python's Java lookups survived R8" in `android-build.yml`.** Derives the class
+names by grepping `jclass('...')` out of `app/src/main/python/`, so a future lookup is covered
+automatically (the drift-proof pattern `NotifId` and `WidgetLinkageTest` already use). Four details
+are load-bearing, each negative-tested:
+- ⚠️ **Extracted DEX files only, NEVER the whole APK.** `lcars_jsi.py` ships as an asset, so an
+  APK-wide grep matches the Python source's own string literal and passes whatever R8 did.
+- ⚠️ **The type descriptor `Ldev/mascwa/pulse/…;`, not the dotted name**, which could survive as an
+  ordinary string constant.
+- ⚠️ **A sentinel that cannot exist must be ABSENT** — a matcher that finds everything is
+  indistinguishable from a passing gate.
+- ⚠️ **The extracted list must be non-empty**, so a grep matching nothing cannot read as success.
+
+⚠️ **MY FIRST TEST HARNESS RETURNED 0 FOR ALL THREE CASES AND PROVED NOTHING.** The YAML block scalar
+strips indentation, so the `sed` anchored on leading spaces never matched, and a range-delete ate the
+rest of the script. Rewritten in python with an `assert` on every substitution *and* on retained
+content. **The harness needs the same care as the thing it checks** — third time this has bitten.
+
+**Verified rather than trusted:** run 1919 green, and the step's own log was fetched and read —
+both names extracted, 2 dex files checked, both `kept:`, `(sentinel correctly absent — the check can
+fail)`. A green conclusion is not evidence the new step ran.
+
+**Considered and not chosen: turning R8 off.** It would fix this and any other latent R8 bug at a
+stroke, but loses the material-icons-extended tree-shaking on an APK already at ~158 MB — now
+downloaded in full by the auto-updater on every build. If the gate later reveals more missing keeps
+than expected, R8-off is the fallback and the owner's call.
+
+⚠️ **Cannot be proven here and the owner is the only one who can close it.** No Android SDK, so R8
+never runs locally; the container's datacenter IP is bot-flagged by YouTube, so even a successful
+extraction would not reproduce the 403. CI proves the class reaches the DEX; the device proves the
+403 is gone. Build **#1919** on `latest`. The line under the THEATER player is the whole test:
+`javascript: quickjs 0.16.0 · py s2/apk 1919` = fixed (and `apk` resolving to a number proves
+`BuildConfig` came back too); still `JsRuntime lookup failed` = the keep did not take; engine live
+but still 403 = a genuinely different cause, and the first time that would be true. The interrogator
+shares the same native library, so a live JS engine implies its transcription is reachable too.
