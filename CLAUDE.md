@@ -7873,6 +7873,24 @@ Import checks the permission first and reports it separately (an empty list mean
 and "could not ask"); imports go through `BodyStore.record`, so the same-day replacement rule applies
 and importing twice cannot double a morning.
 
+⚠️ **THE CI FAILURE, AND THE GAP IT NAMED — read this before adding any AndroidX dependency.**
+`connect-client:1.1.0` was verified locally against the real AAR with javap and compiled clean, and
+CI still failed: an AAR carries a **separate declaration of the toolchain it requires**, in
+`META-INF/com/android/build/gradle/aar-metadata.properties`, which has nothing to do with its API —
+`minCompileSdk=36`, `minAndroidGradlePluginVersion=8.9.1` against this build's compileSdk 35 and AGP
+8.7.3. `:app:checkDebugAarMetadata` refused it before a line of Kotlin compiled. Nothing local
+caught it: the compile check puts `classes.jar` on a classpath and never opens `META-INF`.
+
+⚠️ And the fix was **measured, not reasoned**: the constraint is not monotonic in the way anybody
+would guess. `1.1.0-beta01` requires AGP **8.6.0** while `beta02` jumps to **8.9.1**, so the newest
+usable release is one BEHIND the first that fails. Pinned to `1.1.0-beta01` — a pre-release, which
+is a real cost, and the honest alternative was bumping AGP and compileSdk, a toolchain change
+touching Chaquopy, KSP/Room and the whole native build for one optional integration. The bridge
+recompiles clean against beta01, and the two transitive artifacts are plain JARs so they constrain
+nothing. **New gate: `tools/check_aar_metadata.py <coord…>` or `--catalog`** — negative-tested
+against the exact version that failed (caught) and the one now pinned (clears), and the `--catalog`
+sweep runs over all 20 AARs that declare anything.
+
 ⚠️ **NEW LOCAL TECHNIQUE, and it cost the one compile error of the arc: `javap` gives the JVM
 accessor name, which is NOT the Kotlin property name when the property carries a `@get:JvmName`.**
 `Mass` disassembles as `getKilograms()` and the Kotlin property is `inKilograms`; the real name is in

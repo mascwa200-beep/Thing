@@ -35,7 +35,7 @@ chaquopy = "16.1.0"
 
 # Storage / background / images / location
 datastore = "1.1.1"
-healthConnect = "1.1.0"
+healthConnect = "1.1.0-beta01"
 room = "2.6.1"
 workManager = "2.10.0"
 profileinstaller = "1.4.1"
