@@ -7658,3 +7658,141 @@ build and a real Windows MSI packaged and published to `desktop-latest`. The dev
 by merging `origin/main` back (my authorship, never a fast-forward onto GitHub's squash commit).
 
 **The LONG WATCH plan is now complete** except slice 10, declined above with its reasoning.
+
+### HEALTH — a MacroFactor-class nutrition and body tab (this session, PR #454, branch `claude/loving-edison-bd65oa`)
+
+Owner: *"Make the app the same and more overpowered as MacroFactor by giving just the mobile version
+and that version only the features of what MacroFactor currently has to offer, to the exact detail,
+and make it a tab in the bottom bar between the menu button and the computer."* Four binding
+AskUserQuestion decisions: food data = **Open Food Facts + USDA + a bundled offline seed**; first
+slice = **everything, one long autonomous run**; body data = **manual entry + Health Connect**; tab
+name = **all of them as sub-sections** (Macros, Body, Intake, Coach, and whatever else fits).
+
+**Three things stated once so the rest is honest.** I cannot match MacroFactor "to the exact detail"
+— May 2026 cutoff, and I cannot inspect the live app. Its adaptive-expenditure algorithm is
+proprietary and unpublished; what is public is the *concept*, which is ordinary energy-balance
+science, and that is what this builds from first principles. Its food database is licensed and
+cannot ship here; the free sources below were probed live and are a genuine substitute. No
+MacroFactor branding, artwork, copy or layout — same footing as this repo's Fallout and Star Trek
+homages.
+
+⚠️ **This feature tells a real person how much to eat.** The guardrails live in the tested cores and
+surface as *refusals*, never silent clamps. It is the one part of this app with direct physical
+consequence, and every core in it is written that way.
+
+**Measured, not assumed.** The bottom bar fits seven tabs: Antonio at 9sp/0.6 tracking, each slot
+`(W − 56dp rail − 3dp×n gutters)/n − 4dp padding`, so at 411dp seven leave **43.7dp** of text room
+and the widest label — **COMPUTER, not MARKETS** (a correction to this file) — needs 39.3dp. An
+eighth would not fit. Food sources re-probed: OFF `/api/v2/product/{barcode}` **200** keyless,
+`search.openfoodfacts.org` **200**, USDA bulk JSON **206** on a range request; ⚠️ OFF's legacy
+`cgi/search.pl` is **503** and deprecated, and USDA's keyed search **429**s on `DEMO_KEY`, which is
+why the seed carries the generic-food half.
+
+**Shipped, in slices, each CI-green on its own:** H1 three pure cores (`BodyTrend` local-linear-trend
+Kalman + RTS smoother, `Expenditure` energy balance inverse-variance-blended with Mifflin–St Jeor,
+`MacroTargets` and every guardrail) · H2 the stores · H3 the tab and its sub-tab shell · H4/H5 the
+dead controls · H6 the food layer · H7 INTAKE depth · H13 the tool, Oracle signals and board row ·
+H9 MACROS (micronutrients, adherence, the week) · H10 recipes · H11 habits, streaks and steps.
+
+⚠️ **Four H1 defects were found by running the shipped cores over synthetic series with a known
+ground truth — none by the tests.** The process-noise constant was 4× too large, so a real
+−0.45 kg/week loss read as "holding steady" in 38 of 40 runs. A fixed 25× outlier inflation let an
+850 kg typo drag the trend 8 kg, which is ≈900 kcal/day on the derived target. Macro rounding
+breached the stated 1200 kcal floor. And `blend()` had inverted semantics, so a *certain* estimate
+was the one discarded.
+
+**H9 — MACROS.** `NutrientGuides` (fibre scaled per 1000 kcal, saturated fat as an energy share,
+sodium a flat adult ceiling withheld from children and from an unstated age) and `IntakeWeek`. ⚠️ Two
+rules carry that file: **an unlogged day is absent, not a zero** — averaging zeros in would report a
+starving person for anybody who skipped a weekend, and the calorie target is derived from that
+average — and **today is partial**, charted but never judged, or every day reads as under target
+until dinner. ⚠️ **Sugar gets no limit at all**, deliberately: the WHO figure is for *free* sugars
+and nothing in a food label distinguishes those from the sugar in an apple, so a limit here would be
+a number the data cannot support.
+
+**H10 — recipes.** ⚠️ The rule that is easy to get backwards and would be wrong on every cooked dish:
+a stew loses water, so the same calories sit in less mass and the per-100 g density goes **up**.
+`cookedYieldG` therefore moves the DENSITY and never the TOTAL; dividing the totals by the raw weight
+would under-report every cooked recipe silently, the number simply looking a bit low. A yield LARGER
+than the raw weight is legitimate — rice absorbs water — and refusing it would make the feature
+useless for half of what people cook. The two routes to a helping, weighed and counted, are pinned
+to agree: that is the commonest way a recipe feature goes wrong, one path using the raw weight while
+the other uses the cooked one, both producing a plausible number.
+
+**H11 — habits.** ⚠️ **No habit is a checkbox.** Every streak is derived from a record the app already
+keeps, because `Expenditure` measures what you burn FROM the calorie log — so "how consistently am I
+logging" is a statement about how far the number on COACH can be trusted, and a self-reported version
+would be a comfortable lie about the one figure the feature exists to produce. A run ending
+**yesterday** is still current (today is not over; breaking a streak at four in the afternoon punishes
+the clock), the same rule `StudyProgress` uses. ⚠️ And `TYPE_STEP_COUNTER` is cumulative since the last
+**boot**, so today's count is the reading minus a carried baseline — reading the raw figure as a daily
+total gives a number that only grows, plausibly, for weeks. A reading below the baseline can only mean
+the device restarted: re-baseline to zero and say the count is partial rather than quietly losing a
+morning.
+
+⚠️ **`stepCounterRaw` was doubly dead and both halves are now closed.** `TelemetryController` has read
+`TYPE_STEP_COUNTER` into it since it was written; nothing read the field, AND `ACTIVITY_RECOGNITION`
+was absent from the manifest, so the sensor could never have delivered an event. A listener writing a
+field nobody reads, for a sensor that cannot fire.
+
+**⚠️ THREE CI FAILURES THIS SESSION, and each named a gap in the local gates.**
+1. `ChakraPetch`/`JetBrainsMono` imported from `feature.common` when they live in `ui.theme`.
+   → `tools/kotlin_import_check.py`, and then check 2 after the first version passed on the broken
+   code: **an import that EXISTS is not an import that RESOLVES.**
+2. `LcarsCorner.NONE` — the enum has four values and no NONE; I wrote the call from memory. → the
+   enum-constant check. ⚠️ Its first cut judged only names declared EXACTLY once, to dodge the
+   collision family; but `LcarsCorner` is declared **twice** (`:app` and `:desktop` each keep a copy
+   of the kit), so the whole kit was excluded and **the very failure it was written for was not
+   caught** — a negative test proved it. What matters is not how many declarations exist but whether
+   they DISAGREE.
+3. A second `private fun edit` taking a lambda, beside an existing one. Kotlin permits the overload;
+   it cannot infer which receiver `it` is, and six call sites broke at once. → the lambda-overload
+   check. ⚠️ **My first measurement of how common that shape is returned zero and the zero was
+   worthless** — the detector matched parameters with `[^)]*`, which stops at the `)` inside
+   `(HealthSettings)`, so it could not see a lambda parameter at all and reported clean on the exact
+   code that had just broken the build. Brace-matched now, and the harness asserts it sees the real
+   failure BEFORE trusting its silence. That is the harness needing the same care as the thing it
+   checks, for the third time.
+
+**Gate order per slice, and what each cannot do:** `tools/kotlin_import_check.py` (four checks; per
+package, not repo-wide) → the parse-only kotlinc pass (**type-checks nothing**) →
+`tools/android_resolve_check.sh` (differences unresolved names against HEAD, so a **brand-new file
+has no baseline** and reports everything) → `tools/android_compile_check.sh` where the file's
+non-Kotlin dependencies are only the platform → CI. `tools/check_changed.sh` derives the file list
+from `git diff` so it cannot be hand-picked wrong, which is how the `DAY_MS` failure got through.
+
+⚠️ **A Compose file cannot be fully compiled locally once it touches the app's own kit** — everything
+cascades. What works instead, and did: **extract the real declarations** of every kit function called
+and compare them against the call sites (that is how `LcarsFrame`/`LcarsChip`/`LcarsButton`/
+`LcarsField` were confirmed), resolve every view-model member against its real declaration, `javap`
+the shipped jar for anything from a library, and settle the resolve check's residue with a **typed
+probe** compiling the real expressions against the real core types. That probe is what proved the
+habits arithmetic; the alternative is shrugging at a report.
+
+⚠️ **An invented API caught this way rather than by CI:** I wrote `vm.telemetry()` in the step
+collector. There is no such member — `AppContainer.newTelemetryController()` is a **factory** whose
+product must be `start()`ed and, more importantly, `stop()`ped, so it belongs in a `DisposableEffect`
+in the composable rather than on the view model.
+
+**Operational notes.** ⚠️ **`/tmp/nt.py` shadowed the stdlib `nt` module**, so every python script run
+out of `/tmp` executed a leftover harness first (it printed two stray lines into otherwise clean
+output for most of the session). Running a script from `/tmp` puts `/tmp` on `sys.path[0]`, and this
+scratch directory is full of files that can shadow stdlib names — renamed, but worth knowing. And
+⚠️ **the Bash tool's working directory persists between calls**, so a `cd` in one call silently
+relocates every relative path in the next.
+
+⚠️ **On-device-unverified throughout — CI compiles a tab; it does not draw one, weigh anyone, scan a
+barcode, count a step, or wait a fortnight.** Owner-verify on the Pixel, in rough order of risk: the
+**seven-tab bottom bar at real density** (the measurement says it fits, a screen is the judge); the
+RECIPES builder end to end — search, weigh, set a yield, save, then log a helping both by portion and
+by grams and check the two agree; HABITS granting ACTIVITY_RECOGNITION and a step count actually
+appearing (that path has never once run); and, after a fortnight of real logging, whether the coached
+targets feel sane. Expenditure needs 2–3 weeks before it is trustworthy and the surface says so
+rather than printing a confident number on day two.
+
+**Open, in the plan (`robust-baking-dewdrop.md`):** H8 the barcode scanner (⚠️ **ZXing core, not ML
+Kit** — the unbundled variant needs Play Services, which is the wrong bet on GrapheneOS, and the
+bundled one adds 2–3 MB to an APK the auto-updater re-downloads in full on every build); H12 Health
+Connect behind a capability check (⚠️ its availability on this GrapheneOS build is **unverified**, so
+the whole integration degrades to manual entry), progress photos and CSV export; and saved meals and
+custom foods, which the recipe store's shape already accommodates.

@@ -1,5 +1,9 @@
 package dev.mascwa.pulse.feature.health
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,12 +21,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +42,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import androidx.core.content.ContextCompat
+import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.FoodPortion
+import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
@@ -55,6 +67,7 @@ import dev.mascwa.pulse.feature.common.LcarsTimeChart
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import java.time.LocalDate
@@ -1071,22 +1084,148 @@ private fun ProteinPreference(vm: HealthViewModel, state: HealthViewModel.State)
  * A tab that renders an empty chart and a zero streak looks broken; a tab that says which slice builds
  * it is merely unfinished, which is what it is.
  */
+/**
+ * The daily things worth keeping up, and the walking that feeds what you burn.
+ *
+ * ⚠️ Nothing here is a checkbox. Every streak is derived from a record the app already keeps, so it
+ * cannot be kept by tapping — which matters because [Expenditure] measures what you burn FROM the
+ * calorie log, so "how consistently am I logging" is a statement about how far the number on COACH
+ * can be relied on.
+ */
 @Composable
-fun HabitsBody() {
+fun HabitsBody(vm: HealthViewModel) {
     val c = Pulse.colors
+    val habits by vm.habits.collectAsStateWithLifecycle()
+    val steps by vm.steps.collectAsStateWithLifecycle()
+
+    StepSensor(vm)
+
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        item {
-            NotYet(
-                "Habits, streaks and the step count are not built yet. This will hold the daily things " +
-                    "worth keeping up — logging, weighing, hitting protein — and the activity signal that " +
-                    "feeds what you burn.",
-            )
+        item { StepsPanel(steps) }
+        items(Habits.Habit.entries.toList(), key = { it.name }) { h ->
+            StreakRow(h, habits[h])
         }
         item {
             Text(
-                "Nothing here is hidden behind a purchase or an account. It simply has not been written.",
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                "These are counted from what is already recorded — the log, the scale, the targets. " +
+                    "There is nothing to tick, because a streak you can tick says nothing about how " +
+                    "far the measured expenditure can be trusted.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
+        }
+    }
+}
+
+/**
+ * Feed the pedometer while this tab is open.
+ *
+ * ⚠️ Only while it is open, and that costs nothing. `TYPE_STEP_COUNTER` is maintained by the
+ * hardware whether or not anybody is listening, so the total is already right the moment somebody
+ * looks — a collector running for the life of the process would hold the sensor registered for a
+ * number nobody is reading.
+ *
+ * ⚠️ The permission is requested here rather than at startup. Without ACTIVITY_RECOGNITION the
+ * sensor delivers no events at all on API 29+, which is why the raw field has never once held a
+ * number; asking on the one screen that shows steps is both the honest place and the one where the
+ * request has a visible reason.
+ */
+@Composable
+private fun StepSensor(vm: HealthViewModel) {
+    val context = LocalContext.current
+    val container = (context.applicationContext as PulseApplication).container
+    val scope = rememberCoroutineScope()
+    var granted by remember {
+        mutableStateOf(
+            android.os.Build.VERSION.SDK_INT < 29 ||
+                ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACTIVITY_RECOGNITION,
+                ) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        granted = it
+    }
+    LaunchedEffect(Unit) {
+        if (!granted && android.os.Build.VERSION.SDK_INT >= 29) {
+            ask.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
+    // ⚠️ Keyed on the grant, and it owns the controller. `newTelemetryController()` is a FACTORY —
+    // it hands back a fresh listener that has to be started and, more importantly, stopped, or the
+    // sensor stays registered after the tab is gone. DisposableEffect is the shape that guarantees
+    // the second half; a LaunchedEffect would start it and never take it down.
+    if (!granted) return
+    val vmRef = rememberUpdatedState(vm)
+    DisposableEffect(granted) {
+        val controller = container.newTelemetryController()
+        controller.start()
+        val job = scope.launch {
+            controller.telemetry.collect { t -> t.stepCounterRaw?.let { vmRef.value.onSteps(it) } }
+        }
+        onDispose {
+            job.cancel()
+            controller.stop()
+        }
+    }
+}
+
+@Composable
+private fun StepsPanel(steps: Habits.Steps?) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(
+                "ON FOOT",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            // ⚠️ Null is "cannot tell", not zero. Showing 0 to somebody who has walked all morning
+            // because the permission was refused is worse than saying the count is unavailable.
+            Text(
+                Habits.describe(steps)
+                    ?: if (steps == null) "No step count — the pedometer is not reporting."
+                    else "Nothing much yet today.",
+                fontFamily = ChakraPetch, fontSize = 20.sp, color = c.ink,
+            )
+            if (steps?.partial == true) {
+                Text(
+                    "The phone restarted, so the steps before that are not recoverable — the counter " +
+                        "begins again from zero and nothing recorded the old total.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreakRow(h: Habits.Habit, s: Habits.Streak?) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(h.label, fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink)
+                Text(
+                    if (s != null && s.current > 0) "${s.current}" else "—",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                    color = if (s != null && s.doneToday) c.accent else c.muted,
+                )
+            }
+            s?.let { Habits.summary(it) }?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            Text(h.blurb, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp)
+            // The record stands even when the current run does not, which is the more encouraging
+            // fact and the only one available on a broken streak.
+            if (s != null && s.longest > 0 && s.longest > s.current) {
+                Text(
+                    "Longest so far: ${s.longest} days.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                )
+            }
         }
     }
 }

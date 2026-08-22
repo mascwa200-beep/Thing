@@ -82,7 +82,7 @@ fun HealthScreen(vm: HealthViewModel) {
                 HealthTab.BODY -> BodyBody(vm, state)
                 HealthTab.COACH -> CoachBody(vm, state)
                 HealthTab.RECIPES -> RecipesBody(vm)
-                HealthTab.HABITS -> HabitsBody()
+                HealthTab.HABITS -> HabitsBody(vm)
             }
         }
     }

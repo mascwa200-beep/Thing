@@ -107,6 +107,14 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
 
+    <!--
+      Steps, for HEALTH ▸ HABITS. ⚠️ TelemetryController has read TYPE_STEP_COUNTER since it was
+      written, but WITHOUT this permission the sensor delivers no events at all on API 29+ — so the
+      listener existed, the field existed, and neither could ever hold a number. Runtime-requested
+      from the HABITS tab; refused, the tab says the count is unavailable rather than showing zero.
+    -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
     <!-- This app is built exclusively for a single flagship device. Declaring
          it touch-only with a high-density large screen keeps the Play-style
          feature contract explicit even though distribution is sideload-only. -->
@@ -116,6 +124,7 @@
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application

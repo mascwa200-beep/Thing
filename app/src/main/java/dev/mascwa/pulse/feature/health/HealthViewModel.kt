@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -469,6 +471,62 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             recompute.value++
         }
     }
+
+    // ---------------------------------------------------------------------------------- habits
+
+    /**
+     * Today's walking, straight off the pedometer.
+     *
+     * ⚠️ Null means the count is unknown, not zero. Without ACTIVITY_RECOGNITION granted the sensor
+     * delivers nothing at all, and a screen showing "0 steps" to somebody who has walked all morning
+     * is worse than one saying it cannot tell.
+     */
+    val steps: StateFlow<Habits.Steps?> = c.bodyStore.steps
+
+    /**
+     * Every habit and how long its run is.
+     *
+     * ⚠️ Derived from the record on every change, never stored. Each day set is a question the
+     * existing stores can already answer, which is the whole point — a streak nobody can tap is a
+     * statement about how far the measured expenditure can be trusted, and a stored one would be a
+     * number that was true once.
+     */
+    val habits: StateFlow<Map<Habits.Habit, Habits.Streak>> =
+        combine(c.foodLogStore.days, weighins, state) { byDay, w, s ->
+            val today = _today.value
+            val target = s.targets
+
+            val logged = byDay.filterValues { it.kcal > 0.0 }.keys
+
+            // ⚠️ A weigh-in is stamped with the moment it was taken, not a day start, so it has to be
+            // folded down to the reader's own day before it can be compared with the log's keys.
+            val weighed = w.map { dayStartOf(it.atMs) }.toSet()
+
+            val protein = if (target == null) emptySet() else byDay
+                .filterValues { it.proteinG >= target.proteinG }.keys
+
+            val inBand = if (target == null || target.kcal <= 0) emptySet() else byDay
+                .filterValues {
+                    it.kcal > 0.0 && abs(it.kcal - target.kcal) <= target.kcal * IntakeWeek.ON_TARGET_BAND
+                }.keys
+
+            mapOf(
+                Habits.Habit.LOG_EVERY_DAY to Habits.streak(logged, today),
+                Habits.Habit.WEIGH_IN to Habits.streak(weighed, today),
+                Habits.Habit.HIT_PROTEIN to Habits.streak(protein, today),
+                Habits.Habit.STAY_IN_BAND to Habits.streak(inBand, today),
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /**
+     * Fold a raw pedometer reading in.
+     *
+     * ⚠️ Called from the HABITS tab's sensor collector rather than app-wide. The counter is
+     * cumulative and hardware-maintained, so nothing is lost by only reading it while somebody is
+     * looking — the total is still right the moment they open the tab, and a collector running for
+     * the life of the process would keep the sensor registered for a number nobody is reading.
+     */
+    fun onSteps(raw: Long) = c.bodyStore.onStepReading(raw, todayStartMs())
 
     // --------------------------------------------------------------------------------- recipes
 

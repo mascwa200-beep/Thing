@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.Habits
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,10 +63,26 @@ class BodyStore(
     @Serializable
     private data class StoredMeasurement(val atMs: Long, val kind: String, val cm: Double)
 
+    /**
+     * The pedometer's carried baseline.
+     *
+     * ⚠️ `TYPE_STEP_COUNTER` counts from the last BOOT, not from midnight, so today's figure is the
+     * reading minus whatever it read when the day began — and that has to survive the process. All
+     * fields are defaulted, so a save written before this existed still loads.
+     */
+    @Serializable
+    private data class StoredSteps(
+        val baseline: Long = 0,
+        val dayStartMs: Long = 0,
+        val today: Long = 0,
+        val partial: Boolean = false,
+    )
+
     @Serializable
     private data class Stored(
         val weighins: List<StoredWeighin> = emptyList(),
         val measurements: List<StoredMeasurement> = emptyList(),
+        val steps: StoredSteps? = null,
     )
 
     private val prefsKey = stringPreferencesKey("body_json")
@@ -77,6 +94,11 @@ class BodyStore(
 
     /** Oldest first, which is the order [BodyTrend.estimate] and every chart wants. */
     val weighins: StateFlow<List<BodyTrend.Weighin>> = _weighins.asStateFlow()
+
+    private val _steps = MutableStateFlow<Habits.Steps?>(null)
+
+    /** Today's walking, or null until the pedometer has been read at least once. */
+    val steps: StateFlow<Habits.Steps?> = _steps.asStateFlow()
 
     private val _measurements = MutableStateFlow<List<Measurement>>(emptyList())
     val measurements: StateFlow<List<Measurement>> = _measurements.asStateFlow()
@@ -94,6 +116,7 @@ class BodyStore(
     }
 
     private fun publish(s: Stored) {
+        _steps.value = s.steps?.let { Habits.Steps(it.baseline, it.dayStartMs, it.today, it.partial) }
         _weighins.value = s.weighins.sortedBy { it.atMs }.map { BodyTrend.Weighin(it.atMs, it.kg) }
         _measurements.value = s.measurements.sortedBy { it.atMs }.mapNotNull { m ->
             val kind = runCatching { MeasureKind.valueOf(m.kind) }.getOrNull() ?: return@mapNotNull null
@@ -102,6 +125,33 @@ class BodyStore(
     }
 
     // ------------------------------------------------------------------------------------ writing
+
+    /**
+     * Fold a raw pedometer reading into today's count.
+     *
+     * ⚠️ The arithmetic is [Habits.steps] and is not repeated here. The carried baseline, the
+     * new-day reset and the reboot case are all rules with a wrong answer that looks perfectly
+     * plausible, which is exactly why they live in a tested core rather than in a store.
+     *
+     * ⚠️ A reading that changes nothing does NOT mark the blob dirty. This is called on every sensor
+     * event, and a phone sitting still delivers them for hours — flagging each one would schedule a
+     * disk write every couple of seconds for a value that has not moved.
+     */
+    fun onStepReading(raw: Long, todayStartMs: Long) {
+        scope.launch {
+            val changed = mutex.withLock {
+                val s = loadLocked()
+                val next = Habits.steps(_steps.value, raw, todayStartMs)
+                if (next == _steps.value) return@withLock false
+                loaded = s.copy(
+                    steps = StoredSteps(next.baseline, next.dayStartMs, next.today, next.partial),
+                )
+                _steps.value = next
+                true
+            }
+            if (changed) scheduleFlush()
+        }
+    }
 
     /**
      * Record a weigh-in.
