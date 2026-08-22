@@ -364,7 +364,10 @@ fun LcarsDialog(
     val c = Pulse.colors
     Dialog(onDismissRequest = onDismiss) {
         Row(
-            modifier
+            // ⚠️ Outermost, for the same reason as LcarsDataRow — this is the kit's other
+            // intrinsic-forcing site. See ClampIntrinsics.kt.
+            Modifier.clampIntrinsics("LcarsDialog")
+                .then(modifier)
                 .fillMaxWidth()
                 .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
                 .background(c.panel)

@@ -8004,3 +8004,208 @@ an intrinsic measurement run with a negative height. Our only intrinsic-forcing 
 remaining failure should now name itself and point at the crash console **without closing the
 console**. **The top entry of MENU → CRASH CONSOLE names the site** and turns this from a defensive
 fix into a real one.
+
+### THE FAULT SAYS WHERE, AND THE HARNESS GAINS THE REAL DIRECTORY (this session, PR #455 follow-up)
+
+Owner sent a second screenshot of the Windows companion — the new "LCARS · a panel failed" dialog
+working, the console still running, the page showing a busy bar — with *"Now at least it says what's
+up."* The console surviving was the fix landing; the line it printed was still useless. **Zero
+subagent spend**, as with every arc since the credit directive.
+
+**⚠️ THE DIALOG COULD NEVER HAVE NAMED THE SITE, AND THAT WAS MY BUG FROM AN HOUR EARLIER.**
+`describe()` took `cause.stackTrace.first()`, and for any Compose `require` that frame is always
+`androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException` — the helper that
+throws, never the code that was wrong. **`CrashReporter.summaryOf` had the identical defect,
+independently**, so every row of the crash-console list *also* named the same helper, making the list
+unreadable precisely when it mattered. Two independent copies of one rule, both wrong the same way —
+the duplicated-definition mistake this project has now corrected six times. `FaultTrace` is the one
+rule, and a test asserts the two agree rather than merely that each is individually sane.
+
+⚠️ **`androidx.compose.ui.node` and `.layout` are deliberately NOT skipped.** For a layout fault those
+frames name the measure policy that produced the bad value, which is the entire answer. Only the throw
+plumbing goes. Stack **order** is kept — a reordered stack is a lie about what called what — and when
+no surviving frame is ours the nearest one that is gets appended, because a layout fault inside
+Compose's own measure pass can genuinely have no app frame near the top.
+
+**The dialog now offers SHOW THE REPORT, and the useful half is not the report.** A panel that throws
+will throw again on the very next frame, so reading the trace and leaving the broken page are the same
+action — the button navigates to CRASH. `FaultReportRequest` is a counter, not a flag: two faults in a
+row must each be able to ask, and a flag would latch. Skipped at zero so a launch cannot navigate to
+the crash console on its own.
+
+**⚠️ THE DISASSEMBLY THAT NARROWS THIS HARD, and it is the reusable part.** From
+`NodeMeasuringIntrinsics` in the shipped `ui-desktop-1.7.3.jar`, reading the default-argument masks
+rather than recalling the signatures:
+
+    minWidth$ui(..., h)  -> Constraints$default(0, 0, 0, h, mask=7)   => Constraints(maxHeight = h)
+    minHeight$ui(..., w) -> Constraints$default(0, w, 0, 0, mask=13)  => Constraints(maxWidth  = w)
+
+So `maxHeight(-12) must be >= than minHeight(0)` is **unambiguously an intrinsic WIDTH query run with a
+negative height** — nothing else in Compose builds a `Constraints` of that shape. And in
+`RowColumnImplKt.intrinsicCrossAxisSize` the non-weighted branch computes
+`remaining = availableSize - fixedSpace` **with no clamp** (offset 123-127), while the weighted branch
+twenty lines later *is* clamped with `Math.max(.., 0)`. For a **Column** the cross axis is width, so
+`VerticalMinWidth`/`VerticalMaxWidth` are the blocks that would pass a negative height into a child's
+`minIntrinsicWidth`.
+
+⚠️ **Also established, and it is why this is still open:** the desktop module contains **no
+intrinsic-width site at all**. `grep` finds exactly two `IntrinsicSize` uses, both
+`height(IntrinsicSize.Min)` (`LcarsGeometry.kt` `LcarsDataRow`, `LcarsFrame.kt` `LcarsDialog`), and no
+custom `Layout`, `Modifier.layout {}` or `SubcomposeLayout` anywhere. Whatever asks for an intrinsic
+width is inside a library component, and the trace on the owner's machine names it.
+
+**The harness gained the real directory** — `Directory`/`DirectoryBlock` are `internal` now rather than
+copied, because a test that lays out a *paraphrase* of the shell proves nothing about the shell, and a
+copied stand-in is what had already failed to reproduce this twice. Also the section readout and the
+stardate, which the header reads from composition locals defaulting to the empty string — empty is the
+one case the real console never shows, and they are text measured inside the same squeezed block. Plus
+a directory-only sweep, kept **as well as** the shell case: if both fail the fault is in the directory,
+if only the shell fails it is in the interaction, and that is a different search.
+
+**Six tests × 45 configurations still pass.** So the reproduction is still not local, and this is
+recorded as an honest negative rather than dressed up: what shipped makes the failure legible and
+survivable, and the trace on the owner's machine is what makes it fixable.
+
+⚠️ **My own expectation was wrong where the code was right, again** (roughly the seventeenth in this
+arc-series): I asserted `locate(max = 1).size == 1`, but `max` bounds the *filtered head* and `locate`
+then still appends the nearest app frame when that head holds none — which is exactly what the dialog
+wants. Asserting on the rendered list row rather than on an intermediate is the fix. **Compute the
+expected value from the shipped function before writing the assertion.**
+
+⚠️ **Owner-verify on Windows, and the ask is unchanged and now one click:** when the dialog appears,
+press **SHOW THE REPORT**. It opens the crash console *and* leaves the failing page. The top entry's
+full trace names the composable, and that is the whole of what is still missing.
+
+### THE CLAMP, AND THE CENSUS THAT SAYS WHY IT IS ONLY A CONTAINMENT (this session cont., PR #456)
+
+Owner chose, via AskUserQuestion and against my stated advice, **"diagnostics + a defensive
+clamp"**. Their call; I built it, but designed so it **reports when it fires** rather than
+silencing the bug — which converts the objection into a design constraint instead of a refusal.
+
+**⚠️ PLAN MODE KILLED AN IN-FLIGHT WORKFLOW, exactly as this file warns.** Four hunt lenses were
+dispatched; the concurrency cap meant two started and plan mode ended both mid-run. `journal.jsonl`
+held only `started` markers — but **the agents' own `agent-*.jsonl` transcripts survive and can be
+mined**, which is not recorded here anywhere and saved this arc. Their assistant *text* blocks were
+empty (they were all tool calls); the value was in the **tool results**, which is where the census
+below came from. Recipe: parse the jsonl, pull `type == "user"` records' `tool_result` content.
+
+**THE BYTECODE CENSUS — do not re-derive it.** Across ui / foundation / foundation-layout /
+material3 / ui-graphics there are **86 child `(I)I` intrinsic-width queries; 59 pass the height
+straight through and 27 compute it.** Of the 27, **not one is reachable in the failing tree**:
+the three `DefaultIntrinsicMeasurable.BRTryo0` shims (infrastructure), `HorizontalScrollLayoutModifier`
+and `TextFieldMeasurePolicy`/`OutlinedTextFieldMeasurePolicy` (text fields — absent),
+`ScrollingLayoutNode` (passes a **constant**, `Infinity`), `IntrinsicWidthNode`
+(`Modifier.width(IntrinsicSize)` — the app has none), `ThumbNode` (Slider — absent), and
+`SearchBarLayout` / `CenteredContentMeasurePolicy` / `ListItemMeasurePolicy` / `ScrollableTabRow`
+(Material3, not in this tree). Also re-derived: `RowColumnImplKt.intrinsicCrossAxisSize` **cannot**
+emit a negative on its own — `fixedSpace` starts at `min(spacing*(n-1), availableSize)`, so
+`remaining` stays ≥ 0 for any non-negative input. **The producer is still unidentified**, which is
+the whole reason the clamp reports.
+
+**⚠️ THE FAULT REPRODUCES IN THREE LINES, and nobody had tried.** A `Layout` whose measure policy
+calls `measurable.minIntrinsicWidth(-12)` on a **bare `Box`** throws the exact production message
+under `renderComposeScene`. Every earlier pass assumed it was exotic; it is not, and having a
+known-failing case is what makes the clamp test mean anything.
+
+**⚠️ AND THAT PROBE REFUTED MY OWN LEADING HYPOTHESIS IN THE SAME RUN.** `LcarsDataRow`'s colour tab
+is `Modifier.width(5.dp).fillMaxHeight().padding(vertical = 4.dp)` — 8 dp, which is **exactly 12 px
+at density 1.5**, the commonest Windows scaling, against a reported `-12`. Probed directly it does
+**not** throw: `SizeNode` from the `.width(5.dp)` clamps the query first. A striking coincidence and
+nothing more. Pinned as a test so the refutation is durable rather than a sentence someone doubts.
+
+**What shipped.** `theme/ClampIntrinsics.kt` — a `LayoutModifierNode` overriding all four intrinsic
+methods to `coerceAtLeast(0)` before delegating, layout-transparent in `measure`, placed **outermost**
+on the kit's only two intrinsic-forcing composables (`LcarsDataRow`, `LcarsDialog`) because a
+modifier can only guard a query that travels *through* it. `diagnostics/IntrinsicClampWatch.kt` —
+⚠️ **one report per process, latched before the write**, because the clamp runs inside layout and a
+layout that clamps once clamps every frame after; a file per frame would be far worse than the
+fault. Silent until `install()`, so tests and headless renders cost nothing.
+
+**Two diagnostic gaps closed, both because the owner reports by screenshot.**
+- ⚠️ **The report never said WHICH WINDOW.** Every window here — main pane, standby HUD, each
+  torn-off screen, the ops wall — is declared in ONE composition, so all of them reach the same
+  handler and produced indistinguishable reports; a fault in the always-on-top HUD read exactly like
+  one in the page you were looking at, and the owner has those panels switched on.
+  `CrashReporter.record` gained a defaulted `where`, written beside `thread:`.
+- ⚠️ **The dialog never carried the build.** `buildLabel` was a constructor param used only for
+  `record`. The desktop updates hourly and installs on close, and a per-user MSI lands *beside* a
+  per-machine copy rather than upgrading it — so "you are running older code than I am reading" is
+  live, and one line settles it. This already cost a full session on Android (hence `apk 1919`).
+
+⚠️ **`java.awt.Frame()` throws `HeadlessException` here AND on CI's runner**, so a test built on a
+real window could never pass anywhere. `windowName` was split into the AWT extraction and a pure
+`windowName(title, fallback)` — the rule is what gets tested. Same shape as `TranscriptSeal`.
+
+**Verification:** 266 desktop tests green; **eight rules negative-tested** against a baseline
+asserted green first, each perturbation asserted to have matched the source. Every Compose node API
+(`LayoutModifierNode`'s four intrinsic signatures, `ModifierNodeElement`, `IntrinsicMeasurable`) read
+out of the shipped 1.7.3 jar with `javap` rather than recalled.
+
+**⚠️ THE KILLED WORKFLOW'S FILES TURNED UP AFTERWARDS, AND ONE HELD A REAL RESULT.** Two agent-written
+scratch tests appeared in the tree minutes after plan mode ended — the reproduce lens had finished
+writing before it died. Running its hunt corroborated the bytecode census **from the opposite
+direction**: of 14 candidate shapes (both kit shapes UNGUARDED, nested intrinsics, columns with
+`width(IntrinsicSize.Min)` whose children overflow, `spacedBy` overflow, 40 padded rows in a bounded
+column, `aspectRatio`/`wrapContentHeight`/`requiredHeight` under an intrinsic width, a scrolling
+child inside an intrinsic Row) **not one produced a negative query**, and instrumenting a leaf showed
+the only heights the framework ever passes are **`Infinity` and `0`**. Its thrower set is also worth
+knowing: bare Box, padding, Text, Row, background and verticalScroll all throw on `-12`; `width`,
+`size`, `aspectRatio` and **`Column`** survive (their `SizeNode` clamps first).
+The finding was folded into `ClampIntrinsicsTest` as a compact reviewed guard and **both scratch
+files deleted** — 511 lines of unreviewed agent code does not belong in the tree. ⚠️ **Lesson: after
+plan mode kills a wave, `git status` later — the corpses can still land files**, and one of them may
+be the answer.
+
+**⚠️ THE SURVIVING AGENTS THEN CORRECTED ME TWICE, AND BOTH CORRECTIONS MATTER MORE THAN THE CLAMP.**
+The workflow was not as dead as it looked: two further lenses completed and had to be stopped by hand
+(`TaskStop`) before the 12-agent verify phase fired. Their findings, each re-verified here rather
+than taken on trust:
+
+1. ⚠️ **"Unambiguously an intrinsic width query" was TOO NARROW, and I had written it into the source
+   KDoc, the commit, the PR body and this file.** The message comes from `ui-unit`'s public
+   `ConstraintsKt.Constraints(IIII)` factory, which has ~91 call sites — ~50 supplying a `maxHeight`
+   with `minHeight` zero or defaulted, and **most of those are ordinary MEASURE paths**
+   (`BoxMeasurePolicy`, `WrapContentNode`, `SizeNode`, `FillNode`, `UnspecifiedConstraintsNode`,
+   `OrientationIndependentConstraints.toBoxConstraints`), not intrinsic ones. Every one reachable
+   here clamps, so the intrinsic path is still the best candidate — but that is the honest phrasing.
+   A measure-path fault would explain why an intrinsic-focused hunt has come up empty several times.
+2. ⚠️ **A free discriminator nobody had noticed: the word "than".** Verified by disassembling
+   `ui-unit-desktop-1.7.3.jar` myself — `ConstraintsKt` says **"must be >= than minHeight("**;
+   `Constraints.copy` says it **without "than"**. One glance at the reported string eliminates
+   `copy()` outright. Row/Column's own `createConstraints` throws a different message again
+   (`width() must be >= 0`), so a Row/Column measure is not the producer.
+3. ⚠️ **My census's classifier missed a site.** `IntrinsicMeasureBlocks.VerticalMinWidth`/
+   `VerticalMaxWidth` @190 read as pass-throughs one instruction back and are not — Kotlin's inline
+   lowering hides the arithmetic six instructions up. The 86/59/27 counts hold; **"none of the 27 is
+   reachable" is weaker than it sounded.** What does hold, from the bytecode: a Column *sanitises* a
+   negative height, so it propagates one only when a **child** reports a negative intrinsic height.
+
+**A lead that looked strong, was measured, and DEFLATED — recorded honestly because I gave it top
+billing for about ten minutes.** `VerticalMaxHeight` accumulates with a bare `iadd`, and **m copies
+of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — computed here: 2 → -2, 4 → -4, 10 → -10,
+**12 → -12**, 13 → +2147483635. A Column of twelve children each reporting an infinite intrinsic
+height would produce precisely the reported number. ⚠️ **But probing the actual vocabulary killed
+it**: `Box`, `fillMaxHeight`, `fillMaxSize`, `Spacer(fillMaxHeight)`, `verticalScroll` and
+`background` all report a max intrinsic height of **0**, not `Int.MAX_VALUE`. The arithmetic is real
+and nothing in this app is known to feed it. Worth remembering only if a future trace lands in that
+method. **The measure-path correction above is the finding that actually redirects the search.**
+
+**Also worth keeping:** the throw-site inventory is **six classes, not one** — `PainterNode`
+(`Image`/`Icon`/`Modifier.paint`) throws with **no `LayoutModifierNode` involved at all**, and
+`MeasurePolicy`'s default catches every custom `Layout {}` that overrides an intrinsic height but
+not an intrinsic width. And the three nested `Window`s (standby HUD, pop-outs, ops wall) are the
+largest subtree the harness cannot reach — `renderComposeScene` cannot host an AWT window — which is
+precisely why the window-name change above earns its place.
+
+**One more elimination, cheap and worth not re-deriving: the producer is not our arithmetic.**
+`grep` over the whole `:desktop` main source finds **zero** `MeasurePolicy`, `SubcomposeLayout`,
+`Modifier.layout` or `LayoutModifierNode` outside the clamp file itself, and **zero** four-argument
+`Constraints(...)` construction. `StandbyLayout.forCanvas` — the only place this module computes
+dimensions at all — passes every derived count through `coerceAtLeast`/`coerceIn`. So whatever
+builds the impossible `Constraints` is Compose's own code, driven by a shape we assemble, and the
+remaining unswept ground is a **measure** path (not an intrinsic one) or a subtree
+`renderComposeScene` cannot host.
+
+⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
+carries the build number and names the window. If the clamp caught it instead, the panel draws and
+MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.

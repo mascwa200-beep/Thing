@@ -11,16 +11,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.renderComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
+import dev.mascwa.pulse.desktop.Directory
+import dev.mascwa.pulse.desktop.Screen
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
 import dev.mascwa.pulse.desktop.theme.LcarsGhostButton
 import dev.mascwa.pulse.desktop.theme.LcarsScreenFrame
+import dev.mascwa.pulse.desktop.theme.LocalConsoleSection
+import dev.mascwa.pulse.desktop.theme.LocalStardate
 import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,10 +131,21 @@ class WorldPanelLayoutTest {
     /**
      * The shell as `App.kt` actually builds it, which is not how the simpler cases above build it.
      *
-     * ⚠️ Three differences matter and each is a real one: `rail = false` with a `railWidth` of the
-     * directory's own 232.dp (so the header's corner block is that wide), three ghost buttons in the
-     * header's `actions` slot, and a fixed-width sibling beside the content in the body row. A
-     * reconstruction that omits them is not the thing that failed.
+     * ⚠️ Every difference here is a real one, and the reason this is not a paraphrase:
+     *
+     * - `rail = false` with a `railWidth` of the directory's own 232.dp, so the header's corner block
+     *   is that wide and the weighted title block gets what is left. On a narrow pane that is very
+     *   little, and "very little" is the interesting end of this.
+     * - Three ghost buttons in the header's `actions` slot, which are fixed-width children competing
+     *   with the title for the same remainder.
+     * - **The real [Directory]**, not a `Box` of the same width. It is a scrolling `Column` of about
+     *   twenty `DirectoryBlock`s, each an ellipsised two-line block, and it is the largest subtree in
+     *   the shell. A stand-in of the same *width* proves nothing about it: the fault being hunted is
+     *   a negative constraint reaching an intrinsic measurement, which is a property of what is
+     *   inside a pane and not of how wide the pane is.
+     * - The section readout and the stardate, which the frame's header reads from composition locals
+     *   and which default to the empty string. Empty is the one case the real console never shows,
+     *   and they are text measured inside the same squeezed header block.
      */
     @Test
     fun `the real two-pane shell lays out at every size`() {
@@ -139,35 +155,65 @@ class WorldPanelLayoutTest {
         val feed = WorldFeed<String>(scope, settings) { _, _, _ -> Fetched("", fromCache = false) }
 
         sweep("the two-pane shell") {
-            LcarsScreenFrame(
-                title = "Space weather",
-                seed = "SPACE_WEATHER",
-                modifier = Modifier.fillMaxSize(),
-                rail = false,
-                railWidth = 232.dp,
-                actions = {
-                    LcarsGhostButton("\u2315 GO TO \u00b7 CTRL+K", onClick = {})
-                    LcarsGhostButton("\u29c9 POP OUT", onClick = {})
-                    LcarsGhostButton("\u25a6 OPS WALL", onClick = {})
-                },
+            CompositionLocalProvider(
+                LocalConsoleSection provides "MAPS & SKY",
+                LocalStardate provides "26621.5",
             ) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Box(Modifier.width(232.dp).fillMaxHeight())
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
-                        Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                .padding(horizontal = 24.dp),
-                        ) {
-                            WorldPanel(
-                                title = "Space weather",
-                                feed = feed,
-                                state = Async(),
-                                located = true,
-                            ) { }
+                LcarsScreenFrame(
+                    title = "Space weather",
+                    seed = "SPACE_WEATHER",
+                    modifier = Modifier.fillMaxSize(),
+                    rail = false,
+                    railWidth = 232.dp,
+                    actions = {
+                        LcarsGhostButton("\u2315 GO TO \u00b7 CTRL+K", onClick = {})
+                        LcarsGhostButton("\u29c9 POP OUT", onClick = {})
+                        LcarsGhostButton("\u25a6 OPS WALL", onClick = {})
+                    },
+                ) {
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Directory(
+                            current = Screen.SPACE_WEATHER,
+                            poppedOut = emptyList(),
+                            onSelect = {},
+                            modifier = Modifier.width(232.dp).fillMaxHeight(),
+                        )
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            Column(
+                                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 24.dp),
+                            ) {
+                                WorldPanel(
+                                    title = "Space weather",
+                                    feed = feed,
+                                    state = Async(),
+                                    located = true,
+                                ) { }
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The directory on its own, so a failure names the directory rather than the whole shell.
+     *
+     * ⚠️ Kept **as well as** the shell case, not instead of it. If both fail the fault is in here; if
+     * only the shell fails it is in the interaction, and that is a different search. Splitting the
+     * signal costs one more sweep and is worth it — the alternative is a red test that says only
+     * "something in twenty composables".
+     */
+    @Test
+    fun `the directory pane lays out at every size`() {
+        sweep("Directory") {
+            Directory(
+                current = Screen.SPACE_WEATHER,
+                poppedOut = listOf(Screen.MARKETS),
+                onSelect = {},
+                modifier = Modifier.width(232.dp).fillMaxHeight(),
+            )
         }
     }
 

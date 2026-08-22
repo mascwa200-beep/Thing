@@ -183,7 +183,10 @@ fun LcarsHeaderBar(title: String, modifier: Modifier = Modifier, trailing: Strin
 fun LcarsDataRow(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Pulse.colors.ink) {
     val c = Pulse.colors
     val tabShape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.BottomEnd)
-    Column(modifier.fillMaxWidth()) {
+    // ⚠️ `clampIntrinsics` outermost: this Row forces an intrinsic pass, and a modifier can only
+    // guard a query that travels through it. See ClampIntrinsics.kt for why a containment rather
+    // than a fix, and why it reports when it fires.
+    Column(Modifier.clampIntrinsics("LcarsDataRow").then(modifier).fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.width(5.dp).fillMaxHeight()

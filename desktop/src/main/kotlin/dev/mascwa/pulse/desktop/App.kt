@@ -69,6 +69,7 @@ import dev.mascwa.pulse.desktop.feature.world.MarketsViewModel
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryScreen
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
+import dev.mascwa.pulse.desktop.diagnostics.FaultReportRequest
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
 import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
@@ -438,6 +439,16 @@ fun PulseDesktopApp(
                 screen = target
             }
         }
+        // ⚠️ A fault dialog answered with "SHOW THE REPORT" lands here, and this is the more useful
+        // half of that button: the page that threw will throw again on the very next frame, so
+        // reading the report and leaving the broken page are the same action. Keyed on a counter
+        // rather than a flag because two faults in a row must each be able to ask — and skipped at
+        // zero so a launch does not navigate to the crash console on its own.
+        val reportAsks by FaultReportRequest.requested.collectAsState()
+        LaunchedEffect(reportAsks) {
+            if (reportAsks > 0) openScreen(Screen.CRASH)
+        }
+
         val popOut: (Screen) -> Unit = { target ->
             if (canPopOut(target) && target !in poppedOut) {
                 poppedOut = poppedOut + target
@@ -628,7 +639,7 @@ fun PulseDesktopApp(
  * on every other screen that column is decorative blocks, and here it is the same blocks doing work.
  */
 @Composable
-private fun Directory(
+internal fun Directory(
     current: Screen,
     /** Screens living in windows of their own — marked, because selecting one raises it instead. */
     poppedOut: List<Screen>,
@@ -667,7 +678,7 @@ private fun Directory(
 }
 
 @Composable
-private fun DirectoryBlock(
+internal fun DirectoryBlock(
     entry: DeskEntry,
     accent: Color,
     selected: Boolean,

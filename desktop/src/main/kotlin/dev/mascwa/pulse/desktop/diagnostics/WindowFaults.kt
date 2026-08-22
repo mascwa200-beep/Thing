@@ -3,9 +3,100 @@ package dev.mascwa.pulse.desktop.diagnostics
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.awt.Window
 import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
+
+/**
+ * How a throwable is reduced to something a person can act on.
+ *
+ * ⚠️ **Shared on purpose, by two consumers that had drifted into the same bug.** The fault dialog and
+ * the crash console's own list row each reduced a throwable to one line, and each independently took
+ * `stackTrace.first()`. For the fault this was written for that frame is always
+ * `InlineClassHelperKt.throwIllegalArgumentException` — Compose validates `Constraints` through an
+ * internal helper — so *both* surfaces named the thrower and neither named the code that was wrong.
+ * One rule, two callers, so they cannot disagree about what the answer is.
+ */
+object FaultTrace {
+
+    /** Frames that only ever tell you *that* something threw, never *what* was wrong. */
+    private val PLUMBING = listOf(
+        "androidx.compose.ui.internal.",
+        "androidx.compose.ui.unit.Constraints",
+        "kotlin.",
+        "java.",
+        "jdk.",
+    )
+    private const val OURS = "dev.mascwa.pulse."
+
+    /** The deepest cause: a wrapper is generic, the cause is the thing that went wrong. */
+    fun rootCause(t: Throwable): Throwable {
+        var cause: Throwable = t
+        var guard = 0
+        while (cause.cause != null && cause.cause !== cause && guard++ < 12) cause = cause.cause!!
+        return cause
+    }
+
+    /** The one line that identifies a fault. No frames — see [WindowFaultHandler.announced]. */
+    fun summary(t: Throwable): String = "${t::class.java.simpleName}: ${t.message ?: "no message"}"
+
+    /**
+     * Where it actually happened, as a few lines of stack in **stack order**.
+     *
+     * ⚠️ Frame zero is worthless for exactly the fault this was written for (see the class KDoc). So:
+     * skip the throw plumbing, keep the order — a reordered stack is a lie about what called what —
+     * and if none of the surviving frames is ours, append the nearest one that is. A layout fault
+     * inside Compose's own measure pass can genuinely have no app frame near the top, and the closest
+     * one is still the best pointer available.
+     *
+     * ⚠️ `androidx.compose.ui.node` and `.layout` are deliberately NOT skipped: for a layout fault
+     * those frames name the measure policy that produced the bad value, which is the answer.
+     */
+    fun locate(t: Throwable, max: Int = MAX_FRAMES): List<String> {
+        val stack = t.stackTrace
+        if (stack.isEmpty()) return emptyList()
+
+        val meaningful = stack.filterNot { f -> PLUMBING.any { f.className.startsWith(it) } }
+        // Never print nothing: a trace made entirely of skipped packages beats silence.
+        val head = (if (meaningful.isEmpty()) stack.toList() else meaningful).take(max)
+
+        val ours = stack.firstOrNull { it.className.startsWith(OURS) }
+        val shown = if (ours != null && head.none { it.className.startsWith(OURS) }) head + ours else head
+        return shown.map(::render)
+    }
+
+    fun render(f: StackTraceElement): String {
+        val where = f.fileName?.let { "($it:${f.lineNumber})" }.orEmpty()
+        return "${f.className.substringAfterLast('.')}.${f.methodName}$where"
+    }
+
+    const val MAX_FRAMES = 5
+}
+
+/**
+ * Someone answered a fault dialog with "show me the report".
+ *
+ * ⚠️ A flow rather than a callback because the handler is built in `Main.kt`, above the composition,
+ * and the thing that can navigate lives inside it. Same shape as the phone's navigation bus, and for
+ * the same reason: the producer cannot reach the consumer directly.
+ *
+ * ⚠️ It also gets you **off the screen that is failing**, which is the more useful half. A panel that
+ * throws will throw again on the next frame, so "look at the report" and "stop looking at the broken
+ * page" are the same action.
+ */
+object FaultReportRequest {
+    private val _requested = MutableStateFlow(0)
+
+    /** Bumped, not set: two faults in a row must each be able to ask. */
+    val requested: StateFlow<Int> = _requested.asStateFlow()
+
+    fun ask() {
+        _requested.value = _requested.value + 1
+    }
+}
 
 /**
  * What happens when a Compose window throws while composing, measuring or drawing.
@@ -32,8 +123,8 @@ import javax.swing.SwingUtilities
  *
  * ## What this does instead
  *
- * Records through [CrashReporter], says on screen *what* failed **and where the detail is**, leaves the
- * window open, and then rethrows.
+ * Records through [CrashReporter], says on screen *what* failed, **where in the code**, and where the
+ * rest of the detail is; leaves the window open; then rethrows.
  *
  * ⚠️ **The rethrow is kept deliberately.** Compose has already abandoned this frame; swallowing the
  * throwable here would leave the composition mid-flight rather than letting the AWT event loop unwind
@@ -42,8 +133,7 @@ import javax.swing.SwingUtilities
  *
  * ⚠️ **One dialog per distinct fault, because a failing frame usually fails again.** Compose will
  * re-render, hit the same bad layout and call this again, and a dialog per frame is a machine nobody
- * can use — the first one would be buried under hundreds and the app would be unusable for the entirely
- * separate reason that it is shouting. Repeats are still recorded; they are just not re-announced.
+ * can use. Repeats are still recorded; they are just not re-announced.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class WindowFaultHandler(
@@ -51,26 +141,45 @@ class WindowFaultHandler(
     private val buildLabel: String,
 ) : WindowExceptionHandlerFactory {
 
-    /** Faults already announced, keyed by the message the dialog would show. */
+    /**
+     * Faults already announced.
+     *
+     * ⚠️ Keyed on the **message alone**, deliberately — not on the frames. The same broken layout can
+     * report a slightly different stack between passes (a different measure path reaches it), and
+     * keying on the frames would let one fault announce itself several times over.
+     */
     private val announced = HashSet<String>()
 
     override fun exceptionHandler(window: Window): WindowExceptionHandler =
         WindowExceptionHandler { throwable ->
-            runCatching { reporter.record(Thread.currentThread(), throwable, buildLabel) }
+            // ⚠️ The window's own title, because every window here lives in ONE composition and so
+            // reaches this same handler. Without it a fault in the always-on-top standby HUD, a
+            // torn-off screen or the ops wall is indistinguishable from one in the page you were
+            // actually looking at — and the owner has the standby panels switched on.
+            val which = runCatching { windowName(window) }.getOrNull()
+            runCatching { reporter.record(Thread.currentThread(), throwable, buildLabel, where = which) }
 
-            val key = describe(throwable)
+            val root = FaultTrace.rootCause(throwable)
+            val key = FaultTrace.summary(root)
             val first = synchronized(announced) { announced.add(key) }
             if (first) {
+                val where = FaultTrace.locate(root)
+                val inWindow = which
                 // Off the current stack: we are mid-throw, and a modal dialog opened from here would
                 // run a nested event loop inside a frame Compose has already given up on.
                 SwingUtilities.invokeLater {
                     runCatching {
-                        JOptionPane.showMessageDialog(
+                        val choice = JOptionPane.showOptionDialog(
                             window.takeIf { it.isDisplayable },
-                            body(key),
-                            "LCARS · a panel failed",
+                            body(key, where, inWindow),
+                            "LCARS \u00b7 a panel failed",
+                            JOptionPane.DEFAULT_OPTION,
                             JOptionPane.ERROR_MESSAGE,
+                            null,
+                            arrayOf(SHOW_REPORT, DISMISS),
+                            SHOW_REPORT,
                         )
+                        if (choice == 0) FaultReportRequest.ask()
                     }
                 }
             }
@@ -78,20 +187,63 @@ class WindowFaultHandler(
             throw throwable
         }
 
-    private fun describe(t: Throwable): String {
-        var cause: Throwable = t
-        var guard = 0
-        while (cause.cause != null && cause.cause !== cause && guard++ < 12) cause = cause.cause!!
-        val where = cause.stackTrace.firstOrNull()
-            ?.let { " at ${it.className.substringAfterLast('.')}.${it.methodName}" }
-            .orEmpty()
-        return "${cause::class.java.simpleName}: ${cause.message ?: "no message"}$where"
+    /** The one line that identifies this fault, and the dedupe key. */
+    internal fun summary(t: Throwable): String = FaultTrace.summary(t)
+
+    /** Where the fault actually happened, as a few lines of stack. */
+    internal fun locate(t: Throwable): List<String> = FaultTrace.locate(t)
+
+    internal fun body(key: String, where: List<String>, inWindow: String? = null): String = buildString {
+        append("A panel could not be drawn. The rest of the console is still running.\n\n")
+        append(key).append('\n')
+        where.forEach { append("    at ").append(it).append('\n') }
+        // ⚠️ Build and window on the DIALOG, not only in the file. This gets reported by screenshot,
+        // and both facts have already cost a session each: an Android arc lost one to not knowing
+        // which build was installed (hence the `apk 1919` stamp that replaced it), and a fault in a
+        // second window is invisible without a name. One line each ends both arguments on sight.
+        append('\n').append("build ").append(buildLabel)
+        inWindow?.let { append("  \u00b7  window \u201c").append(it).append('\u201d') }
+        append('\n')
+        append("\nThe full stack trace has been recorded. \u201c")
+        append(SHOW_REPORT)
+        append("\u201d opens it and takes you off the page that is failing;\n")
+        append("it is also under MENU \u2192 CRASH CONSOLE, and on disk as diagnostics\\fault-*.txt.")
     }
 
-    private fun body(key: String): String = buildString {
-        append("A panel could not be drawn. The rest of the console is still running.\n\n")
-        append(key).append("\n\n")
-        append("The full stack trace has been recorded. Open MENU → CRASH CONSOLE to read it,\n")
-        append("or find it on disk under diagnostics\\fault-*.txt.")
+    /**
+     * What to call the window in the report.
+     *
+     * AWT gives a title only on a [java.awt.Frame] or [java.awt.Dialog]; anything else falls back to
+     * the class name, which still separates one window kind from another. A blank title is treated
+     * as absent rather than printed as an empty pair of quotes.
+     */
+    internal fun windowName(window: Window): String = windowName(
+        title = when (window) {
+            is java.awt.Frame -> window.title
+            is java.awt.Dialog -> window.title
+            else -> null
+        },
+        fallback = window.javaClass.simpleName,
+    )
+
+    /**
+     * The rule, separated from the AWT object that carries it.
+     *
+     * ⚠️ Not a stylistic split: constructing a `java.awt.Frame` throws `HeadlessException` in a
+     * container AND on CI's runner, so a test written against a real window could never pass
+     * anywhere. Taking the two facts instead makes the decision testable and leaves the extraction
+     * above trivial enough to read.
+     */
+    internal fun windowName(title: String?, fallback: String): String =
+        title?.takeIf { it.isNotBlank() } ?: fallback
+
+    private companion object {
+        /**
+         * ⚠️ First in the array and the default, so the obvious action is the useful one. A dialog
+         * whose only button is OK teaches people to dismiss it without reading, and the report is
+         * the entire point of announcing anything.
+         */
+        const val SHOW_REPORT = "SHOW THE REPORT"
+        const val DISMISS = "DISMISS"
     }
 }
