@@ -29,8 +29,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.feature.common.ChartSeries
 import dev.mascwa.pulse.feature.common.LcarsButton
@@ -196,6 +198,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
         item { DayStepper(vm) }
+        item { FindAFood(vm, meal) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -974,3 +977,140 @@ internal fun relativeDay(atMs: Long): String {
         else -> "${days / 30} months ago"
     }
 }
+
+// ------------------------------------------------------------------------------- finding a food
+
+/**
+ * Search the food databases and log a portion of what comes back.
+ *
+ * ⚠️ The whole flow is one card rather than a route of its own, and that is deliberate: it sits above
+ * QUICK ADD because it is the path somebody should reach for first, and a search that navigated away
+ * would lose the meal they had already chosen. QUICK ADD stays below it for the food no database has.
+ */
+@Composable
+private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val c = Pulse.colors
+    val search by vm.search.collectAsStateWithLifecycle()
+    val picked by vm.picked.collectAsStateWithLifecycle()
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "FIND A FOOD",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            LcarsField(
+                search.query,
+                vm::onSearchQuery,
+                placeholder = "Chicken breast, olive oil, a brand name…",
+            )
+            when {
+                search.busy -> Text(
+                    "Looking…",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+                // ⚠️ Only once they have actually typed enough to have searched. "No matches" under a
+                // half-typed word is the screen calling somebody wrong mid-sentence.
+                search.query.trim().length >= 2 && search.results.isEmpty() -> Text(
+                    "No matches. QUICK ADD below takes the numbers straight off a label.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+            if (search.note.isNotBlank()) {
+                Text(
+                    search.note,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+            val chosen = picked
+            if (chosen == null) {
+                search.results.take(12).forEach { food ->
+                    FoodResultRow(food) { vm.pick(food) }
+                }
+            } else {
+                PortionPicker(chosen, meal, vm)
+            }
+        }
+    }
+}
+
+/** One search result: what it is, where the numbers came from, and what it costs per 100 g. */
+@Composable
+private fun FoodResultRow(food: Food, onPick: () -> Unit) {
+    val c = Pulse.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onPick)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            food.display,
+            fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink, lineHeight = 16.sp,
+        )
+        Text(
+            // ⚠️ Always says per 100 g. Two rows showing "148" mean nothing to each other unless the
+            // basis is stated, and this corpus mixes foods whose natural portion differs tenfold.
+            "${food.per100g.kcal.roundToInt()} kcal / 100 g · " +
+                "P ${fmt1(food.per100g.proteinG)} F ${fmt1(food.per100g.fatG)} C ${fmt1(food.per100g.carbG)}" +
+                " · ${food.source.label}",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+        )
+    }
+}
+
+/**
+ * How much of it, and what that comes to.
+ *
+ * ⚠️ The units offered come from [FoodPortion.unitsFor], which asks the food what it can express.
+ * A record with no declared serving weight simply does not offer "serving" — rather than offering it
+ * and quietly guessing, which is how a portion becomes a number nobody can check.
+ */
+@Composable
+private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewModel) {
+    val c = Pulse.colors
+    val units = remember(food.id) { FoodPortion.unitsFor(food.sizes) }
+    var unit by remember(food.id) { mutableStateOf(units.first()) }
+    var amount by remember(food.id) { mutableStateOf(if (unit == FoodPortion.Unit.GRAM) "100" else "1") }
+
+    val value = amount.replace(',', '.').toDoubleOrNull()
+    val grams = value?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
+    val eaten = grams?.let { FoodPortion.eaten(food.per100g, it) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(food.display, fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink, lineHeight = 16.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            units.forEach { u ->
+                LcarsChip(u.label.uppercase(), unit == u, {
+                    unit = u
+                    // Switching units keeps the amount sensible: 100 grams, but one of anything else.
+                    amount = if (u == FoodPortion.Unit.GRAM) "100" else "1"
+                })
+            }
+        }
+        NumberCell("HOW MUCH", amount, { amount = it }, Modifier.fillMaxWidth())
+        if (eaten != null) {
+            Text(
+                "${eaten.kcal.roundToInt()} kcal · P ${fmt1(eaten.proteinG)} " +
+                    "F ${fmt1(eaten.fatG)} C ${fmt1(eaten.carbG)}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                FoodPortion.describe(FoodPortion.Portion(value ?: 0.0, unit), food.sizes),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            LcarsButton(
+                text = "LOG TO ${meal.label.uppercase()}",
+                enabled = eaten != null,
+                modifier = Modifier.weight(1f),
+                onClick = { if (value != null) vm.logPortion(food, value, unit, meal) },
+            )
+            LcarsButton(text = "BACK", modifier = Modifier.weight(0.5f), onClick = { vm.pick(null) })
+        }
+    }
+}
+
+/** One decimal, and never the device locale — these sit beside numbers rendered elsewhere. */
+private fun fmt1(v: Double): String = String.format(java.util.Locale.US, "%.1f", v)

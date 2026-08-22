@@ -344,6 +344,20 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.FoodLogStore(appContext, json)
     }
 
+    /** Packaged food by barcode or name, from the keyless Open Food Facts community database. */
+    val openFoodFacts: dev.mascwa.pulse.data.food.OpenFoodFactsRepository by lazy {
+        dev.mascwa.pulse.data.food.OpenFoodFactsRepository(http, diskCache)
+    }
+
+    /**
+     * Everything findable: the bundled USDA seed first and always, packaged goods when there is a
+     * network. The one place the two sources are joined, so nothing downstream needs to know there
+     * are two.
+     */
+    val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
+        dev.mascwa.pulse.data.health.FoodRepository(appContext, openFoodFacts)
+    }
+
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {

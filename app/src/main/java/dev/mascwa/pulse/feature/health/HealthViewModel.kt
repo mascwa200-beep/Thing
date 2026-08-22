@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.health.BodyStore
+import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.settings.HealthSettings
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -266,6 +270,109 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      * The whole food database arrives in a later slice; this is the path that never needs one and never
      * goes away — a label in your hand, or a meal somebody cooked you, is faster to type than to search.
      */
+    // ------------------------------------------------------------------- finding a food
+
+    /**
+     * What a food search is currently showing.
+     *
+     * ⚠️ [note] exists so the screen can say *why* a list is short. A phone in a basement supermarket
+     * gets the bundled half and nothing else, and rendering that identically to "we looked everywhere
+     * and this is all there is" tells somebody their packaged food does not exist when in fact nobody
+     * could ask.
+     */
+    data class Search(
+        val query: String = "",
+        val results: List<Food> = emptyList(),
+        val busy: Boolean = false,
+        val note: String = "",
+    )
+
+    private val _search = MutableStateFlow(Search())
+    val search: StateFlow<Search> = _search.asStateFlow()
+
+    /** The food being portioned, if the reader has picked one. */
+    private val _picked = MutableStateFlow<Food?>(null)
+    val picked: StateFlow<Food?> = _picked.asStateFlow()
+
+    private var searchJob: Job? = null
+
+    /**
+     * Search as they type.
+     *
+     * ⚠️ Debounced, and the previous search is **cancelled** rather than left to finish. Without that
+     * the answer to "chick" can land after the answer to "chicken" and overwrite it — the results
+     * would visibly go backwards while somebody is still typing, which reads as the search being
+     * broken rather than slow.
+     */
+    fun onSearchQuery(query: String) {
+        _search.value = _search.value.copy(query = query)
+        searchJob?.cancel()
+        if (query.trim().length < MIN_QUERY) {
+            _search.value = _search.value.copy(results = emptyList(), busy = false, note = "")
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(DEBOUNCE_MS)
+            _search.value = _search.value.copy(busy = true)
+            val online = c.connectivityObserver.isOnline.value
+            val r = c.foodRepository.search(query, online)
+            // ⚠️ Guard against a stale answer landing on a query that has moved on. The cancel above
+            // handles the common case; this handles the one where the request had already returned.
+            if (_search.value.query != query) return@launch
+            _search.value = Search(
+                query = query,
+                results = r.foods,
+                busy = false,
+                note = when {
+                    r.onlineFailure != null ->
+                        "Offline foods only — the packaged-food database could not be reached."
+                    !r.onlineConsulted ->
+                        "Offline foods only — no network, so packaged goods are not in this list."
+                    else -> ""
+                },
+            )
+        }
+    }
+
+    fun pick(food: Food?) {
+        _picked.value = food
+    }
+
+    /**
+     * Log a portion of a found food.
+     *
+     * ⚠️ The conversion to what was actually eaten happens **here and nowhere else**, through
+     * [FoodPortion.eaten]. Every source publishes per 100 grams; an entry stores what is on the plate.
+     * Carrying a per-100-gram figure any further is how a 30-gram biscuit gets logged as a packet.
+     */
+    fun logPortion(food: Food, amount: Double, unit: FoodPortion.Unit, meal: NutritionDay.Meal) {
+        val portion = FoodPortion.Portion(amount, unit)
+        val grams = FoodPortion.gramsFor(portion, food.sizes) ?: return
+        val eaten = FoodPortion.eaten(food.per100g, grams)
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            c.foodLogStore.add(
+                NutritionDay.Entry(
+                    id = UUID.randomUUID().toString(),
+                    dayStartMs = _today.value,
+                    atMs = now,
+                    name = food.display,
+                    grams = grams,
+                    nutrients = eaten,
+                    meal = meal,
+                    brand = food.brand,
+                    servingLabel = food.servingLabel,
+                    source = food.source,
+                    foodId = food.id,
+                ),
+            )
+            _picked.value = null
+            _search.value = Search()
+            reloadEntries()
+            recompute.value++
+        }
+    }
+
     fun quickAdd(
         name: String,
         kcal: Double,
@@ -348,5 +455,11 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     private companion object {
         const val DAY_MS = 86_400_000L
+    }
+
+    private companion object {
+        const val MIN_QUERY = 2
+        /** Long enough that an ordinary typist fires one search per word, short enough to feel live. */
+        const val DEBOUNCE_MS = 280L
     }
 }

@@ -38,8 +38,8 @@ running it rather than by writing it:
     — so scanning one directory made every sibling from the other half look unimported.
 
 ⚠️ **SCOPE: this is a per-package gate for code you are writing, not a repo-wide sweep.** Run it on
-the package you touched. Across all 159 packages it still reports 11, and the residue is two shapes
-it cannot model without being a compiler, both benign:
+the package you touched. Across every package it still reports about a dozen, and the residue is two
+shapes it cannot model without being a compiler, both benign:
 
   - **nested declarations** — `private data class ApiAlbum` inside an object, an AIDL-generated
     `IInferenceService`, a Room `Callback`. Only top-level names are collected;
@@ -83,7 +83,9 @@ BUILTINS = set(
     NumberFormatException UnsupportedOperationException NoSuchElementException
     IndexOutOfBoundsException ConcurrentModificationException ArithmeticException
     Class Integer Character ProcessBuilder ProcessHandle Object Void Boolean
-    System Math Locale UUID Runtime Thread Error""".split()
+    System Math Locale UUID Runtime Thread Error Runnable LinkageError
+    UnsatisfiedLinkError NoClassDefFoundError StackOverflowError OutOfMemoryError
+    AssertionError CloneNotSupportedException InterruptedException""".split()
 )
 
 
@@ -235,7 +237,25 @@ def main(pkgdir: pathlib.Path) -> int:
         body = strip(text)
         imported = {m.rsplit(".", 1)[1] for m in re.findall(r'^import ([\w.]+)$', text, re.M)}
         imported |= set(re.findall(r'^import [\w.]+ as (\w+)$', text, re.M))
+        # A symbol being CALLED, constructed, or given type arguments.
         used = set(re.findall(r'(?<![\w.])([A-Z]\w*)(?=[.(<])', body))
+        # ⚠️ Plus a symbol in an unambiguous TYPE position, which the pattern above cannot see: it
+        # requires the name be followed by `.`, `(` or `<`, so a type used only as an annotation —
+        # `food: Food`, `is Food`, `as Food` — is invisible to it. That hole let a genuinely missing
+        # `import …data.food.Food` through a gate reporting "clean", which is the exact failure this
+        # tool exists to prevent. Restricted to those three lead-ins because they are the only places
+        # a capitalised word is certainly a type; widening further picks up enum branches in a `when`.
+        # ⚠️ `[ \t]*` and NOT `\s*`: a whitespace class that crosses a newline makes every capitalised
+        # word at the start of a line follow the colon that ended the line before it, which turned
+        # every `when` branch of an enum into a false alarm. Measured: 11 noisy packages became 23.
+        used |= set(re.findall(r'(?::[ \t]*|\bis[ \t]+|\bas[ \t]+)([A-Z]\w*)', body))
+        # A generic parameter is declared, not imported. `fun <T> load(): T` must not report T.
+        # ⚠️ The optional NAME matters: `fun <T> load()` puts the list straight after the keyword,
+        # `class Async<T>` puts the class name in between. A pattern that only handles the first
+        # leaves every generic container reporting its own type parameter as an unresolved import.
+        used -= {n for decl in re.findall(
+                     r'\b(?:fun|class|interface|object)\s*(?:\w+\s*)?<([^>]*)>', body)
+                 for n in re.findall(r'\b([A-Z]\w*)\b', decl)}
         missing = sorted(u for u in used
                          if u not in imported and u not in same_pkg and u not in BUILTINS)
         if missing:
