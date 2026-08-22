@@ -50,15 +50,22 @@ import dev.mascwa.pulse.desktop.diagnostics.IntrinsicClampWatch
  * A node whose intrinsics are the framework defaults throws the moment it is asked a negative one,
  * which is reproducible in three lines (see `ClampIntrinsicsTest`) — a bare `Box` will do it.
  *
- * ## ⚠️ The strongest unchased lead: -12 may be a count, not a length
+ * ## A lead that looked strong, was measured, and mostly deflated
  *
  * `IntrinsicMeasureBlocks.VerticalMaxHeight` accumulates children's intrinsic heights with a bare
- * `iadd`. **m copies of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — verified arithmetically:
- * 2 → -2, 4 → -4, 10 → -10, **12 → -12**, 13 → +2147483635. So the reported `-12` is exactly what a
- * Column of **twelve children each reporting an infinite intrinsic height** produces. That is a
- * falsifiable prediction and the first thing to check on a populated page. (A second route to the
- * same number: four zero-height children at `Arrangement.spacedBy((-4).dp)`, which has no
- * validation.)
+ * `iadd`, and **m copies of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — verified
+ * arithmetically: 2 → -2, 4 → -4, 10 → -10, **12 → -12**, 13 → +2147483635. A Column of twelve
+ * children each reporting an infinite intrinsic height would therefore produce precisely the
+ * reported number, which is a striking coincidence.
+ *
+ * ⚠️ **But nothing ordinary feeds it.** Probed directly, `Box`, `fillMaxHeight`, `fillMaxSize`,
+ * `Spacer(fillMaxHeight)`, `verticalScroll` and `background` all report a maximum intrinsic height
+ * of **0**, not `Int.MAX_VALUE`. So the arithmetic is real and no composable in this app's
+ * vocabulary is known to trigger it. Recorded because the coincidence is worth remembering if a
+ * future trace lands in that method — but it is not the answer, and it should not be given the
+ * billing an earlier draft of this comment gave it. (A second route to the same number, also
+ * unverified against real code: four zero-height children at `Arrangement.spacedBy((-4).dp)`, which
+ * has no validation.)
  *
  * ## ⚠️ This is a containment, not a diagnosis, and it is built to say so
  *

@@ -8180,13 +8180,15 @@ than taken on trust:
    reachable" is weaker than it sounded.** What does hold, from the bytecode: a Column *sanitises* a
    negative height, so it propagates one only when a **child** reports a negative intrinsic height.
 
-**⚠️ THE STRONGEST UNCHASED LEAD, and it is arithmetic anyone can check: `-12` may be a COUNT, not a
-length.** `VerticalMaxHeight` accumulates children's intrinsic heights with a bare `iadd`, and **m
-copies of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — computed here: 2 → -2, 4 → -4,
-10 → -10, **12 → -12**, 13 → +2147483635. So the reported number is exactly what a Column of
-**twelve children each reporting an infinite intrinsic height** produces. Falsifiable, and the first
-thing to check on a POPULATED page. (Second route to the same number: four zero-height children at
-`Arrangement.spacedBy((-4).dp)`, which has no validation at all.)
+**A lead that looked strong, was measured, and DEFLATED — recorded honestly because I gave it top
+billing for about ten minutes.** `VerticalMaxHeight` accumulates with a bare `iadd`, and **m copies
+of `Int.MAX_VALUE` wrap to exactly `-m` for even m** — computed here: 2 → -2, 4 → -4, 10 → -10,
+**12 → -12**, 13 → +2147483635. A Column of twelve children each reporting an infinite intrinsic
+height would produce precisely the reported number. ⚠️ **But probing the actual vocabulary killed
+it**: `Box`, `fillMaxHeight`, `fillMaxSize`, `Spacer(fillMaxHeight)`, `verticalScroll` and
+`background` all report a max intrinsic height of **0**, not `Int.MAX_VALUE`. The arithmetic is real
+and nothing in this app is known to feed it. Worth remembering only if a future trace lands in that
+method. **The measure-path correction above is the finding that actually redirects the search.**
 
 **Also worth keeping:** the throw-site inventory is **six classes, not one** — `PainterNode`
 (`Image`/`Icon`/`Modifier.paint`) throws with **no `LayoutModifierNode` involved at all**, and
