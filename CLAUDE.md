@@ -8197,6 +8197,15 @@ not an intrinsic width. And the three nested `Window`s (standby HUD, pop-outs, o
 largest subtree the harness cannot reach — `renderComposeScene` cannot host an AWT window — which is
 precisely why the window-name change above earns its place.
 
+**One more elimination, cheap and worth not re-deriving: the producer is not our arithmetic.**
+`grep` over the whole `:desktop` main source finds **zero** `MeasurePolicy`, `SubcomposeLayout`,
+`Modifier.layout` or `LayoutModifierNode` outside the clamp file itself, and **zero** four-argument
+`Constraints(...)` construction. `StandbyLayout.forCanvas` — the only place this module computes
+dimensions at all — passes every derived count through `coerceAtLeast`/`coerceIn`. So whatever
+builds the impossible `Constraints` is Compose's own code, driven by a shape we assemble, and the
+remaining unswept ground is a **measure** path (not an intrinsic one) or a subtree
+`renderComposeScene` cannot host.
+
 ⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
 carries the build number and names the window. If the clamp caught it instead, the panel draws and
 MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.
