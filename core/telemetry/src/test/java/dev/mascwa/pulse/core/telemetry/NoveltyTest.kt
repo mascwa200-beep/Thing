@@ -508,6 +508,208 @@ class NoveltyTest {
         )
     }
 
+    // ------------------------------------------------------------------ movement over a span
+
+    /**
+     * A known series with hand-computable spans: `v[i] = 10 + (7i mod 13)`, hourly.
+     *
+     * ⚠️ Fine for the structural tests below and **useless** for scoring, which is the trap worth
+     * naming: any modular ramp has `v[i+k] − v[i]` taking only two values, so every span is one of two
+     * numbers and [Novelty.effectiveSampleSize] collapses. Scoring tests use [varied].
+     */
+    private fun cyc(i: Int) = 10.0 + (7 * i % 13)
+
+    /**
+     * Deterministic pseudo-noise in 100.00..139.99, so consecutive spans genuinely differ.
+     *
+     * Pure `Long` arithmetic, so it is the same sequence on any JVM.
+     */
+    private fun varied(i: Int): Double {
+        var x = (i + 1) * 2_654_435_761L
+        x = x xor (x ushr 13)
+        x *= 1_274_126_177L
+        x = x xor (x ushr 17)
+        return 100.0 + Math.floorMod(x, 4000L) / 100.0
+    }
+
+    /**
+     * ⚠️ THE LOAD-BEARING ONE. Spans must not overlap, and the one being judged must be last.
+     *
+     * 24 hourly readings at a 6-hour lag. Walking back from t=23h the pairs are 23←17, 17←11, 11←5;
+     * t=5h then has nothing 6 hours before it (the series starts at 0), so the walk stops. Values from
+     * `v[i] = 10 + (7i mod 13)`: v5=19, v11=22, v17=12, v23=15 — so +3, −10, +3 in time order.
+     *
+     * Overlapping spans would share five-sixths of their data while looking like independent samples to
+     * every count in the scorer, which is the whole reason for the stride.
+     */
+    @Test
+    fun spansDoNotOverlapAndTheNewestIsLast() {
+        val series = (0 until 24).map { obs(it * hour, cyc(it)) }
+
+        val spans = Novelty.spanSeries(series, 6 * hour)
+
+        assertEquals(listOf(11 * hour, 17 * hour, 23 * hour), spans.map { it.atMs })
+        assertEquals(listOf(3.0, -10.0, 3.0), spans.map { it.value })
+        assertEquals("the span being judged has to be the last element", 23 * hour, spans.last().atMs)
+        spans.zipWithNext { a, b ->
+            assertTrue(
+                "spans ${a.atMs} and ${b.atMs} overlap at a 6-hour lag",
+                b.atMs - a.atMs >= 6 * hour,
+            )
+        }
+    }
+
+    /**
+     * ⚠️ A hole must make the walk step back, not call seven hours six.
+     *
+     * The same series with t=17h missing. From t=23h the nearest reading to 17h is t=16h, which would
+     * make the "6-hour" span seven hours long — rejected, so the walk drops to t=22h, which pairs
+     * exactly with t=16h. v22=21, v16=18, so +3.0 at t=22h.
+     *
+     * Accepting the wrong pair would report v23−v16 = 15−18 = −3.0 at t=23h: the opposite sign, from a
+     * span a seventh longer than the one asked for.
+     */
+    @Test
+    fun aHoleMakesTheWalkStepBackRatherThanCallSevenHoursSix() {
+        val series = (0 until 24).filter { it != 17 }.map { obs(it * hour, cyc(it)) }
+
+        val spans = Novelty.spanSeries(series, 6 * hour)
+
+        assertEquals(22 * hour, spans.last().atMs)
+        assertEquals(3.0, spans.last().value, 1e-9)
+        assertEquals(listOf(10 * hour, 16 * hour, 22 * hour), spans.map { it.atMs })
+    }
+
+    /**
+     * ⚠️ The tolerance floor, and the branch neither test above reaches.
+     *
+     * In both of those `0.6 × medianGap` and `SPAN_TOLERANCE × lag` come to the same 36 minutes, so
+     * `maxOf` picks either and the floor is never exercised. Here the lag is 2.5 hours against hourly
+     * sampling: ten per cent of the lag is 15 minutes, and **no target ever falls within 15 minutes of a
+     * reading** because every one of them lands on a half hour. Without the floor this series yields
+     * nothing at all.
+     *
+     * ⚠️ It also documents the honest cost: hourly sampling cannot express two and a half hours, so what
+     * comes back is three-hour spans (the tie goes to the older reading, consistently). Measured the
+     * same way throughout, they are comparable with each other, which is what the scoring needs — the
+     * lag asked for is just a label at that resolution. This is why the caller's floor is two hours
+     * rather than one.
+     */
+    @Test
+    fun theToleranceFloorIsAWholeSamplingGapOrNothingWouldEverPair() {
+        val series = (0 until 24).map { obs(it * hour, cyc(it)) }
+
+        val spans = Novelty.spanSeries(series, 5 * hour / 2)
+
+        assertEquals(8, spans.size)
+        assertEquals(23 * hour, spans.last().atMs)
+        assertEquals(
+            "consistently rounded to the nearest expressible span",
+            listOf(2, 5, 8, 11, 14, 17, 20, 23).map { it * hour },
+            spans.map { it.atMs },
+        )
+    }
+
+    /** Nothing to say when the history is shorter than the question. */
+    @Test
+    fun aHistoryShorterThanTheLagYieldsNoSpans() {
+        val series = (0 until 4).map { obs(it * hour, cyc(it)) }
+        assertTrue(Novelty.spanSeries(series, 6 * hour).isEmpty())
+        assertTrue("a non-positive lag is not a question", Novelty.spanSeries(series, 0L).isEmpty())
+    }
+
+    /**
+     * ⚠️ A perfectly linear series is REFUSED, and that is the rule working rather than a defect.
+     *
+     * Every 6-hour span of a ramp is the same number, so [Novelty.effectiveSampleSize] counts one
+     * independent reading among them and [Novelty.score] declines. Pinned because it is the fixture trap
+     * this file has already been caught by twice: a series regular enough to reason about in your head
+     * is often too regular to reach the branch under test.
+     */
+    @Test
+    fun everySpanOfARampIsIdenticalSoTheScorerRefuses() {
+        val series = (0 until 200).map { obs(it * hour, 50.0 + it * 2.0) }
+
+        val spans = Novelty.spanSeries(series, 6 * hour)
+        assertTrue("the ramp does produce spans", spans.size > 24)
+        assertEquals("all of them identical", 1, spans.map { it.value }.distinct().size)
+
+        val s = Novelty.score(spans, spans.last())
+        assertTrue("thirty identical readings are one reading, so this must refuse", s is Novelty.Score.TooLittleHistory)
+    }
+
+    /**
+     * The whole path: a move far outside anything this metric has done over the same span is scored as
+     * a record, and the sentence says so in the language of a **move**.
+     *
+     * 300 hourly noisy readings, then one 6 hours later that is 200 above its predecessor — an order of
+     * magnitude past the ±40 the series can produce in six hours.
+     */
+    @Test
+    fun aMoveIsJudgedAgainstMovesOverTheSameSpan() {
+        val history = (0 until 300).map { obs(it * hour, varied(it)) }
+        val series = history + obs(305 * hour, varied(299) + 200.0)
+
+        val spans = Novelty.spanSeries(series, 6 * hour)
+        assertEquals(305 * hour, spans.last().atMs)
+        assertEquals(200.0, spans.last().value, 1e-9)
+
+        val r = reading(Novelty.score(spans, spans.last()))
+        assertNull("nothing in the history came near it", r.extremeSinceMs)
+        assertTrue("a record move must clear the wall's threshold, got ${r.bits}", r.bits >= 4.0)
+        // ⚠️ The sample the record is worth, said out loud. A year of six-hour spans is 1,460 of them
+        // and a year of weekly ones is 52, and "on record" means very different things across that
+        // range — measured over a real year of London weather, "biggest fall on record over 7 days"
+        // came up on 6.8% of hours, which is exactly the 2/53 that sample can resolve.
+        assertEquals(
+            "the biggest rise on record over 6 hours — as rare as ${r.effectiveN} readings can show",
+            Novelty.spanSentence(r, 6 * hour, spans.last().value),
+        )
+    }
+
+    /**
+     * ⚠️ THE OTHER LOAD-BEARING ONE. A span never borrows the level sentence.
+     *
+     * `Reading.sentence` says "Highest on record" / "Lowest on record". Over a difference series those
+     * mean the largest rise and the largest fall, and "Lowest on record" printed beside a plunging
+     * value reads as a claim about the level — the opposite of what happened.
+     */
+    @Test
+    fun aSpanIsNeverDescribedAsAHighOrALow() {
+        val fell = stub(bits = 6.0).copy(direction = -1)
+        val said = Novelty.spanSentence(fell, 6 * hour, change = -12.0)
+
+        assertEquals("the biggest fall on record over 6 hours — as rare as 100 readings can show", said)
+        assertTrue("'lowest' would be read as a statement about the level", said!!.none { it.isUpperCase() })
+    }
+
+    /**
+     * ⚠️ Direction is measured against the **median span**, not against zero, so on a metric that mostly
+     * climbs a flat six hours reads as direction −1 while nothing fell. Where the two disagree the
+     * wording must drop to a neutral "move" rather than assert a fall that did not happen.
+     */
+    @Test
+    fun aDirectionTheChangeDisagreesWithIsNotAssertedAsARiseOrAFall() {
+        val r = stub(bits = 6.0).copy(direction = -1)
+
+        val said = Novelty.spanSentence(r, 6 * hour, change = 5.0)
+
+        assertEquals("the most unusual move on record over 6 hours — as rare as 100 readings can show", said)
+        assertTrue("it rose, so it must not say it fell", !said!!.contains("fall"))
+    }
+
+    /** An ordinary move is not news, and the basis is stated when it is not what this machine watched. */
+    @Test
+    fun anOrdinaryMoveSaysNothingAndAFetchedBasisSaysSo() {
+        assertNull(Novelty.spanSentence(stub(bits = 1.5), 6 * hour, change = 2.0))
+
+        val fetched = stub(bits = 6.0).copy(extremeSinceMs = 1L, basis = Novelty.Basis.BACKFILLED)
+        assertEquals(
+            "an unusually large rise over 6 hours — a 1-in-65 move (against fetched history)",
+            Novelty.spanSentence(fetched, 6 * hour, change = 9.0),
+        )
+    }
+
     private fun stub(bits: Double) = Novelty.Reading(
         bits = bits,
         cappedAtCeiling = false,
