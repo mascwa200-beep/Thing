@@ -70,6 +70,7 @@ import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
+import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
 import dev.mascwa.pulse.desktop.feature.world.MapScreen
 import dev.mascwa.pulse.desktop.feature.world.MapViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
@@ -364,6 +365,8 @@ fun PulseDesktopApp(
             )
         }
 
+        val anomaliesVm = remember { AnomaliesViewModel(scope, settings) }
+
         val crashVm = remember { CrashViewModel(scope, crashReporter) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
@@ -389,7 +392,7 @@ fun PulseDesktopApp(
         val vms = remember {
             DeskViewModels(
                 library = library,
-                about = aboutVm, advisories = advisoriesVm, crash = crashVm, diary = diaryVm,
+                about = aboutVm, advisories = advisoriesVm, anomalies = anomaliesVm, crash = crashVm, diary = diaryVm,
                 economy = economyVm, fuel = fuelVm, home = homeVm, libraryVm = libraryVm,
                 live = liveVm, map = mapVm, markets = marketsVm, news = newsVm, notes = notesVm,
                 observatory = observatoryVm, packs = packsVm, places = placesVm, radar = radarVm,

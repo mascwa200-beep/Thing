@@ -43,7 +43,7 @@ enum class Screen {
     HOME,
     REMOTE, ABOUT, SETTINGS, CRASH,
     LIBRARY, SEARCH, STUDY, PACKS,
-    ADVISORIES,
+    ADVISORIES, ANOMALIES,
     NEWS, LIVE,
     MAP, SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
     MARKETS, WEATHER, ECONOMY, FUEL,
@@ -67,6 +67,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("expansion", "download", "more guides")),
     )),
     DeskGroup("THE WORLD", { it.sky }, listOf(
+        DeskEntry(Screen.ANOMALIES, "Anomalies", "What is unusual right now, judged against what this machine has watched",
+            listOf("unusual", "strange", "normal", "baseline", "record", "history", "ledger", "long watch", "highest", "lowest")),
         DeskEntry(Screen.ADVISORIES, "Advisories", "What is worth knowing right now, across every feed at once",
             listOf("oracle", "insights", "alerts", "brief", "briefing", "what matters", "now")),
         DeskEntry(Screen.NEWS, "News", "Headlines, refreshed while you watch",

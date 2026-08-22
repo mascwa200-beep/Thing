@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
+import dev.mascwa.pulse.desktop.theme.LcarsSparkline
 import dev.mascwa.pulse.desktop.theme.Orbitron
 import dev.mascwa.pulse.desktop.theme.Pulse
 import java.util.Locale
@@ -371,7 +372,7 @@ private fun WeatherPanel(state: StandbyState, layout: StandbyLayout, modifier: M
         }
         if (layout.showSparkline && state.hourlyTemps.size >= 4) {
             Spacer(Modifier.height((8 * scale).dp))
-            Sparkline(state.hourlyTemps, c.sky, Modifier.fillMaxWidth().height((26 * scale).dp))
+            LcarsSparkline(state.hourlyTemps, c.sky, Modifier.fillMaxWidth().height((26 * scale).dp), c.raise)
         }
     }
 }
@@ -457,35 +458,6 @@ private fun SkyPanel(state: StandbyState, layout: StandbyLayout, modifier: Modif
 }
 
 /* ── bits ────────────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * A compact temperature trace.
- *
- * ⚠️ Deliberately **not** the shared `LcarsTimeChart`. That one is built for a full screen and
- * draws a labelled time axis; at HUD scale the axis is most of the ink and none of the information.
- * The trace is normalised to its own range because what a reader wants from a strip this size is
- * the shape of the next day, not the absolute value — which the panel states above it in words.
- */
-@Composable
-private fun Sparkline(values: List<Double>, colour: Color, modifier: Modifier) {
-    val c = Pulse.colors
-    Canvas(modifier.background(c.raise)) {
-        if (values.size < 2) return@Canvas
-        val lo = values.min()
-        val hi = values.max()
-        val span = (hi - lo).takeIf { it > 0.0001 } ?: 1.0
-        val stepX = size.width / (values.size - 1)
-        var previous: Offset? = null
-        values.forEachIndexed { i, v ->
-            val point = Offset(
-                x = stepX * i,
-                y = (size.height - (((v - lo) / span) * size.height)).toFloat(),
-            )
-            previous?.let { drawLine(colour, it, point, strokeWidth = size.height * 0.08f) }
-            previous = point
-        }
-    }
-}
 
 /** Sign always shown, so a rise and a fall are told apart by more than colour. */
 private fun signed(v: Double): String = (if (v >= 0) "+" else "") + String.format(Locale.US, "%.2f", v)
