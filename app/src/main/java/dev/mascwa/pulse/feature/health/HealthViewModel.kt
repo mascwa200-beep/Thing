@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
@@ -140,6 +141,28 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         combine(profile, weighins, _entries, recompute) { p, w, todayEntries, _ ->
             build(p, w, todayEntries)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, State())
+
+    /**
+     * How the last week went, or null while there is no plan to have gone against.
+     *
+     * ⚠️ Its own flow rather than a field on [State], and the reason is the assistant. `State` is
+     * shared with the `health` tool through [composeHealthReading], and folding a week into it would
+     * make every tool call assemble one for a caller that never asks. This is a screen's question.
+     *
+     * The source is `FoodLogStore.days`, a per-day nutrient map the store has published on every
+     * index rebuild since it was written and which nothing has ever read. `refresh()` calls the
+     * store's `load()`, which is what makes the flow non-empty — the store's own note warns that
+     * every flow there starts empty and fills on first read, and that has silently hidden whole
+     * categories of data elsewhere in this app.
+     *
+     * ⚠️ `todayStartMs()` is read on every emission rather than captured once. A phone left on the
+     * counter overnight would otherwise keep scoring the week against yesterday, which is the same
+     * midnight bug this view model has already had once.
+     */
+    val week: StateFlow<IntakeWeek.Week?> =
+        combine(c.foodLogStore.days, state) { byDay, s ->
+            IntakeWeek.score(byDay, s.targets?.kcal, todayStartMs())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
      * ⚠️ Delegates to [composeHealthReading], which is a TOP-LEVEL function rather than a method

@@ -3,10 +3,12 @@ package dev.mascwa.pulse.feature.health
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -34,6 +36,7 @@ import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
+import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.health.BodyStore
@@ -65,6 +68,10 @@ private val Pad = PaddingValues(13.dp)
 @Composable
 fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val c = Pulse.colors
+    // ⚠️ Collected HERE, not inside the LazyColumn. `content` is an ordinary
+    // `LazyListScope.() -> Unit` lambda rather than a composable one, so a
+    // `collectAsStateWithLifecycle()` inside it does not compile.
+    val weekState by vm.week.collectAsStateWithLifecycle()
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
 
@@ -130,6 +137,15 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             item { SugarRow(eaten.sugarG) }
         }
 
+        // The week, which is the question somebody actually has after a fortnight: whether the plan
+        // is being followed at all. It is also what makes the calorie target trustworthy — an
+        // expenditure measured from a log with four days missing is measured from a fiction.
+        val week = weekState
+        if (week != null) {
+            item { LcarsHeaderBar("THE LAST ${week.windowDays} DAYS") }
+            item { WeekPanel(week, targets.kcal) }
+        }
+
         val set = plan as? MacroTargets.Plan.Set
         if (set != null && set.adjustments.isNotEmpty()) {
             item { LcarsHeaderBar("WHAT WAS HELD BACK") }
@@ -164,6 +180,96 @@ private fun MacroTile(label: String, eaten: Double, target: Int, tint: Color, mo
             )
             Text("of $target g", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
             MacroBar(eaten, target.toDouble(), tint)
+        }
+    }
+}
+
+/**
+ * The week: a bar per logged day against the target line, the verdict, and how complete it is.
+ *
+ * ⚠️ The chart has GAPS where days were not logged, and that is the truthful picture rather than a
+ * rendering flaw. Drawing a missing day as a zero-height bar would say somebody ate nothing; drawing
+ * the days shoulder-to-shoulder would hide that four of them are missing altogether. Each bar sits at
+ * its own position in the window, so the holes are visible.
+ *
+ * ⚠️ Today's bar is drawn dimmer and is excluded from every figure below it. Its calories are
+ * incomplete until the day ends, and counting it would mark every day under target until dinner.
+ */
+@Composable
+private fun WeekPanel(week: IntakeWeek.Week, targetKcal: Int) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            // The tallest thing on the chart is whichever is larger — the biggest day or the target —
+            // so the target line is always on the chart rather than off the top of it.
+            val peak = maxOf(
+                targetKcal.toDouble(),
+                week.days.maxOfOrNull { it.kcal } ?: targetKcal.toDouble(),
+            ).coerceAtLeast(1.0)
+            val byDay = week.days.associateBy { it.dayStartMs }
+
+            Row(
+                Modifier.fillMaxWidth().height(64.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                // ⚠️ Walk the WINDOW, not the logged days, so an unlogged day leaves a hole rather
+                // than being quietly closed up by its neighbours — and take the window's start from
+                // the core rather than deriving it, which is wrong whenever either end is unlogged.
+                for (i in 0 until week.windowDays) {
+                    val day = week.windowStartMs + i * IntakeWeek.DAY_MS
+                    val d = byDay[day]
+                    val frac = ((d?.kcal ?: 0.0) / peak).toFloat().coerceIn(0f, 1f)
+                    val tint = when {
+                        d == null -> c.line
+                        d.partial -> c.muted
+                        d.standing(targetKcal) == IntakeWeek.Standing.ON_TARGET -> c.positive
+                        d.standing(targetKcal) == IntakeWeek.Standing.OVER -> c.amber
+                        else -> c.sky
+                    }
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(top = 0.dp),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                // A day with nothing logged still draws a hairline, so the slot is
+                                // visibly a slot rather than blank space at the end of the row.
+                                .fillMaxHeight(if (d == null) 0.02f else frac.coerceAtLeast(0.02f))
+                                .background(tint, lcarsBlockShape(2.dp, LcarsCorner.NONE)),
+                        )
+                    }
+                }
+            }
+
+            Text(
+                "Target ${targetKcal} kcal · green on target, amber over, blue under, grey today",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+            )
+
+            val verdict = IntakeWeek.verdict(week)
+            if (verdict != null) {
+                Text(verdict, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2, lineHeight = 15.sp)
+                Text(
+                    "Averaging ${week.meanProteinG.roundToInt()} g protein · " +
+                        "${week.meanFatG.roundToInt()} g fat · ${week.meanCarbG.roundToInt()} g carbs",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+            } else {
+                Text(
+                    "Not enough finished days yet to say how the week is going.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, lineHeight = 15.sp,
+                )
+            }
+
+            // ⚠️ Amber, because it prices everything above it AND the calorie target itself.
+            IntakeWeek.completenessNote(week)?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp)
+            }
         }
     }
 }
