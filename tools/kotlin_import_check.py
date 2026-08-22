@@ -23,7 +23,7 @@ It is textual, so it cannot fail for an environmental reason — the same reason
 WidgetLinkageTest. Only own-package imports are resolved; a third-party import cannot be checked
 from source and guessing would produce noise.
 
-⚠️ Three things had to be handled before its output was worth reading, and all three were found by
+⚠️ Four things had to be handled before its output was worth reading, and every one was found by
 running it rather than by writing it:
 
   - comments and string literals are stripped first, or every capitalised word of English prose in
@@ -32,7 +32,24 @@ running it rather than by writing it:
     call to an unimported symbol;
   - source roots are DISCOVERED, not listed. A hardcoded list said every module keeps sources under
     `src/main/java`; `:core:feeds` uses `src/main/kotlin`, so that whole shared module was invisible
-    and the tool reported 265 false alarms across the app, every one of them a real import.
+    and the tool reported 265 false alarms across the app, every one of them a real import;
+  - a package can SPAN MODULES. `dev.mascwa.pulse.data.settings` exists in both `:app` and
+    `:core:feeds` — deliberately, so the shared repositories kept their import paths when they moved
+    — so scanning one directory made every sibling from the other half look unimported.
+
+⚠️ **SCOPE: this is a per-package gate for code you are writing, not a repo-wide sweep.** Run it on
+the package you touched. Across all 159 packages it still reports 11, and the residue is two shapes
+it cannot model without being a compiler, both benign:
+
+  - **nested declarations** — `private data class ApiAlbum` inside an object, an AIDL-generated
+    `IInferenceService`, a Room `Callback`. Only top-level names are collected;
+  - **unqualified enum entries in a `when`** — Kotlin 2.0 resolves `AIR ->` from the subject's type
+    without an import, and knowing the subject's type requires type inference.
+
+Both are reported as "used but not imported". Neither is worth chasing: the fix would be a type
+checker, and the compiler already is one. What this catches — a name that resolves nowhere, and an
+import pointing at the wrong package — is the part the compiler only tells you about after a CI
+round.
 """
 
 import re
@@ -51,9 +68,21 @@ SRC_ROOTS = sorted(
 # `android_resolve_check.sh` also carries; naming them here is cheaper than re-diagnosing it.
 GENERATED = {"R", "BuildConfig"}
 
+# ⚠️ The collection aliases matter as much as the obvious ones. `ArrayList`, `HashMap` and friends are
+# `kotlin.collections` typealiases available with no import, and omitting them produces a false alarm
+# on ordinary code — which is the failure mode that makes a gate get ignored.
 BUILTINS = set(
     """String Int Long Double Float Boolean List Map Set Pair Triple Unit Any Nothing
-    Array Char Byte Short Number Comparable Iterable Sequence Result Exception Throwable Regex
+    Array Char Byte Short Number Comparable Iterable Iterator Sequence Result Exception Throwable
+    Regex StringBuilder CharSequence Enum Annotation Lazy Deprecated Suppress JvmStatic JvmField
+    ArrayList HashMap HashSet LinkedHashMap LinkedHashSet MutableList MutableMap MutableSet
+    MutableCollection Collection Entry IntArray LongArray DoubleArray FloatArray BooleanArray
+    ByteArray CharArray ShortArray IntRange LongRange ClosedRange ArrayDeque Comparator
+    Charsets RegexOption OptIn Throws JvmName JvmOverloads Volatile Synchronized Transient
+    IllegalStateException IllegalArgumentException SecurityException RuntimeException
+    NumberFormatException UnsupportedOperationException NoSuchElementException
+    IndexOutOfBoundsException ConcurrentModificationException ArithmeticException
+    Class Integer Character ProcessBuilder ProcessHandle Object Void Boolean
     System Math Locale UUID Runtime Thread Error""".split()
 )
 
@@ -105,7 +134,9 @@ def declarations(text: str) -> set:
         r'inline |operator |infix |tailrec |external |override |final |value )*'
         r'(?:fun|val|var|const val|class|object|enum class|interface|data class|'
         r'annotation class|typealias) (?:<[^>]*> )?([A-Za-z_]\w*)', body, re.M))
-    names |= set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\s*[(,;]', body, re.M))
+    # ⚠️ `[(,;]` alone misses the LAST entry of an enum, which carries no trailing comma — and
+    # Kotlin 2.0 resolves unqualified entries in a `when`, so those reads look unimported.
+    names |= set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\s*(?:[(,;}]|$)', body, re.M))
     return names
 
 
@@ -180,6 +211,24 @@ def main(pkgdir: pathlib.Path) -> int:
     same_pkg = set()
     for text in texts.values():
         same_pkg |= declarations(text)
+
+    # ⚠️ A package can span modules. `dev.mascwa.pulse.data.settings` exists in BOTH :app and
+    # :core:feeds — deliberately, so the shared repositories kept their import paths when they moved —
+    # so a type declared in the other half is same-package and needs no import, while a scan of one
+    # directory cannot see it. Fold in every root that carries the same package path.
+    pkg_path = None
+    for root in SRC_ROOTS:
+        try:
+            pkg_path = pkgdir.resolve().relative_to(root.resolve())
+            break
+        except ValueError:
+            continue
+    if pkg_path is not None:
+        for root in SRC_ROOTS:
+            twin = root / pkg_path
+            if twin.is_dir() and twin.resolve() != pkgdir.resolve():
+                for kt in twin.glob("*.kt"):
+                    same_pkg |= declarations(kt.read_text())
 
     bad = False
     for f, text in texts.items():
