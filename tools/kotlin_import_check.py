@@ -8,10 +8,11 @@ names, and `tools/android_resolve_check.sh` differences unresolved names against
 reports nothing for a brand-new file, because there is no baseline to cancel against. A missing
 import in a new Compose file therefore reaches CI untouched by either.
 
-Two checks, and the second one exists because the first was not enough:
+Three checks, and each later one exists because an earlier one was not enough:
 
   1. every capitalised symbol used is imported, declared in the same package, or a builtin;
-  2. every own-package import actually RESOLVES to a declaration at that path.
+  2. every own-package import actually RESOLVES to a declaration at that path;
+  3. no class declares two `companion object`s — a compile error no other local gate can see.
 
 ⚠️ Check 2 was added after CI failed on code this tool had just called clean. An import that
 EXISTS is not an import that RESOLVES: `import dev.mascwa.pulse.feature.common.JetBrainsMono`
@@ -204,6 +205,49 @@ def unresolvable_imports(text: str) -> list:
     return out
 
 
+def duplicate_companions(text: str) -> list:
+    """Classes in this file declaring more than one `companion object`.
+
+    ⚠️ Kotlin allows exactly one per class, and getting this wrong is a compile error that NONE of
+    the other local gates can see: two companions parse perfectly, no import is missing, and the
+    symptom is that every constant in the second one reports as an unresolved reference — which
+    reads like a missing import and is not one. It cost a CI round, from a scripted edit that
+    appended a companion to a class that already had one and asserted only that the file ended in a
+    closing brace.
+
+    Brace-matched rather than counted, because two companions in one FILE are perfectly legal when
+    they belong to two different classes.
+    """
+    body = strip(text)
+    out = []
+    # ⚠️ `[ \t]*`, NEVER `\s*`. Under re.M a `\s*` after `^` walks across blank lines and captures
+    # them as part of the indentation — so this matched `'\n\n'` for a top-level class and the
+    # per-class companion search then looked for a line indented by two newlines, which nothing is.
+    # The guard reported clean against the very defect it was written for. This is the SECOND time
+    # that exact trap has bitten in one sitting; the import check above carries the same note.
+    for m in re.finditer(r'^([ \t]*)(?:internal |private |public |abstract |open |sealed |data |value )*'
+                         r'(?:class|object|interface)\s+(\w+)', body, re.M):
+        indent, name = m.group(1), m.group(2)
+        brace = body.find("{", m.end())
+        if brace < 0:
+            continue
+        depth, i, n = 1, brace + 1, len(body)
+        while i < n and depth:
+            if body[i] == "{":
+                depth += 1
+            elif body[i] == "}":
+                depth -= 1
+            i += 1
+        inner = body[brace:i]
+        # Only companions belonging to THIS class, not to a class nested inside it.
+        want = indent + "    "
+        found = [ln for ln in inner.splitlines()
+                 if re.match(re.escape(want) + r'(?:private |internal |public )?companion object\b', ln)]
+        if len(found) > 1:
+            out.append(f"{name} declares {len(found)} companion objects; Kotlin allows one")
+    return out
+
+
 def main(pkgdir: pathlib.Path) -> int:
     files = sorted(pkgdir.glob("*.kt"))
     if not files:
@@ -264,6 +308,9 @@ def main(pkgdir: pathlib.Path) -> int:
         for bad_import in unresolvable_imports(text):
             bad = True
             print(f"  {f.name}: import does not resolve: {bad_import}")
+        for dup in duplicate_companions(text):
+            bad = True
+            print(f"  {f.name}: {dup}")
 
     print("REVIEW THE ABOVE" if bad
           else "clean — every symbol is imported, same-package, or a Kotlin/JDK builtin")

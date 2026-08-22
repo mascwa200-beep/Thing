@@ -185,4 +185,97 @@ class NutritionDayTest {
         assertTrue(NutritionDay.Meal.entries.all { it.label.isNotBlank() })
         assertTrue(NutritionDay.Source.entries.all { it.label.isNotBlank() })
     }
+
+    // ------------------------------------------------------------------------------- eaten before
+
+    private fun entry(
+        id: String,
+        name: String,
+        atMs: Long,
+        foodId: String = "",
+        source: NutritionDay.Source = NutritionDay.Source.CUSTOM,
+        kcal: Double = 100.0,
+    ) = NutritionDay.Entry(
+        id = id, dayStartMs = 0L, atMs = atMs, name = name, grams = 100.0,
+        nutrients = NutritionDay.Nutrients(kcal = kcal), source = source, foodId = foodId,
+    )
+
+    @Test
+    fun theSameFoodAppearsOnceCarryingItsMostRecentPortion() {
+        val list = listOf(
+            entry("1", "Porridge", 100, kcal = 200.0),
+            entry("2", "Porridge", 300, kcal = 250.0),
+            entry("3", "Coffee", 200),
+        )
+        val recent = NutritionDay.recentFoods(list)
+        assertEquals(listOf("Porridge", "Coffee"), recent.map { it.name })
+        assertEquals("the most recent portion, not the first", 250.0, recent[0].nutrients.kcal, 1e-9)
+    }
+
+    /**
+     * ⚠️ Ordered by the moment it was eaten, never by the day it belongs to.
+     *
+     * Every entry logged today shares one `dayStartMs`, so ordering by that leaves today — where all
+     * the useful rows are — in whatever order the store happened to return.
+     */
+    @Test
+    fun orderingIsByTheMomentEatenNotTheDay() {
+        val morning = entry("1", "Toast", 8_000).copy(dayStartMs = 0L)
+        val evening = entry("2", "Soup", 20_000).copy(dayStartMs = 0L)
+        assertEquals(listOf("Soup", "Toast"), NutritionDay.recentFoods(listOf(morning, evening)).map { it.name })
+    }
+
+    /**
+     * ⚠️ A shared name does NOT make two foods one when they have different database ids.
+     *
+     * A scanned pot of Greek yogurt and a typed-in one legitimately share a name, and folding them
+     * together would offer a single row that logs the other one's calories.
+     */
+    @Test
+    fun aSharedNameDoesNotMergeTwoDifferentDatabaseFoods() {
+        val scanned = entry("1", "Greek yogurt", 100, foodId = "123", source = NutritionDay.Source.OPEN_FOOD_FACTS)
+        val bundled = entry("2", "Greek yogurt", 200, foodId = "sr999", source = NutritionDay.Source.OFFLINE)
+        assertEquals(2, NutritionDay.recentFoods(listOf(scanned, bundled)).size)
+        // ...while the same id from the same source is one food, whatever it was called that day.
+        val again = scanned.copy(id = "3", name = "GREEK YOGURT", atMs = 300)
+        assertEquals(2, NutritionDay.recentFoods(listOf(scanned, bundled, again)).size)
+    }
+
+    /** With no id at all the name is the identity, case and padding ignored. */
+    @Test
+    fun withoutAnIdTheNameIsTheIdentity() {
+        val a = entry("1", "Porridge", 100)
+        val b = entry("2", "  porridge ", 200)
+        assertEquals(1, NutritionDay.recentFoods(listOf(a, b)).size)
+        assertEquals("name:porridge", NutritionDay.identityOf(b))
+    }
+
+    /**
+     * Re-logging copies the numbers rather than recomputing them.
+     *
+     * ⚠️ Recomputing from a per-100-gram figure would be a second chance to get the portion
+     * arithmetic wrong, and would silently change a number the person already checked.
+     */
+    @Test
+    fun eatingItAgainCarriesTheNumbersUnchanged() {
+        val first = entry("1", "Porridge", 100, kcal = 237.0).copy(grams = 63.0)
+        val next = NutritionDay.again(first, id = "new", dayStartMs = 999L, nowMs = 5_000L)
+        assertEquals("new", next.id)
+        assertEquals(999L, next.dayStartMs)
+        assertEquals(5_000L, next.atMs)
+        assertEquals(237.0, next.nutrients.kcal, 1e-9)
+        assertEquals(63.0, next.grams, 1e-9)
+        assertEquals(first.meal, next.meal)
+        // A different sitting is allowed, and is the only thing that may change.
+        assertEquals(NutritionDay.Meal.DINNER,
+            NutritionDay.again(first, "x", 0L, 0L, NutritionDay.Meal.DINNER).meal)
+    }
+
+    @Test
+    fun theListIsCappedAndAnEmptyLogGivesNothing() {
+        val many = (1..50).map { entry("$it", "Food $it", it.toLong()) }
+        assertEquals(20, NutritionDay.recentFoods(many).size)
+        assertEquals(5, NutritionDay.recentFoods(many, limit = 5).size)
+        assertEquals(emptyList<NutritionDay.Entry>(), NutritionDay.recentFoods(emptyList()))
+    }
 }

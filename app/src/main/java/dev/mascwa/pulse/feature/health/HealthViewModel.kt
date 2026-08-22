@@ -248,6 +248,9 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     private suspend fun reloadEntries() {
         _entries.value = c.foodLogStore.entriesFor(_today.value)
+        // ⚠️ Refreshed here rather than once at construction: something logged a moment ago is the
+        // most likely thing to be logged again, and a list that never moves is one nobody looks at.
+        _recents.value = c.foodLogStore.recentFoods(System.currentTimeMillis())
     }
 
     fun recordWeighin(kg: Double) {
@@ -270,6 +273,41 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      * The whole food database arrives in a later slice; this is the path that never needs one and never
      * goes away — a label in your hand, or a meal somebody cooked you, is faster to type than to search.
      */
+    // ------------------------------------------------------------------- eaten before
+
+    private val _recents = MutableStateFlow<List<NutritionDay.Entry>>(emptyList())
+
+    /**
+     * Distinct foods eaten recently, most recent first.
+     *
+     * Logging the same breakfast every morning is the commonest thing anybody does with a food log,
+     * and making them search for it again each time is the commonest reason they stop.
+     */
+    val recents: StateFlow<List<NutritionDay.Entry>> = _recents.asStateFlow()
+
+    /**
+     * Log a past entry again, on the day currently shown.
+     *
+     * ⚠️ The numbers are COPIED, never recomputed — see [NutritionDay.again]. Re-deriving them from a
+     * per-100-gram figure would be a second chance to get the portion arithmetic wrong, on a value
+     * the person has already checked and accepted once.
+     */
+    fun logAgain(entry: NutritionDay.Entry, meal: NutritionDay.Meal = entry.meal) {
+        viewModelScope.launch {
+            c.foodLogStore.add(
+                NutritionDay.again(
+                    entry,
+                    id = UUID.randomUUID().toString(),
+                    dayStartMs = _today.value,
+                    nowMs = System.currentTimeMillis(),
+                    meal = meal,
+                ),
+            )
+            reloadEntries()
+            recompute.value++
+        }
+    }
+
     // ------------------------------------------------------------------- finding a food
 
     /**
@@ -455,9 +493,6 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     private companion object {
         const val DAY_MS = 86_400_000L
-    }
-
-    private companion object {
         const val MIN_QUERY = 2
         /** Long enough that an ordinary typist fires one search per word, short enough to feel live. */
         const val DEBOUNCE_MS = 280L

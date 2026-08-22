@@ -150,6 +150,57 @@ object NutritionDay {
     const val ENERGY_MISMATCH_FLOOR_KCAL: Double = 30.0
 
     /** True when a record's stated calories and its own macros cannot both be right. */
+    // ------------------------------------------------------------------------------- eaten before
+
+    /**
+     * What identifies "the same food" across two log entries.
+     *
+     * ⚠️ **A database id when there is one, the name only when there is not**, and the two must not
+     * be mixed. A packaged food and a typed-in food can share a name — "Greek yogurt" is both a
+     * scanned pot and something somebody keyed the numbers for — and folding those together would
+     * offer one row that logs the other one's calories. Where an id exists it is what the source
+     * itself considers the food; where it does not, the name is all anybody has.
+     *
+     * The name is compared case-insensitively and trimmed, because "Greek Yogurt" typed on Tuesday
+     * and "greek yogurt" on Thursday are one food to the person who ate them.
+     */
+    fun identityOf(entry: Entry): String =
+        if (entry.foodId.isNotBlank()) "${entry.source.name}:${entry.foodId}"
+        else "name:${entry.name.trim().lowercase()}"
+
+    /**
+     * Distinct foods eaten recently, most recent first, each carrying the portion last used.
+     *
+     * The point is one tap: logging the same breakfast every morning is the commonest thing anybody
+     * does with a food log, and making them search for it again each time is the commonest reason
+     * they stop. What comes back is a real past [Entry] — so re-logging it is a copy, and the
+     * numbers are exactly the ones that were recorded rather than a re-derivation that could differ.
+     *
+     * ⚠️ Ordered by [Entry.atMs] and NOT by [Entry.dayStartMs]. A day-start is shared by everything
+     * eaten that day, so ordering by it makes the sequence within today arbitrary — and today is
+     * exactly where the useful rows are.
+     */
+    fun recentFoods(entries: List<Entry>, limit: Int = 20): List<Entry> {
+        val seen = HashSet<String>()
+        val out = ArrayList<Entry>(limit)
+        for (e in entries.sortedByDescending { it.atMs }) {
+            if (!seen.add(identityOf(e))) continue
+            out += e
+            if (out.size >= limit) break
+        }
+        return out
+    }
+
+    /**
+     * A copy of [entry], eaten again now.
+     *
+     * ⚠️ The nutrients and grams are carried across UNCHANGED. Recomputing them from a per-100-gram
+     * figure would be a second chance to get the portion arithmetic wrong, and it would silently
+     * change a number the person already checked and accepted.
+     */
+    fun again(entry: Entry, id: String, dayStartMs: Long, nowMs: Long, meal: Meal = entry.meal): Entry =
+        entry.copy(id = id, dayStartMs = dayStartMs, atMs = nowMs, meal = meal)
+
     fun energyLooksWrong(n: Nutrients): Boolean {
         if (n.kcal <= 0.0 || !n.kcal.isFinite()) return false
         val implied = energyFromMacros(n)

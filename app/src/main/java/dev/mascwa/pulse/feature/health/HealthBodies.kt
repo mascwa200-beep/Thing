@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,12 +38,14 @@ import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.feature.common.ChartSeries
 import dev.mascwa.pulse.feature.common.LcarsButton
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsDataRow
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.feature.common.LcarsStatBlock
 import dev.mascwa.pulse.feature.common.LcarsTimeChart
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -199,6 +203,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item { Notice(vm) }
         item { DayStepper(vm) }
         item { FindAFood(vm, meal) }
+        item { EatenBefore(vm, meal) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1114,3 +1119,55 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
 
 /** One decimal, and never the device locale — these sit beside numbers rendered elsewhere. */
 private fun fmt1(v: Double): String = String.format(java.util.Locale.US, "%.1f", v)
+
+/**
+ * One tap to log something eaten before.
+ *
+ * ⚠️ Deliberately a horizontal rail rather than a list. It sits between search and quick-add on a
+ * page that is already long, and a vertical list of twenty rows would push the thing somebody
+ * actually came to do below the fold — which is how a convenience becomes an obstacle.
+ */
+@Composable
+private fun EatenBefore(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val c = Pulse.colors
+    val recents by vm.recents.collectAsStateWithLifecycle()
+    if (recents.isEmpty()) return
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                "EATEN BEFORE",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                items(recents, key = { it.id }) { e ->
+                    Column(
+                        Modifier
+                            .widthIn(min = 96.dp, max = 150.dp)
+                            .clickable { vm.logAgain(e, meal) }
+                            .background(c.raise, lcarsBlockShape(8.dp, LcarsCorner.TopStart))
+                            .padding(horizontal = 9.dp, vertical = 7.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            e.name,
+                            fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp,
+                        )
+                        Text(
+                            // The portion is part of the identity of the tap: two rows reading
+                            // "Porridge" that log different amounts would be indistinguishable.
+                            "${e.nutrients.kcal.roundToInt()} kcal" +
+                                if (e.grams > 0.0) " · ${e.grams.roundToInt()} g" else "",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                }
+            }
+            Text(
+                "Tap to log it again to ${meal.label.lowercase()}.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+        }
+    }
+}

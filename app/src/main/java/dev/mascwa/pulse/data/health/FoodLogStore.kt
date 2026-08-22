@@ -270,6 +270,23 @@ class FoodLogStore(
             .map { it.domain() }
     }
 
+    /**
+     * Distinct foods eaten recently, most recent first, each carrying the portion last used.
+     *
+     * ⚠️ **Two shards at most, and which two is derived from [nowMs] rather than from the clock.**
+     * Shards are filed by UTC month, so on the first of a month everything eaten "recently" is in
+     * the one before — reading only the current shard would empty this list overnight, every month,
+     * and look like the log had been wiped. Two is also the ceiling: somebody who has logged for a
+     * year has twelve shards, and reading them all to fill a row of chips would open the whole
+     * history for a screen that shows twenty entries.
+     */
+    suspend fun recentFoods(nowMs: Long, limit: Int = 20): List<NutritionDay.Entry> = mutex.withLock {
+        indexLocked()
+        val months = linkedSetOf(monthOf(nowMs), monthOf(nowMs - THIRTY_ONE_DAYS_MS))
+        val entries = months.flatMap { shardLocked(it).entries }.map { it.domain() }
+        NutritionDay.recentFoods(entries, limit)
+    }
+
     /** A day's totals, from the index — no shard is opened. */
     suspend fun totalsFor(dayStartMs: Long): NutritionDay.Nutrients = mutex.withLock {
         val row = indexLocked()[dayStartMs] ?: return@withLock NutritionDay.Nutrients()
@@ -369,5 +386,12 @@ class FoodLogStore(
 
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
+
+        /**
+         * ⚠️ Thirty-ONE, so stepping back from any date in any month lands in the previous one.
+         * Thirty would leave the 31st of a 31-day month pointing at itself, which is the one day of
+         * the month the second shard would have been silently the same as the first.
+         */
+        const val THIRTY_ONE_DAYS_MS = 31L * 24 * 60 * 60 * 1000
     }
 }
