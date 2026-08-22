@@ -313,6 +313,26 @@ class FoodLogStore(
         indexLocked().values.count { it.day in fromMs..toMs && it.kcal > 0.0 }
     }
 
+    /**
+     * Every entry ever logged. **For export only.**
+     *
+     * ⚠️ This opens every shard, which is exactly what the sharding exists to avoid — five years of
+     * logging is around sixty files and a couple of megabytes held at once. That is a fine price for
+     * something a person asks for by name and waits on, and a terrible one for a screen. Nothing on a
+     * hot path may call this; [totalsFor] and [entriesFor] are what those want.
+     *
+     * ⚠️ The month list comes from the **index**, not from the shards already in memory. A cold
+     * process has opened none of them, so exporting from `shards.keys` would silently write out only
+     * whatever the session happened to touch — a file that looks complete and is not, which is worse
+     * than one that fails.
+     */
+    suspend fun allEntries(): List<NutritionDay.Entry> = mutex.withLock {
+        val months = indexLocked().keys.map { monthOf(it) }.toSortedSet()
+        months.flatMap { shardLocked(it).entries }
+            .sortedWith(compareBy({ it.day }, { it.at }))
+            .map { it.domain() }
+    }
+
     // ---------------------------------------------------------------------------------- lifecycle
 
     /**

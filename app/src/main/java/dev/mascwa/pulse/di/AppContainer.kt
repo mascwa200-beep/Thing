@@ -344,6 +344,17 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.FoodLogStore(appContext, json)
     }
 
+    /**
+     * The whole health record as a zip of CSVs.
+     *
+     * ⚠️ Lazy, like every store here, and for a sharper reason than usual: it exists to open every
+     * shard at once, which is exactly what the log's sharding avoids. Nothing constructs it until
+     * somebody asks for their data by name.
+     */
+    val healthExporter: dev.mascwa.pulse.data.health.HealthExporter by lazy {
+        dev.mascwa.pulse.data.health.HealthExporter(appContext, foodLogStore, bodyStore)
+    }
+
     /** Dishes made more than once, so a bolognese is one entry rather than eleven. */
     val recipeStore: dev.mascwa.pulse.data.health.RecipeStore by lazy {
         dev.mascwa.pulse.data.health.RecipeStore(appContext, json)

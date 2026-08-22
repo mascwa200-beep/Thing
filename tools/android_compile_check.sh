@@ -105,8 +105,13 @@ done
 # below. A silent false pass is worse than no check at all.
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
 SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.jar' 2>/dev/null | head -1)
+# ⚠️ jsoup is a DEPENDENCY OF :core:telemetry (Readability.kt), so any run that passes the whole
+# core fails wholesale without it — and the resulting hundreds of errors are all in Readability,
+# which reads like a real finding and buries whatever you were actually checking. Cost two rounds
+# once. Kept alongside the coroutines/serialization jars for exactly the same reason.
+JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER$extra"
+TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
       -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)

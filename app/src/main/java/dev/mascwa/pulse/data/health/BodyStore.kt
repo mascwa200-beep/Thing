@@ -239,6 +239,12 @@ class BodyStore(
         return s.weighins.firstOrNull { it.atMs == atMs }?.note.orEmpty()
     }
 
+    /** Every note at once, keyed by reading. For the export, which needs them all and cannot suspend. */
+    suspend fun notes(): Map<Long, String> {
+        val s = ensureLoaded()
+        return s.weighins.filter { it.note.isNotBlank() }.associate { it.atMs to it.note }
+    }
+
     // ----------------------------------------------------------------------------------- lifecycle
 
     suspend fun clear() {

@@ -528,6 +528,37 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      */
     fun onSteps(raw: Long) = c.bodyStore.onStepReading(raw, todayStartMs())
 
+    // ---------------------------------------------------------------------------- your own copy
+
+    private val _exporting = MutableStateFlow(false)
+    val exporting: StateFlow<Boolean> = _exporting.asStateFlow()
+
+    private val _exportStatus = MutableStateFlow("")
+
+    /** What the last export did, in a sentence. Blank until one has been tried. */
+    val exportStatus: StateFlow<String> = _exportStatus.asStateFlow()
+
+    /**
+     * Write the whole record to a file the reader chose.
+     *
+     * ⚠️ [exporting] is set before the launch and cleared in a `finally`. This opens every shard of
+     * the food log, so on a long record it is genuinely slow — a button with no busy state invites a
+     * second tap, and a second export while the first is still walking the shards would read the same
+     * files twice for no reason.
+     */
+    fun exportRecord(uri: android.net.Uri) {
+        if (_exporting.value) return
+        _exporting.value = true
+        _exportStatus.value = ""
+        viewModelScope.launch {
+            try {
+                _exportStatus.value = c.healthExporter.export(uri).message
+            } finally {
+                _exporting.value = false
+            }
+        }
+    }
+
     // --------------------------------------------------------------------------------- recipes
 
     /** Every saved recipe, newest first. */

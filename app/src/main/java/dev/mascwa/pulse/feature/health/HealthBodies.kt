@@ -1113,6 +1113,56 @@ fun HabitsBody(vm: HealthViewModel) {
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
         }
+        item { ExportPanel(vm) }
+    }
+}
+
+/**
+ * Take the whole record away with you.
+ *
+ * ⚠️ **On this tab and not in Settings**, which is where every other data control in this app lives.
+ * The habits are the one part of HEALTH that is about the *record* rather than about food or a body,
+ * so an export sits with them rather than beside "clear usage data"; and the practical half is that
+ * this view model already holds the two stores, where Settings' would need both threading through a
+ * constructor and a factory for one button.
+ */
+@Composable
+private fun ExportPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val busy by vm.exporting.collectAsStateWithLifecycle()
+    val status by vm.exportStatus.collectAsStateWithLifecycle()
+    val save = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri -> if (uri != null) vm.exportRecord(uri) }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                "YOUR RECORD",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                "Every entry, every day's totals, every weigh-in and every measurement, as four " +
+                    "spreadsheets in one zip. It is yours; nothing here is sent anywhere.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+            )
+            LcarsButton(
+                text = if (busy) "GATHERING…" else "EXPORT EVERYTHING",
+                onClick = { save.launch("lcars-health.zip") },
+                enabled = !busy,
+            )
+            if (busy) {
+                // ⚠️ Said out loud because this genuinely takes a while: it opens every month of the
+                // log at once, which is exactly what the log's sharding exists to avoid doing.
+                Text(
+                    "Reading the whole log — on a long record this takes a moment.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+            if (status.isNotBlank()) {
+                Text(status, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink, lineHeight = 14.sp)
+            }
+        }
     }
 }
 
