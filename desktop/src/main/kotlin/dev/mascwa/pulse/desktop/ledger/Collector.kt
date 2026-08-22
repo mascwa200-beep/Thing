@@ -60,7 +60,12 @@ class Collector(
                 recorded == 0 -> "nothing came back from ${domains.joinToString(", ")}"
                 else -> "$recorded readings from ${domains.joinToString(", ")}"
             }
-            return backfilled?.let { "$collected; backfill: ${it.describe()}" } ?: collected
+            // ⚠️ What could not be read is said, not swallowed. A domain that quietly returned
+            // nothing looks identical to a domain that was not due, and the difference is exactly
+            // what somebody reading this line needs to know.
+            val missed = if (skipped.isEmpty()) "" else " (no ${skipped.joinToString(", ")})"
+            val line = collected + missed
+            return backfilled?.let { "$line; backfill: ${it.describe()}" } ?: line
         }
     }
 

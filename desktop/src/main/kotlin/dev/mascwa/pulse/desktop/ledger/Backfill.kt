@@ -70,11 +70,17 @@ class Backfill(
         val rejected: Map<String, String>,
         val skipped: List<String>,
     ) {
-        fun describe(): String = when {
-            filled.isEmpty() && rejected.isEmpty() -> "nothing to backfill"
-            filled.isEmpty() -> "no history could be trusted here (${rejected.size} judged, none agreed)"
-            else -> "${filled.values.sum()} readings across ${filled.size} metrics" +
-                if (rejected.isEmpty()) "" else ", ${rejected.size} rejected as a different measurement"
+        fun describe(): String {
+            val head = when {
+                filled.isEmpty() && rejected.isEmpty() -> "nothing to backfill"
+                filled.isEmpty() -> "no history could be trusted here (${rejected.size} judged, none agreed)"
+                else -> "${filled.values.sum()} readings across ${filled.size} metrics" +
+                    if (rejected.isEmpty()) "" else ", ${rejected.size} rejected as a different measurement"
+            }
+            // ⚠️ A provider that could not be reached is said out loud. It is the difference between
+            // "there is no history for this" and "nobody has asked yet", and only one of them means
+            // the next pass will try again.
+            return head + if (skipped.isEmpty()) "" else "; could not reach ${skipped.joinToString(", ")}"
         }
     }
 

@@ -314,6 +314,15 @@ private fun reading(a: Anomaly): String {
 }
 
 private fun footnote(a: Anomaly): String = buildString {
+    // ⚠️ The percentile earns its place precisely where the sentence is vaguest. "Highest on record"
+    // needs no help, but "unusually high" is a shrug without a number, and a reader knows instantly
+    // what "higher than 97% of everything recorded" means. Both of these were computed by the core
+    // and read by nothing at all until now, which is the defect class this project keeps correcting.
+    if (!a.reading.cappedAtCeiling) {
+        val pct = (a.reading.percentile * 100).roundToLong()
+        append(if (a.reading.direction < 0) "below ${100 - pct}% of the record" else "above $pct% of the record")
+        append(" · ")
+    }
     // The sample really behind the verdict, which on a metric polled faster than it updates is far
     // smaller than the number of rows — see Novelty.effectiveSampleSize.
     append("${a.reading.effectiveN} readings")
