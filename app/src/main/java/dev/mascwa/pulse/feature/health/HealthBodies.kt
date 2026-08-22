@@ -33,6 +33,7 @@ import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.health.BodyStore
@@ -53,6 +54,8 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import java.time.LocalDate
+import java.time.ZoneId
 
 private val Pad = PaddingValues(13.dp)
 
@@ -108,6 +111,25 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        // ⚠️ Fibre, sugar, saturated fat and sodium have been parsed from both food sources, summed
+        // and written to the log since the store was built, and drawn by nothing. This is the first
+        // caller. Which of them can be shown is NutrientGuides' judgement, not this screen's — two of
+        // the three need a calorie target and one needs an adult birth year, and inventing either
+        // would produce a bar that looks measured.
+        val guides = NutrientGuides.forDay(
+            eaten = eaten,
+            targetKcal = targets.kcal,
+            birthYear = state.profile.birthYear,
+            thisYear = LocalDate.now(ZoneId.systemDefault()).year,
+        )
+        if (guides.isNotEmpty() || eaten.sugarG > 0.0) {
+            item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
+        }
+        items(guides) { serving -> NutrientRow(serving.guide, serving.eaten) }
+        if (eaten.sugarG > 0.0) {
+            item { SugarRow(eaten.sugarG) }
+        }
+
         val set = plan as? MacroTargets.Plan.Set
         if (set != null && set.adjustments.isNotEmpty()) {
             item { LcarsHeaderBar("WHAT WAS HELD BACK") }
@@ -142,6 +164,80 @@ private fun MacroTile(label: String, eaten: Double, target: Int, tint: Color, mo
             )
             Text("of $target g", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
             MacroBar(eaten, target.toDouble(), tint)
+        }
+    }
+}
+
+/**
+ * One reference intake, its bar, and the sentence that says what kind of number it is.
+ *
+ * ⚠️ A TARGET and a LIMIT are drawn in different colours ON PURPOSE, and the colour turns at
+ * different points. Reaching a fibre floor is the good outcome and is drawn in the positive colour;
+ * reaching a sodium ceiling is the thing the figure exists to flag. One shared "past 100%" style
+ * would congratulate somebody for going over their salt.
+ */
+@Composable
+private fun NutrientRow(guide: NutrientGuides.Guide, amount: Double) {
+    val c = Pulse.colors
+    val f = guide.fractionOf(amount)
+    val tint = when (guide.kind) {
+        NutrientGuides.Kind.TARGET -> if (f >= 1.0) c.positive else c.sky
+        NutrientGuides.Kind.LIMIT -> if (f > 1.0) c.negative else if (f >= 0.85) c.amber else c.ink2
+    }
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    guide.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    guide.readout(amount),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = tint,
+                )
+            }
+            MacroBar(amount, guide.amount, tint)
+            Text(
+                NutrientGuides.sentence(guide, amount),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+            // The basis, because two of these move with the calorie target and one does not — and a
+            // figure that moves for a reason the screen has not given reads as a bug.
+            Text(
+                "${guide.basis} · ${guide.source}",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+            )
+        }
+    }
+}
+
+/**
+ * Sugar: the total, and no bar.
+ *
+ * ⚠️ Deliberately shaped unlike [NutrientRow], because it is a different kind of statement. Both food
+ * sources publish TOTAL sugars; the guideline everyone quotes is about ADDED sugars, and nothing in
+ * the data separates them. A bar here would tell somebody eating fruit they had breached a limit they
+ * had not gone near, so the figure ships with its limitation attached instead.
+ */
+@Composable
+private fun SugarRow(sugarG: Double) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "SUGAR",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    "${sugarG.roundToInt()} g",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink2,
+                )
+            }
+            Text(
+                NutrientGuides.sugarNote,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
         }
     }
 }

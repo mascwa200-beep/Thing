@@ -87,8 +87,8 @@ class NutrientGuidesTest {
             thisYear = THIS_YEAR,
         )
         assertTrue(
-            "no guide may be about sugar: ${guides.map { it.first.label }}",
-            guides.none { it.first.label.contains("Sugar", ignoreCase = true) },
+            "no guide may be about sugar: ${guides.map { it.guide.label }}",
+            guides.none { it.guide.label.contains("Sugar", ignoreCase = true) },
         )
         assertTrue(NutrientGuides.sugarNote.contains("added sugars"))
         assertTrue(NutrientGuides.sugarNote.contains("no limit"))
@@ -102,10 +102,10 @@ class NutrientGuidesTest {
             eaten = NutritionDay.Nutrients(fibreG = 18.0, satFatG = 12.0, sodiumMg = 1400.0),
             targetKcal = 2000, birthYear = 1990, thisYear = THIS_YEAR,
         )
-        assertEquals(listOf("Fibre", "Saturated fat", "Sodium"), guides.map { it.first.label })
-        assertEquals(NutrientGuides.Kind.TARGET, guides[0].first.kind)
-        assertEquals(18.0, guides[0].second, 1e-9)
-        assertEquals(1400.0, guides[2].second, 1e-9)
+        assertEquals(listOf("Fibre", "Saturated fat", "Sodium"), guides.map { it.guide.label })
+        assertEquals(NutrientGuides.Kind.TARGET, guides[0].guide.kind)
+        assertEquals(18.0, guides[0].eaten, 1e-9)
+        assertEquals(1400.0, guides[2].eaten, 1e-9)
     }
 
     /** No target and no birth year is a brand-new install, and it must say nothing rather than guess. */
@@ -123,7 +123,7 @@ class NutrientGuidesTest {
         val guides = NutrientGuides.forDay(
             NutritionDay.Nutrients(), targetKcal = 2000, birthYear = 0, thisYear = THIS_YEAR,
         )
-        assertEquals(listOf("Fibre", "Saturated fat"), guides.map { it.first.label })
+        assertEquals(listOf("Fibre", "Saturated fat"), guides.map { it.guide.label })
     }
 
     // ------------------------------------------------------------------------------- the sentence

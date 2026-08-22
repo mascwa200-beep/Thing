@@ -178,6 +178,16 @@ object NutrientGuides {
     }
 
     /**
+     * A guide and the day measured against it.
+     *
+     * ⚠️ A named pair rather than [Pair], and not only for readability. `it.first.label` at three call
+     * sites is worse prose than `it.guide.label`, and destructuring a `Pair` inside a lambda whose
+     * receiver the compiler is still inferring is a well-known way to turn a clear error into
+     * "not enough information to infer type argument".
+     */
+    data class Serving(val guide: Guide, val eaten: Double)
+
+    /**
      * Every guide the app can honestly state for this reader, paired with what they have eaten.
      *
      * Ordered fibre → saturated fat → sodium, which is one to reach followed by two to stay under.
@@ -189,9 +199,9 @@ object NutrientGuides {
         targetKcal: Int?,
         birthYear: Int,
         thisYear: Int,
-    ): List<Pair<Guide, Double>> = listOfNotNull(
-        fibre(targetKcal)?.let { it to eaten.fibreG },
-        saturatedFat(targetKcal)?.let { it to eaten.satFatG },
-        sodium(birthYear, thisYear)?.let { it to eaten.sodiumMg },
+    ): List<Serving> = listOfNotNull(
+        fibre(targetKcal)?.let { Serving(it, eaten.fibreG) },
+        saturatedFat(targetKcal)?.let { Serving(it, eaten.satFatG) },
+        sodium(birthYear, thisYear)?.let { Serving(it, eaten.sodiumMg) },
     )
 }

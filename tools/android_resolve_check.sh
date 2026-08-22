@@ -38,6 +38,23 @@
 # Usage:  tools/android_resolve_check.sh <file.kt> [more.kt ...]
 set -uo pipefail
 
+# ⚠️ COMPOSE IS DELIBERATELY ABSENT, and that has a loud, recognisable false positive.
+#
+# A NEW `LazyColumn { items(xs) { x -> x.field } }` call site reports three things at once: an
+# inference failure naming some type parameter ("not enough information to infer type argument for
+# 'K'"), and an unresolved reference for EVERY member touched on the lambda parameter. The chain is
+# `items` unresolved -> the lambda parameter has an error type -> every access on it cascades.
+# Existing call sites cancel in the differencing, so only a new one shows.
+#
+# Confirmed by compiling the same shape WITH the real Compose jars: zero frontend errors, failing
+# only in `Exception during IR lowering` while inlining `items$default`, which is exactly what a
+# correct @Composable does without the Compose plugin. Reaching lowering IS the pass.
+#
+# Adding the Compose artifacts here is not worth it — foundation, foundation-layout, ui, ui-unit,
+# ui-graphics, ui-text, material3 and their transitives, resolved per run, to type-check files that
+# CI compiles properly in minutes. Recognise the shape instead, and settle a doubtful one with
+# tools/android_compile_check.sh over a small probe rather than the whole screen.
+#
 G=/opt/gradle-8.14.3/lib
 GC=/root/.gradle/caches/modules-2/files-2.1
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
