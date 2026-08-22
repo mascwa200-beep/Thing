@@ -356,6 +356,16 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * Health Connect, behind a capability check.
+     *
+     * ⚠️ Stateless and cheap to construct — every call re-reads whether a provider is there, because
+     * Health Connect can be installed, updated or removed while this app is alive.
+     */
+    val healthConnect: dev.mascwa.pulse.data.health.HealthConnectBridge by lazy {
+        dev.mascwa.pulse.data.health.HealthConnectBridge(appContext)
+    }
+
+    /**
      * Progress photographs — app-private, never in the camera roll, and in `filesDir` rather than
      * the cache so the OS cannot reclaim somebody's "before" without telling them.
      */

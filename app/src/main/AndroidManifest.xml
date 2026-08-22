@@ -13,7 +13,19 @@
              this the in-app player's SpotifyAppRemote.connect() can never find/bind Spotify and just
              spins on "Connecting…". Declaring the package restores that visibility. -->
         <package android:name="com.spotify.music" />
+        <!-- ⚠️ Health Connect is resolved BY PACKAGE, and on Android 11+ package visibility hides it
+             by default. Without this, HealthConnectClient.getSdkStatus() returns SDK_UNAVAILABLE on a
+             phone that has it installed — a silent false negative indistinguishable from "this device
+             does not support it", on the one call the whole integration is gated behind. -->
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
+
+    <!-- Health Connect. Read only what the HEALTH tab actually uses, and write back only weight so a
+         reading typed here reaches a scale app. A permission that is not declared here cannot be
+         requested at all, so this list IS the integration's reach. -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
 
     <!-- Networking for all the free public data sources. -->
     <uses-permission android:name="android.permission.INTERNET" />

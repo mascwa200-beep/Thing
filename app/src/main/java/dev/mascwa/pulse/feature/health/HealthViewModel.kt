@@ -12,6 +12,7 @@ import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.data.health.BodyStore
+import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
@@ -525,6 +526,63 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     fun forgetPhoto(id: String) {
         viewModelScope.launch { c.progressPhotoStore.remove(id) }
+    }
+
+    // -------------------------------------------------------------------------- Health Connect
+
+    /** Whether a scale or watch can reach this tab at all, re-read rather than cached. */
+    fun healthConnect(): HealthConnectBridge = c.healthConnect
+
+    private val _syncStatus = MutableStateFlow("")
+
+    /** What the last import did, in a sentence. Blank until one has been tried. */
+    val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
+
+    /**
+     * Pull weigh-ins recorded by anything else into the record.
+     *
+     * ⚠️ The permission is checked FIRST and reported separately. `weighinsSince` returns an empty
+     * list both for "nothing new" and for "could not ask", and telling somebody "no new readings"
+     * when the truth is "you refused the permission" is the silent-failure shape this repo keeps
+     * correcting.
+     *
+     * ⚠️ Imported readings go through `BodyStore.record` with the day computed here, so the
+     * same-day replacement rule applies exactly as it does to a typed one — importing twice cannot
+     * double a morning's weight in the trend.
+     */
+    fun importFromHealthConnect() {
+        viewModelScope.launch {
+            val hc = c.healthConnect
+            if (hc.availability() !is HealthConnectBridge.Availability.Ready) {
+                _syncStatus.value = "Health Connect is not available on this device."
+                return@launch
+            }
+            if (!hc.hasAll()) {
+                _syncStatus.value = "Permission has not been granted, so nothing could be read."
+                return@launch
+            }
+            // ⚠️ Since the newest reading already held, not "since forever". A first import brings
+            // the lot; every later one asks only for what it has not seen, which is both cheaper and
+            // the reason re-importing cannot resurrect a reading deliberately deleted here.
+            val newest = c.bodyStore.all().maxOfOrNull { it.atMs } ?: 0L
+            val found = hc.weighinsSince(newest)
+            found.forEach { c.bodyStore.record(it.atMs, it.kg, dayStartOf(it.atMs)) }
+            _syncStatus.value = when (found.size) {
+                0 -> "Nothing new to bring in."
+                1 -> "Brought in 1 weigh-in."
+                else -> "Brought in ${found.size} weigh-ins."
+            }
+            recompute.value++
+        }
+    }
+
+    /** Publish a reading so a scale app or a watch can see it. Best-effort and says which. */
+    fun publishToHealthConnect(atMs: Long, kg: Double) {
+        viewModelScope.launch {
+            _syncStatus.value =
+                if (c.healthConnect.publishWeight(atMs, kg)) "Sent to Health Connect."
+                else "Could not send it — check the permission."
+        }
     }
 
     fun removeEntry(id: String) {

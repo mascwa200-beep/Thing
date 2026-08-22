@@ -336,6 +336,9 @@ dependencies {
 
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
+    // Reads weight/steps from a scale or watch, and writes weight back. Behind a capability
+    // check: without a provider installed the whole integration degrades to manual entry.
+    implementation(libs.androidx.health.connect)
     implementation(libs.androidx.work.runtime.ktx)
     // Baseline Profiles: installs the app's + AndroidX libraries' profiles so ART AOT-compiles hot paths
     // (faster cold start / less jank) on the non-debuggable shipped build.

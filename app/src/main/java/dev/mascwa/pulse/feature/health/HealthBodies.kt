@@ -56,6 +56,7 @@ import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.health.BodyStore
+import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.feature.common.ChartSeries
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
@@ -826,6 +827,9 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item { LcarsHeaderBar("PHOTOGRAPHS") }
         item { ProgressPhotos(vm) }
 
+        item { LcarsHeaderBar("OTHER APPS") }
+        item { HealthConnectPanel(vm) }
+
         item { LcarsHeaderBar("READINGS") }
         items(weighins.asReversed().take(40), key = { it.atMs }) { w ->
             ReadingRow(
@@ -1512,6 +1516,84 @@ private fun ProgressPhotos(vm: HealthViewModel) {
 private val PHOTO_W = 92.dp
 private val PHOTO_H = 122.dp
 private val PHOTO_OPEN_H = 360.dp
+
+/**
+ * Let a scale or a watch fill the record in, if this device has Health Connect at all.
+ *
+ * ⚠️ **The whole panel is a capability check, and the "no" case is a first-class state.** Below
+ * Android 14 Health Connect is a separate app; from 14 it is part of the platform — but a de-Googled
+ * or hardened build can ship without it, and this app's own device gate targets GrapheneOS, where
+ * its presence is **unverified**. Absence is stated plainly, alongside the fact that nothing here
+ * stops working: weight is typed in and steps come from the phone's own pedometer.
+ *
+ * ⚠️ The availability is read on every composition rather than remembered. Health Connect can be
+ * installed while the app is alive, and a status decided once would leave the panel greyed out
+ * after somebody did the exact thing it told them to.
+ */
+@Composable
+private fun HealthConnectPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val bridge = vm.healthConnect()
+    val status by vm.syncStatus.collectAsStateWithLifecycle()
+    val availability = bridge.availability()
+    var granted by remember { mutableStateOf(false) }
+
+    // The contract is null when there is no provider, so the launcher is only built when there is
+    // something to launch. A contract for an absent provider would throw on launch.
+    val contract = remember(availability) { bridge.permissionContract() }
+    val ask = contract?.let { ct ->
+        rememberLauncherForActivityResult(ct) { result ->
+            granted = result.containsAll(bridge.permissions)
+        }
+    }
+    LaunchedEffect(availability) {
+        granted = availability is HealthConnectBridge.Availability.Ready && bridge.hasAll()
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "HEALTH CONNECT",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            when (availability) {
+                is HealthConnectBridge.Availability.Missing -> Text(
+                    availability.reason,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+                HealthConnectBridge.Availability.UpdateNeeded -> Text(
+                    "Health Connect is installed but too old to talk to. Updating it from the Play " +
+                        "Store or your app store is all this needs.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                )
+                HealthConnectBridge.Availability.Ready -> {
+                    Text(
+                        if (granted) {
+                            "Connected. Weigh-ins recorded by a scale or another app can be brought " +
+                                "in, and readings typed here are published back."
+                        } else {
+                            "Available on this device. Weight and steps only — nothing about food, " +
+                                "sleep or exercise is asked for."
+                        },
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                    )
+                    if (!granted) {
+                        LcarsButton(
+                            text = "ALLOW WEIGHT & STEPS",
+                            enabled = ask != null,
+                            onClick = { ask?.launch(bridge.permissions) },
+                        )
+                    } else {
+                        LcarsButton(text = "BRING IN NEW WEIGH-INS", onClick = { vm.importFromHealthConnect() })
+                    }
+                }
+            }
+            if (status.isNotBlank()) {
+                Text(status, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink, lineHeight = 14.sp)
+            }
+        }
+    }
+}
 
 // =================================================================================== shared
 
