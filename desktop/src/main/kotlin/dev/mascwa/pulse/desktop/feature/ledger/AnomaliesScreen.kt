@@ -297,7 +297,7 @@ private fun SectionLabel(text: String, colour: Color) {
  * misfortune — colouring by direction would quietly turn it into a different instrument.
  */
 @Composable
-private fun tintFor(bits: Double): Color {
+internal fun tintFor(bits: Double): Color {
     val c = Pulse.colors
     return when {
         bits >= 8.0 -> c.negative
@@ -335,7 +335,7 @@ private fun footnote(a: Anomaly): String = buildString {
     if (a.persistence > 1) append(" · held ${a.persistence} collections")
 }
 
-private fun fmt(v: Double, decimals: Int): String = String.format(Locale.US, "%.${decimals}f", v)
+internal fun fmt(v: Double, decimals: Int): String = String.format(Locale.US, "%.${decimals}f", v)
 
 private fun bytes(n: Long): String = when {
     n >= 1_048_576L -> String.format(Locale.US, "%.1f MB", n / 1_048_576.0)

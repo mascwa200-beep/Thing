@@ -9,6 +9,7 @@ import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
 import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesScreen
 import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
+import dev.mascwa.pulse.desktop.feature.ledger.SinceYouLeftViewModel
 import dev.mascwa.pulse.desktop.feature.home.HomeScreen
 import dev.mascwa.pulse.desktop.feature.home.HomeViewModel
 import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
@@ -99,6 +100,7 @@ class DeskViewModels(
     val safety: SafetyViewModel,
     val search: SearchViewModel,
     val settings: SettingsViewModel,
+    val since: SinceYouLeftViewModel,
     val spaceWeather: SpaceWeatherViewModel,
     val study: StudyViewModel,
     val weather: WeatherViewModel,
@@ -153,6 +155,7 @@ fun ScreenHost(
             // The SAME advisories view model the ADVISORIES screen reads, so the two pages can never
             // rank one machine's signals differently.
             advisories = vms.advisories,
+            since = vms.since,
             onOpenScreen = onOpenScreen,
             modifier = m,
         )

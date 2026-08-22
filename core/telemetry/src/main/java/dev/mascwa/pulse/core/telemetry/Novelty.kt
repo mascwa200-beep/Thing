@@ -375,6 +375,143 @@ object Novelty {
         }.filterNotNull()
     }
 
+    // ---------------------------------------------------------------- movement over a span
+
+    /**
+     * How far apart a pair may be from [spanSeries]'s requested lag and still count as that lag.
+     *
+     * A fraction of the lag rather than a fixed duration, because "close enough to six hours" and
+     * "close enough to six days" are not the same amount of slack.
+     */
+    const val SPAN_TOLERANCE: Double = 0.10
+
+    /**
+     * ⚠️ The other half of that tolerance, and the reason it is not a bare fraction: for a lag near the
+     * sampling cadence, ten per cent is smaller than one sampling interval and **nothing would ever
+     * pair**. A series sampled every half hour cannot express a two-hour span to within twelve minutes.
+     *
+     * Slightly over half a gap, so the worst case — a target falling exactly between two samples — still
+     * pairs, while a genuinely missing sample (a whole gap out) does not.
+     */
+    private const val SPAN_GAP_SLACK: Double = 0.6
+
+    /**
+     * Differences across a **fixed lag**, so a move can be judged against the same metric's own history
+     * of moves over the same span.
+     *
+     * ⚠️ [changeSeries] is the wrong tool for this and deliberately so: it is single-step, and its gap
+     * guard *discards* differences taken across an unusually long interval. Judging "how much has this
+     * moved in the six hours I was away" against a distribution of fifteen-minute moves would report
+     * every absence as extraordinary. The comparison has to be like for like.
+     *
+     * ⚠️ **Walked backwards from the newest observation**, so the span the caller wants to judge — the
+     * one ending now — is the **last** element. A forward walk would lay the spans on an arbitrary grid
+     * and the current move, which is the entire point, might not be one of them. This shape means the
+     * caller can use the same `score(series, series.last())` idiom the level and rate paths already use.
+     *
+     * ⚠️ **Non-overlapping, and this is the load-bearing statistical decision.** A rolling six-hour
+     * difference taken at every fifteen-minute step yields samples that share five-sixths of their data;
+     * [effectiveSampleSize] cannot catch it, because consecutive overlapping spans have *different*
+     * values and run-counting reads them as independent. Striding by the lag makes each span genuinely
+     * independent, at the cost of sample size — and the refusal floor in [score] then declines to judge
+     * a window this machine has not watched enough times, which is the honest answer.
+     *
+     * A pair too far from the lag is rejected and the walk steps back one observation and tries again,
+     * so a single hole does not truncate all the history behind it.
+     *
+     * @param lagMs the span to measure across. Non-positive yields nothing.
+     */
+    fun spanSeries(series: List<Observation>, lagMs: Long): List<Observation> {
+        if (lagMs <= 0L) return emptyList()
+        val ordered = series.filter { it.value.isFinite() }.sortedBy { it.atMs }
+        if (ordered.size < 2) return emptyList()
+
+        val gaps = ordered.zipWithNext { a, b -> b.atMs - a.atMs }.filter { it > 0L }
+        val medianGap = if (gaps.isEmpty()) 0.0 else medianOfSorted(gaps.map { it.toDouble() }.sorted())
+        val tolerance = maxOf(
+            (medianGap * SPAN_GAP_SLACK).toLong(),
+            (lagMs * SPAN_TOLERANCE).toLong(),
+        ).coerceAtLeast(1L)
+
+        val out = mutableListOf<Observation>()
+        var end = ordered.size - 1
+        while (end > 0) {
+            val b = ordered[end]
+            val start = nearestIndexBefore(ordered, b.atMs - lagMs, end)
+            if (start < 0) break
+            val a = ordered[start]
+            if (abs((b.atMs - a.atMs) - lagMs) <= tolerance) {
+                out += Observation(b.atMs, b.value - a.value, a.backfilled || b.backfilled)
+                // Non-overlap: the next span ends where this one began.
+                end = start
+            } else {
+                end--
+            }
+        }
+        return out.asReversed()
+    }
+
+    /**
+     * What a scored **span** says, or null when there is nothing worth saying.
+     *
+     * ⚠️ [Reading.sentence] must not be printed for a span. It says "Highest on record" and "Lowest on
+     * record", which over a difference series mean *the largest rise* and *the largest fall* — and
+     * "lowest on record" printed beside a plunging value reads as a claim about the **level**, which is
+     * the opposite of what happened.
+     *
+     * ⚠️ [change] is taken as well as the reading because [Reading.direction] is measured against the
+     * **median span**, not against zero. On a metric that mostly climbs, the median six-hour move is
+     * positive, so a flat six hours has direction −1 while nothing actually fell. Where the two
+     * disagree the wording drops to a neutral "move" rather than asserting a direction that is wrong.
+     */
+    fun spanSentence(reading: Reading, lagMs: Long, change: Double): String? {
+        if (reading.bits < NOTABLE_BITS) return null
+
+        val span = spanPhrase(lagMs)
+        val extreme = reading.extremeSinceMs == null
+        val agrees = (reading.direction > 0 && change > 0.0) || (reading.direction < 0 && change < 0.0)
+        val word = if (change > 0.0) "rise" else "fall"
+
+        val note = when (reading.basis) {
+            Basis.RECORDED -> ""
+            Basis.BACKFILLED -> " (against fetched history)"
+            Basis.MIXED -> " (partly against fetched history)"
+        }
+
+        // "over $span" throughout rather than "$span move": [spanPhrase] yields a noun phrase ("6
+        // hours"), and using it attributively reads as "the biggest 6 hours rise".
+        val rarity = oneIn(Math.pow(2.0, -reading.bits))
+        // ⚠️ "On record" is worth very different amounts at different lags, and the sentence has to say
+        // which. Spans do not overlap, so a year of history holds about 1,460 six-hour moves and only
+        // 52 weekly ones — measured over a real year of London weather, "the biggest fall on record
+        // over 7 days" came up on 6.8% of hours, which is exactly the 2/53 the sample can resolve and
+        // nothing like the once-a-year event the bare phrase implies. This is the same hedge [sentence]
+        // has always carried for a record level, and dropping it here was an overclaim.
+        val outOf = " — as rare as ${reading.effectiveN} readings can show"
+        val body = when {
+            extreme && agrees -> "the biggest $word on record over $span$outOf"
+            extreme -> "the most unusual move on record over $span$outOf"
+            agrees -> "an unusually large $word over $span — a 1-in-$rarity move"
+            else -> "an unusual move over $span — a 1-in-$rarity"
+        }
+        return body + note
+    }
+
+    /** Index of the observation nearest [targetMs] among `[0, before)`, or −1 when there is none. */
+    private fun nearestIndexBefore(ordered: List<Observation>, targetMs: Long, before: Int): Int {
+        if (before <= 0) return -1
+        var lo = 0
+        var hi = before - 1
+        while (lo < hi) {
+            val mid = (lo + hi) / 2
+            if (ordered[mid].atMs < targetMs) lo = mid + 1 else hi = mid
+        }
+        // `lo` is the first index at or after the target, or the last candidate when they are all before
+        // it. The one below can still be nearer.
+        if (lo > 0 && abs(ordered[lo - 1].atMs - targetMs) <= abs(ordered[lo].atMs - targetMs)) return lo - 1
+        return lo
+    }
+
     // ---------------------------------------------------------------- ranking a whole wall
 
     /**

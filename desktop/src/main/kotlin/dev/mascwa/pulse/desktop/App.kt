@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +72,7 @@ import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
 import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
+import dev.mascwa.pulse.desktop.feature.ledger.SinceYouLeftViewModel
 import dev.mascwa.pulse.desktop.feature.world.MapScreen
 import dev.mascwa.pulse.desktop.feature.world.MapViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
@@ -131,6 +133,7 @@ import dev.mascwa.pulse.desktop.theme.lcarsBlockShape
 import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -375,6 +378,10 @@ fun PulseDesktopApp(
 
         val anomaliesVm = remember { AnomaliesViewModel(scope, settings, worldLedger) }
 
+        // The same ledger again — this asks a different question of it (what moved across an absence,
+        // rather than what is strange right now), and one record must not be read twice.
+        val sinceVm = remember { SinceYouLeftViewModel(scope, settings, worldLedger) }
+
         val crashVm = remember { CrashViewModel(scope, crashReporter) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
@@ -405,7 +412,7 @@ fun PulseDesktopApp(
                 live = liveVm, map = mapVm, markets = marketsVm, news = newsVm, notes = notesVm,
                 observatory = observatoryVm, packs = packsVm, places = placesVm, radar = radarVm,
                 radio = radioVm, remote = remoteVm, safety = safetyVm, search = searchVm,
-                settings = settingsVm, spaceWeather = spaceWeatherVm, study = studyVm,
+                settings = settingsVm, since = sinceVm, spaceWeather = spaceWeatherVm, study = studyVm,
                 weather = weatherVm, wildlife = wildlifeVm,
             )
         }
@@ -477,6 +484,21 @@ fun PulseDesktopApp(
         // boolean would be a duplicate subscription for nothing.
         LaunchedEffect(prefs.longWatch) {
             if (prefs.longWatch) longWatch.start() else longWatch.stop()
+        }
+
+        // Presence, so the world can be diffed across an absence. ⚠️ At the shell rather than on Home:
+        // three hours spent on MARKETS is not an absence, and a heartbeat that only ran on Home would
+        // report one every time you came back to it.
+        val focused = LocalWindowInfo.current.isWindowFocused
+        LaunchedEffect(focused) {
+            if (!focused) return@LaunchedEffect
+            // Resolve the absence first, then keep saying "still here" until focus goes. Cancelling on
+            // focus loss is what makes the marker stop advancing while nobody is at the machine.
+            sinceVm.onPresent()
+            while (true) {
+                delay(SinceYouLeftViewModel.HEARTBEAT_MS)
+                sinceVm.heartbeat()
+            }
         }
         CompositionLocalProvider(
             LocalConsoleSection provides (DESK_SECTION[screen] ?: ""),
