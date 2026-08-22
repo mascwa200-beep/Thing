@@ -3457,8 +3457,16 @@ Pixel. **182 desktop tests green locally.**
 
 **⚠️ THE TANDEM RULE — standing, for every session after this one.** When a change lands on the phone,
 ask whether the desktop carries the same thing, and move it in the same PR:
-- **Touching a pure core in `core:telemetry` that is mirrored?** Run `python3
-  tools/mirror_desktop_cores.py` and commit the regenerated mirror. `MirrorDriftTest` fails CI otherwise.
+- ~~**Touching a pure core in `core:telemetry` that is mirrored?** Run `python3
+  tools/mirror_desktop_cores.py` and commit the regenerated mirror. `MirrorDriftTest` fails CI otherwise.~~
+  **STALE AND ACTIVELY WRONG — there are no mirrors any more.** `f07953b` made `:core:telemetry` a plain
+  Kotlin/JVM module that BOTH applications depend on directly, and deleted all 53 mirrors along with
+  `tools/mirror_desktop_cores.py` and `MirrorDriftTest`. A shared core is now shared by compiling once;
+  editing one costs nothing on the desktop side and needs no list updated anywhere. Every other mention
+  of mirroring in this file is a **historical session record** and correct as of when it was written —
+  left standing on purpose, because rewriting the log would be worse than dating it. This is the only
+  entry that was a live instruction, and following it now would send somebody hunting a script that does
+  not exist. (⚠️ `:core:feeds` is the same shape: 22 repositories, both applications, one copy.)
 - **Touching `app/src/main/assets/survival/**` (a KB wave) or `data/survival/`?** The desktop bundles
   and parses those; `desktop-build.yml`'s path filter now triggers on them, so CI re-verifies the bundle.
 - **Adding a reading/knowledge surface** (library, study, search, news) — the desktop is in scope.
@@ -7306,3 +7314,220 @@ longer tells you to install something it has already installed.
 (`StandbyDisplay.kt`) and its sizing one small pure core, both easy to tune from a screenshot; the
 `.scr` is copied from the launcher at registration time rather than shipped as a separate artifact,
 which is simpler but means the screensaver only exists after the switch is first turned on.
+
+### THE THEATER 403 — R8 renamed away the class Python looks up (this session, PR #451, merged)
+
+Owner sent one screenshot and one line: *"hopefully this actually gave the right information this
+time"*, alongside a standing budget instruction — **be conscious of plan usage, especially in plan
+mode.** So: **zero subagent spend, zero workflows**, one CI round, four files.
+
+The screenshot carried the decisive text, which the D1 diagnostic shipped two sessions earlier
+exists to produce:
+
+```
+javascript: NONE (the JsRuntime lookup failed: NoClassDefFoundError:
+  dev.mascwa.pulse.data.media.JsRuntime ... at v5.c.invokeSuspend ...) · py s2/apk ?
+warning: [youtube] No supported JavaScript runtime could be found.
+```
+
+**The chain, end to end.** `proguard-rules.pro` had no keep for `JsRuntime` → R8 renamed it (`v5.c`,
+`O6.a`, `n7.a$b` are Kotlin coroutine internals under obfuscation) → `jclass(...)` at
+`lcars_jsi.py:56` threw → our JS-runtime provider could never report itself available → yt-dlp found
+no runtime → YouTube's `n` parameter was never transformed → **403**. `apk ?` on the same line is the
+same bug a second time: `lcars_extract.py:210` reads `VERSION_CODE` off `BuildConfig`, which R8
+removes once its constants are inlined.
+
+⚠️ **THE CLASS HAS NEVER ONCE WORKED IN A SHIPPED APK.** `git log` settles it: R8 was enabled at
+`39418b5` (PR #328), long before `JsRuntime.kt` landed at `58c3476`. It was born into an R8 build
+with no keep rule.
+
+⚠️ **WHY FIVE ROUNDS OF DEBUGGING WENT PAST IT, and this is the transferable part.** CI's native
+assertion reads `nm -D` for the **C++ JNI symbol**, which R8 cannot touch — so it passed *correctly*
+on every build while the Kotlin class binding to it was renamed away in the same artifact. **A JNI
+symbol proves the native half and says nothing about the DEX half.** Two independent facts, one
+check.
+
+⚠️ **THREE STALE CLAIMS IN THE TREE ACTIVELY MISLED THE INVESTIGATION, AND ONE OF THEM WAS MINE.**
+This file said `isMinifyEnabled=false (R8 OFF — deliberate)` in two places, and the D1 diagnostic
+table I wrote last session said of this exact symptom *"R8 is off, so the name survives"* — which
+sent that whole session hunting a stale-Chaquopy hypothesis instead. `build.gradle.kts`'s R8 comment
+listed seven third-party libraries the keeps cover and omitted the Python bridge into our own code,
+the one that broke. All three corrected; in this tree a comment that overstates its own justification
+is a defect, and this one demonstrably cost a session.
+
+⚠️ **The irony worth keeping:** `proguard-rules.pro`'s own Chaquopy block already describes this
+failure in writing — *"R8 renames or removes classes the native interpreter resolves BY NAME at
+runtime, so the build goes green, the APK ships, and Python fails on the device. Nothing in CI could
+catch that."* Its keeps cover Chaquopy's **runtime classes** and **`PyProxy` subclasses**.
+`JsRuntime` is an ordinary app class reached by fully-qualified name and is **neither**. A correct
+warning with an incomplete keep reads exactly like a solved problem.
+
+**The gate — "Verify Python's Java lookups survived R8" in `android-build.yml`.** Derives the class
+names by grepping `jclass('...')` out of `app/src/main/python/`, so a future lookup is covered
+automatically (the drift-proof pattern `NotifId` and `WidgetLinkageTest` already use). Four details
+are load-bearing, each negative-tested:
+- ⚠️ **Extracted DEX files only, NEVER the whole APK.** `lcars_jsi.py` ships as an asset, so an
+  APK-wide grep matches the Python source's own string literal and passes whatever R8 did.
+- ⚠️ **The type descriptor `Ldev/mascwa/pulse/…;`, not the dotted name**, which could survive as an
+  ordinary string constant.
+- ⚠️ **A sentinel that cannot exist must be ABSENT** — a matcher that finds everything is
+  indistinguishable from a passing gate.
+- ⚠️ **The extracted list must be non-empty**, so a grep matching nothing cannot read as success.
+
+⚠️ **MY FIRST TEST HARNESS RETURNED 0 FOR ALL THREE CASES AND PROVED NOTHING.** The YAML block scalar
+strips indentation, so the `sed` anchored on leading spaces never matched, and a range-delete ate the
+rest of the script. Rewritten in python with an `assert` on every substitution *and* on retained
+content. **The harness needs the same care as the thing it checks** — third time this has bitten.
+
+**Verified rather than trusted:** run 1919 green, and the step's own log was fetched and read —
+both names extracted, 2 dex files checked, both `kept:`, `(sentinel correctly absent — the check can
+fail)`. A green conclusion is not evidence the new step ran.
+
+**Considered and not chosen: turning R8 off.** It would fix this and any other latent R8 bug at a
+stroke, but loses the material-icons-extended tree-shaking on an APK already at ~158 MB — now
+downloaded in full by the auto-updater on every build. If the gate later reveals more missing keeps
+than expected, R8-off is the fallback and the owner's call.
+
+⚠️ **Cannot be proven here and the owner is the only one who can close it.** No Android SDK, so R8
+never runs locally; the container's datacenter IP is bot-flagged by YouTube, so even a successful
+extraction would not reproduce the 403. CI proves the class reaches the DEX; the device proves the
+403 is gone. Build **#1919** on `latest`. The line under the THEATER player is the whole test:
+`javascript: quickjs 0.16.0 · py s2/apk 1919` = fixed (and `apk` resolving to a number proves
+`BuildConfig` came back too); still `JsRuntime lookup failed` = the keep did not take; engine live
+but still 403 = a genuinely different cause, and the first time that would be true. The interrogator
+shares the same native library, so a live JS engine implies its transcription is reachable too.
+
+### THE LONG WATCH — the desktop remembers the world, and tells you what is strange (this session)
+
+Owner asked for a **desktop-exclusive** feature: insanely creative, genuinely useful, and never seen
+in any app — something that boosts awareness specifically because of the data this app already
+touches. Budget instruction: at most one agent, used only where it really counted. **One Explore
+agent, for the initial codebase map. Zero after that.**
+
+**The gap was real and it was embarrassing.** Every screen in both applications answers *"what is X
+right now?"* — the price, the temperature, the Kp index, the magnitude. **Not one answered "is this
+normal?"**, which is the question that actually creates awareness. And the app threw away everything
+it fetched: twenty-two repositories pulling markets, weather, air quality, space weather, seismic and
+aviation every day, every value discarded when its cache expired. Years of a hyper-local personal
+record of the world had been flowing through the machine into the bin.
+
+**Desktop-exclusive for a real reason.** Continuous collection needs a machine that is always on,
+mains-powered, unmetered, with a disk that does not care about tens of megabytes. That is a tower PC
+and emphatically not a phone under Doze with a metered radio.
+
+Three binding AskUserQuestion decisions: collection reach = **a per-user scheduled task, 24/7**;
+record the owner's own activity = **world data only**; disk ceiling = **~100 MB**.
+
+**Shipped:** `c2add4b` Novelty · `3b8c036` ledger + registry · `ebb6635` collector, lock, headless
+`--collect`, schtasks, Settings · `66debbc` the effective-sample fix · `48af0ff` backfill ·
+`57a8496` the wall.
+
+- **`core:telemetry/Novelty.kt`** — surprisal in bits as the one axis comparable across domains. A
+  z-score is comparable only between similar distributions; a percentile saturates (p=0.999 and
+  p=0.99999 both read as ≈1.0 while the second is a hundred times rarer). Median and MAD throughout,
+  never mean and standard deviation, because world data is heavy-tailed and **the outliers are what
+  this is hunting** — one large earthquake inflates a standard deviation until the next scores as
+  ordinary.
+- **`ledger/WorldLedger.kt`** — one file per metric per month, the id in the path and never repeated
+  per line. Full resolution for a year, then one row a day forever, keeping **min and max** and not
+  just the mean: collapse to a mean and "highest in three years" starts silently lying the moment a
+  peak leaves the window.
+- **`ledger/MetricRegistry.kt`** (48 metrics), **`Collector`** + **`CollectorLock`** (an OS-released
+  file lock, per-domain cadence), **`ScheduledCollect`** (`schtasks`, no `/ru`, no `/rl HIGHEST`, so
+  no UAC), **`Backfill`**, and **`feature/ledger/`** — the wall, the scrubber, `scanLedger`.
+
+⚠️ **DOING THE ARITHMETIC KILLED THE PLAN'S OWN HOURLY TIER.** An hourly aggregate of ~100 metrics is
+2,400 rows a day, and **most metrics are collected less often than hourly**, so that tier would have
+*increased* storage for them. Full resolution → daily, nothing in between. ≈20 MB rolling + ~1.6 MB a
+year.
+
+⚠️ **THE DEFECT THAT MATTERED MOST WAS IN MY OWN CORE, FOUND WHILE AUDITING BACKFILL.** The whole
+design rests on one property — surprisal capped at what the sample can resolve — and it took that cap
+from the number of rows. Several metrics update far less often than they are polled: F10.7 solar flux
+is measured once a day at Penticton and SPACE is read every fifteen minutes, so a year is 35,000 rows
+describing 365 readings. Ninety-six identical numbers leave the median, the MAD and every percentile
+exactly where they were and multiply the row count by ninety-six — the ceiling would have claimed to
+resolve a **one-in-seventeen-thousand** event out of one year of daily data. `effectiveSampleSize`
+counts runs; the ceiling, the refusal floor and the sentence all derive from it now. The floor goes on
+`p` rather than on the bits, because `p` is also what becomes "a 1-in-340 reading" — capping only the
+number would leave the two halves of one verdict contradicting each other.
+
+⚠️ **"HISTORY EXISTS" IS NOT "HISTORY OF THE SAME THING", and measuring that changed the backfill
+design twice.** The weather archive is ERA5 reanalysis on a ~31 km grid; the live endpoint is a
+blended high-resolution forecast. Measured over a week in London, as a fraction of each field's own
+spread: pressure 0.009, gusts 0.006, humidity 0.029, temperature 0.055, dew point 0.143 — but **wind
+speed 0.493** (half a MAD of systematic offset) and **cloud cover 0.220** (up to a hundred points
+apart on a single hour). Pouring those two under the recorded readings would not look like a bug; it
+would look like the world having been different last year.
+
+⚠️ **And that list is deliberately NOT hardcoded.** One week at one flat coastal city is thin evidence
+for what a 31 km cell does in mountains, and the fields that fail there are exactly the ones whose
+error is terrain-driven. `Backfill.agrees` measures it **on the machine that will use it**: one extra
+request for the overlapping week from the live endpoint, judged per field against that field's own
+variability. Air quality had no such question — the history and the live reading come from one
+endpoint and one model, and checked hour for hour they agree **to the last digit** on every pollutant
+and both indices. Not backfilled, each probed rather than assumed: visibility (absent from the
+archive), markets (a daily bar's close is a different sub-population from an hourly intraday read),
+solar flux (the long series is monthly means), seismic (a reconstructed count).
+
+**What the wall does that a dashboard would not:** it **states its own expected false-alarm count**
+(score ninety readings and a one-in-sixteen turns up several times over by chance; a wall that never
+says so trains its reader to believe in noise); it gives unjudgeable metrics **their own section** (on
+a new install almost everything is there, and sorting them in either direction makes the world look
+uniformly calm or uniformly alarming); and it **reads the past** — `score` judges a reading against
+the history before it, so rendering the wall as it stood at any earlier moment costs nothing but
+choosing a different reading. One slider. Warmer means stranger and nothing is red for being *bad*: a
+two-year low and a two-year high are equally surprising.
+
+**Also:** the Oracle gained a `ledgerHeadline`/`ledgerBits` signal and one rule, fed from the **same
+`scanLedger`** the wall renders, so the advisory and the page cannot disagree about one machine's own
+record. Its bar (6 bits, one in sixty) is far above the wall's own listing threshold on purpose — the
+wall is a page somebody chose to open, this is a line arriving unasked in a stream people must keep
+trusting. And a **`DirectoryTest`**, which did not exist: `ScreenHost` switches over `Screen` with no
+`else`, so a new value fails the build until it has something to draw, but nothing at all required a
+`DeskEntry` — and a screen without one is simply **unreachable** while compiling perfectly.
+
+**Verification: zero subagent spend after the one Explore agent.** `:core:telemetry:test` (1,380) and
+`:desktop:build` (229) both genuinely run here. **Twenty-four load-bearing rules negative-tested**,
+each perturbation asserted to have matched the source first. Live probes against Open-Meteo's archive,
+forecast and air-quality endpoints. And the shipped `agrees` was run over the real fetched comparison,
+reproducing the Python twin to three decimals on all seven fields.
+
+⚠️ **FOUR GUARDS WERE ASLEEP, and three traced to fixtures too regular to reach the branch.** An
+alternating series has a **zero MAD at odd lengths**, so the flat-window branch answered instead of the
+two guards under test. A pressure climbing by exactly +1 an hour is **three distinct rates over sixty
+readings**, which the new effective-sample rule correctly refused to judge at all. And the ordering
+fixture produced a single anomaly — a one-element list is sorted in every direction. **A fixture
+regular enough to reason about in your head is often too regular to reach the branch.**
+
+⚠️ **The flat-window guard turned out not to be independently observable** — the division already
+refuses via NaN. It stays because that is accidental correctness (written as `!(ratio >= limit)`, NaN
+would come back **true**), and the comment now says exactly that rather than claiming more.
+
+⚠️ **`tools/negtest.py` (in the session scratchpad) reported "DID NOT COMPILE" for two things that
+were nothing of the kind** — a Gradle module path with a colon in it, and a `--tests` pattern
+containing `|`, which Gradle has no OR syntax for. Both produced no XML, and "no results" was being
+read as a compile failure. It now distinguishes *filter matched nothing* / *did not compile* / *no
+results and not a compile error either*, and asserts the build directory exists before it starts. A
+harness that reports the cautious-sounding answer for its own misconfiguration is worse than one that
+crashes.
+
+**Deliberately NOT built, with the reasoning rather than silence:** co-movement (slice 10). Lagged
+cross-correlation across ~100 metrics is ~5,000 pairs of heavily autocorrelated series, and done
+honestly — with an autocorrelation-corrected effective sample size and false-discovery-rate control —
+**it will report that nothing survived correction, every time, for months**, because there is no
+history yet. That is the correct output and a rare thing for software to be willing to say, but
+building it now means shipping a large piece whose only possible answer today is "nothing". It earns
+its keep after months of collection, which is the point of a machine that never turns off.
+
+**Also corrected: the standing TANDEM RULE told future sessions to run `mirror_desktop_cores.py`.**
+That script and `MirrorDriftTest` were deleted in `f07953b`; both applications depend on
+`:core:telemetry` and `:core:feeds` directly now. Every other mirror mention in this file is a
+historical session record and left standing — rewriting the log would be worse than dating it.
+
+⚠️ **Owner-verify on Windows, and none of it can be proven here** — Skiko cannot get a GL context in
+this container. Install, switch the long watch on in Settings, confirm the task appears in Task
+Scheduler **with no UAC prompt**, then leave the machine closed overnight and open ANOMALIES next
+morning: it should show a night's worth of history it collected while nobody was looking, a
+false-alarm line, a scrubber that genuinely rewinds, and — on the first run at a new location — a
+backfill report saying which weather fields it judged trustworthy **here**.

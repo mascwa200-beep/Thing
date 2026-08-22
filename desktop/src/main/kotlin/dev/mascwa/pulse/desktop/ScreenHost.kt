@@ -7,6 +7,8 @@ import dev.mascwa.pulse.desktop.feature.about.AboutScreen
 import dev.mascwa.pulse.desktop.feature.about.AboutViewModel
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
+import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesScreen
+import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
 import dev.mascwa.pulse.desktop.feature.home.HomeScreen
 import dev.mascwa.pulse.desktop.feature.home.HomeViewModel
 import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
@@ -76,6 +78,7 @@ class DeskViewModels(
     val library: LibraryRepository,
     val about: AboutViewModel,
     val advisories: AdvisoriesViewModel,
+    val anomalies: AnomaliesViewModel,
     val crash: CrashViewModel,
     val diary: DiaryViewModel,
     val economy: EconomyViewModel,
@@ -150,6 +153,13 @@ fun ScreenHost(
             // The SAME advisories view model the ADVISORIES screen reads, so the two pages can never
             // rank one machine's signals differently.
             advisories = vms.advisories,
+            onOpenScreen = onOpenScreen,
+            modifier = m,
+        )
+        Screen.ANOMALIES -> AnomaliesScreen(
+            vm = vms.anomalies,
+            // Every row points at the screen that owns the reading, so "unusual" and "what is it"
+            // are one tap apart.
             onOpenScreen = onOpenScreen,
             modifier = m,
         )

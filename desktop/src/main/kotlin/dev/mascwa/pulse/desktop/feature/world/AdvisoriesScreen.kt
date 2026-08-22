@@ -38,6 +38,7 @@ import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.screenForRoute
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.ledger.WorldLedger
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsBusyBar
@@ -88,6 +89,8 @@ class AdvisoriesViewModel(
     private val space: SpaceWeatherRepository,
     private val news: NewsRepository,
     private val study: StudyStore,
+    /** The long watch, when it has recorded anything. Null simply mutes the ledger advisory. */
+    private val ledger: WorldLedger? = null,
 ) {
     private val _state = MutableStateFlow(AdvisoriesState())
     val state: StateFlow<AdvisoriesState> = _state.asStateFlow()
@@ -125,7 +128,7 @@ class AdvisoriesViewModel(
      * gives for Home sharing this view model rather than taking a second reading.
      */
     private suspend fun snapshot(): OracleSignals =
-        gatherOracleSignals(settings, weather, markets, space, news, study)
+        gatherOracleSignals(settings, weather, markets, space, news, study, ledger)
 }
 
 /**

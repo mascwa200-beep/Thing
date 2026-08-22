@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.desktop.theme
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -471,6 +472,44 @@ fun LcarsMeter(
                 color = markerColor ?: c.ink,
                 start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 2.5f,
             )
+        }
+    }
+}
+
+/**
+ * A compact trace with no axis at all — the shape of a series, at a size where a label would be
+ * most of the ink.
+ *
+ * ⚠️ Deliberately **not** [LcarsTimeChart]. That one is built for a full screen and draws a labelled
+ * time axis; on a HUD strip or inside a list row the axis is most of the ink and none of the
+ * information. The trace is normalised to its own range because what a reader wants at this size is
+ * the shape, not the value — which whatever draws it states in words alongside.
+ *
+ * Promoted out of the standby display, which had the only copy. A second hand-rolled one for the
+ * anomaly wall would have been the duplicated-definition mistake this project has corrected five
+ * times with palettes.
+ */
+@Composable
+fun LcarsSparkline(
+    values: List<Double>,
+    colour: Color,
+    modifier: Modifier,
+    background: Color? = null,
+) {
+    Canvas(if (background != null) modifier.background(background) else modifier) {
+        if (values.size < 2) return@Canvas
+        val lo = values.min()
+        val hi = values.max()
+        val span = (hi - lo).takeIf { it > 0.0001 } ?: 1.0
+        val stepX = size.width / (values.size - 1)
+        var previous: Offset? = null
+        values.forEachIndexed { i, v ->
+            val point = Offset(
+                x = stepX * i,
+                y = (size.height - (((v - lo) / span) * size.height)).toFloat(),
+            )
+            previous?.let { drawLine(colour, it, point, strokeWidth = size.height * 0.08f) }
+            previous = point
         }
     }
 }

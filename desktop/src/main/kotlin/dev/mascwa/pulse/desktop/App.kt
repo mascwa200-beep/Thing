@@ -70,6 +70,7 @@ import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
 import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
+import dev.mascwa.pulse.desktop.feature.ledger.AnomaliesViewModel
 import dev.mascwa.pulse.desktop.feature.world.MapScreen
 import dev.mascwa.pulse.desktop.feature.world.MapViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
@@ -229,6 +230,30 @@ fun PulseDesktopApp(
         }
         LaunchedEffect(standby) { standby.start() }
 
+        // One ledger for the whole window: the collector writes it, the ANOMALIES page reads it, and
+        // the Oracle takes its strangest line. Sharing the instance is not about cost — it is a plain
+        // file reader — but about there being one answer to "what is odd here" rather than three.
+        val worldLedger = remember { dev.mascwa.pulse.desktop.ledger.WorldLedger() }
+
+        // The long watch, while the window is open. Between this and the scheduled task the record
+        // has no holes. ⚠️ Built HERE, over the shell's one HTTP client and one disk cache, for the
+        // reason the note above the repositories gives — a second set inside the running process
+        // would fragment the connection pool and the per-host rate gates it exists to keep honest.
+        val longWatch = remember {
+            dev.mascwa.pulse.desktop.ledger.LongWatch.Session(
+                scope = scope,
+                collector = dev.mascwa.pulse.desktop.ledger.LongWatch.inApp(
+                    settings = settings,
+                    http = http,
+                    cache = cache,
+                    weather = weatherRepository,
+                    space = spaceWeatherRepository,
+                    markets = marketsRepository,
+                ),
+            )
+        }
+
+
         val newsVm = remember {
             NewsViewModel(
                 scope = scope,
@@ -342,8 +367,13 @@ fun PulseDesktopApp(
                 space = spaceWeatherRepository,
                 news = newsRepository,
                 study = studyStore,
+                // The same ledger the ANOMALIES page reads, so the advisory and the wall can never
+                // disagree about what the strangest reading on this machine is.
+                ledger = worldLedger,
             )
         }
+
+        val anomaliesVm = remember { AnomaliesViewModel(scope, settings, worldLedger) }
 
         val crashVm = remember { CrashViewModel(scope, crashReporter) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
@@ -370,7 +400,7 @@ fun PulseDesktopApp(
         val vms = remember {
             DeskViewModels(
                 library = library,
-                about = aboutVm, advisories = advisoriesVm, crash = crashVm, diary = diaryVm,
+                about = aboutVm, advisories = advisoriesVm, anomalies = anomaliesVm, crash = crashVm, diary = diaryVm,
                 economy = economyVm, fuel = fuelVm, home = homeVm, libraryVm = libraryVm,
                 live = liveVm, map = mapVm, markets = marketsVm, news = newsVm, notes = notesVm,
                 observatory = observatoryVm, packs = packsVm, places = placesVm, radar = radarVm,
@@ -440,6 +470,14 @@ fun PulseDesktopApp(
         // one redraws every screen holding a distance or a clock time — see [LocalUnits].
         val prefs by settings.settingsFlow.collectAsState()
         val units = UnitPrefs(miles = prefs.miles, twelveHourClock = prefs.twelveHourClock)
+
+        // Keyed on the switch, so turning the long watch off stops the timer now rather than at the
+        // next launch. ⚠️ Placed here rather than beside the session it drives, because `prefs` is
+        // collected at this point — a second `collectAsState` over the same flow just to read one
+        // boolean would be a duplicate subscription for nothing.
+        LaunchedEffect(prefs.longWatch) {
+            if (prefs.longWatch) longWatch.start() else longWatch.stop()
+        }
         CompositionLocalProvider(
             LocalConsoleSection provides (DESK_SECTION[screen] ?: ""),
             LocalUnits provides units,

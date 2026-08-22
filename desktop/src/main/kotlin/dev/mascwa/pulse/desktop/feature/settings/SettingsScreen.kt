@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.desktop.ledger.ScheduledCollect
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsBusyBar
@@ -183,6 +184,35 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
         // has neither a boot sequence nor an audio kit — the two switches were written to disk and
         // read by nothing, which is worse than not offering them. They come back with the subsystems,
         // not before.
+
+        // ----- The long watch --------------------------------------------------------------------
+        LcarsFrame(Modifier.fillMaxWidth()) {
+            Column {
+                SectionTitle("THE LONG WATCH")
+                Text(
+                    "Records what every feed reports, so ANOMALIES can tell you when a reading is " +
+                        "unusual for this machine, in this place, at this hour. Keeps a year at full " +
+                        "detail and a daily summary after that — around 16 MB a year.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.muted,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                LcarsSwitch(
+                    "Keep recording", s.longWatch, vm::setLongWatch,
+                    subtitle = "A scheduled task every ${ScheduledCollect.EVERY_MINUTES} minutes, as you, " +
+                        "with no window — so the record has no holes where the app was shut. Switching " +
+                        "this off stops the recording and leaves what is already kept alone.",
+                )
+                // ⚠️ What the task ACTUALLY last did, not what it was asked to do. A background job
+                // with nowhere to report is how "it is running" becomes an article of faith.
+                vm.lastCollectPass()?.let {
+                    Text(
+                        "Last pass: $it",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        }
 
         StandbySection(s, vm)
 

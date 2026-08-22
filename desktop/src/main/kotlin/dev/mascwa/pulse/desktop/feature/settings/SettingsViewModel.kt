@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.desktop.feature.settings
 
 import dev.mascwa.pulse.desktop.location.IpLocationService
+import dev.mascwa.pulse.desktop.ledger.ScheduledCollect
 import dev.mascwa.pulse.desktop.settings.DesktopSettings
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +77,24 @@ class SettingsViewModel(
     fun setTwelveHourClock(v: Boolean) = write { it.copy(twelveHourClock = v) }
     fun setRefreshMinutes(v: Int) = write { it.copy(refreshMinutes = v.coerceIn(1, 240)) }
     fun setRefreshOnOpen(v: Boolean) = write { it.copy(refreshOnOpen = v) }
+
+    /**
+     * Switch the long watch on or off, and register or remove the scheduled task to match.
+     *
+     * ⚠️ The task registration follows the switch here rather than only at launch, so turning it off
+     * stops the recording *now* instead of at the next start. Windows keeps running a task nobody
+     * asked for otherwise, and a switch that says "off" over a task still firing every quarter hour
+     * is the kind of lie this codebase treats as a defect.
+     */
+    fun setLongWatch(v: Boolean) {
+        write { it.copy(longWatch = v) }
+        scope.launch {
+            runCatching { if (v) ScheduledCollect.install() else ScheduledCollect.uninstall() }
+        }
+    }
+
+    /** What the last background pass did, for the row's subtitle. Null before one has ever run. */
+    fun lastCollectPass(): String? = ScheduledCollect.lastPass()
     fun setCommunityChannels(v: Boolean) = write { it.copy(communityChannels = v) }
 
     // The standby display. ⚠️ These write a preference and nothing more — the session watches them
