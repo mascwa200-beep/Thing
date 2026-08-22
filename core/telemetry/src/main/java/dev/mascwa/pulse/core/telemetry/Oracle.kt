@@ -123,6 +123,23 @@ data class OracleSignals(
     // reader who has never studied hears nothing at all from this domain.
     /** Cards ready to be asked right now. */
     val reviewsDue: Int = 0,
+
+    // ---------------------------------------------------------------------------------- health
+    /**
+     * Calories left against today's target, and null when there is no target.
+     *
+     * ⚠️ Null and zero are completely different here. Zero is "you have eaten exactly your target",
+     * a real and useful fact; null is "there is no target", which happens for weeks while the
+     * expenditure measurement fills in. A rule reading a defaulted zero as a real figure would tell
+     * somebody they had nothing left on the day they installed the app.
+     */
+    val kcalLeftToday: Int? = null,
+    /** Protein eaten today against target, both null until there is a plan. */
+    val proteinLeftG: Int? = null,
+    /** True once anything at all has been logged today. */
+    val loggedAnythingToday: Boolean = false,
+    /** Days since the last weigh-in, or null if none was ever recorded. */
+    val daysSinceWeighIn: Int? = null,
     /** Consecutive days of study ending today or yesterday. */
     val studyStreakDays: Int = 0,
     /** Whether today is already counted — a streak is only "at risk" if it is not. */
@@ -158,6 +175,32 @@ object Oracle {
 
     /** One in a thousand — worth raising even across ninety metrics tested every few minutes. */
     private const val LEDGER_IMPORTANT_BITS = 10.0
+
+    /** Past this hour the day's eating is a pattern rather than a half-finished sentence. */
+    private const val EVENING_FROM_HOUR = 18
+
+    /**
+     * ⚠️ Asymmetric on purpose, and the asymmetry is the safety property.
+     *
+     * Being over is worth saying at a smaller margin than being under, because "you have room left"
+     * on a feature that tells people how much to eat is an invitation and the other is information.
+     * Both bars are well clear of the rounding in a day's logging.
+     */
+    private const val KCAL_OVERSHOOT_WORTH_SAYING = 250
+    private const val KCAL_HEADROOM_WORTH_SAYING = 500
+
+    /**
+     * Protein worth naming beside the calorie headroom.
+     *
+     * ⚠️ Deliberately well above rounding. A 6 g shortfall is a yoghurt and reads as pedantry on a
+     * line whose whole job is to be glanceable; 25 g is a decision about what the next meal is.
+     */
+    private const val PROTEIN_SHORTFALL_WORTH_SAYING = 25
+
+    /** A weekend off the scale is not a lapse; the better part of a week is. */
+    private const val WEIGH_IN_GAP_DAYS = 5
+    private const val MORNING_FROM_HOUR = 6
+    private const val MORNING_TO_HOUR = 11
 
     private const val REVIEWS_WORTH_MENTIONING = 3
 
@@ -640,12 +683,80 @@ object Oracle {
         )
     }
 
+    /**
+     * A day's eating heading well past its target, while there is still a meal left to change.
+     *
+     * ⚠️ Three gates, and every one of them removes a way this becomes harmful. It fires only in the
+     * **evening** (before that the day is not yet a pattern, and the honest advice is "carry on"), only
+     * when the overshoot is large enough to be a real difference rather than rounding, and never when
+     * nothing has been logged — an empty log means somebody has not recorded lunch, not that they have
+     * not eaten it, and telling them they are under is the single most misleading thing this feature
+     * could say.
+     *
+     * The tone is deliberately not corrective. This tab tells a real person how much to eat, so it
+     * states the number and stops; "you have overeaten" is a judgement the data cannot support and
+     * nobody asked for.
+     */
+    private fun caloriesLeft(s: OracleSignals): Insight? {
+        val left = s.kcalLeftToday ?: return null
+        if (!s.loggedAnythingToday) return null
+        if (s.hourOfDay < EVENING_FROM_HOUR || s.isNight) return null
+        if (left > -KCAL_OVERSHOOT_WORTH_SAYING && left < KCAL_HEADROOM_WORTH_SAYING) return null
+        val over = left < 0
+        return Insight(
+            id = "health_kcal", kind = InsightKind.PREDICTION, urgency = Urgency.AMBIENT,
+            title = if (over) "${-left} calories past today's target" else "$left calories still to go today",
+            // ⚠️ Protein is named only when there is a real shortfall left to act on, and only on
+            // the under-target branch. Past the calorie target "84 g of protein to go" is advice to
+            // eat more on the one evening the reader has already been told they are over — two
+            // instructions in opposite directions, from one line.
+            detail = buildString {
+                append(
+                    if (over) "Worth knowing before the last meal. One day does not move the trend."
+                    else "There is room left if you want it — the target is a target, not a ceiling.",
+                )
+                val protein = s.proteinLeftG
+                if (!over && protein != null && protein >= PROTEIN_SHORTFALL_WORTH_SAYING) {
+                    append(" Still $protein g of protein to go.")
+                }
+            },
+            score = Urgency.AMBIENT.weight * 1000.0 + 6,
+            actionRoute = "health",
+            sources = listOf("health"),
+        )
+    }
+
+    /**
+     * The scale has not been stepped on for long enough that the measurement is going stale.
+     *
+     * ⚠️ This one matters more than it looks: the whole expenditure figure is derived from weight
+     * change against logged intake, so a gap in weigh-ins does not merely leave the chart patchy —
+     * it stops the calorie target being measurable at all. Raised only once the gap is long enough
+     * to be a lapse rather than a weekend, and only in the morning, which is the only time the
+     * suggestion can actually be acted on.
+     */
+    private fun weighInDue(s: OracleSignals): Insight? {
+        val days = s.daysSinceWeighIn ?: return null
+        if (days < WEIGH_IN_GAP_DAYS) return null
+        if (s.hourOfDay !in MORNING_FROM_HOUR..MORNING_TO_HOUR) return null
+        return Insight(
+            id = "health_weigh", kind = InsightKind.REMINDER, urgency = Urgency.NOTABLE,
+            title = "No weigh-in for $days days",
+            detail = "The calorie target is measured from weight change against what you log, so a " +
+                "gap here is what stops it being measurable.",
+            score = Urgency.NOTABLE.weight * 1000.0 + days,
+            actionRoute = "health",
+            sources = listOf("health", "time"),
+        )
+    }
+
     private val RULES: List<(OracleSignals) -> Insight?> = listOf(
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
         ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
         ::heatStress, ::windChillBite, ::gustWarning, ::coldNight, ::fogLikely, ::ledgerAnomaly,
         ::reviewsDue, ::streakAtRisk, ::studyWeakSpot,
+        ::caloriesLeft, ::weighInDue,
     )
 
     /**

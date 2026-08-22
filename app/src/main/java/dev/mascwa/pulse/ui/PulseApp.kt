@@ -207,6 +207,10 @@ fun PulseApp(
                 val fuelVm: FuelViewModel = viewModel(factory = factory)
                 MarketsScreen(marketsVm, economyVm, fuelVm)
             }
+            composable(Routes.HEALTH) {
+                val vm: dev.mascwa.pulse.feature.health.HealthViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.health.HealthScreen(vm)
+            }
             composable(Routes.WEATHER) {
                 val vm: WeatherViewModel = viewModel(factory = factory)
                 WeatherScreen(vm)

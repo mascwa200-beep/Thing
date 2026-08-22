@@ -130,6 +130,29 @@ object OracleEngine {
         // every failure leaves the field at its neutral default, which mutes that field's own rules.
         val study = runCatching { container.studyStore.progress() }.getOrNull()
         val reviewsDue = runCatching { container.studyStore.dueCount() }.getOrDefault(0)
+
+        // Health — today's log against today's target, from the SAME composition the HEALTH screen
+        // draws. ⚠️ Every field stays null on any failure, which mutes its own rules rather than
+        // feeding them a defaulted zero: on this feature a defaulted "nothing left" is advice.
+        val health = runCatching {
+            val zone = java.time.ZoneId.systemDefault()
+            val dayStart = java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+            val entries = container.foodLogStore.entriesFor(dayStart)
+            val weighins = container.bodyStore.all()
+            val reading = dev.mascwa.pulse.feature.health.composeHealthReading(
+                p = settings.health,
+                w = weighins,
+                todayEntries = entries,
+                foodLog = container.foodLogStore,
+                todayStartMs = dayStart,
+            )
+            Triple(reading, entries.isNotEmpty(), weighins.lastOrNull()?.atMs)
+        }.getOrNull()
+        val healthReading = health?.first
+        val loggedToday = health?.second ?: false
+        val daysSinceWeighIn = health?.third?.let {
+            ((System.currentTimeMillis() - it) / 86_400_000L).toInt().coerceAtLeast(0)
+        }
         // "Studied today" is decided by the same local-day index the deck itself counts by — deriving a
         // day boundary here from UTC would tell somebody outside Greenwich their streak was at risk on
         // the wrong evening.
@@ -157,6 +180,10 @@ object OracleEngine {
             envAnomaly = topAnomaly,
             pressureFallingFast = plunging,
             reviewsDue = reviewsDue,
+            kcalLeftToday = healthReading?.remaining?.kcal,
+            proteinLeftG = healthReading?.remaining?.proteinG,
+            loggedAnythingToday = loggedToday,
+            daysSinceWeighIn = daysSinceWeighIn,
             studyStreakDays = study?.streakDays ?: 0,
             studiedToday = studiedToday,
             shakyGuideTitle = shaky?.first,

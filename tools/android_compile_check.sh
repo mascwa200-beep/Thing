@@ -47,11 +47,24 @@ mkdir -p "$CACHE"
 ANDROID_JAR="$CACHE/android-all-$ANDROID_ALL_VERSION.jar"
 
 libs=()
-while [ $# -gt 0 ] && [ "$1" = "-l" ]; do
-  libs+=("$2")
-  shift 2
+plugins=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -l) libs+=("$2"); shift 2 ;;
+    # ⚠️ @Serializable classes only gain a synthetic `serializer()` when the kotlinx-serialization
+    # compiler plugin runs. Without -s, every `.serializer()` in a store reports "unresolved
+    # reference" and a dozen inference failures cascade off it — which reads exactly like a real
+    # defect and is not one.
+    -s) SERIALIZATION_PLUGIN=1; shift ;;
+    *) break ;;
+  esac
 done
-[ $# -ge 1 ] || { echo "usage: $0 [-l group:artifact:version ...] <file.kt> [more.kt ...]"; exit 64; }
+if [ -n "${SERIALIZATION_PLUGIN:-}" ]; then
+  sp=$(find "$HOME/.gradle/caches/modules-2" -name 'kotlin-serialization-compiler-plugin-embeddable-*.jar' 2>/dev/null | head -1)
+  [ -n "$sp" ] || { echo "-s asked for but the serialization compiler plugin is not in the Gradle cache" >&2; exit 70; }
+  plugins+=("-Xplugin=$sp")
+fi
+[ $# -ge 1 ] || { echo "usage: $0 [-s] [-l group:artifact:version ...] <file.kt> [more.kt ...]"; exit 64; }
 
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "fetching the platform classes (~186 MB, once per cache) …" >&2
@@ -92,11 +105,16 @@ done
 # below. A silent false pass is worse than no check at all.
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
 SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.jar' 2>/dev/null | head -1)
+# ⚠️ jsoup is a DEPENDENCY OF :core:telemetry (Readability.kt), so any run that passes the whole
+# core fails wholesale without it — and the resulting hundreds of errors are all in Readability,
+# which reads like a real finding and buries whatever you were actually checking. Cost two rounds
+# once. Kept alongside the coroutines/serialization jars for exactly the same reason.
+JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER$extra"
+TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
-      -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" "$@" 2>&1)
+      -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)
 
 errors=$(grep -E '^([^:]+\.kt):[0-9]+:[0-9]+: error:' <<<"$out")
 

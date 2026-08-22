@@ -149,6 +149,10 @@ fun screenForRoute(route: String): Screen? = when (route) {
     // The phone's positional route. It used to be a null here because this machine had no map; it has
     // one now, so an advisory about where something is can actually be acted on.
     "nav" -> Screen.MAP
+    // ⚠️ The long watch's own advisory, and it pointed nowhere until this line. The rule that emits
+    // it reads `ledgerHeadline`, which ONLY this machine populates — the phone keeps no ledger — so
+    // the one platform that can raise the insight was also the one whose ACT button did nothing.
+    "anomalies" -> Screen.ANOMALIES
     // "jarvis", "objectives", "sensorium" — the assistant, a task board and the ambient sensors. None
     // of them exist here, and none of the rules that emit them can fire on this machine either, so
     // this is a belt-and-braces null rather than a gap.

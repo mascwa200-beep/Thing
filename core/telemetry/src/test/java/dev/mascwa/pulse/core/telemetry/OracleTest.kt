@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -351,4 +352,143 @@ class OracleTest {
         assertTrue(Oracle.divine(base(hour = 21).copy(movement = 0f)).isEmpty())
     }
 
+    // ---------------------------------------------------------------------------------- health
+
+    /**
+     * ⚠️ An empty log NEVER produces a calorie advisory, and this is the most important rule here.
+     *
+     * A blank day means somebody has not recorded lunch, not that they have not eaten it. Telling
+     * them they have hundreds of calories left is the single most misleading thing this feature
+     * could say, and it is exactly what a rule reading a defaulted zero would do.
+     */
+    @Test
+    fun anEmptyLogNeverProducesACalorieAdvisory() {
+        val s = OracleSignals(nowMs = 0L, hourOfDay = 20, kcalLeftToday = 900, loggedAnythingToday = false)
+        assertTrue(Oracle.divine(s).none { it.id == "health_kcal" })
+    }
+
+    /**
+     * Nor does a day with no target at all, which is the state for the first few weeks.
+     *
+     * ⚠️ Asserted as a CONTRAST, not as a bare negative. The same signals with a real figure must
+     * produce the advisory — otherwise this passes for whatever reason happens to suppress it, and
+     * a null quietly coerced to some default would slip straight through.
+     */
+    @Test
+    fun noTargetMeansNoCalorieAdvisory() {
+        fun fires(left: Int?) = Oracle.divine(
+            OracleSignals(nowMs = 0L, hourOfDay = 20, kcalLeftToday = left, loggedAnythingToday = true),
+        ).any { it.id == "health_kcal" }
+        assertFalse("no target, nothing to say", fires(null))
+        assertTrue("the same day with a target does speak", fires(-900))
+    }
+
+    /**
+     * Not before the evening: until then the day is a half-finished sentence and the honest advice
+     * is to carry on.
+     */
+    @Test
+    fun theDayIsNotJudgedBeforeItHasHappened() {
+        fun at(hour: Int) = Oracle.divine(
+            OracleSignals(nowMs = 0L, hourOfDay = hour, kcalLeftToday = -600, loggedAnythingToday = true),
+        ).any { it.id == "health_kcal" }
+        assertFalse("midday", at(12))
+        assertFalse("late afternoon", at(16))
+        assertTrue("evening", at(20))
+    }
+
+    /**
+     * ⚠️ The two bars are ASYMMETRIC, and the asymmetry is the safety property: being over is worth
+     * saying at a smaller margin than being under, because "you have room left" on a feature that
+     * tells people how much to eat is an invitation where the other is information.
+     */
+    @Test
+    fun overshootIsRaisedSoonerThanHeadroom() {
+        fun left(k: Int) = Oracle.divine(
+            OracleSignals(nowMs = 0L, hourOfDay = 20, kcalLeftToday = k, loggedAnythingToday = true),
+        ).any { it.id == "health_kcal" }
+        assertTrue("300 over is worth saying", left(-300))
+        assertFalse("300 under is not", left(300))
+        assertTrue("600 under is", left(600))
+        assertFalse("on target says nothing", left(0))
+    }
+
+    /** It states the number and stops — no judgement the data cannot support. */
+    @Test
+    fun theCalorieAdvisoryDoesNotScold() {
+        val i = Oracle.divine(
+            OracleSignals(nowMs = 0L, hourOfDay = 20, kcalLeftToday = -400, loggedAnythingToday = true),
+        ).first { it.id == "health_kcal" }
+        val text = (i.title + " " + i.detail).lowercase()
+        listOf("overeaten", "too much", "should not", "shouldn't", "bad", "failed").forEach {
+            assertFalse("must not say '$it': $text", text.contains(it))
+        }
+        // ...and it is never push-worthy. This is worth knowing, never worth interrupting for.
+        assertEquals(Urgency.AMBIENT, i.urgency)
+    }
+
+    /**
+     * Protein is the actionable half of "you have room left", so the line carries it — but only when
+     * there is a real shortfall and only when there is room to fill it.
+     */
+    @Test
+    fun theCalorieAdvisoryNamesAProteinShortfallWorthActingOn() {
+        fun detailFor(kcal: Int, protein: Int?) = Oracle.divine(
+            OracleSignals(
+                nowMs = 0L, hourOfDay = 20,
+                kcalLeftToday = kcal, proteinLeftG = protein, loggedAnythingToday = true,
+            ),
+        ).first { it.id == "health_kcal" }.detail
+
+        // 700 clears KCAL_HEADROOM_WORTH_SAYING (500); 84 clears the 25 g bar.
+        assertTrue(detailFor(700, 84).contains("84 g of protein"))
+        // 6 g is a yoghurt. Naming it on a glanceable line is pedantry, not advice.
+        assertFalse(detailFor(700, 6).contains("protein"))
+        // No plan, no figure — and certainly no defaulted zero rendered as "0 g to go".
+        assertFalse(detailFor(700, null).contains("protein"))
+    }
+
+    /**
+     * ⚠️ Past the target it says nothing about protein, and that is the load-bearing half.
+     *
+     * "You are 400 over" and "eat 84 g more protein" are instructions in opposite directions, and a
+     * line that carries both leaves the reader to resolve the contradiction on the one evening this
+     * feature has already told them they overshot.
+     */
+    @Test
+    fun aDayPastItsTargetIsNeverToldToEatMoreProtein() {
+        val detail = Oracle.divine(
+            OracleSignals(
+                nowMs = 0L, hourOfDay = 20,
+                kcalLeftToday = -400, proteinLeftG = 84, loggedAnythingToday = true,
+            ),
+        ).first { it.id == "health_kcal" }.detail
+        assertFalse("must not ask for more food past the target: $detail", detail.contains("protein"))
+    }
+
+    /**
+     * A weigh-in gap is raised in the MORNING, which is the only time the suggestion can be acted on.
+     */
+    @Test
+    fun theWeighInNudgeComesWhenItCanBeActedOn() {
+        fun at(hour: Int, days: Int?) = Oracle.divine(
+            OracleSignals(nowMs = 0L, hourOfDay = hour, daysSinceWeighIn = days),
+        ).any { it.id == "health_weigh" }
+        assertTrue("morning, real gap", at(8, 6))
+        assertFalse("same gap in the evening", at(20, 6))
+        assertFalse("a weekend off is not a lapse", at(8, 2))
+        assertFalse("never weighed at all", at(8, null))
+    }
+
+    /** Every new rule points somewhere that exists. */
+    @Test
+    fun theHealthAdvisoriesRouteToTheHealthTab() {
+        val s = OracleSignals(
+            nowMs = 0L, hourOfDay = 8, daysSinceWeighIn = 9,
+            kcalLeftToday = -700, loggedAnythingToday = true,
+        )
+        Oracle.divine(s).filter { it.id.startsWith("health_") }.forEach {
+            assertEquals("health", it.actionRoute)
+        }
+    }
 }

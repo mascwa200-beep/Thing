@@ -7644,4 +7644,293 @@ plausible movers; then close it overnight and check the window reads in days rat
 a fresh install expect the "too little recent history" line to dominate until the collector has run
 for a couple of weeks, which is the honest state rather than a fault.
 
+⚠️ **AN ORDERING MISTAKE WORTH NOT REPEATING, and it is a consequence of the `paths-ignore` rule
+added a few sessions back.** The handoff commit was pushed *last*, so a docs-only commit became the
+PR head — and `android-build.yml` ignores `CLAUDE.md` while `desktop-build.yml` has an allowlist it
+does not match, so **the head carried no check runs at all** and `get_check_runs` on the PR returned
+zero. It did not block anything (`mergeable_state` was `clean`, so no required checks are
+configured), but it makes the PR read as untested and the compact CI poll useless. **Push the docs
+commit first, or bundle it with the code.**
+
+**Merged to `main` as `8a36b81` (PR #453), both suites green at `0604c55`** — Android unit tests,
+release APK, the native/Python packaging assertions and the R8 keep-rule gate, plus the desktop
+build and a real Windows MSI packaged and published to `desktop-latest`. The dev branch is re-synced
+by merging `origin/main` back (my authorship, never a fast-forward onto GitHub's squash commit).
+
 **The LONG WATCH plan is now complete** except slice 10, declined above with its reasoning.
+
+### HEALTH — a MacroFactor-class nutrition and body tab (this session, PR #454, branch `claude/loving-edison-bd65oa`)
+
+Owner: *"Make the app the same and more overpowered as MacroFactor by giving just the mobile version
+and that version only the features of what MacroFactor currently has to offer, to the exact detail,
+and make it a tab in the bottom bar between the menu button and the computer."* Four binding
+AskUserQuestion decisions: food data = **Open Food Facts + USDA + a bundled offline seed**; first
+slice = **everything, one long autonomous run**; body data = **manual entry + Health Connect**; tab
+name = **all of them as sub-sections** (Macros, Body, Intake, Coach, and whatever else fits).
+
+**Three things stated once so the rest is honest.** I cannot match MacroFactor "to the exact detail"
+— May 2026 cutoff, and I cannot inspect the live app. Its adaptive-expenditure algorithm is
+proprietary and unpublished; what is public is the *concept*, which is ordinary energy-balance
+science, and that is what this builds from first principles. Its food database is licensed and
+cannot ship here; the free sources below were probed live and are a genuine substitute. No
+MacroFactor branding, artwork, copy or layout — same footing as this repo's Fallout and Star Trek
+homages.
+
+⚠️ **This feature tells a real person how much to eat.** The guardrails live in the tested cores and
+surface as *refusals*, never silent clamps. It is the one part of this app with direct physical
+consequence, and every core in it is written that way.
+
+**Measured, not assumed.** The bottom bar fits seven tabs: Antonio at 9sp/0.6 tracking, each slot
+`(W − 56dp rail − 3dp×n gutters)/n − 4dp padding`, so at 411dp seven leave **43.7dp** of text room
+and the widest label — **COMPUTER, not MARKETS** (a correction to this file) — needs 39.3dp. An
+eighth would not fit. Food sources re-probed: OFF `/api/v2/product/{barcode}` **200** keyless,
+`search.openfoodfacts.org` **200**, USDA bulk JSON **206** on a range request; ⚠️ OFF's legacy
+`cgi/search.pl` is **503** and deprecated, and USDA's keyed search **429**s on `DEMO_KEY`, which is
+why the seed carries the generic-food half.
+
+**Shipped, in slices, each CI-green on its own:** H1 three pure cores (`BodyTrend` local-linear-trend
+Kalman + RTS smoother, `Expenditure` energy balance inverse-variance-blended with Mifflin–St Jeor,
+`MacroTargets` and every guardrail) · H2 the stores · H3 the tab and its sub-tab shell · H4/H5 the
+dead controls · H6 the food layer · H7 INTAKE depth · H13 the tool, Oracle signals and board row ·
+H9 MACROS (micronutrients, adherence, the week) · H10 recipes · H11 habits, streaks and steps.
+
+⚠️ **Four H1 defects were found by running the shipped cores over synthetic series with a known
+ground truth — none by the tests.** The process-noise constant was 4× too large, so a real
+−0.45 kg/week loss read as "holding steady" in 38 of 40 runs. A fixed 25× outlier inflation let an
+850 kg typo drag the trend 8 kg, which is ≈900 kcal/day on the derived target. Macro rounding
+breached the stated 1200 kcal floor. And `blend()` had inverted semantics, so a *certain* estimate
+was the one discarded.
+
+**H9 — MACROS.** `NutrientGuides` (fibre scaled per 1000 kcal, saturated fat as an energy share,
+sodium a flat adult ceiling withheld from children and from an unstated age) and `IntakeWeek`. ⚠️ Two
+rules carry that file: **an unlogged day is absent, not a zero** — averaging zeros in would report a
+starving person for anybody who skipped a weekend, and the calorie target is derived from that
+average — and **today is partial**, charted but never judged, or every day reads as under target
+until dinner. ⚠️ **Sugar gets no limit at all**, deliberately: the WHO figure is for *free* sugars
+and nothing in a food label distinguishes those from the sugar in an apple, so a limit here would be
+a number the data cannot support.
+
+**H10 — recipes.** ⚠️ The rule that is easy to get backwards and would be wrong on every cooked dish:
+a stew loses water, so the same calories sit in less mass and the per-100 g density goes **up**.
+`cookedYieldG` therefore moves the DENSITY and never the TOTAL; dividing the totals by the raw weight
+would under-report every cooked recipe silently, the number simply looking a bit low. A yield LARGER
+than the raw weight is legitimate — rice absorbs water — and refusing it would make the feature
+useless for half of what people cook. The two routes to a helping, weighed and counted, are pinned
+to agree: that is the commonest way a recipe feature goes wrong, one path using the raw weight while
+the other uses the cooked one, both producing a plausible number.
+
+**H11 — habits.** ⚠️ **No habit is a checkbox.** Every streak is derived from a record the app already
+keeps, because `Expenditure` measures what you burn FROM the calorie log — so "how consistently am I
+logging" is a statement about how far the number on COACH can be trusted, and a self-reported version
+would be a comfortable lie about the one figure the feature exists to produce. A run ending
+**yesterday** is still current (today is not over; breaking a streak at four in the afternoon punishes
+the clock), the same rule `StudyProgress` uses. ⚠️ And `TYPE_STEP_COUNTER` is cumulative since the last
+**boot**, so today's count is the reading minus a carried baseline — reading the raw figure as a daily
+total gives a number that only grows, plausibly, for weeks. A reading below the baseline can only mean
+the device restarted: re-baseline to zero and say the count is partial rather than quietly losing a
+morning.
+
+⚠️ **`stepCounterRaw` was doubly dead and both halves are now closed.** `TelemetryController` has read
+`TYPE_STEP_COUNTER` into it since it was written; nothing read the field, AND `ACTIVITY_RECOGNITION`
+was absent from the manifest, so the sensor could never have delivered an event. A listener writing a
+field nobody reads, for a sensor that cannot fire.
+
+**⚠️ THREE CI FAILURES THIS SESSION, and each named a gap in the local gates.**
+1. `ChakraPetch`/`JetBrainsMono` imported from `feature.common` when they live in `ui.theme`.
+   → `tools/kotlin_import_check.py`, and then check 2 after the first version passed on the broken
+   code: **an import that EXISTS is not an import that RESOLVES.**
+2. `LcarsCorner.NONE` — the enum has four values and no NONE; I wrote the call from memory. → the
+   enum-constant check. ⚠️ Its first cut judged only names declared EXACTLY once, to dodge the
+   collision family; but `LcarsCorner` is declared **twice** (`:app` and `:desktop` each keep a copy
+   of the kit), so the whole kit was excluded and **the very failure it was written for was not
+   caught** — a negative test proved it. What matters is not how many declarations exist but whether
+   they DISAGREE.
+3. A second `private fun edit` taking a lambda, beside an existing one. Kotlin permits the overload;
+   it cannot infer which receiver `it` is, and six call sites broke at once. → the lambda-overload
+   check. ⚠️ **My first measurement of how common that shape is returned zero and the zero was
+   worthless** — the detector matched parameters with `[^)]*`, which stops at the `)` inside
+   `(HealthSettings)`, so it could not see a lambda parameter at all and reported clean on the exact
+   code that had just broken the build. Brace-matched now, and the harness asserts it sees the real
+   failure BEFORE trusting its silence. That is the harness needing the same care as the thing it
+   checks, for the third time.
+
+**Gate order per slice, and what each cannot do:** `tools/kotlin_import_check.py` (four checks; per
+package, not repo-wide) → the parse-only kotlinc pass (**type-checks nothing**) →
+`tools/android_resolve_check.sh` (differences unresolved names against HEAD, so a **brand-new file
+has no baseline** and reports everything) → `tools/android_compile_check.sh` where the file's
+non-Kotlin dependencies are only the platform → CI. `tools/check_changed.sh` derives the file list
+from `git diff` so it cannot be hand-picked wrong, which is how the `DAY_MS` failure got through.
+
+⚠️ **A Compose file cannot be fully compiled locally once it touches the app's own kit** — everything
+cascades. What works instead, and did: **extract the real declarations** of every kit function called
+and compare them against the call sites (that is how `LcarsFrame`/`LcarsChip`/`LcarsButton`/
+`LcarsField` were confirmed), resolve every view-model member against its real declaration, `javap`
+the shipped jar for anything from a library, and settle the resolve check's residue with a **typed
+probe** compiling the real expressions against the real core types. That probe is what proved the
+habits arithmetic; the alternative is shrugging at a report.
+
+⚠️ **An invented API caught this way rather than by CI:** I wrote `vm.telemetry()` in the step
+collector. There is no such member — `AppContainer.newTelemetryController()` is a **factory** whose
+product must be `start()`ed and, more importantly, `stop()`ped, so it belongs in a `DisposableEffect`
+in the composable rather than on the view model.
+
+**Operational notes.** ⚠️ **`/tmp/nt.py` shadowed the stdlib `nt` module**, so every python script run
+out of `/tmp` executed a leftover harness first (it printed two stray lines into otherwise clean
+output for most of the session). Running a script from `/tmp` puts `/tmp` on `sys.path[0]`, and this
+scratch directory is full of files that can shadow stdlib names — renamed, but worth knowing. And
+⚠️ **the Bash tool's working directory persists between calls**, so a `cd` in one call silently
+relocates every relative path in the next.
+
+⚠️ **On-device-unverified throughout — CI compiles a tab; it does not draw one, weigh anyone, scan a
+barcode, count a step, or wait a fortnight.** Owner-verify on the Pixel, in rough order of risk: the
+**seven-tab bottom bar at real density** (the measurement says it fits, a screen is the judge); the
+RECIPES builder end to end — search, weigh, set a yield, save, then log a helping both by portion and
+by grams and check the two agree; HABITS granting ACTIVITY_RECOGNITION and a step count actually
+appearing (that path has never once run); and, after a fortnight of real logging, whether the coached
+targets feel sane. Expenditure needs 2–3 weeks before it is trustworthy and the surface says so
+rather than printing a confident number on day two.
+
+**Open, in the plan (`robust-baking-dewdrop.md`):** H12 Health Connect behind a capability check
+(⚠️ its availability on this GrapheneOS build is **unverified**, so the whole integration degrades to
+manual entry), progress photos and CSV export; and saved meals and custom foods, which the recipe
+store's shape already accommodates.
+
+⚠️ **The plan's "remaining" list is stale on H8 — the barcode scanner is DONE.** ZXing core is a real
+dependency, `androidx.camera.view` is implemented, `BarcodeScannerScreen.kt` is 250 lines, and
+`FindAFood` calls it. Checked rather than assumed, after I repeated the plan's claim in a commit
+message. ZXing core was the right call over ML Kit for the reasons the plan gives: the unbundled ML
+Kit variant needs Play Services, which is the wrong bet on GrapheneOS, and the bundled one adds
+2–3 MB to an APK the auto-updater re-downloads in full on every build.
+
+### THE HEALTH TAB FINISHED — export, custom foods, photographs, Health Connect (this session cont.)
+
+The four items the plan had left. All four shipped, each its own CI-green slice on
+`claude/loving-edison-bd65oa` (PR #454). **Zero subagent spend**, as with every arc since the credit
+directive.
+
+**`532a3a2` — the record leaves the phone.** It is the one dataset in this app that cannot be
+refetched: markets, weather and news all come back from a server, a year of weigh-ins and nine
+thousand meals exist on exactly one device. `HealthExport` (pure, 15 tests) writes food log, daily
+totals, weigh-ins and measurements. Three rules carry it and each has a plausible wrong answer:
+- **RFC 4180 quoting.** The bundled seed contains `Chicken breast, baked, skin not eaten` — commas
+  and all — so an unquoted writer turns one food into three columns and shifts every number two
+  places left, which reads as a data-entry mistake rather than a bug. ⚠️ The test parses the row back
+  with an **independent reader** rather than comparing against a string I typed.
+- **`Locale.US` on every number.** A comma decimal in a comma-separated file is two fields, so this
+  does not misprint a figure, it destroys the row.
+- ⚠️ **A text field beginning `=`, `+`, `-` or `@` is a formula to a spreadsheet.** Open Food Facts is
+  crowd-sourced, so a product name is attacker-controlled text arriving in Excel. Guarded with an
+  apostrophe — and **numeric fields are exempt**, because a minus sign is how a negative number
+  begins and guarding it would turn every loss on the trend into text.
+
+⚠️ `FoodLogStore.allEntries()` opens **every shard**, which is exactly what the sharding exists to
+avoid. Fine for something asked for by name and waited on, terrible for a screen, and the KDoc says
+so. Its month list comes from the **index**, not from the shards already in memory: a cold process
+has opened none, so exporting from those writes a file that looks complete and is not.
+
+⚠️ The trend column is the trend **as it stood at each reading**. `BodyTrend.estimate` runs an RTS
+smoother *backwards* over the whole series, so `points[i]` knows about every later weigh-in — right
+for a chart, wrong here, because somebody comparing the export against a screenshot from that morning
+would find the two disagreeing with nothing to say which was wrong. Readings are sorted at the call
+site, not left to the core, or `trendKgAt(i)` pairs each reading with somebody else's trend. A
+**UTF-8 BOM**, deliberately: Excel on Windows reads a BOM-less UTF-8 CSV as Windows-1252 and mangles
+every accented food name, and the companion runs on Windows; the cost is that naive Python needs
+`utf-8-sig`.
+
+**`a142f90` — a food typed in once, kept.** QUICK ADD wrote one entry and remembered nothing, so
+eating the same thing on Tuesday meant reading the same label again. Saved foods are searched **ahead
+of both databases** (a short list you named yourself beats one of thirteen thousand generic rows), and
+the cap in `CustomFoodStore` is what makes that safe. Both are ranked by the **same** `FoodSearch.score`
+as the seed, so it is an ordering decision and not a second, disagreeing search.
+⚠️ **The load-bearing rule is a refusal.** `FoodPortion.per100gFrom` returns null without a weight,
+because a saved food IS a density and there is no honest way to derive one from "320 calories". The
+switch is disabled **with the reason on screen** rather than absent; the view model re-checks rather
+than trusting it, since the switch does not clear itself when the weight field is emptied. Ids are
+prefixed `own:` — a bare one could collide with a real barcode and attribute a home-made entry to a
+supermarket record. Two defects fixed on the way: `FindAFood` did not declare its pick target, so a
+recipe builder left open sent the next logged food into the ingredient slot; and `IntakeBody`'s KDoc
+still said "only quick-add for now" with the search card three lines below it.
+
+**`06639ee` — photographs.** ⚠️ **The load-bearing decision is where the files live.** This app's
+existing camera helper writes into `cacheDir`, which Android reclaims without asking — a twelve-week
+comparison would lose its "before" at an arbitrary point with no error and no gap in the list. These
+go in `filesDir/progress/`. Not in the MediaStore either, so they never reach the camera roll; the
+screen says that **and** says the cost of the same decision, that uninstalling takes them with it.
+Reserving a slot does not record it — a cancelled capture leaves a zero-byte file the load-time sweep
+cannot catch, because it exists. Thumbnails go through Coil, which downsamples to the drawn size.
+
+**`ee1c276` — Health Connect, entirely behind a capability check.** ⚠️ **The trap that would have
+made it look unsupported on a phone that has it:** `getSdkStatus` resolves the provider BY PACKAGE,
+and Android 11+ package visibility hides it unless the manifest declares
+`<queries><package android:name="com.google.android.apps.healthdata" />`. Without it the call returns
+SDK_UNAVAILABLE on a device with Health Connect installed — a silent false negative indistinguishable
+from a device that genuinely lacks it, on the one call the whole integration is gated behind, and
+exactly the answer I was expecting to get for a different reason. Availability is re-read on every
+call, not cached: it can be installed while the app is alive, and a status decided once leaves the
+panel greyed out after somebody did the thing it told them to. ⚠️ A permission not in the manifest
+cannot be requested at all, so the three there ARE the reach — read weight, write weight, read steps.
+Import checks the permission first and reports it separately (an empty list means both "nothing new"
+and "could not ask"); imports go through `BodyStore.record`, so the same-day replacement rule applies
+and importing twice cannot double a morning.
+
+⚠️ **THE CI FAILURE, AND THE GAP IT NAMED — read this before adding any AndroidX dependency.**
+`connect-client:1.1.0` was verified locally against the real AAR with javap and compiled clean, and
+CI still failed: an AAR carries a **separate declaration of the toolchain it requires**, in
+`META-INF/com/android/build/gradle/aar-metadata.properties`, which has nothing to do with its API —
+`minCompileSdk=36`, `minAndroidGradlePluginVersion=8.9.1` against this build's compileSdk 35 and AGP
+8.7.3. `:app:checkDebugAarMetadata` refused it before a line of Kotlin compiled. Nothing local
+caught it: the compile check puts `classes.jar` on a classpath and never opens `META-INF`.
+
+⚠️ And the fix was **measured, not reasoned**: the constraint is not monotonic in the way anybody
+would guess. `1.1.0-beta01` requires AGP **8.6.0** while `beta02` jumps to **8.9.1**, so the newest
+usable release is one BEHIND the first that fails. Pinned to `1.1.0-beta01` — a pre-release, which
+is a real cost, and the honest alternative was bumping AGP and compileSdk, a toolchain change
+touching Chaquopy, KSP/Room and the whole native build for one optional integration. The bridge
+recompiles clean against beta01, and the two transitive artifacts are plain JARs so they constrain
+nothing. **New gate: `tools/check_aar_metadata.py <coord…>` or `--catalog`** — negative-tested
+against the exact version that failed (caught) and the one now pinned (clears), and the `--catalog`
+sweep runs over all 20 AARs that declare anything.
+
+⚠️ **NEW LOCAL TECHNIQUE, and it cost the one compile error of the arc: `javap` gives the JVM
+accessor name, which is NOT the Kotlin property name when the property carries a `@get:JvmName`.**
+`Mass` disassembles as `getKilograms()` and the Kotlin property is `inKilograms`; the real name is in
+the class file's `@Metadata`, which plain `strings` will show. Same shape on `Energy.inKilocalories`.
+Every other constant, signature and permission string was read out of the real 1.1.0 AAR with javap
+rather than recalled. Measured rather than assumed: guava is already in the graph via media3-common
+so this adds no second copy, and the AAR ships its own consumer proguard rules keeping the protobuf
+members R8 would strip — unlike the JsRuntime case, there is no keep rule to remember.
+
+**Tooling: `tools/android_compile_check.sh` now carries jsoup by default.** It is a dependency of
+`:core:telemetry`, so any run passing the whole core failed wholesale without it and the resulting
+hundreds of Readability errors buried whatever was actually being checked. Cost two rounds here;
+confirmed the gate still catches a planted error afterwards.
+
+**The gate that earned itself again:** `tools/kotlin_import_check.py` caught a missing `LcarsSwitch`
+import — the exact failure it was written for, on a path where the resolve check reports nothing
+because a new file has no baseline.
+
+⚠️ **Owner-verify on the Pixel, in order of risk.** (1) **Does Health Connect exist on this
+GrapheneOS build at all** — that is the one thing nothing here can establish, and the panel will say.
+(2) Photographs: take one, confirm it does **not** appear in the camera roll, and that it survives a
+few days (that is the cacheDir bug not happening). (3) EXPORT EVERYTHING on HABITS → open the zip in
+Excel and check accented food names are intact and the numbers are numbers. (4) QUICK ADD with a
+weight → keep it → search for it tomorrow. Everything above is CI-compile-gated only.
+
+**Open / steerable:** saved *meals* (a group logged as several entries, distinct from a recipe's one)
+were considered and not built — `Recipes` already carries the arithmetic, so it is a `kind` field and
+a branch at the log site whenever the owner wants it. A `health` CSV import has no counterpart.
+
+**All four items green on `49a3515` (build #1949).** Android: unit tests 3m01s, release APK 9m43s,
+both packaging assertions and the R8 keep gate passing with their evidence printed —
+`kept: dev.mascwa.pulse.BuildConfig`, `kept: dev.mascwa.pulse.data.media.JsRuntime`, sentinel
+correctly absent. Desktop: build plus a real Windows MSI packaged and published. ⚠️ **APK now 160 MB
+(168,355,541 bytes)** — the 158 MB figure recorded under run 1906 above is that run's number and
+stays as written; this is the current one, and it is still paid in full on every automatic update.
+
+⚠️ **A verification note from the wait itself.** The relayed `check_suite.completed` events read
+*"No check in this GitHub App's check suite failed … if you were waiting on CI, continue"* — and the
+first one arrived while the Android job was still building, because this repo runs **two workflows
+per push** and each completes its own suite. Acting on it would have been acting on the desktop
+result. The suite event is a prompt to look, never the verdict; `pull_request_read` with
+`get_check_runs` is the verdict, and `actions_get`/`get_workflow_job` gives the step-level detail
+that says *which* gate has actually passed.

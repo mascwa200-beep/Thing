@@ -19,6 +19,7 @@ import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.study.localDayIndex
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.data.weather.WeatherData
+import dev.mascwa.pulse.feature.health.composeHealthReading
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -151,6 +152,7 @@ object BriefEngine {
         } else null
 
         val advisory = advisory(container, settings)
+        val health = if (prefs.showHealthRow) healthLine(container, settings) else null
 
         // --- A live official emergency alert → the board's ALERT row, in condition RED. ---
         //
@@ -226,6 +228,7 @@ object BriefEngine {
                 advisoryUrgent = advisory?.urgent == true,
                 advisoryKey = advisory?.key,
                 lesson = lesson(container, pendingTasks.map { it.title }),
+                healthLine = health,
                 departureNotice = departure?.first,
                 departureKey = departure?.second,
             ),
@@ -338,6 +341,47 @@ object BriefEngine {
     private suspend fun lesson(container: AppContainer, pendingTasks: List<String>): String? = runCatching {
         val interests = container.profileStore.all().sortedByDescending { it.weight }.map { it.text }
         container.studyStore.today(interests, pendingTasks, localDayIndex())?.boardLine
+    }.getOrNull()
+
+    /**
+     * Today's eating against today's target, in one line, or nothing.
+     *
+     * ⚠️ **Composed here rather than in the core, and off the same [composeHealthReading] the screen
+     * draws.** That is the whole reason `BriefSignals.healthLine` is a string and not four numbers: a
+     * second place deciding how a calorie figure is phrased and rounded is how the tray and the screen
+     * come to quote different counts for the same day, and on this feature the reader acts on the
+     * number.
+     *
+     * Silent in two cases, both deliberate:
+     *
+     *  - **No target.** [MacroTargets] refuses until it has enough to be trusted, and a "remaining"
+     *    figure with nothing to remain against is not a missing number, it is advice.
+     *  - **Nothing logged yet.** Otherwise every morning for ever the row restates the target and
+     *    calls it news. There is no information in it until something has been eaten.
+     *
+     * Best-effort. It reads two stores that are already resident and does no fetch; any failure drops
+     * the row rather than the board.
+     */
+    private suspend fun healthLine(container: AppContainer, settings: AppSettings): String? = runCatching {
+        val zone = java.time.ZoneId.systemDefault()
+        val todayStart = java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+        val entries = container.foodLogStore.entriesFor(todayStart)
+        if (entries.isEmpty()) return@runCatching null
+        val state = composeHealthReading(
+            p = settings.health,
+            w = container.bodyStore.all(),
+            todayEntries = entries,
+            foodLog = container.foodLogStore,
+            todayStartMs = todayStart,
+        )
+        val left = state.remaining ?: return@runCatching null
+        buildString {
+            append(if (left.overKcal) "${-left.kcal} kcal over" else "${left.kcal} kcal left")
+            // Protein is the one macro worth a board line: it is the one people miss, and unlike
+            // calories it cannot be made up for tomorrow.
+            append(" · ")
+            append(if (left.proteinG > 0) "${left.proteinG} g protein to go" else "protein met")
+        }
     }.getOrNull()
 
     /**

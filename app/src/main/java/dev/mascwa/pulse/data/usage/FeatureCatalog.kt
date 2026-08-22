@@ -17,9 +17,15 @@ import dev.mascwa.pulse.navigation.Routes
  */
 object FeatureCatalog {
     /**
-     * The only destinations the directory's GROUPS deliberately do not list: the six bottom-nav tabs
-     * (their own top level) and the two Markets sub-screens (reached as sub-tabs, but old shortcuts
-     * and notifications still deep-link them, so they still need names).
+     * The only destinations the directory's GROUPS deliberately do not list: the seven bottom-nav
+     * tabs (their own top level) and the two Markets sub-screens (reached as sub-tabs, but old
+     * shortcuts and notifications still deep-link them, so they still need names).
+     *
+     * ⚠️ A tab absent from here is NAMELESS in six places at once — device search, Home's
+     * recommendations and MOST USED row, the Oracle's habitual-route line, the `open` tool's
+     * vocabulary and the activity log — because [labelFor] falls back to the raw route key. This
+     * app has already shipped a raw key as user-facing copy once; the list is short enough to keep
+     * in step with [dev.mascwa.pulse.navigation.TOP_DESTINATIONS] by hand.
      */
     private val OFF_MENU = listOf(
         FeatureMeta(Routes.HOME, "Home", "Your at-a-glance dashboard."),
@@ -27,6 +33,7 @@ object FeatureCatalog {
         FeatureMeta(Routes.MARKETS, "Markets", "Indices, stocks, FX, commodities & crypto."),
         FeatureMeta(Routes.WEATHER, "Weather", "Forecast, feels-like & air quality."),
         FeatureMeta(Routes.JARVIS, "Computer", "Your private, on-device assistant — ask it anything."),
+        FeatureMeta(Routes.HEALTH, "Health", "What you eat, what your body does about it, what to do next."),
         FeatureMeta(Routes.MENU, "Menu", "Every feature, one tap, plain English."),
         FeatureMeta(Routes.ECONOMY, "Economy", "Inflation, GDP & jobs."),
         FeatureMeta(Routes.FUEL, "Fuel & Energy", "Benchmarks & pump prices."),

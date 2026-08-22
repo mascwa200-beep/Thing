@@ -327,6 +327,79 @@ class AppContainer(private val appContext: Context) {
     val studyStore: dev.mascwa.pulse.data.study.StudyStore by lazy {
         dev.mascwa.pulse.data.study.StudyStore(appContext, json, survivalContentRepository)
     }
+    /**
+     * Weigh-ins and body measurements. The trend, the rate and their intervals are never stored — they
+     * come from the pure [dev.mascwa.pulse.core.telemetry.BodyTrend], so nothing here can disagree with
+     * what the screen draws.
+     */
+    val bodyStore: dev.mascwa.pulse.data.health.BodyStore by lazy {
+        dev.mascwa.pulse.data.health.BodyStore(appContext, json)
+    }
+
+    /**
+     * The food log — monthly shards plus a resident index of daily totals, because this is the one
+     * health dataset that grows for ever and is written several times a day.
+     */
+    val foodLogStore: dev.mascwa.pulse.data.health.FoodLogStore by lazy {
+        dev.mascwa.pulse.data.health.FoodLogStore(appContext, json)
+    }
+
+    /**
+     * The whole health record as a zip of CSVs.
+     *
+     * ⚠️ Lazy, like every store here, and for a sharper reason than usual: it exists to open every
+     * shard at once, which is exactly what the log's sharding avoids. Nothing constructs it until
+     * somebody asks for their data by name.
+     */
+    val healthExporter: dev.mascwa.pulse.data.health.HealthExporter by lazy {
+        dev.mascwa.pulse.data.health.HealthExporter(appContext, foodLogStore, bodyStore)
+    }
+
+    /**
+     * Health Connect, behind a capability check.
+     *
+     * ⚠️ Stateless and cheap to construct — every call re-reads whether a provider is there, because
+     * Health Connect can be installed, updated or removed while this app is alive.
+     */
+    val healthConnect: dev.mascwa.pulse.data.health.HealthConnectBridge by lazy {
+        dev.mascwa.pulse.data.health.HealthConnectBridge(appContext)
+    }
+
+    /**
+     * Progress photographs — app-private, never in the camera roll, and in `filesDir` rather than
+     * the cache so the OS cannot reclaim somebody's "before" without telling them.
+     */
+    val progressPhotoStore: dev.mascwa.pulse.data.health.ProgressPhotoStore by lazy {
+        dev.mascwa.pulse.data.health.ProgressPhotoStore(appContext, json)
+    }
+
+    /** Dishes made more than once, so a bolognese is one entry rather than eleven. */
+    val recipeStore: dev.mascwa.pulse.data.health.RecipeStore by lazy {
+        dev.mascwa.pulse.data.health.RecipeStore(appContext, json)
+    }
+
+    /** Packaged food by barcode or name, from the keyless Open Food Facts community database. */
+    val openFoodFacts: dev.mascwa.pulse.data.food.OpenFoodFactsRepository by lazy {
+        dev.mascwa.pulse.data.food.OpenFoodFactsRepository(http, diskCache)
+    }
+
+    /**
+     * Everything findable: the bundled USDA seed first and always, packaged goods when there is a
+     * network. The one place the two sources are joined, so nothing downstream needs to know there
+     * are two.
+     */
+    val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
+        dev.mascwa.pulse.data.health.FoodRepository(appContext, openFoodFacts, customFoodStore)
+    }
+
+    /**
+     * Foods somebody typed in themselves. Searched ahead of both databases, because a short list you
+     * named yourself is more likely to be what you meant than one of thirteen thousand generic rows.
+     */
+    val customFoodStore: dev.mascwa.pulse.data.health.CustomFoodStore by lazy {
+        dev.mascwa.pulse.data.health.CustomFoodStore(appContext, json)
+    }
+
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
@@ -644,6 +717,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.ArchitectureTool(knowledgeStore, gitHubRepo),
             dev.mascwa.pulse.jarvis.agent.CiTool(gitHubRepo),
+            dev.mascwa.pulse.jarvis.agent.HealthTool(foodLogStore, bodyStore, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),

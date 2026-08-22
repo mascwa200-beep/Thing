@@ -2,6 +2,13 @@
 <paths>
     <!-- The downloaded update APK lives in cacheDir/apk/ (see UpdateRepository). -->
     <cache-path name="apk" path="apk/" />
-    <!-- Photos captured by the camera for the J.A.R.V.I.S. console live in cacheDir/camera/. -->
+    <!-- Photos captured by the camera for the Computer console live in cacheDir/camera/. -->
     <cache-path name="camera" path="camera/" />
+    <!--
+        Progress photographs (HEALTH ▸ BODY) live in filesDir/progress/ — deliberately NOT the cache,
+        which Android reclaims without asking. A twelve-week comparison losing its "before" at some
+        arbitrary point, with no error and no gap in the list, is the failure this avoids. Must match
+        ProgressPhotoStore.DIR.
+    -->
+    <files-path name="progress" path="progress/" />
 </paths>

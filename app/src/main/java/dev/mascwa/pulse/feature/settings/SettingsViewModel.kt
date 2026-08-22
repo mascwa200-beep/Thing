@@ -404,9 +404,14 @@ class SettingsViewModel(
                     dev.mascwa.pulse.core.telemetry.BriefRowKind.NEWS,
                     "Your top story appears here — Sample Source",
                 ),
+                // ⚠️ HEALTH stands in the WEATHER seat, and the swap is deliberate. Five slots, and
+                // the two rows a reader cannot conjure on demand are the two worth showing: an
+                // advisory needs the Oracle to have reasoned its way to one, and a health row needs
+                // both a settled calorie target and a day of logging behind it. WEATHER renders on
+                // essentially every real board, and the temperature chip above still exercises it.
                 dev.mascwa.pulse.core.telemetry.BriefRow(
-                    dev.mascwa.pulse.core.telemetry.BriefRowKind.WEATHER,
-                    "72°F now · Cloudy · High 78 / Low 61",
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.HEALTH,
+                    "1,240 kcal left · 84 g protein to go",
                 ),
                 dev.mascwa.pulse.core.telemetry.BriefRow(
                     dev.mascwa.pulse.core.telemetry.BriefRowKind.AGENDA,

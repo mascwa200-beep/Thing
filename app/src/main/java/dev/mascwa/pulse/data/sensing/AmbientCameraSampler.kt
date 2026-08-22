@@ -62,6 +62,11 @@ class AmbientCameraSampler(
      */
     suspend fun burst(): List<PerceptLabel> = mutex.withLock {
         if (!hasCamera()) return@withLock emptyList()
+        // ⚠️ Yield to the barcode scanner. `provider.unbindAll()` below unbinds EVERY client's use
+        // cases, not just this sampler's, so a burst taken while a scanner is open tears down its
+        // preview and analysis mid-scan — the viewfinder freezes and nothing on screen says why.
+        // Publishing nothing for a few seconds costs a neutral scene; the collision costs the scan.
+        if (dev.mascwa.pulse.feature.media.CameraFloor.scanning.value) return@withLock emptyList()
         val c = runCatching { ensureClassifier() }.getOrNull() ?: return@withLock emptyList()
         val provider = runCatching { awaitProvider() }.getOrNull() ?: return@withLock emptyList()
 

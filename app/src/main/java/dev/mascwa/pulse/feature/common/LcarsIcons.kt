@@ -395,4 +395,33 @@ object LcarsIcons {
                 }
             }.build()
     }
+
+    /**
+     * A blocky operator silhouette — head block over a squared torso — for the HEALTH bottom-nav tab.
+     *
+     * ⚠️ A figure rather than a heart or a cross. A heart reads as "favourite" everywhere else in a phone
+     * and a cross reads as an emergency, and this tab is neither: it is your body, what you eat and the
+     * plan built from them. Straight lines only, like every other glyph here.
+     */
+    val Vitals: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsVitals", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                // Head.
+                path(fill = BLACK) {
+                    moveTo(9.5f, 2.5f)
+                    lineTo(14.5f, 2.5f)
+                    lineTo(14.5f, 8f)
+                    lineTo(9.5f, 8f)
+                    close()
+                }
+                // Shoulders down to the waist — a trapezoid, wider at the top.
+                path(fill = BLACK) {
+                    moveTo(5.5f, 10f)
+                    lineTo(18.5f, 10f)
+                    lineTo(16.5f, 21.5f)
+                    lineTo(7.5f, 21.5f)
+                    close()
+                }
+            }.build()
+    }
 }
