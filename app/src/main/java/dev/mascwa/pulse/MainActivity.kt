@@ -402,6 +402,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.studyStore.flushNow() }
             runCatching { app.container.bodyStore.flushNow() }
             runCatching { app.container.foodLogStore.flushNow() }
+            runCatching { app.container.recipeStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

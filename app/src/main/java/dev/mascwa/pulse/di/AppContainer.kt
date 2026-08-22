@@ -344,6 +344,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.FoodLogStore(appContext, json)
     }
 
+    /** Dishes made more than once, so a bolognese is one entry rather than eleven. */
+    val recipeStore: dev.mascwa.pulse.data.health.RecipeStore by lazy {
+        dev.mascwa.pulse.data.health.RecipeStore(appContext, json)
+    }
+
     /** Packaged food by barcode or name, from the keyless Open Food Facts community database. */
     val openFoodFacts: dev.mascwa.pulse.data.food.OpenFoodFactsRepository by lazy {
         dev.mascwa.pulse.data.food.OpenFoodFactsRepository(http, diskCache)

@@ -9,6 +9,7 @@ import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
@@ -294,6 +295,27 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     private val _picked = MutableStateFlow<Food?>(null)
     val picked: StateFlow<Food?> = _picked.asStateFlow()
 
+    /**
+     * What the next pick is FOR.
+     *
+     * ⚠️ One view model serves every sub-tab, so the search box and the picked food are shared
+     * between logging a meal and building a recipe. Without this, picking a food on RECIPES and then
+     * switching to INTAKE would show that food in the log's portion picker, and the two screens would
+     * disagree about what the person is doing. Making the destination explicit means the wrong screen
+     * cannot render the picker at all, rather than relying on the two never being open together.
+     */
+    enum class PickFor { LOG, RECIPE }
+
+    private val _pickFor = MutableStateFlow(PickFor.LOG)
+    val pickFor: StateFlow<PickFor> = _pickFor.asStateFlow()
+
+    fun searchFor(target: PickFor) {
+        if (_pickFor.value == target) return
+        _pickFor.value = target
+        // A pick belongs to the destination that made it. Carrying it across would be the bug above.
+        _picked.value = null
+    }
+
     private var searchJob: Job? = null
 
     /**
@@ -443,6 +465,141 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun removeEntry(id: String) {
         viewModelScope.launch {
             c.foodLogStore.remove(id, _today.value)
+            reloadEntries()
+            recompute.value++
+        }
+    }
+
+    // --------------------------------------------------------------------------------- recipes
+
+    /** Every saved recipe, newest first. */
+    val recipes: StateFlow<List<Recipes.Recipe>> = c.recipeStore.recipes
+
+    /**
+     * The recipe being built or edited, or null when the builder is closed.
+     *
+     * ⚠️ Held here rather than in the composable. A builder is several minutes of work across a
+     * search, a scan and half a dozen weights, and `remember` dies the moment the reader navigates to
+     * MACROS to check something — which is exactly when they would lose it.
+     */
+    private val _draft = MutableStateFlow<Recipes.Recipe?>(null)
+    val draft: StateFlow<Recipes.Recipe?> = _draft.asStateFlow()
+
+    fun newRecipe() {
+        _draft.value = Recipes.Recipe(id = UUID.randomUUID().toString(), name = "")
+        searchFor(PickFor.RECIPE)
+    }
+
+    fun editRecipe(r: Recipes.Recipe) {
+        _draft.value = r
+        searchFor(PickFor.RECIPE)
+    }
+
+    /** Close the builder without saving. The saved copy, if there is one, is untouched. */
+    fun closeDraft() {
+        _draft.value = null
+        _picked.value = null
+        _search.value = Search()
+        searchFor(PickFor.LOG)
+    }
+
+    private fun edit(block: (Recipes.Recipe) -> Recipes.Recipe) {
+        _draft.value = _draft.value?.let(block)
+    }
+
+    fun draftName(name: String) = edit { it.copy(name = name) }
+
+    fun draftNote(note: String) = edit { it.copy(note = note) }
+
+    /** Null clears the weighed yield, which is not the same as weighing it as zero. */
+    fun draftYield(grams: Double?) = edit { it.copy(cookedYieldG = grams) }
+
+    fun draftServings(n: Int) = edit { it.copy(servings = n.coerceAtLeast(1)) }
+
+    /**
+     * Add a found food to the draft at a weight.
+     *
+     * ⚠️ Goes through [FoodPortion.gramsFor] like every other portion in this feature, so a
+     * "1 serving" of something is converted by the one function that knows how, rather than by a
+     * second copy of that arithmetic living in the builder.
+     */
+    fun draftAdd(food: Food, amount: Double, unit: FoodPortion.Unit) {
+        val grams = FoodPortion.gramsFor(FoodPortion.Portion(amount, unit), food.sizes) ?: return
+        edit {
+            it.copy(
+                components = it.components + Recipes.Component(
+                    foodId = food.id,
+                    name = food.display,
+                    per100g = food.per100g,
+                    grams = grams,
+                ),
+            )
+        }
+        _picked.value = null
+        _search.value = Search()
+    }
+
+    /**
+     * ⚠️ Removes by POSITION, not by food id. A recipe legitimately holds the same ingredient twice —
+     * half the butter in the pastry and half in the filling — and removing by id would silently take
+     * both.
+     */
+    fun draftRemoveAt(index: Int) = edit {
+        if (index !in it.components.indices) it
+        else it.copy(components = it.components.filterIndexed { i, _ -> i != index })
+    }
+
+    fun saveDraft() {
+        val d = _draft.value ?: return
+        viewModelScope.launch {
+            c.recipeStore.save(d)
+            closeDraft()
+        }
+    }
+
+    fun deleteRecipe(id: String) {
+        viewModelScope.launch {
+            c.recipeStore.remove(id)
+            if (_draft.value?.id == id) closeDraft()
+        }
+    }
+
+    /**
+     * Log a helping of a saved recipe.
+     *
+     * ⚠️ [Recipes.eatenGrams] and [Recipes.eatenServings] are the only two ways to get here, and the
+     * core pins that they agree for the same amount of food. Weighing the pot is not always possible,
+     * counting portions is not always accurate, and a person will use both — so the two must not be
+     * able to disagree about what a helping came to.
+     */
+    fun logRecipe(
+        recipe: Recipes.Recipe,
+        amount: Double,
+        byServings: Boolean,
+        meal: NutritionDay.Meal,
+    ) {
+        val eaten = if (byServings) Recipes.eatenServings(recipe, amount)
+        else Recipes.eatenGrams(recipe, amount)
+        if (eaten == null) return
+        val grams = if (byServings) (Recipes.servingGrams(recipe) ?: return) * amount else amount
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            c.foodLogStore.add(
+                NutritionDay.Entry(
+                    id = UUID.randomUUID().toString(),
+                    dayStartMs = _today.value,
+                    atMs = now,
+                    name = recipe.name.ifBlank { "Recipe" },
+                    grams = grams,
+                    nutrients = eaten,
+                    meal = meal,
+                    // ⚠️ CUSTOM, because it is. The source field says where the numbers came from,
+                    // and a dish somebody assembled is not a database record however carefully its
+                    // ingredients were looked up.
+                    source = NutritionDay.Source.CUSTOM,
+                    foodId = recipe.id,
+                ),
+            )
             reloadEntries()
             recompute.value++
         }

@@ -36,8 +36,8 @@ import java.time.LocalDate
 /**
  * HEALTH — what you eat, what your body does about it, and what to do next.
  *
- * Five sub-tabs on the established rail, in the order a day is actually used: see where you are, log
- * what you ate, step on the scale, adjust the plan, keep the habits.
+ * Six sub-tabs on the established rail, in the order a day is actually used: see where you are, log
+ * what you ate, step on the scale, adjust the plan, keep the dishes you cook, keep the habits.
  *
  * ⚠️ The whole tab rests on three pure cores — [BodyTrend], [Expenditure] and [MacroTargets] — and
  * draws nothing it has not been given. Where a number cannot be computed yet the surface says which
@@ -49,6 +49,7 @@ enum class HealthTab(val label: String) {
     INTAKE("INTAKE"),
     BODY("BODY"),
     COACH("COACH"),
+    RECIPES("RECIPES"),
     HABITS("HABITS"),
 }
 
@@ -80,6 +81,7 @@ fun HealthScreen(vm: HealthViewModel) {
                 HealthTab.INTAKE -> IntakeBody(vm, state)
                 HealthTab.BODY -> BodyBody(vm, state)
                 HealthTab.COACH -> CoachBody(vm, state)
+                HealthTab.RECIPES -> RecipesBody(vm)
                 HealthTab.HABITS -> HabitsBody()
             }
         }
