@@ -196,6 +196,19 @@ data class DesktopSettings(
      * and leaves what has already been recorded alone.
      */
     val longWatch: Boolean = true,
+
+    /**
+     * When somebody was last demonstrably at this machine, so the world can be diffed across an absence.
+     *
+     * Written by a slow heartbeat while the console window holds focus, which is one rule with no
+     * transitions to get wrong. ⚠️ Writing it on focus loss and focus gain instead looks cheaper and is
+     * wrong in the case that matters: a process killed while focused would leave this at the last
+     * *gain*, over-reporting the next absence by however long that session ran.
+     *
+     * ⚠️ Zero means never — not "the epoch". Treating an unset marker as a timestamp would greet a
+     * first launch with a fifty-six-year absence.
+     */
+    val lastSeenMs: Long = 0,
 )
 
 private val defaultJson = Json {

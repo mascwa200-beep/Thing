@@ -31,6 +31,8 @@ import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.data.weather.WeatherData
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.desktop.Screen
+import dev.mascwa.pulse.desktop.feature.ledger.SinceYouLeftCard
+import dev.mascwa.pulse.desktop.feature.ledger.SinceYouLeftViewModel
 import dev.mascwa.pulse.desktop.feature.world.AdvisoriesViewModel
 import dev.mascwa.pulse.desktop.feature.world.here
 import dev.mascwa.pulse.desktop.news.Article
@@ -139,16 +141,24 @@ class HomeViewModel(
  * the same signals. Two independent Oracle snapshots taken seconds apart would disagree about which
  * insight is first — the ranking is a function of the moment — and the two pages would then be
  * telling you different things about one machine.
+ *
+ * ⚠️ [since] is its own view model rather than a field on [HomeState], and not for tidiness:
+ * [HomeViewModel.refresh] assigns a whole new `HomeState`, so a separately-computed field would be
+ * silently wiped by any refresh. Its trigger is different too — window focus and the local ledger,
+ * against Home's network fetch — so folding them together would mean refetching the world on every
+ * alt-tab or splitting the method anyway.
  */
 @Composable
 fun HomeScreen(
     vm: HomeViewModel,
     advisories: AdvisoriesViewModel,
+    since: SinceYouLeftViewModel,
     onOpenScreen: (Screen) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state: HomeState by vm.state.collectAsState()
     val advice by advisories.state.collectAsState()
+    val away by since.state.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
@@ -164,7 +174,12 @@ fun HomeScreen(
                 advisories.refresh()
             })
         }
-        LcarsBusyBar(active = state.loading || advice.loading, modifier = Modifier.fillMaxWidth())
+        // The ledger read belongs here too: it is slower than it looks after a long absence, and a
+        // `loading` written by the view model and read by nobody is this project's most-corrected defect.
+        LcarsBusyBar(
+            active = state.loading || advice.loading || away.loading,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         val freshness = Freshness.assess(
             lastUpdatedMs = state.oldestFetchMs,
@@ -218,6 +233,11 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // ⚠️ Below the read rather than above it. This card arrives from the ledger a moment after
+            // the page draws, and putting it first would shove the advisories down just as they are
+            // being read — the one thing on Home whose position is already argued for above.
+            item { SinceYouLeftCard(away, onOpenScreen) }
 
             state.weather?.current?.let { now ->
                 item {
