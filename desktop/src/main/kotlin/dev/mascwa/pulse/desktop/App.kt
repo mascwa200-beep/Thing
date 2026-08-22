@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -156,12 +157,17 @@ fun PulseDesktopApp(
      */
     keys: ConsoleKeys = remember { ConsoleKeys() },
     onQuitForInstall: () -> Unit = {},
+    /**
+     * Where to open, when something other than a person opened us — Windows asking the screensaver
+     * to be configured lands on SETTINGS. Null means the ordinary launch.
+     */
+    startOn: Screen? = null,
 ) {
     PulseDesktopTheme {
         val c = Pulse.colors
         // Home, not the pairing page: the first thing this machine should show is what is going on,
         // not a setup screen you have already been through.
-        var screen by remember { mutableStateOf(Screen.HOME) }
+        var screen by remember { mutableStateOf(startOn ?: Screen.HOME) }
 
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
         val remoteVm = remember { RemoteViewModel(scope, settings) }
@@ -193,6 +199,35 @@ fun PulseDesktopApp(
             // three switches were written to disk and changed nothing on screen.
             WeatherRepository(http, cache) { DesktopUnits.weatherPreferences(settings.current()) }
         }
+
+        // The standby display — what the console shows when nobody is at it. Built HERE rather than
+        // in Main.kt because it reads the same six repositories the screens do, and a second set
+        // would mean a second OkHttp cache over one directory, which is the corruption the note
+        // above exists to prevent.
+        val standby = remember {
+            dev.mascwa.pulse.desktop.standby.StandbySession(
+                scope = scope,
+                engine = dev.mascwa.pulse.desktop.standby.StandbyEngine(
+                    settings = settings,
+                    weather = weatherRepository,
+                    markets = marketsRepository,
+                    space = spaceWeatherRepository,
+                    news = newsRepository,
+                    study = studyStore,
+                    tle = dev.mascwa.pulse.data.orbital.TleRepository(http, cache),
+                    // What the radio is playing, if anything. A lambda so the standalone renders,
+                    // which have no player at all, record it as "not asked" rather than as absent.
+                    nowPlaying = {
+                        // The player's own state, not a second read of the stream. Only while
+                        // something is actually on air — a stopped player has nothing to say, which
+                        // the engine records as empty rather than as a failure.
+                        radioPlayer.state.value.station?.name
+                    },
+                ),
+                settings = settings,
+            )
+        }
+        LaunchedEffect(standby) { standby.start() }
 
         val newsVm = remember {
             NewsViewModel(
@@ -422,6 +457,18 @@ fun PulseDesktopApp(
                     onOpenGuide = openGuide,
                     onStudyGuide = studyGuide,
                 )
+                // Rung C of the standby display: its own always-on-top panel. Declared here for the
+                // same reason the torn-off windows are — a Compose Desktop `Window` is a plain
+                // composable, so this one reads the session the shell already built rather than
+                // standing up a second set of repositories to feed a second copy of the same view.
+                if (prefs.standbyHud) {
+                    dev.mascwa.pulse.desktop.standby.StandbyHudWindow(standby) {
+                        // Closing the panel switches it off rather than merely hiding it. A window
+                        // that came back on the next launch after being deliberately dismissed would
+                        // read as the app ignoring you — the same reasoning as the phone's overlay.
+                        scope.launch { settings.update { it.copy(standbyHud = false) } }
+                    }
+                }
                 if (wallOpen) {
                     OpsWallWindow(
                         // ⚠️ Resolved by NAME, and an unknown one is dropped rather than crashing.

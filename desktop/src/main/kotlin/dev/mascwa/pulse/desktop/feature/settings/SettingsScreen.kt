@@ -29,6 +29,7 @@ import dev.mascwa.pulse.desktop.theme.LcarsButton
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsGhostButton
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
+import dev.mascwa.pulse.desktop.standby.StandbyDiagnostics
 import dev.mascwa.pulse.desktop.theme.LcarsSwitch
 import dev.mascwa.pulse.desktop.theme.LcarsTextField
 import dev.mascwa.pulse.desktop.theme.Pulse
@@ -183,6 +184,8 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
         // read by nothing, which is worse than not offering them. They come back with the subsystems,
         // not before.
 
+        StandbySection(s, vm)
+
         // ----- Library & updates ----------------------------------------------------------------
         LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
@@ -230,6 +233,86 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
         }
 
         Box(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * The standby display, and — just as importantly — whether each of its three rungs actually engaged.
+ *
+ * ⚠️ **The readout is not decoration.** Windows does not let any application draw on the lock screen:
+ * Winlogon owns a separate desktop object and only the credential provider renders there. What can
+ * be done is set the *picture* behind that screen, and even that call can be refused for an
+ * unpackaged program on some builds. So the honest design is three genuinely different mechanisms,
+ * each of which says in words whether it worked — otherwise "it is not on my lock screen" and "the
+ * feature was never finished" look exactly alike from outside.
+ */
+@Composable
+private fun StandbySection(s: dev.mascwa.pulse.desktop.settings.DesktopSettings, vm: SettingsViewModel) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column {
+            SectionTitle("STANDBY DISPLAY")
+            Text(
+                "What the console shows when nobody is at it — the whole ops picture, drawn from the " +
+                    "same feeds every screen here reads.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            LcarsSwitch(
+                "Keep it in front", s.standbyHud, vm::setStandbyHud,
+                subtitle = "A panel of its own, always on top. Drag it anywhere; closing it switches this off.",
+            )
+            LcarsSwitch(
+                "Use it as the screensaver", s.standbyScreenSaver, vm::setStandbyScreenSaver,
+                subtitle = "Registers with Windows for this user only — no administrator prompt. With " +
+                    "\"on resume, display logon screen\" set, this is what fills the display on the way " +
+                    "into the lock.",
+            )
+            LcarsSwitch(
+                "Put it on the lock screen", s.standbyLockScreen, vm::setStandbyLockScreen,
+                subtitle = "Sets the picture Windows shows behind the lock screen. The clock and the " +
+                    "sign-in box stay Windows'; no program is permitted to draw over those.",
+            )
+
+            // ⚠️ Read straight off the last refresh rather than kept in this screen's own state: a
+            // second copy of the rung outcomes is a second thing that can be out of date, and this
+            // panel exists precisely to be trusted about what happened.
+            val report = StandbyDiagnostics.last
+            Text(
+                "WHAT ACTUALLY HAPPENED",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.amber, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            )
+            if (report == null) {
+                Text(
+                    "Nothing drawn yet. Switch one of the three on and it will report here within a " +
+                        "few minutes.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
+                )
+            } else {
+                StandbyDiagnostics.rungLines(report).forEach { line ->
+                    Text(
+                        line,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp,
+                        // Colour follows the mark the line already carries, so nothing here has to
+                        // re-derive a verdict the diagnostics core has already reached.
+                        color = when {
+                            line.contains("✓") -> c.accent
+                            line.contains("✗") -> c.amber
+                            else -> c.faint
+                        },
+                    )
+                }
+                val degraded = StandbyDiagnostics.degradedLine(report.outcomes)
+                if (degraded.isNotBlank()) {
+                    Text(
+                        degraded,
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+        }
     }
 }
 

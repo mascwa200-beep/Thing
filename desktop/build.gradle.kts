@@ -157,6 +157,17 @@ compose.desktop {
             modules(
                 "java.naming", "java.security.jgss", "java.xml", "jdk.crypto.ec", "java.instrument",
                 "jdk.unsupported", "jdk.unsupported.desktop",
+                // ⚠️ The standby display's machine vitals. `com.sun.management.OperatingSystemMXBean`
+                // is exported by `jdk.management` (read out of the JDK with `--describe-module`, not
+                // recalled) and reached through a ServiceLoader `provides` that only exists if that
+                // module is in the image. `java.management` comes with it transitively and is listed
+                // anyway, because an entry that is merely implied is one an image trim can drop.
+                //
+                // The whole reason this list is load-bearing: jlink strips anything unlisted, and a
+                // missing module surfaces ONLY as a failure on real Windows — never as a build error.
+                // Here it would be silent rather than loud, because the vitals read is wrapped: the
+                // panel would simply say it could not measure this machine, forever, on every install.
+                "java.management", "jdk.management",
             )
 
             windows {

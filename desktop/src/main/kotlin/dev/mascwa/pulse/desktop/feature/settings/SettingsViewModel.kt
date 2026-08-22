@@ -77,6 +77,13 @@ class SettingsViewModel(
     fun setRefreshMinutes(v: Int) = write { it.copy(refreshMinutes = v.coerceIn(1, 240)) }
     fun setRefreshOnOpen(v: Boolean) = write { it.copy(refreshOnOpen = v) }
     fun setCommunityChannels(v: Boolean) = write { it.copy(communityChannels = v) }
+
+    // The standby display. ⚠️ These write a preference and nothing more — the session watches them
+    // and decides what Windows is actually told, so there is one place that knows how to register a
+    // screensaver rather than a switch handler that also has to.
+    fun setStandbyHud(v: Boolean) = write { it.copy(standbyHud = v) }
+    fun setStandbyScreenSaver(v: Boolean) = write { it.copy(standbyScreenSaver = v) }
+    fun setStandbyLockScreen(v: Boolean) = write { it.copy(standbyLockScreen = v) }
     fun setAutoCheckUpdates(v: Boolean) = write { it.copy(autoCheckUpdates = v) }
     fun setGithubToken(v: String) = write { it.copy(githubToken = v.trim()) }
 

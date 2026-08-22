@@ -119,6 +119,20 @@ data class DesktopSettings(
     val twelveHourClock: Boolean = false,
 
     /**
+     * The standby display — what the console shows when nobody is at it.
+     *
+     * ⚠️ Three switches rather than one, because they are three genuinely different mechanisms with
+     * three different failure modes. Windows does not let an application draw on the lock screen at
+     * all (Winlogon owns a separate desktop), so [standbyLockScreen] sets the *picture behind* it,
+     * which an unpackaged process can be refused; [standbyScreenSaver] registers a real `.scr` and
+     * cannot be; and [standbyHud] is just a window of ours. One switch would hide which of them is
+     * actually carrying the display, which is the question a person will have.
+     */
+    val standbyHud: Boolean = false,
+    val standbyScreenSaver: Boolean = false,
+    val standbyLockScreen: Boolean = false,
+
+    /**
      * ISO-3166 alpha-2, for the figures that belong to a country rather than a coordinate — the
      * economic indicators and the fuel prices.
      *
