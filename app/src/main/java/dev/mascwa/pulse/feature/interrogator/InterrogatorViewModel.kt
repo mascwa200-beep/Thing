@@ -26,6 +26,14 @@ class InterrogatorViewModel(private val c: AppContainer) : ViewModel() {
     val findings = c.interrogatorCascade.findings
 
     /**
+     * Every finding this run has made, newest first.
+     *
+     * ⚠️ [findings] replays exactly one, so the screen used to show the last and lose the rest — a
+     * conversation produces several and the useful act is looking back over them.
+     */
+    val findingLog = c.interrogatorCascade.log
+
+    /**
      * Whether it is listening — the FACT, not the intent.
      *
      * ⚠️ [MicFloor.interrogating] is true only while the service actually holds the microphone, so

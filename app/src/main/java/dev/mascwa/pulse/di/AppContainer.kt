@@ -18,7 +18,10 @@ import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sensors.SurvivalTools
+import dev.mascwa.pulse.data.settings.FuelPreferences
+import dev.mascwa.pulse.data.settings.MarketPreferences
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.WeatherPreferences
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -59,7 +62,9 @@ class AppContainer(private val appContext: Context) {
 
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
-    val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
+    // ⚠️ `filesDir`, not the `Context` itself. The cache is shared with the desktop companion now,
+    // and reading a directory was the only thing it ever wanted a `Context` for.
+    val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
         dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
@@ -183,22 +188,31 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.live.LiveCatalogRepository(http, diskCache)
     }
     val marketsRepository: MarketsRepository by lazy {
-        MarketsRepository(http, diskCache, settingsRepository)
+        MarketsRepository(http, diskCache) {
+            val v = settingsRepository.current()
+            MarketPreferences(v.currencyCode, v.watchlist, v.cryptoList)
+        }
     }
     val economyRepository: EconomyRepository by lazy {
-        EconomyRepository(worldBank, diskCache, settingsRepository)
+        EconomyRepository(worldBank, diskCache) { settingsRepository.current().countryCode }
     }
     val fuelRepository: FuelRepository by lazy {
-        FuelRepository(http, marketsRepository, worldBank, diskCache, settingsRepository)
+        FuelRepository(http, marketsRepository, worldBank, diskCache) {
+            val v = settingsRepository.current()
+            FuelPreferences(v.countryCode, v.apiKeys.eia)
+        }
     }
     val weatherRepository: WeatherRepository by lazy {
-        WeatherRepository(http, diskCache, settingsRepository)
+        WeatherRepository(http, diskCache) {
+            val v = settingsRepository.current()
+            WeatherPreferences(v.temperatureUnit, v.windUnit, v.precipUnit)
+        }
     }
     val spaceWeatherRepository: SpaceWeatherRepository by lazy {
         SpaceWeatherRepository(http, diskCache)
     }
     val orbitalRepository: OrbitalRepository by lazy {
-        OrbitalRepository(http, diskCache, settingsRepository)
+        OrbitalRepository(http, diskCache) { settingsRepository.current().apiKeys.nasaOrDemo }
     }
     val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
     val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
@@ -292,6 +306,19 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * The large optional payloads, fetching themselves on Wi-Fi rather than waiting to be pressed.
+     *
+     * ⚠️ A lazy, so a phone that never reaches an unmetered pass never constructs it — and, more to
+     * the point, never touches [llamaEngine], whose own construction is what a device with no
+     * interest in the interrogator should be spared.
+     */
+    val payloadProvisioner: dev.mascwa.pulse.data.provision.PayloadProvisioner by lazy {
+        dev.mascwa.pulse.data.provision.PayloadProvisioner(
+            appContext, packRepository, llamaEngine, usageRepository,
+        )
+    }
+
+    /**
      * What the reader is learning from the bundled library, and when they are next due to be asked.
      *
      * Separate from [libraryLookup]: that one answers a question, this one decides what to teach and
@@ -303,7 +330,12 @@ class AppContainer(private val appContext: Context) {
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
-        dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
+        dev.mascwa.pulse.data.social.SocialRepository(
+            http,
+            diskCache,
+            lemmyInstance = { settingsRepository.current().lemmyInstance },
+            mastodonInstance = { settingsRepository.current().mastodonInstance },
+        )
     }
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
         dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache, tleRepository)
@@ -373,8 +405,8 @@ class AppContainer(private val appContext: Context) {
         )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */
-    val deviceContextProvider: dev.mascwa.pulse.core.telemetry.DeviceContextProvider by lazy {
-        dev.mascwa.pulse.core.telemetry.DeviceContextProvider(appContext)
+    val deviceContextProvider: dev.mascwa.pulse.core.device.DeviceContextProvider by lazy {
+        dev.mascwa.pulse.core.device.DeviceContextProvider(appContext)
     }
     val banterEngine: dev.mascwa.pulse.core.telemetry.BanterContextEngine by lazy {
         dev.mascwa.pulse.core.telemetry.BanterContextEngine()

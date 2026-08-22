@@ -1,11 +1,13 @@
 package dev.mascwa.pulse.data.survival
 
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.io.File
 
 /**
  * Every emergency route must land on a section that actually exists in the shipped library.

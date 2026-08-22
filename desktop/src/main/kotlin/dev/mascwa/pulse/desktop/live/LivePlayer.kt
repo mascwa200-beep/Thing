@@ -1,7 +1,7 @@
 package dev.mascwa.pulse.desktop.live
 
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels.LiveChannel
+import dev.mascwa.pulse.core.telemetry.LiveChannels
+import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import javafx.application.Platform
 import javafx.embed.swing.JFXPanel
 import javafx.scene.Scene

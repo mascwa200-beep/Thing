@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Rebuttal
+import dev.mascwa.pulse.data.interrogator.InterrogatorCascade
 import dev.mascwa.pulse.data.interrogator.TranscriptStore
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
@@ -67,6 +68,7 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
     val kept by vm.kept.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val trace by vm.lastTrace.collectAsStateWithLifecycle()
+    val log by vm.findingLog.collectAsStateWithLifecycle()
     var finding by remember { mutableStateOf<Rebuttal.Response?>(null) }
     var confirmPurge by remember { mutableStateOf(false) }
 
@@ -111,6 +113,18 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
                     )
                 }
                 item { FindingCard(finding, InterrogatorViewModel.quietLine(trace), trace?.heard) }
+                if (log.size > 1) {
+                    item {
+                        Text(
+                            "EARLIER · ${log.size - 1}",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold, color = c.accent,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    // Everything but the newest, which the card above is already showing.
+                    items(log.drop(1), key = { it.atMs }) { EarlierFinding(it) }
+                }
                 item {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -214,12 +228,27 @@ private fun FindingCard(finding: Rebuttal.Response?, quiet: String, heard: Strin
         }
         // The question first and largest — it is the whole value of the feature.
         Text(finding.question, fontFamily = ChakraPetch, fontSize = 16.sp, color = c.ink)
+        // ⚠️ THE EVIDENCE, and it comes before the label. The sentence is what lets somebody dismiss
+        // a silly match at a glance; a label cannot be checked against anything. Absent from older
+        // findings made before this was carried through, so it is rendered only when present.
+        if (finding.heard.isNotEmpty()) {
+            Text(
+                "“${finding.heard}”",
+                fontFamily = ChakraPetch, fontSize = 14.sp, lineHeight = 19.sp, color = c.ink2,
+            )
+        }
         Text(
             finding.label + " · " + InterrogatorViewModel.provenanceLine(finding.provenance),
             fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
         )
         Text(finding.note, fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted)
-        Text(finding.quote, fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted)
+        // ⚠️ Labelled and in the monospace face. It used to render identically to the note above it,
+        // which defeated the reason it is on screen at all: it is not another sentence of
+        // explanation, it is the literal words the keyword screen matched on.
+        Text(
+            "matched on: ${finding.quote}",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+        )
         finding.repeatNote?.let { Text(it, fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted) }
         finding.citation?.let {
             Text("Source: $it", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
@@ -229,6 +258,39 @@ private fun FindingCard(finding: Rebuttal.Response?, quiet: String, heard: Strin
                 Rebuttal.UNREASONED_CAVEAT,
                 fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted,
             )
+        }
+    }
+}
+
+/**
+ * One finding from earlier in the conversation.
+ *
+ * Same order as the card above and the same rule about what leads — the question, then the sentence
+ * it was about — but smaller, because the reason to look at these is to compare them with each other
+ * rather than to read one closely.
+ */
+@Composable
+private fun EarlierFinding(entry: InterrogatorCascade.Finding) {
+    val c = Pulse.colors
+    val f = entry.response
+    val stamp = remember(entry.atMs) {
+        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(entry.atMs))
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            "$stamp · ${f.label} · ${InterrogatorViewModel.provenanceLine(f.provenance)}",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.accent,
+        )
+        Text(f.question, fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink)
+        if (f.heard.isNotEmpty()) {
+            Text("“${f.heard}”", fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2)
+        }
+        f.citation?.let {
+            Text("Source: $it", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
         }
     }
 }

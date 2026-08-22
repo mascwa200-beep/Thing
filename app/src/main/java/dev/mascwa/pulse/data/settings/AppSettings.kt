@@ -25,23 +25,6 @@ enum class AccentColor(val argb: Long, val r: Int, val g: Int, val b: Int) {
     YELLOW(0xFFFCEE0A, 252, 238, 10),
 }
 
-enum class TemperatureUnit(val apiValue: String, val symbol: String) {
-    CELSIUS("celsius", "°C"),
-    FAHRENHEIT("fahrenheit", "°F"),
-}
-
-enum class WindUnit(val apiValue: String, val symbol: String) {
-    KMH("kmh", "km/h"),
-    MPH("mph", "mph"),
-    MS("ms", "m/s"),
-    KNOTS("kn", "kn"),
-}
-
-enum class PrecipUnit(val apiValue: String, val symbol: String) {
-    MM("mm", "mm"),
-    INCH("inch", "in"),
-}
-
 /** Sections shown on the Home dashboard; order is user-customizable. */
 enum class HomeSection(val title: String) {
     HEADLINES("Top Headlines"),
@@ -54,30 +37,6 @@ enum class HomeSection(val title: String) {
     TECH("Tech"),
     POPCULTURE("Pop Culture"),
 }
-
-enum class WatchType { INDEX, STOCK, FOREX, COMMODITY, CRYPTO }
-
-@Serializable
-data class WatchItem(
-    val id: String,          // stooq symbol or coingecko id
-    val label: String,       // display name
-    val type: WatchType,
-)
-
-@Serializable
-data class CustomFeed(
-    val name: String,
-    val url: String,
-)
-
-@Serializable
-data class SavedLocation(
-    val name: String,
-    val country: String = "",
-    val latitude: Double,
-    val longitude: Double,
-    val timezone: String = "auto",
-)
 
 /** Personal medical / ICE info for the SOS card (stays on-device). */
 @Serializable
@@ -414,9 +373,14 @@ data class AppSettings(
     val refreshIntervalMinutes: Int = 60,
     val refreshOnlyOnWifi: Boolean = false,
     val newsItemsPerCategory: Int = 30,
-    /** Per-article bias-distribution + social-buzz "COVERAGE" strip — does one extra (cached, lazy) network
-     *  search per viewed article to find who else is covering the story. Default on; off = the extra fetch
-     *  never fires. */
+    /** Whether a viewed article looks up who ELSE is carrying the same story — one extra (cached, lazy)
+     *  network search per article. Default on; off = the extra fetch never fires and the card simply says
+     *  no other outlet was found.
+     *
+     *  ⚠️ The NAME is stale and deliberately not changed: this once drove a coloured bias-distribution +
+     *  social-buzz strip, both of which were removed (a band of colour is not a fact, and a lean label
+     *  rates a newspaper rather than reporting the event). Renaming the field would silently discard every
+     *  existing device's saved value, which is a worse trade than an inaccurate identifier. */
     val showNewsCoverageStrip: Boolean = true,
 
     // Home dashboard
@@ -500,9 +464,24 @@ data class AppSettings(
      *  everything up to it is automatic. Default ON — the user asked for "as soon as it's green, install
      *  it, show the installer thing so I can tap." Off = never check. */
     val autoUpdate: Boolean = true,
-    /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
-     *  installer on every open after the user dismisses it). */
+    /** Highest build number we've already auto-installed (dedupe, so one build is only ever offered
+     *  once however many times the app is opened). */
     val lastAutoUpdateCode: Int = 0,
+    /**
+     * A build whose install was committed but which has not yet been followed by a successful
+     * launch. Zero means nothing is outstanding.
+     *
+     * ⚠️ **The loop-breaker for a self-installing app.** Since the install now completes with no
+     * confirmation, a failure that is invisible — a refused session, a build that dies before it can
+     * draw — would otherwise be met by downloading and committing again on the next check, forever.
+     * While this is set the automatic path stands down; it is cleared the first time the app reaches
+     * a successful resume, whichever build that turns out to be, so a merely-failed install costs
+     * one cycle rather than the feature. The manual UPDATE control is never gated by it.
+     *
+     * It is deliberately NOT a claim that the build is bad — nothing here can know that — only that
+     * one install is already in flight and a second should wait for evidence.
+     */
+    val unconfirmedUpdateCode: Int = 0,
     /** Offer live TV channels from the volunteer-maintained iptv-org catalogue alongside the handful
      *  of broadcasters' own feeds the app ships with. **Default OFF, and it is a switch rather than a
      *  silent merge on purpose**: that catalogue is of mixed origin and includes unauthorised

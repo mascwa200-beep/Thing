@@ -98,6 +98,41 @@ class RebuttalTest {
         assertTrue(Rebuttal.compose(candidate).quote.contains("everyone knows", ignoreCase = true))
     }
 
+    /**
+     * ⚠️ The evidence is the SENTENCE, and it has to reach the surface.
+     *
+     * `quote` is the few words the keyword screen matched on, and a reader shown only those cannot
+     * tell a real appeal to popularity from somebody introducing a fact everyone does in fact know —
+     * which is the commonest way this screen misfires. It is also the case where dismissing the
+     * finding at a glance matters most.
+     */
+    @Test
+    fun theWholeUtteranceReachesTheResponseAndTheDisplay() {
+        val said = "Everyone knows the meeting always overruns, so there is no point booking the room."
+        val r = Rebuttal.compose(candidate, heard = said)
+        assertEquals(said, r.heard)
+        assertTrue("the sentence must be on screen: ${r.display()}", r.display().contains(said))
+        // And before the label, because a label cannot be checked against anything.
+        assertTrue(r.display().indexOf(said) < r.display().indexOf(r.label))
+    }
+
+    /** A caller that supplies nothing gets no empty quotation marks. */
+    @Test
+    fun anAbsentUtteranceIsOmittedRatherThanShownBlank() {
+        val d = Rebuttal.compose(candidate).display()
+        assertEquals("", Rebuttal.compose(candidate).heard)
+        assertFalse("no empty quotation marks: $d", d.contains("“”"))
+    }
+
+    /** The spoken form is still the question alone — the sentence was just said out loud. */
+    @Test
+    fun theSpokenFormDoesNotReadTheSentenceBack() {
+        val said = "Everyone knows that."
+        val r = Rebuttal.compose(candidate, heard = said)
+        assertEquals(r.question, r.speakable())
+        assertFalse(r.speakable().contains(said))
+    }
+
     // ---- the repeat line ---------------------------------------------------------------------
 
     /**

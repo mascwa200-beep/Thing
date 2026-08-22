@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.theater
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.MediaFloor
 import dev.mascwa.pulse.core.telemetry.MediaItem
 import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
@@ -10,6 +11,7 @@ import dev.mascwa.pulse.core.telemetry.TheaterModel
 import dev.mascwa.pulse.data.media.MediaBrowser
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.di.AppContainer
+import dev.mascwa.pulse.feature.media.AudioFloor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +52,18 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
     sealed interface Resolve {
         data object Idle : Resolve
         data object Working : Resolve
-        data class Refused(val reason: MediaResolution.Reason, val detail: String) : Resolve
+        data class Refused(
+            val reason: MediaResolution.Reason,
+            val detail: String,
+            /**
+             * What the extractor said on the way down, addresses removed.
+             *
+             * ⚠️ Shown rather than logged. Until this existed the screen could only report the
+             * app's own summary of a failure, which is one remove from what actually went wrong —
+             * and the extractor's own sentence is usually the whole diagnosis.
+             */
+            val notes: List<String> = emptyList(),
+        ) : Resolve
         data class Ready(
             val item: MediaItem,
             /** Usable (merged, policy-filtered) segments; empty when skipping is off or none exist. */
@@ -78,6 +91,37 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
 
     private val _resolve = MutableStateFlow<Resolve>(Resolve.Idle)
     val resolve: StateFlow<Resolve> = _resolve.asStateFlow()
+
+    /**
+     * The video being played through YouTube's own embedded player instead of ours.
+     *
+     * ⚠️ **This is the last resort, and it is offered rather than substituted.** Extraction hands
+     * back a direct media address, and a direct address can be refused — a 403 on a URL yt-dlp had
+     * just minted is exactly what the owner reported. When that happens there is no picture to
+     * show. The embedded player does not depend on extraction at all, so it is the one route that
+     * cannot be broken by a signature, a client string or an expiry.
+     *
+     * Non-null means it is on screen; the failure and its reason stay above it, because a fault
+     * that silently becomes a different player is a fault nobody can report.
+     */
+    data class Embedded(
+        val videoId: String,
+        val title: String,
+        val startAtS: Double,
+        val segments: List<SponsorSegments.Segment>,
+        val skippingOn: Boolean,
+        /**
+         * What our own player said before it was stopped to make room for this.
+         *
+         * ⚠️ Carried HERE rather than read live, because stopping the player clears it. Without
+         * this the failure vanished at the moment of the tap — the opposite of the invariant the
+         * whole fallback is built around.
+         */
+        val failureDetail: String? = null,
+    )
+
+    private val _embedded = MutableStateFlow<Embedded?>(null)
+    val embedded: StateFlow<Embedded?> = _embedded.asStateFlow()
 
     private val _shelves = MutableStateFlow(Shelves())
     val shelves: StateFlow<Shelves> = _shelves.asStateFlow()
@@ -262,7 +306,7 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
      */
     fun playItem(context: Context, item: MediaItem, audioOnly: Boolean = false) {
         if (item.isResolved && item.isFresh(System.currentTimeMillis())) {
-            supersedePlays() // an in-flight resolve from an earlier tap must not stomp this
+            beginPlayback() // supersedes an in-flight resolve AND closes the fallback
             _resolve.value = Resolve.Ready(item, emptyList(), skippingOn = false)
             OnDemandController.play(context, item, emptyList(), audioOnly = audioOnly)
             return
@@ -275,14 +319,14 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         val ready = resolve.value as? Resolve.Ready ?: return
         val at = progress.value.positionMs // capture BEFORE the restart resets the player
         saveProgress()
-        supersedePlays()
+        beginPlayback()
         OnDemandController.play(context, ready.item, ready.segments, audioOnly = true)
         if (at > RESUME_MIN_MS) resumeWhenPlaying(ready.item.id, at)
     }
 
     /** Play a harvested file from this device — works with no network at all. */
     fun playHarvested(context: Context, file: File) {
-        supersedePlays()
+        beginPlayback()
         val item = MediaItem(
             id = "",
             title = file.nameWithoutExtension,
@@ -320,9 +364,105 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         playUrl(context, url, audioOnly = false)
     }
 
+    /**
+     * The video currently on the viewscreen, whether it played or not — what the fallback needs.
+     *
+     * ⚠️ **THE RESOLVED ITEM FIRST, THE ADDRESS BOX ONLY AS A FALLBACK.** A first cut read
+     * `_input` alone, which is wrong in both directions and was caught by review rather than by any
+     * gate. `_input` is written by exactly two things — the collapsed DIRECT ADDRESS field and the
+     * `viewscreen?play=` deep link — so **every browse path leaves it untouched**: tapping a card
+     * goes `playItem` → `playUrl(item.pageUrl)` and never sets it. The button would therefore have
+     * been invisible for the commonest failure there is, which is the one the owner actually hit.
+     * Worse, a stale paste left in the box would have offered to play *that* video instead.
+     *
+     * A blank id means it is not a YouTube video, and there is no embedded player for anything
+     * else, so the caller offers nothing rather than a button that cannot work.
+     */
+    fun fallbackVideoId(): String {
+        val onScreen = (resolve.value as? Resolve.Ready)?.item?.pageUrl.orEmpty()
+        return TheaterModel.videoId(onScreen).ifBlank { TheaterModel.videoId(_input.value.trim()) }
+    }
+
+    /**
+     * Everything that starts playback goes through here first.
+     *
+     * ⚠️ Two rules that were being restated per call site and had already drifted: a new play
+     * supersedes any in-flight resolve, and it closes the embedded fallback. Three entry points
+     * (`listenCurrent`, `playHarvested`, and `playItem`'s already-resolved branch) had the first
+     * and not the second, so starting a local file or switching to LISTEN while the WebView was up
+     * left both playing — and the audio floor cannot see a WebView, so it would have reported
+     * nothing wrong. Funnelling them removes the chance to forget.
+     */
+    private fun beginPlayback(): Int {
+        closeEmbedded()
+        return supersedePlays()
+    }
+
+    /**
+     * Play what is on the viewscreen through YouTube's own player.
+     *
+     * ⚠️ **THE FAILURE TEXT IS CAPTURED BEFORE ANYTHING ELSE HAPPENS.** `OnDemandController.stop`
+     * resets the player's whole state, which includes the `detail` the screen renders as "Playback
+     * failed: 403 …" — so a first cut wiped, at the moment of the tap, the exact sentence both KDocs
+     * promise stays on screen. The fallback carries it now, and [EmbeddedFallback] draws it above
+     * the picture. "Offered, never substituted" has to survive contact with the code that offers it.
+     *
+     * ⚠️ **The floor is claimed where the player actually appears, not here.** A first cut claimed
+     * synchronously and published after three awaits, one of them a network call — so navigating
+     * away in between left the floor held by a player that never existed, and the radio would have
+     * believed the speaker was busy indefinitely. The generation check does the same job for the
+     * publish that it does on the ordinary resolve path: a newer tap wins, however slow this one is.
+     */
+    fun playEmbedded(context: Context) {
+        val id = fallbackVideoId()
+        if (id.isBlank()) return
+        val ready = resolve.value as? Resolve.Ready
+        val title = ready?.item?.title.orEmpty().ifBlank { "Embedded player" }
+        // Read BEFORE stop() clears it — this is the sentence the fallback exists to preserve.
+        val failure = playback.value
+            .takeIf { it.status == OnDemandController.Status.ERROR }
+            ?.detail
+            ?.takeIf { it.isNotBlank() }
+        val gen = beginPlayback()
+        // ⚠️ The context is REQUIRED and not merely to satisfy the signature: `stop` also tears down
+        // the keep-alive foreground service, and an audio-only session left running would otherwise
+        // keep its notification and its claim on the speaker while this plays over the top.
+        OnDemandController.stop(context)
+        viewModelScope.launch {
+            // Suspending, and nullable when this video has never been watched — a fresh start is 0.
+            val resumeAt = c.viewingLedger.positionOf(id) ?: 0L
+            val skippingOn = c.settingsRepository.current().sponsorSkip
+            // The setting gates the REQUEST, not just the seeks — the same rule as the ordinary
+            // path, and the reason that rule is written down there.
+            val segments = if (skippingOn) {
+                val raw = runCatching { c.sponsorBlockRepository.segments(id) }.getOrDefault(emptyList())
+                SponsorSegments.usable(raw, SponsorSegments.Policy())
+            } else {
+                emptyList()
+            }
+            if (gen != playGeneration) return@launch // superseded while this was awaiting
+            AudioFloor.claim(context, MediaFloor.Owner.ONDEMAND)
+            _embedded.value = Embedded(
+                videoId = id,
+                title = title,
+                startAtS = resumeAt / 1000.0,
+                segments = segments,
+                skippingOn = skippingOn,
+                failureDetail = failure,
+            )
+        }
+    }
+
+    /** Take the embedded player off screen and give the speaker back. */
+    fun closeEmbedded() {
+        if (_embedded.value == null) return
+        _embedded.value = null
+        AudioFloor.released(MediaFloor.Owner.ONDEMAND)
+    }
+
     private fun playUrl(context: Context, url: String, audioOnly: Boolean) {
         if (url.isBlank()) return
-        val gen = supersedePlays()
+        val gen = beginPlayback()
         _resolve.value = Resolve.Working
         viewModelScope.launch {
             val r = c.mediaExtractor.resolve(url)
@@ -330,7 +470,8 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
             // must not win — it neither publishes state nor starts playback.
             if (gen != playGeneration) return@launch
             when (r) {
-                is MediaResolution.Refused -> _resolve.value = Resolve.Refused(r.reason, r.detail)
+                is MediaResolution.Refused ->
+                    _resolve.value = Resolve.Refused(r.reason, r.detail, r.notes)
                 is MediaResolution.Ready -> {
                     val skippingOn = c.settingsRepository.current().sponsorSkip
                     val segments = if (skippingOn) fetchSegments(url, r.item) else emptyList()
@@ -452,6 +593,10 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         // point, and the service's notification carries their Stop.
         val pb = playback.value
         if (pb.item != null && !pb.audioOnly) OnDemandController.stop(c.applicationContext)
+        // The WebView dies with the composition, so its audio stops on its own — but the audio
+        // floor does not know that, and a floor left claimed makes the radio believe something is
+        // still using the speaker forever after.
+        closeEmbedded()
         super.onCleared()
     }
 

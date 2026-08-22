@@ -56,6 +56,27 @@ android {
         // behaviour change on the target device.
         ndk { abiFilters += "arm64-v8a" }
 
+        // ⚠️ **NAME THE ONE TARGET, because the AGP default is "build every executable and shared
+        // library the CMake project defines" — and `EXCLUDE_FROM_ALL` on `add_subdirectory` does not
+        // save you, since AGP enumerates targets from CMake's file API rather than building `all`.**
+        //
+        // This did not matter while the tree held whisper.cpp and llama.cpp: both have
+        // BUILD_TESTS/EXAMPLES/SERVER options that are set OFF here, so their tools are never
+        // *defined*. quickjs-ng is the first upstream to define command-line targets
+        // unconditionally — at the pinned v0.16.0 that is `qjsc`, `qjs_exe`, `run-test262`,
+        // `api-test`, `lre-test` and `function_source`, none of which upstream ever compiles for
+        // Android and none of which this app has any use for.
+        //
+        // ⚠️ **MEASURED AFTERWARDS: this is hygiene, not a repair, and the record should say so.**
+        // The worry was that one of those tools would fail to cross-compile and take the APK with
+        // it — upstream's own Android CI job builds only `qjs` and sets `QJS_BUILD_LIBC=ON` so the
+        // standalone `qjs-libc` those tools link never exists, so it looked live. It is not: CI run
+        // 1903 built and packaged a green APK from this tree WITHOUT this line, with quickjs
+        // compiled in and the JS symbol verified in the shipped library. Whatever AGP named, it
+        // cross-compiled. So what this buys is a smaller, faster, explicitly-stated build graph —
+        // the same thing `ndkVersion` and the ABI filter above buy — and not a fixed break.
+        externalNativeBuild { cmake { targets += "lcarsnative" } }
+
         // Device the app is built exclusively for. The runtime gate matches
         // Build.MODEL against this (case-insensitive, substring). Documented
         // override in DeviceGate keeps the sole user from ever being locked out.
@@ -206,6 +227,25 @@ chaquopy {
             // `requires_dist` is EMPTY — every extra is optional. So this adds one 3.2 MB wheel and
             // nothing else, on a build that has no Android SDK story for native Python packages.
             install("yt-dlp==2026.7.4")
+
+            // The JavaScript the YouTube challenge solver actually runs. Without it the engine
+            // shipped in liblcarsnative.so has nothing to execute.
+            //
+            // ⚠️ **NOT OPTIONAL, AND THAT WAS MEASURED RATHER THAN ASSUMED.** yt-dlp vendors its own
+            // copy of the solver's *core* script but NOT the *lib* script — its `_builtin/vendor`
+            // directory holds `yt.solver.core.js` alongside two 240-byte NPM import shims, and
+            // nothing else. So the builtin source can never supply the lib half; the remaining
+            // routes are this package, a warm cache, or a GitHub download gated behind an opt-in
+            // `remote_components` flag. On a phone with neither, this is the only one.
+            //
+            // ⚠️ **THE VERSION MUST TRACK yt-dlp's OWN `vendor.VERSION`.** The scripts are checked
+            // against a hash table baked into yt-dlp, and a mismatch is not an error — the script is
+            // rejected with a warning and the provider quietly becomes unavailable. Verified for
+            // this pair: yt-dlp 2026.7.4 declares 0.8.0, and 0.8.0's lib and core hash exactly to
+            // its `yt.solver.lib.min.js` and `yt.solver.core.min.js` entries.
+            //
+            // Pure-Python `py3-none-any`, like yt-dlp itself, so there is nothing to cross-compile.
+            install("yt-dlp-ejs==0.8.0")
         }
     }
 }
@@ -246,11 +286,16 @@ dependencies {
     // redirects that bare MediaPlayer fails on (StreamTheWorld/Triton commercial streams).
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.extractor)
 
     // Local feature modules
     implementation(project(":core:database"))
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
+    // The HTTP client, the disk cache and the sixteen world-data repositories, shared with the
+    // desktop companion. Moved out of this module in the same pass that made `:core:telemetry`
+    // a plain JVM module: not one of those files imported `android.*`.
+    implementation(project(":core:feeds"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

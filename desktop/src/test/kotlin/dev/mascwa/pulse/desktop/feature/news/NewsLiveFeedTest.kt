@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.desktop.feature.news
 
+import dev.mascwa.pulse.desktop.feature.news.NewsViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel.Companion.LIVE_INTERVAL_MS
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel.Companion.nextTickDelayMs
 import org.junit.Assert.assertEquals
@@ -67,5 +68,31 @@ class NewsLiveFeedTest {
     @Test
     fun theBeatIsFiveMinutes() {
         assertEquals(300_000L, LIVE_INTERVAL_MS)
+    }
+
+    /**
+     * The reader's own interval, which the setting had no way to reach: the delay was computed from a
+     * fixed constant, so "how often a live feed re-fetches" was written to disk and read by nothing.
+     *
+     * Expected values computed from the shipped clamp rather than recalled — 2 minutes is inside the
+     * 1..60 bound so it passes through, and a full interval is what an empty screen waits.
+     */
+    @Test
+    fun `the interval comes from the setting, within bounds a live feed can honour`() {
+        assertEquals(2 * 60_000L, NewsViewModel.intervalMs(2))
+        // Below the floor and above the ceiling are clamped rather than refused: a stored 0 would
+        // otherwise mean a request every millisecond.
+        assertEquals(60_000L, NewsViewModel.intervalMs(0))
+        assertEquals(60_000L, NewsViewModel.intervalMs(-5))
+        // ⚠️ The ceiling matches `SettingsViewModel.setRefreshMinutes`, which allows up to 240. A
+        // tighter one here would silently honour a stored 120 as something else.
+        assertEquals(240 * 60_000L, NewsViewModel.intervalMs(999))
+        assertEquals(120 * 60_000L, NewsViewModel.intervalMs(120))
+
+        val now = 1_700_000_000_000L
+        val two = NewsViewModel.intervalMs(2)
+        assertEquals(two, nextTickDelayMs(0L, now, two))
+        assertEquals(0L, nextTickDelayMs(now - two, now, two))
+        assertEquals(two - 30_000L, nextTickDelayMs(now - 30_000L, now, two))
     }
 }

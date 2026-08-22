@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,37 +18,35 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.news.Article
-import dev.mascwa.pulse.desktop.news.NewsCategory
-import dev.mascwa.pulse.desktop.telemetry.Freshness
-import dev.mascwa.pulse.desktop.telemetry.MediaBias
-import dev.mascwa.pulse.desktop.telemetry.NewsInsights
-import dev.mascwa.pulse.desktop.telemetry.NewsSummary
-import dev.mascwa.pulse.desktop.telemetry.Readability
-import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
-import dev.mascwa.pulse.desktop.telemetry.Tone
+import dev.mascwa.pulse.core.telemetry.Freshness
+import dev.mascwa.pulse.core.telemetry.NewsInsights
+import dev.mascwa.pulse.core.telemetry.NewsSummary
+import dev.mascwa.pulse.core.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsBusyBar
 import dev.mascwa.pulse.desktop.theme.LcarsButton
 import dev.mascwa.pulse.desktop.theme.LcarsChip
-import dev.mascwa.pulse.desktop.theme.LcarsFillRow
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.Pulse
 
 /**
- * The News feed. Renders through the insight cores that were ported earlier but never wired to anything.
+ * The News feed, drawn the same way the phone draws it.
  *
- * Follows the design the Android app converged on rather than its older stacked-strips layout: one
- * plain-English takeaway line per article, always visible, with the segmented MOOD read rendered as
- * discrete blocks (a real dim remainder block, so magnitude stays visible and it never auto-normalises to
- * full width) instead of a smooth bar.
+ * One plain-English takeaway line per article, made only of counts and names — how many outlets are
+ * carrying it, whether it is live on social, whether it touches a market.
+ *
+ * ⚠️ Two coloured strips used to sit under each story: a MOOD read scored from charged keywords, and an
+ * outlet political-lean line. Both are gone from both platforms. A band of colour is not a fact, and a
+ * lean label rates a newspaper rather than reporting the event. Nothing replaced them with another
+ * graphic — the outlets are simply named.
  */
 @Composable
 fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
@@ -84,8 +81,15 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            NewsCategory.entries.forEach { cat ->
-                LcarsChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
+            // Categories, then the discussion sites — the phone's own arrangement. A Lemmy post and a
+            // wire story are the same kind of row, so they share a rail rather than a second screen.
+            vm.tabs.forEach { tab ->
+                LcarsChip(
+                    tab.title,
+                    selected = tab == state.tab,
+                    onClick = { vm.select(tab) },
+                    accent = if (tab.social != null) c.violet else c.accent,
+                )
             }
         }
 
@@ -144,7 +148,6 @@ private fun ArticleCard(
     onRead: () -> Unit = {},
 ) {
     val c = Pulse.colors
-    val mood = NewsInsights.toneBreakdown(article.title, article.summary)
     val topics = NewsInsights.topics(article.title, article.summary)
     val links = NewsMarketLink.linksFor(article.title, article.summary, article.category)
     val impact = NewsInsights.marketImpact(links)
@@ -171,16 +174,13 @@ private fun ArticleCard(
                 )
             }
 
-            // The always-visible one-liner: what the coverage feels like and whether markets care.
+            // The always-visible one-liner. Counts only — how many other stories in this feed are on the
+            // same subject, and whether the story touches a market at all.
             Text(
-                takeaway(mood.tone, impact.label, links.size),
+                takeaway(cluster(article, all), impact.label, links.size),
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 8.dp),
             )
-
-            // MOOD as discrete blocks. The dim remainder is a real segment, so a story with one charged
-            // word reads visibly differently from one with six — a proportional bar would hide that.
-            MoodBlocks(mood.positive, mood.tense, mood.negative)
 
             if (topics.isNotEmpty()) {
                 Text(
@@ -193,13 +193,6 @@ private fun ArticleCard(
                 Text(
                     NewsMarketLink.summarize(links),
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-            MediaBias.leanOf(article.source)?.let { lean ->
-                Text(
-                    "Outlet lean: ${lean.label}",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -217,41 +210,43 @@ private fun ArticleCard(
     }
 }
 
-/** Segmented mood read: filled blocks for charged words, a dim block for the unspent remainder. */
-@Composable
-private fun MoodBlocks(positive: Int, tense: Int, negative: Int) {
-    val c = Pulse.colors
-    val filled = positive + tense + negative
-    val remainder = (MOOD_SCALE - filled).coerceAtLeast(0)
-    val segments = buildList<Pair<Float, Color>> {
-        if (positive > 0) add(positive.toFloat() to c.positive)
-        if (tense > 0) add(tense.toFloat() to c.amber)
-        if (negative > 0) add(negative.toFloat() to c.negative)
-        if (remainder > 0) add(remainder.toFloat() to c.raise)
-    }
-    if (segments.isEmpty()) return
-    LcarsFillRow(segments, Modifier.fillMaxWidth().height(6.dp).padding(top = 8.dp), gap = 1.5.dp)
+/**
+ * How many other stories in this same feed are on this subject — the phone's crowd signal, computed the
+ * same way from the same core, so a story reads identically on both.
+ */
+private fun cluster(article: Article, all: List<Article>): Int {
+    val tags = NewsInsights.topics(article.title, article.summary)
+    if (tags.isEmpty()) return 0
+    val others = all.asSequence()
+        .filter { it.url != article.url }
+        .map { NewsInsights.topics(it.title, it.summary) }
+        .toList()
+    return NewsInsights.clusterSize(tags, others)
 }
 
-/** One plain sentence combining tone and market relevance — no jargon, no glyph legend to decode. */
-private fun takeaway(tone: Tone, impactLabel: String, linkCount: Int): String {
-    val mood = when (tone) {
-        Tone.UPBEAT -> "Coverage reads positive"
-        Tone.MIXED -> "Coverage reads mixed"
-        Tone.GRIM -> "Coverage reads grim"
-        Tone.TENSE -> "Coverage reads tense"
+/**
+ * The one-line takeaway. Every clause is a COUNT — nothing here describes how the writing feels.
+ *
+ * ⚠️ This used to open with "Coverage reads grim" / "reads upbeat", scored from charged words in the
+ * headline. That clause went with the MOOD bar it belonged to: a word like "grim" describes a reader's
+ * reaction rather than the story, and the reader is right there having their own. A signal that is not
+ * there is omitted rather than padded, so a quiet story gets a short line and never an invented verdict.
+ */
+private fun takeaway(cluster: Int, impactLabel: String, linkCount: Int): String {
+    val bits = buildList {
+        if (cluster > 0) add("$cluster more ${if (cluster == 1) "story" else "stories"} here on it")
+        if (linkCount > 0) {
+            add(
+                when (impactLabel) {
+                    "High" -> "a strong market angle"
+                    "Medium" -> "some market relevance"
+                    else -> "a slight market angle"
+                },
+            )
+        }
     }
-    val market = when {
-        linkCount == 0 -> "no obvious market angle"
-        impactLabel == "High" -> "a strong market angle"
-        impactLabel == "Medium" -> "some market relevance"
-        else -> "a slight market angle"
-    }
-    return "$mood · $market."
+    return if (bits.isEmpty()) "No wider coverage found yet" else bits.joinToString(" · ")
 }
-
-/** Matches the Android app's scale so a story looks the same on both. */
-private const val MOOD_SCALE = 6
 
 
 /**

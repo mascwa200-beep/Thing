@@ -1,10 +1,10 @@
 package dev.mascwa.pulse.desktop.feature.library
 
-import dev.mascwa.pulse.desktop.library.Guide
-import dev.mascwa.pulse.desktop.library.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.desktop.library.LibraryRepository
-import dev.mascwa.pulse.desktop.library.SUPERGROUPS
-import dev.mascwa.pulse.desktop.library.supergroupOf
+import dev.mascwa.pulse.core.telemetry.SUPERGROUPS
+import dev.mascwa.pulse.core.telemetry.supergroupOf
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

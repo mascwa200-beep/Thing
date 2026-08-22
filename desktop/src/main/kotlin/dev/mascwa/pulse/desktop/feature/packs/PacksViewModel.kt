@@ -2,7 +2,7 @@ package dev.mascwa.pulse.desktop.feature.packs
 
 import dev.mascwa.pulse.desktop.library.PackOffer
 import dev.mascwa.pulse.desktop.library.PackRepository
-import dev.mascwa.pulse.desktop.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.ContentPack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow

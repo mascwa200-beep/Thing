@@ -58,22 +58,64 @@ class MainActivity : ComponentActivity() {
      * Fully defensive (never crashes the launch/resume) and throttled so foreground churn isn't chatty.
      * Runs on cold launch and on every foreground return so an update lands "as soon as it's green."
      */
+    /**
+     * An APK that is downloaded and waiting for a moment when nobody is looking at the app.
+     *
+     * ⚠️ **Android kills the process while its own package is replaced**, so an install committed in
+     * the foreground makes the app disappear mid-sentence — indistinguishable from a crash, and a
+     * worse experience than the confirmation tap it replaced. The commit therefore happens in
+     * [onStop] and the next launch is simply the newer build.
+     */
+    private var pendingInstall: java.io.File? = null
+
+    /**
+     * Clear the in-flight marker, then look for a newer build.
+     *
+     * ⚠️ **One coroutine, in this order, deliberately.** The clear and the check both touch
+     * `unconfirmedUpdateCode`, and as two independent launches the check could read the value before
+     * the clear landed (stand down for no reason) or — much worse — the clear could land after a
+     * fresh download had set it, wiping the guard the moment it was needed. Sequencing them removes
+     * the question. The clear is outside the throttle because reaching the foreground is the
+     * evidence, and evidence should not be rate-limited.
+     */
     private fun maybeAutoUpdate() {
-        val now = System.currentTimeMillis()
-        if (now - lastAutoUpdateCheckMs < AUTO_UPDATE_MIN_INTERVAL_MS) return
-        lastAutoUpdateCheckMs = now
         lifecycleScope.launch {
+            runCatching {
+                if (app.container.settingsRepository.current().unconfirmedUpdateCode != 0) {
+                    app.container.settingsRepository.update { it.copy(unconfirmedUpdateCode = 0) }
+                }
+            }
+            val now = System.currentTimeMillis()
+            if (now - lastAutoUpdateCheckMs < AUTO_UPDATE_MIN_INTERVAL_MS) return@launch
+            lastAutoUpdateCheckMs = now
             runCatching {
                 val settings = app.container.settingsRepository.current()
                 // Auto-update is permanently on (no opt-out) — always check for a newer green build.
+                // One exception: an install already committed and not yet followed by a successful
+                // launch. See AppSettings.unconfirmedUpdateCode — this is the loop-breaker, not a
+                // judgement about the build.
+                if (settings.unconfirmedUpdateCode != 0) return@runCatching
                 val info = app.container.updateRepository.check().available
                 if (info != null && info.versionCode > settings.lastAutoUpdateCode) {
                     val file = app.container.updateRepository.download(info) { }
-                    app.container.settingsRepository.update { it.copy(lastAutoUpdateCode = info.versionCode) }
-                    dev.mascwa.pulse.core.util.installApk(this@MainActivity, file)
+                    app.container.settingsRepository.update {
+                        it.copy(lastAutoUpdateCode = info.versionCode, unconfirmedUpdateCode = info.versionCode)
+                    }
+                    pendingInstall = file
+                    // The download can outlast the visit that started it. If the app is already in
+                    // the background by the time it lands, this is the quiet moment we were waiting
+                    // for and there may not be another for hours.
+                    if (!app.container.appForeground.value) commitPendingInstall()
                 }
             }
         }
+    }
+
+    /** Commit a staged update. Safe to call when nothing is staged. */
+    private fun commitPendingInstall() {
+        val file = pendingInstall ?: return
+        pendingInstall = null
+        runCatching { dev.mascwa.pulse.core.util.installApk(this, file) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -324,7 +366,9 @@ class MainActivity : ComponentActivity() {
         app.container.appForeground.value = true
         // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
-        // Catch a build that turned green while the app was backgrounded — prompt the install on return.
+        // Reaching the foreground is both the evidence the update guard waits for and the moment to
+        // catch a build that turned green while the app was backgrounded. The install itself waits
+        // for onStop — see pendingInstall.
         maybeAutoUpdate()
         // Sensorium arming: every return to foreground is a legal moment to (re)arm the mic/camera
         // FGS types — a service revived on the standby path since the last open upgrades right here.
@@ -362,6 +406,12 @@ class MainActivity : ComponentActivity() {
                     this@MainActivity, app.container.findingStore.unseenCount(),
                 )
             }
+            // ⚠️ **Last, and inside this coroutine, on purpose.** Nobody is looking now, which is
+            // the quiet moment a self-replacing install needs — but the platform kills this process
+            // while the package is replaced, so anything still owed to disk must already be written.
+            // `commit` returns before the replacement happens, yet the margin is seconds, not a
+            // design, and every flush above is a piece of on-device learning that cannot be refetched.
+            commitPendingInstall()
         }
         super.onStop()
     }

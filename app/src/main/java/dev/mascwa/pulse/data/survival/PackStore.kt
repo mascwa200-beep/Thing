@@ -2,13 +2,15 @@ package dev.mascwa.pulse.data.survival
 
 import android.content.Context
 import dev.mascwa.pulse.core.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.io.File
 
 /**
  * Expansion packs on disk — the Android twin of the desktop `PackStore`, same shape for the same

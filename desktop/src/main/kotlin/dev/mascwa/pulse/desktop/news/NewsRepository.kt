@@ -1,8 +1,9 @@
 package dev.mascwa.pulse.desktop.news
 
-import dev.mascwa.pulse.desktop.cache.DiskCache
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.network.RssParser
+import dev.mascwa.pulse.core.util.Fetched
 import java.net.URLEncoder
 
 /**

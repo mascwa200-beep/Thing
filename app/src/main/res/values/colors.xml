@@ -28,6 +28,38 @@
     <color name="lcars_row_agenda">#8A5CE0</color>
     <color name="lcars_row_advisory">#E0409A</color>
     <color name="lcars_row_lesson">#24C04A</color>
+    <!-- Home-screen widget palette — real TosPalette tokens, under the same rule as the
+         notification colours above and for exactly the same reason: a widget is RemoteViews
+         inflated from XML and cannot read the Compose palette, so when the palette moves it must
+         be moved here in the same commit.
+
+         ⚠️ These exist because the widgets were the LAST surviving consumers of the retired
+         NIGHTWIRE palette — sixteen hardcoded hex values across seven variants of what should be
+         five tokens, including two different drifted accents and a `positive`/`negative` pair that
+         drew market direction in colours the rest of the app had abandoned. `WidgetLinkageTest`
+         now fails the build on any raw hex in a widget file, so this is the last copy rather than
+         the fifth.
+
+         There is no third text tier here, and that is deliberate. The widget draws with no
+         background over an arbitrary wallpaper, so its dimmest line takes nw_muted: text that has
+         to survive a light wallpaper cannot also be the darkest grey in the set. Only
+         @drawable/widget_bg paints a panel, and it backs the fault card alone. -->
+    <color name="nw_ink">#F4F4F6</color>
+    <color name="nw_muted">#ACACB6</color>
+    <color name="nw_panel">#121216</color>
+    <color name="nw_line">#3C3C44</color>
+    <!-- Semantic, and the reason the drift mattered: these carry market direction. -->
+    <color name="nw_positive">#24C04A</color>
+    <color name="nw_negative">#E02020</color>
+    <!-- Red alert, from tosRedAlert. Only the accent moves: the alert palette deliberately keeps
+         the greys and the ink exactly as they are, so an alert never makes a readout harder to
+         read. Chosen by AlertStatus.condition, the same process-wide flag that recolours every
+         screen and tints the tray. -->
+    <color name="nw_alert_accent">#E01414</color>
+    <!-- Not a palette colour — a legibility device. The lock widget draws no background of its own,
+         so every line carries a drop shadow to survive an arbitrary wallpaper. It lives here so the
+         "no raw hex in a widget file" rule can be absolute rather than carrying an exception. -->
+    <color name="nw_shadow">#E6000000</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

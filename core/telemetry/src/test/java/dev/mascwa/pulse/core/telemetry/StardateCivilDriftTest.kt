@@ -7,12 +7,12 @@ import org.junit.Test
 /**
  * The two hand-rolled civil calendars in this module agree, always.
  *
- * ⚠️ **Why this is a separate file from `StardateTest`, and why that is not tidiness.** `Stardate` is
- * mirrored to the desktop companion and `MirrorDriftTest` requires the mirror to be byte-identical,
- * tests included — but [EconomyVintage] is *not* mirrored, because the companion has no economy
- * screen. A cross-check living inside the mirrored test would therefore not compile on the desktop
- * at all. It also would not mean anything there: the property under test is that two
- * implementations *which coexist in this module* cannot drift apart, and only one of them crosses.
+ * ⚠️ **Why this is a separate file from `StardateTest`.** It was originally split because `Stardate`
+ * was COPIED into the desktop companion by a generator, tests included, while [EconomyVintage] was
+ * not — so a cross-check inside the mirrored test would not have compiled there. That reason is gone
+ * (the companion depends on this module directly now; there are no mirrors), but the split is kept:
+ * the property under test is that two implementations *which coexist in this module* cannot drift
+ * apart, which is a different subject from what `StardateTest` asserts about the stardate scale.
  *
  * Both convert days-since-epoch to a civil date by hand rather than through `java.time`, so that
  * `:core:telemetry` keeps no platform dependency — each says so in its own KDoc. Neither can be

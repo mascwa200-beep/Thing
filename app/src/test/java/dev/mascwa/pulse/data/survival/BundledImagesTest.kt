@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.GuideBook
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertTrue

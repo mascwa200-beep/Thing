@@ -25,6 +25,14 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
+    <!-- Keeps a stream alive with the screen off.
+         ⚠️ Load-bearing rather than defensive: ExoPlayer's `setWakeMode(C.WAKE_MODE_NETWORK)` acquires
+         a partial wake lock AND a Wi-Fi lock, and without this permission that call does nothing at
+         all — silently. The radio's foreground service keeps the PROCESS alive but holds no lock, so
+         doze could stall the socket and the drop then landed in a retry window measured in seconds.
+         This is the second, independent cause of "it will not stay tuned". -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Full-screen takeovers that show over the lock screen (e.g. the BREAKING NEWS interrupt). -->
@@ -52,6 +60,13 @@
     <!-- Self-update: install a newer APK the app downloaded (the user still confirms in the system
          installer, and must grant "install unknown apps" once). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!--
+      Lets an update complete with no confirmation, but ONLY for the installer of record of the
+      package being updated. This app is not that yet — every install so far came through the system
+      installer UI — so the permission arms itself one update after the first session ApkInstaller
+      commits. It is the fallback route; the primary is device-owner status, which needs nothing here.
+    -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <!-- Active-Matrix: keep J.A.R.V.I.S. resident as a foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -199,6 +214,19 @@
         </service>
 
         <!-- Re-arm the periodic refresh worker after a reboot. -->
+        <!--
+          The install session's own result. Not exported: the PendingIntent that reaches it is
+          package-scoped, and an exported receiver here would let any app fake an install outcome.
+        -->
+        <receiver
+            android:name=".data.update.ApkInstaller$ResultReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.mascwa.pulse.INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".notifications.BootReceiver"
             android:enabled="true"
@@ -225,20 +253,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- Glanceable home-screen widget: active objective + weather; taps to the J.A.R.V.I.S. console. -->
-        <receiver
-            android:name=".widget.PulseWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pulse_widget_info" />
-        </receiver>
+        <!--
+          The one widget. It reads how much room it has been given and draws a different layout for
+          each size rather than the same rows stretched, so there is nothing left for a picker to
+          ask about — which is why the other two receivers and the configure activity are gone.
 
-        <!-- Compact glanceable widget, lock-screen-eligible (widgetCategory keyguard|home_screen):
-             active objective + weather + top market mover. -->
+          ⚠️ The class name and the `widget_lock` layout id are IDENTITY, not copy. Renaming either
+          orphans every instance already placed on a home screen, which is why they survived a
+          consolidation that changed everything else about this widget.
+        -->
         <receiver
             android:name=".widget.LockWidgetProvider"
             android:exported="true"
@@ -250,74 +273,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/lock_widget_info" />
         </receiver>
-
-        <!-- Live data-feed widget: auto-cycles markets · fuel · economy/inflation · news. Backed by a
-             RemoteViewsService collection; the AdapterViewFlipper auto-advances. -->
-        <receiver
-            android:name=".widget.FeedWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_feed_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/feed_widget_info" />
-        </receiver>
-        <service
-            android:name=".widget.FeedRemoteViewsService"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
-
-        <!-- Four J.A.R.V.I.S. widgets (STATUS / OBJECTIVE / FINDING / BRIEF). Each opens a config screen on
-             placement to choose HIGH-contrast or TRANSPARENT (text-only) mode. They share one layout +
-             provider info; the renderer derives the content from the receiver class. -->
-        <receiver
-            android:name=".widget.JarvisStatusWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_status">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisObjectiveWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_objective">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisFindingWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_finding">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.JarvisBriefWidget"
-            android:exported="true"
-            android:label="@string/widget_jarvis_brief">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_widget_info" />
-        </receiver>
-
-        <!-- Per-instance look picker for the J.A.R.V.I.S. widgets (high-contrast / transparent). -->
-        <activity
-            android:name=".widget.JarvisWidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Pulse">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
 
         <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
              the service picks the matching type at runtime. -->

@@ -94,13 +94,13 @@
    "id": "t00016",
    "topic": "Vacuoles and Cell Storage",
    "category": "Biology",
-   "guideId": null
+   "guideId": "vacuoles-and-cell-storage"
   },
   {
    "id": "t00017",
    "topic": "The Cytoskeleton: Actin, Microtubules and Intermediate Filaments",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-cytoskeleton-actin-microtubules-and-intermediate-filamen"
   },
   {
    "id": "t00018",
@@ -3070,7 +3070,7 @@
    "id": "t00512",
    "topic": "Predation and Predator-Prey Dynamics",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "predation-and-predator-prey-dynamics"
   },
   {
    "id": "t00513",
@@ -4354,13 +4354,13 @@
    "id": "t00726",
    "topic": "Periodic Trends: Atomic Radius, Ionization Energy and Electronegativity",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "periodic-trends-atomic-radius-ionization-energy-and-electron"
   },
   {
    "id": "t00727",
    "topic": "Lewis Structures and Formal Charge",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "lewis-structures-and-formal-charge"
   },
   {
    "id": "t00728",
@@ -7684,13 +7684,13 @@
    "id": "t01281",
    "topic": "History of Microsoft",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-microsoft"
   },
   {
    "id": "t01282",
    "topic": "History of IBM",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-ibm"
   },
   {
    "id": "t01283",
@@ -11788,13 +11788,13 @@
    "id": "t01965",
    "topic": "Turquoise, Malachite and Lapis Lazuli",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "turquoise-malachite-and-lapis-lazuli"
   },
   {
    "id": "t01966",
    "topic": "Pearl and Amber — Organic Gems",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "pearl-and-amber-organic-gems"
   },
   {
    "id": "t01967",
@@ -12784,7 +12784,7 @@
    "id": "t02131",
    "topic": "The Coriolis Effect",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-coriolis-effect"
   },
   {
    "id": "t02132",
@@ -13222,13 +13222,13 @@
    "id": "t02204",
    "topic": "Extreme Weather in a Warming World",
    "category": "Climate",
-   "guideId": null
+   "guideId": "extreme-weather-in-a-warming-world"
   },
   {
    "id": "t02205",
    "topic": "The Keeling Curve and Measuring CO2",
    "category": "Climate",
-   "guideId": null
+   "guideId": "the-keeling-curve-and-measuring-co2"
   },
   {
    "id": "t02206",
@@ -15052,7 +15052,7 @@
    "id": "t02509",
    "topic": "Structural dynamics and vibration of buildings",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "structural-dynamics-and-vibration-of-buildings"
   },
   {
    "id": "t02510",
@@ -17044,7 +17044,7 @@
    "id": "t02841",
    "topic": "Electrical safety practices",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "electrical-safety-practices"
   },
   {
    "id": "t02842",
@@ -18292,7 +18292,7 @@
    "id": "t03049",
    "topic": "Geography of Côte d'Ivoire",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-c-te-d-ivoire"
   },
   {
    "id": "t03050",
@@ -23362,13 +23362,13 @@
    "id": "t03894",
    "topic": "Experimental Archaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "experimental-archaeology"
   },
   {
    "id": "t03895",
    "topic": "Ethnoarchaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "ethnoarchaeology"
   },
   {
    "id": "t03896",
@@ -24322,7 +24322,7 @@
    "id": "t04054",
    "topic": "The History of Money and Coinage",
    "category": "History",
-   "guideId": null
+   "guideId": "the-history-of-money-and-coinage"
   },
   {
    "id": "t04055",
@@ -30010,7 +30010,7 @@
    "id": "t05002",
    "topic": "Psychoanalytic Literary Criticism",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "psychoanalytic-literary-criticism"
   },
   {
    "id": "t05003",
@@ -32200,7 +32200,7 @@
    "id": "t05367",
    "topic": "Sociolinguistics — Language in Society",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "sociolinguistics-language-in-society"
   },
   {
    "id": "t05368",
@@ -33370,7 +33370,7 @@
    "id": "t05562",
    "topic": "Order of Operations and Arithmetic Conventions",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "order-of-operations-and-arithmetic-conventions"
   },
   {
    "id": "t05563",
@@ -36454,7 +36454,7 @@
    "id": "t06076",
    "topic": "Red Blood Cells and Oxygen Transport",
    "category": "Medical",
-   "guideId": null
+   "guideId": "red-blood-cells-and-oxygen-transport"
   },
   {
    "id": "t06077",
@@ -39592,7 +39592,7 @@
    "id": "t06599",
    "topic": "Gum Disease: Gingivitis and Periodontitis",
    "category": "Health",
-   "guideId": null
+   "guideId": "gum-disease-gingivitis-and-periodontitis"
   },
   {
    "id": "t06600",
@@ -39700,7 +39700,7 @@
    "id": "t06617",
    "topic": "Obsessive-Compulsive Disorder (OCD)",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "obsessive-compulsive-disorder-ocd"
   },
   {
    "id": "t06618",
@@ -40444,7 +40444,7 @@
    "id": "t06741",
    "topic": "Dietary Fiber and Digestive Health",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "dietary-fiber-and-digestive-health"
   },
   {
    "id": "t06742",
@@ -41698,7 +41698,7 @@
    "id": "t06950",
    "topic": "Diatonic Harmony and Chord Progressions",
    "category": "Music",
-   "guideId": null
+   "guideId": "diatonic-harmony-and-chord-progressions"
   },
   {
    "id": "t06951",
@@ -44374,7 +44374,7 @@
    "id": "t07396",
    "topic": "Thought Experiments — Philosophy's Laboratory",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "thought-experiments-philosophy-s-laboratory"
   },
   {
    "id": "t07397",
@@ -45748,7 +45748,7 @@
    "id": "t07625",
    "topic": "Myth — Theories of Sacred Story",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "myth-theories-of-sacred-story"
   },
   {
    "id": "t07626",
@@ -47380,7 +47380,7 @@
    "id": "t07897",
    "topic": "Rational Choice & Social Exchange Theory",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "rational-choice-social-exchange-theory"
   },
   {
    "id": "t07898",
@@ -48916,7 +48916,7 @@
    "id": "t08153",
    "topic": "Democracy: Theory & Practice",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "democracy-theory-practice"
   },
   {
    "id": "t08154",
@@ -50644,13 +50644,13 @@
    "id": "t08441",
    "topic": "Soil Microbiology and the Rhizosphere",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "soil-microbiology-and-the-rhizosphere"
   },
   {
    "id": "t08442",
    "topic": "Mycorrhizal Fungi in Crop Production",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "mycorrhizal-fungi-in-crop-production"
   },
   {
    "id": "t08443",
@@ -53320,7 +53320,7 @@
    "id": "t08887",
    "topic": "Ancient Egyptian Architecture: Pyramids, Temples and Tombs",
    "category": "Visual Arts & Design",
-   "guideId": null
+   "guideId": "ancient-egyptian-architecture-pyramids-temples-and-tombs"
   },
   {
    "id": "t08888",
@@ -55162,7 +55162,7 @@
    "id": "t09194",
    "topic": "Italian Neorealism",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "italian-neorealism"
   },
   {
    "id": "t09195",
@@ -81322,7 +81322,7 @@
    "id": "t13554",
    "topic": "Angular Momentum and Its Conservation",
    "category": "Physics",
-   "guideId": null
+   "guideId": "angular-momentum-and-its-conservation"
   },
   {
    "id": "t13555",
@@ -82852,13 +82852,13 @@
    "id": "t13809",
    "topic": "Tycho Brahe: Life and Work",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "tycho-brahe-life-and-work"
   },
   {
    "id": "t13810",
    "topic": "Johannes Kepler: Life and Work",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "johannes-kepler-life-and-work"
   },
   {
    "id": "t13811",
@@ -87982,7 +87982,7 @@
    "id": "t14664",
    "topic": "The Kilogram and the Kibble Balance",
    "category": "Reference",
-   "guideId": null
+   "guideId": "the-kilogram-and-the-kibble-balance"
   },
   {
    "id": "t14665",
@@ -90250,7 +90250,7 @@
    "id": "t15042",
    "topic": "Choosing and Using an Angle Grinder",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "choosing-and-using-an-angle-grinder"
   },
   {
    "id": "t15043",
@@ -94570,7 +94570,7 @@
    "id": "t15762",
    "topic": "Plywood, MDF and Sheet Goods Explained",
    "category": "Making",
-   "guideId": null
+   "guideId": "plywood-mdf-and-sheet-goods-explained"
   },
   {
    "id": "t15763",
@@ -98878,13 +98878,13 @@
    "id": "t16480",
    "topic": "Sole Proprietorship Advantages and Risks",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "sole-proprietorship-advantages-and-risks"
   },
   {
    "id": "t16481",
    "topic": "How Business Partnerships Work",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "how-business-partnerships-work"
   },
   {
    "id": "t16482",
@@ -104668,7 +104668,7 @@
    "id": "t17445",
    "topic": "Elasticity and Total Revenue",
    "category": "Economics",
-   "guideId": null
+   "guideId": "elasticity-and-total-revenue"
   },
   {
    "id": "t17446",
@@ -107536,7 +107536,7 @@
    "id": "t17923",
    "topic": "Intrinsic, Extraneous and Germane Load",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "intrinsic-extraneous-and-germane-load"
   },
   {
    "id": "t17924",
@@ -110416,13 +110416,13 @@
    "id": "t18403",
    "topic": "Competitive Microflora and Spoilage Organisms",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "competitive-microflora-and-spoilage-organisms"
   },
   {
    "id": "t18404",
    "topic": "Oxygen Requirements of Foodborne Bacteria",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "oxygen-requirements-of-foodborne-bacteria"
   },
   {
    "id": "t18405",
@@ -112936,7 +112936,7 @@
    "id": "t18823",
    "topic": "Plant Family Patterns for Foragers",
    "category": "Sustenance",
-   "guideId": null
+   "guideId": "plant-family-patterns-for-foragers"
   },
   {
    "id": "t18824",
@@ -116848,13 +116848,13 @@
    "id": "t19475",
    "topic": "Caramelization Versus Maillard Browning",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "caramelization-versus-maillard-browning"
   },
   {
    "id": "t19476",
    "topic": "Surface Drying and Why Browning Stalls",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "surface-drying-and-why-browning-stalls"
   },
   {
    "id": "t19477",
@@ -120370,7 +120370,7 @@
    "id": "t20062",
    "topic": "Sittuyin: The Chess of Myanmar",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "sittuyin-the-chess-of-myanmar"
   },
   {
    "id": "t20063",
@@ -124726,7 +124726,7 @@
    "id": "t20788",
    "topic": "The Ashley Stopper Knot Explained",
    "category": "Skills",
-   "guideId": null
+   "guideId": "the-ashley-stopper-knot-explained"
   },
   {
    "id": "t20789",
@@ -128716,7 +128716,7 @@
    "id": "t21453",
    "topic": "Passing and Receiving in Football",
    "category": "Sports & Fitness",
-   "guideId": null
+   "guideId": "passing-and-receiving-in-football"
   },
   {
    "id": "t21454",
@@ -133732,7 +133732,7 @@
    "id": "t22289",
    "topic": "Emergency Shelter Site Triage at Dusk",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "emergency-shelter-site-triage-at-dusk"
   },
   {
    "id": "t22290",
@@ -134866,7 +134866,7 @@
    "id": "t22478",
    "topic": "Standard Operating Procedures for Emergencies",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "standard-operating-procedures-for-emergencies"
   },
   {
    "id": "t22479",
@@ -136012,7 +136012,7 @@
    "id": "t22669",
    "topic": "Vehicle Hazards in Moving Floodwater",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "vehicle-hazards-in-moving-floodwater"
   },
   {
    "id": "t22670",
@@ -137794,7 +137794,7 @@
    "id": "t22966",
    "topic": "Search Urgency Determination",
    "category": "Rescue",
-   "guideId": null
+   "guideId": "search-urgency-determination"
   },
   {
    "id": "t22967",
@@ -139630,7 +139630,7 @@
    "id": "t23272",
    "topic": "Recognising Landforms From Contour Patterns",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "recognising-landforms-from-contour-patterns"
   },
   {
    "id": "t23273",
@@ -141034,7 +141034,7 @@
    "id": "t23506",
    "topic": "Adjusting Pole Length for Terrain",
    "category": "Movement",
-   "guideId": null
+   "guideId": "adjusting-pole-length-for-terrain"
   },
   {
    "id": "t23507",
@@ -142420,7 +142420,7 @@
    "id": "t23737",
    "topic": "Choosing Scenarios Worth Planning Against",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "choosing-scenarios-worth-planning-against"
   },
   {
    "id": "t23738",
@@ -145330,7 +145330,7 @@
    "id": "t24222",
    "topic": "The Atkinson and Miller Engine Cycles",
    "category": "Vehicles & Transport",
-   "guideId": null
+   "guideId": "the-atkinson-and-miller-engine-cycles"
   },
   {
    "id": "t24223",

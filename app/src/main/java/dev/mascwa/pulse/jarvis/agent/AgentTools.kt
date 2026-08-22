@@ -2,7 +2,7 @@ package dev.mascwa.pulse.jarvis.agent
 
 import android.util.Base64
 import dev.mascwa.pulse.core.network.HttpClient
-import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.device.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.Readability
 import dev.mascwa.pulse.core.telemetry.SearchPlan
 import dev.mascwa.pulse.data.jarvis.JarvisMemory

@@ -1,8 +1,8 @@
 package dev.mascwa.pulse.desktop.library
 
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
-import dev.mascwa.pulse.desktop.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.ContentPack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable

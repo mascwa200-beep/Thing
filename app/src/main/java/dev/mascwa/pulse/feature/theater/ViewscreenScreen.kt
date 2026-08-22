@@ -95,6 +95,7 @@ fun ViewscreenScreen(
     val results by vm.searchResults.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
     val searchNote by vm.searchNote.collectAsStateWithLifecycle()
+    val embedded by vm.embedded.collectAsStateWithLifecycle()
 
     // A `viewscreen?play=` deep-link (a feed's play affordance, a shared address) starts playback
     // ONCE. ⚠️ A LaunchedEffect key survives recomposition but NOT leaving and re-entering the
@@ -125,10 +126,26 @@ fun ViewscreenScreen(
         title = "Theater",
         onBack = onBack,
     ) { innerPadding ->
+      Column(modifier = Modifier.padding(innerPadding)) {
+        // ---- The embedded fallback, PINNED ABOVE THE LIST -----------------------------------
+        //
+        // ⚠️ **Deliberately outside the LazyColumn.** A lazy list disposes an item as soon as it
+        // leaves the viewport, and disposing this one destroys the WebView — playback would stop
+        // the moment you scrolled down to the shelves, then restart from the original offset when
+        // you scrolled back. Nothing about that is obvious from the code; it looks like an ordinary
+        // item. A pinned player is also what every video app does, so the layout is not a
+        // compromise. The OFFER (the button) stays in the list, where disposal costs nothing.
+        embedded?.let { onScreen ->
+            EmbeddedFallback(
+                vm = vm,
+                embedded = onScreen,
+                harvestable = resolve is ViewscreenViewModel.Resolve.Ready,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .padding(innerPadding)
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth(),
         ) {
@@ -138,20 +155,55 @@ fun ViewscreenScreen(
                     when (val r = resolve) {
                         ViewscreenViewModel.Resolve.Idle -> {}
                         ViewscreenViewModel.Resolve.Working -> StatusLine("Resolving…", c.amber)
-                        is ViewscreenViewModel.Resolve.Refused ->
+                        is ViewscreenViewModel.Resolve.Refused -> {
                             StatusLine(
                                 MediaResolution.say(r.reason) +
                                     if (r.detail.isNotBlank()) "  (${r.detail})" else "",
                                 c.negative,
                             )
+                            // The extractor's own words, dimmer than the verdict above them. Every
+                            // address has already been removed on the Python side.
+                            r.notes.forEach { StatusLine(it, c.muted) }
+                        }
                         is ViewscreenViewModel.Resolve.Ready ->
                             PlayerPanel(vm = vm, ready = r, playback = playback, progress = progress)
                     }
                     // The lines the picture cannot say for itself, in the order they matter.
                     skipNote?.let { StatusLine(it, c.amber) }
                     floorNote?.let { StatusLine(it, c.muted) }
-                    playback.detail?.takeIf { playback.status == OnDemandController.Status.ERROR }?.let {
-                        StatusLine("Playback failed: $it", c.negative)
+                    val playbackFailed = playback.status == OnDemandController.Status.ERROR
+                    val failed = resolve is ViewscreenViewModel.Resolve.Refused || playbackFailed
+                    val canFallBack = vm.fallbackVideoId().isNotBlank()
+
+                    // ---- The failure text, shown ONLY when nothing can be done about it -------
+                    //
+                    // ⚠️ **Owner's call, and the tradeoff is real.** They chose a silent switch:
+                    // when the video can still be played another way it just plays, with no error.
+                    // The cost is that a future extraction fault becomes invisible here — which is
+                    // exactly what would have made THIS bug unreportable. The mitigation is that
+                    // the reason is not destroyed, only unshown: the full untruncated report goes
+                    // to the Crash Console, which is why that surface got the extraction section.
+                    //
+                    // When there is NO fallback the message stays, because silence plus a dead
+                    // player would leave nothing at all to go on.
+                    if (failed && !canFallBack) {
+                        playback.detail?.takeIf { playbackFailed }?.let {
+                            StatusLine("Playback failed: $it", c.negative)
+                        }
+                    }
+                    // ⚠️ The player itself is NOT drawn here — see the pinned Box above the list.
+                    // A `LazyColumn` disposes an item once it scrolls out of the viewport, and
+                    // disposing this one destroys the WebView: playback stops dead and, on scrolling
+                    // back, restarts from the original offset.
+                    //
+                    // ⚠️ Keyed on the VIDEO ID, not on a boolean. A flag would latch: dismissing the
+                    // embedded player and hitting the same failure again would never re-arm, and a
+                    // failing embedded player could re-trigger the switch on itself. Keying on the
+                    // id means each video auto-switches exactly once, and `LaunchedEffect` cancels
+                    // itself the moment the id changes.
+                    val autoId = if (failed && canFallBack) vm.fallbackVideoId() else ""
+                    LaunchedEffect(autoId, embedded == null) {
+                        if (autoId.isNotBlank() && embedded == null) vm.playEmbedded(context)
                     }
                     HarvestLine(harvestState)
                 }
@@ -276,6 +328,7 @@ fun ViewscreenScreen(
                 }
             }
         }
+      }
     }
 }
 
@@ -462,6 +515,79 @@ private fun PlayerPanel(
     }
 
     Spacer(Modifier.height(10.dp))
+}
+
+/**
+ * The embedded player, with everything it cannot do said out loud.
+ *
+ * ⚠️ **What HARVEST can do here depends on WHY we are here, and the line says which.** The two ways
+ * in are not equivalent. If extraction was REFUSED there is nothing to save, because
+ * [dev.mascwa.pulse.data.media.MediaHarvester] downloads through the same yt-dlp that just refused.
+ * But if extraction SUCCEEDED and only playback failed, harvesting still works perfectly — it is
+ * keyed on the item's PAGE address and re-resolves from scratch, so it never depended on the stream
+ * address this player could not fetch. Saying "HARVEST cannot save this one" in that case is simply
+ * false, and it talks the owner out of the one control that would still have worked.
+ *
+ * The transport is a different matter and genuinely absent: the ±10s buttons, LISTEN and the
+ * timeline all belong to our own player, which is stopped. Better admitted in a line than discovered
+ * by hunting for them.
+ *
+ * @param harvestable whether extraction produced an item — i.e. whether HARVEST has anything to
+ *   work from. Read live from `resolve` at the call site rather than carried: opening this player
+ *   goes through `beginPlayback()`, which closes it again before any new resolve can start, so the
+ *   verdict cannot change underneath while it is on screen.
+ */
+@Composable
+private fun EmbeddedFallback(
+    vm: ViewscreenViewModel,
+    embedded: ViewscreenViewModel.Embedded,
+    harvestable: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val c = Pulse.colors
+    Column(modifier) {
+        // ⚠️ The reason we are here, kept in view. Our own player's failure line is driven by
+        // `playback.detail`, which `stop()` clears the instant this player is asked for — so
+        // without this the fault would disappear at exactly the moment somebody wants to report it.
+        embedded.failureDetail?.let { StatusLine("Playback failed: $it", c.negative) }
+        StatusLine("Playing through YouTube's own player — ads may appear.", c.amber)
+        EmbeddedPlayer(
+            videoId = embedded.videoId,
+            startAtS = embedded.startAtS,
+            segments = embedded.segments,
+            skippingOn = embedded.skippingOn,
+            onSkip = { OnDemandController.noteSkip(it) },
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        StatusLine(
+            if (embedded.skippingOn && embedded.segments.isNotEmpty()) {
+                "Sponsor skipping is on: ${embedded.segments.size} to skip."
+            } else if (embedded.skippingOn) {
+                "Sponsor skipping is on: nothing flagged on this one."
+            } else {
+                "Sponsor skipping is off."
+            },
+            c.muted,
+        )
+        StatusLine(
+            if (harvestable) {
+                // True, and worth saying: the downloader never used the address this player could
+                // not fetch. It re-resolves the page from scratch, so it is unaffected by whatever
+                // refused us here.
+                "HARVEST still works — it downloads separately, not from this player."
+            } else {
+                "Nothing to HARVEST — the downloader uses the same extractor that refused this."
+            },
+            c.muted,
+        )
+        LcarsButton(
+            "CLOSE",
+            onClick = { vm.closeEmbedded() },
+            color = c.violet,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+    }
 }
 
 @Composable

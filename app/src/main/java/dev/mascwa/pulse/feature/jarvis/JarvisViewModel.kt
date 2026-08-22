@@ -16,7 +16,7 @@ import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
-import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.device.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.IntentRouter
 import dev.mascwa.pulse.core.telemetry.JarvisIntent

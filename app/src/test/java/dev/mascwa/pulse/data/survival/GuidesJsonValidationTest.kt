@@ -1,5 +1,9 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.CATEGORY_SUPERGROUP
+import dev.mascwa.pulse.core.telemetry.GuideBook
+import dev.mascwa.pulse.core.telemetry.GuideIndex
+import dev.mascwa.pulse.core.telemetry.GuideSection
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -220,6 +224,6 @@ class GuidesJsonValidationTest {
          *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
          *  waves land, never down. `tools/kb/ci_parity_lint.py` prints the value to use; it does not
          *  edit this file, so the bump is a deliberate manual step after every merge. */
-        const val FULL_PAGE_BASELINE = 9214
+        const val FULL_PAGE_BASELINE = 10076
     }
 }

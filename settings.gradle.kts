@@ -25,6 +25,7 @@ include(":app")
 include(":core:database")
 include(":core:model-inference")
 include(":core:telemetry")
+include(":core:feeds")
 
 // Windows desktop companion (Kotlin/JVM + Compose Multiplatform) — a structurally separate module, no
 // dependency on :app/:core:* on this first pass (see desktop/build.gradle.kts), so it never touches the

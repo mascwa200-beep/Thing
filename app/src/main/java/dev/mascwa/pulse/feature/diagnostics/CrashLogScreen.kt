@@ -90,6 +90,61 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
                 }
             }
 
+            // ---- What the extractor said last time, in full ---------------------------------
+            //
+            // ⚠️ Untruncated on purpose. The compact version under the player caps each line, and a
+            // device report arrived cut off mid-URL with the engine-status line missing — which is
+            // what turned a one-glance answer into an investigation. The `javascript: …` line here
+            // names the engine or the precise reason it is unreachable.
+            //
+            // Addresses are already stripped on the Python side by `_redact` before any of this
+            // crosses the bridge, which matters because this console is meant to be shared.
+            vm.extractionReport()?.let { report ->
+                NeonPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = c.accent.copy(alpha = 0.6f),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "◢ LAST EXTRACTION",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            letterSpacing = 1.sp, color = c.accent,
+                        )
+                        Text(
+                            report,
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                }
+            }
+
+            // ⚠️ The widget cannot leave a stack trace anywhere a person would find it: it draws in
+            // a launcher's process-hosted view, and when it fails the launcher shows its own
+            // "Can't load widget", which names nothing. This panel is where the reason ends up
+            // instead — per source, so "could not find out" is legible next to "nothing to report".
+            //
+            // In-memory, so it covers the render this process performed. A render from an earlier
+            // process is not lost either: the compact form goes through the activity log and rides
+            // out in a debug report. See WidgetDiagnostics.
+            vm.widgetReport()?.let { report ->
+                NeonPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = c.accent.copy(alpha = 0.6f),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "\u25E2 LAST WIDGET RENDER",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            letterSpacing = 1.sp, color = c.accent,
+                        )
+                        Text(
+                            report,
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                }
+            }
+
             if (BuildConfig.DEBUG) {
                 NeonPanel(
                     modifier = Modifier

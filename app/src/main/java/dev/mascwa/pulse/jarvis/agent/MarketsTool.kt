@@ -82,8 +82,13 @@ class MarketsTool(private val markets: MarketsRepository) : JarvisTool {
             MarketSession.Phase.UNKNOWN -> Unit // Saying nothing is honest; claiming CLOSED would not be.
         }
 
-        if (q.low != null && q.high != null) {
-            append("\nToday: ").append(num(q.low, q)).append(" – ").append(num(q.high, q))
+        // ⚠️ Hoisted, exactly as the year's range below already was. `Quote` lives in `:core:feeds`
+        // now, and Kotlin will not smart-cast a public property declared in a DIFFERENT module — the
+        // guard above reads as though it narrows and does not.
+        val dayLow = q.low
+        val dayHigh = q.high
+        if (dayLow != null && dayHigh != null) {
+            append("\nToday: ").append(num(dayLow, q)).append(" – ").append(num(dayHigh, q))
         }
         val lo = q.fiftyTwoWeekLow
         val hi = q.fiftyTwoWeekHigh

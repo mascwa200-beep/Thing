@@ -37,17 +37,16 @@
     <string name="notif_row_advisory">ADVISE</string>
     <string name="notif_row_lesson">STUDY</string>
 
-    <!-- Live data-feed widget -->
-    <string name="widget_feed_label">LCARS Live Feed</string>
+    <!-- The one widget. There used to be three (and before that, seven); a picker offering several
+         near-identical entries made the user responsible for a decision the widget can make itself
+         by reading how big it has been made. -->
+    <string name="widget_lock_label">LCARS</string>
+    <string name="widget_lock_description">What the Computer thinks you should know, in as much detail as you give it room for. Resize it — it shows more, not the same rows stretched.</string>
 
-    <!-- Compact lock-screen / glanceable widget -->
-    <string name="widget_lock_label">LCARS Lock</string>
-
-    <!-- J.A.R.V.I.S. home-screen widgets -->
-    <string name="widget_jarvis_status">J.A.R.V.I.S. Status</string>
-    <string name="widget_jarvis_objective">J.A.R.V.I.S. Objective</string>
-    <string name="widget_jarvis_finding">J.A.R.V.I.S. Finding</string>
-    <string name="widget_jarvis_brief">J.A.R.V.I.S. Brief</string>
+    <!-- The fault card. ⚠️ This is NOT the launcher's "Can't load widget": that string belongs to
+         the host and no app can replace it. This is what we draw so the host never has to. -->
+    <string name="widget_fault_title">LCARS · WIDGET FAULT</string>
+    <string name="widget_fault_hint">Screenshot this, or open MENU ▸ Crash Console and send a report.</string>
 
     <!-- Trusted Network Mode device-admin component -->
     <string name="device_admin_label">LCARS Trusted Network Mode</string>

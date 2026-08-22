@@ -14,8 +14,12 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
+import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.MediaFloor
 import dev.mascwa.pulse.core.telemetry.MediaItem
+import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
 import dev.mascwa.pulse.feature.media.AudioFloor
 import dev.mascwa.pulse.feature.media.MediaHttp
@@ -92,6 +96,17 @@ object OnDemandController {
     private var segments: List<SponsorSegments.Segment> = emptyList()
 
     private var retries = 0
+
+    /**
+     * Whether this tune has already been given a fresh address after a refusal.
+     *
+     * ⚠️ **Per TUNE, not per outage — the opposite of [retries], deliberately.** A retry re-prepares
+     * an address the app already has, which costs nothing; a re-resolve spawns the extractor and a
+     * network round trip. Resetting this on READY would allow a source that answers the first range
+     * request and refuses the rest to re-extract forever, and each turn of that loop is expensive
+     * enough to be noticed as the app getting stuck. One per tune fails honestly instead.
+     */
+    private var reResolved = false
     private const val MAX_RETRIES = 2
     private const val POLL_MS = 250L
 
@@ -123,6 +138,8 @@ object OnDemandController {
         AudioFloor.claim(app, MediaFloor.Owner.ONDEMAND)
         segments = skip
         _skipNote.value = null
+        retries = 0
+        reResolved = false
         _state.value = OnDemandState(item, Status.CONNECTING, audioOnly = audioOnly)
         _progress.value = Progress()
         // ⚠️ Only audio-only playback earns the keep-alive service. Video with no visible surface is
@@ -202,13 +219,16 @@ object OnDemandController {
         if (_state.value.item?.id != item.id) return
         releasePlayerInternal()
         runCatching {
-            val httpFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent(MediaHttp.BROWSER_UA)
-                .setAllowCrossProtocolRedirects(true)
-                .setConnectTimeoutMs(MediaHttp.TIMEOUT_MS)
-                .setReadTimeoutMs(MediaHttp.TIMEOUT_MS)
             val exo = ExoPlayer.Builder(app)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory)))
+                // ⚠️ The headers for the track this mode will actually fetch, not the video's in
+                // every case. Both prepare paths hand the player an explicitly-built source, so this
+                // factory is only reached by something media3 resolves for itself — a sideloaded
+                // subtitle, a child load — but when that happens it must not go out with an identity
+                // minted for a different track, or for no track at all. `emptyMap()` here was how the
+                // audio-only mode came to be requesting with the video's User-Agent.
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory(app, headersFor(item)))),
+                )
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA)
@@ -217,7 +237,7 @@ object OnDemandController {
                     /* handleAudioFocus = */ true,
                 )
                 .build()
-            exo.setMediaItem(ExoMediaItem.fromUri(urlOf(item)))
+            exo.setMediaSource(sourceFor(app, item))
             exo.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (_state.value.item?.id != item.id) return
@@ -247,8 +267,15 @@ object OnDemandController {
 
                 override fun onPlayerError(error: PlaybackException) {
                     if (_state.value.item?.id != item.id) return
-                    if (isTransient(error)) retryOrFail(app, item, error.errorCodeName)
-                    else failPermanently(item, error.errorCodeName)
+                    when {
+                        isTransient(error) -> retryOrFail(app, item, error.errorCodeName)
+                        // ⚠️ A REFUSAL IS NOT A BLIP, and the two need opposite recoveries. Re-preparing
+                        // the same address is right for a network stutter and useless here: a signed
+                        // media URL that comes back 403 or 404 will come back 403 or 404 forever. The
+                        // only thing that can help is a NEW address, so this branch re-resolves.
+                        isRefusal(error) -> reResolveOrFail(app, item, describe(error))
+                        else -> failPermanently(item, describe(error))
+                    }
                 }
             })
             surface?.let { exo.setVideoSurfaceView(it) }
@@ -266,6 +293,19 @@ object OnDemandController {
     private fun isTransient(error: PlaybackException): Boolean =
         error.errorCode in
             PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+
+    /**
+     * The server answered, and said no — and what to print for it.
+     *
+     * ⚠️ Both live in [MediaHttp] now rather than here, because the radio needs exactly the same two
+     * judgements and had neither: a refused reconnect there went straight to a dead "No signal".
+     * A shared definition also closed a real gap in this copy — `INVALID_HTTP_CONTENT_TYPE` (2003)
+     * sat between the transient band and the refusal test and fell through to permanent failure,
+     * which is what a 403 returning an HTML error page produces.
+     */
+    private fun isRefusal(error: PlaybackException) = MediaHttp.isRefusal(error)
+
+    private fun describe(error: PlaybackException) = MediaHttp.describe(error)
 
     private fun retryOrFail(app: Context, item: MediaItem, reason: String) {
         if (retries >= MAX_RETRIES) {
@@ -288,7 +328,12 @@ object OnDemandController {
                     return@runOnMain
                 }
                 runCatching {
-                    exo.setMediaItem(ExoMediaItem.fromUri(urlOf(item)))
+                    // ⚠️ setMediaSource, not setMediaItem. A bare URI throws away the headers the
+                    // address was minted for AND collapses an adaptive pair down to one of its two
+                    // halves — so a network blip on a merged stream would come back silent, which is
+                    // much harder to explain than the blip itself. [sourceFor] is the ONE place that
+                    // decides what plays; both prepare paths go through it.
+                    exo.setMediaSource(sourceFor(app, item))
                     exo.prepare()
                     exo.seekTo(resumeMs)
                     exo.playWhenReady = true
@@ -297,10 +342,23 @@ object OnDemandController {
         }
     }
 
+    /**
+     * Give up, and say everything that is known about why.
+     *
+     * ⚠️ The extractor's own notes are appended here, and this is the case they exist for: the
+     * resolve SUCCEEDED — title, duration and thumbnail all arrived — and the address it produced
+     * was then refused. "403" alone leaves nobody any wiser; "403, and by the way there was no
+     * JavaScript runtime so some formats were missing" is a diagnosis. The notes are carried on the
+     * item precisely so they survive from the resolve to this moment, seconds or hours later.
+     */
     private fun failPermanently(item: MediaItem, reason: String?) {
         pollJob?.cancel()
         runOnMain { releasePlayerInternal() }
-        _state.value = OnDemandState(item, Status.ERROR, reason)
+        val detail = listOfNotNull(reason?.takeIf { it.isNotBlank() })
+            .plus(item.notes)
+            .joinToString("\n")
+            .ifBlank { null }
+        _state.value = OnDemandState(item, Status.ERROR, detail)
         AudioFloor.released(MediaFloor.Owner.ONDEMAND)
     }
 
@@ -339,10 +397,170 @@ object OnDemandController {
         }
     }
 
-    /** The address for the current mode: the audio rendition when audio-only and one exists. */
-    private fun urlOf(item: MediaItem): String =
-        if (_state.value.audioOnly && item.audioUrl.isNotBlank()) item.audioUrl
-        else item.streamUrl.ifBlank { item.audioUrl }
+    /**
+     * Say that a segment was skipped, in the words this player already uses.
+     *
+     * ⚠️ Exists for the embedded fallback, which does its own seeking through YouTube's IFrame API
+     * and so cannot reach the private note above. Sharing the sentence rather than writing a second
+     * one is the point: two phrasings for the same event is a small thing that reads as a bug the
+     * first time somebody notices they differ.
+     */
+    fun noteSkip(segment: SponsorSegments.Segment) {
+        val length = (segment.endS - segment.startS).toInt()
+        _skipNote.value = "Skipped ${SponsorSegments.label(segment.category)} · ${length}s"
+    }
+
+    /**
+     * An HTTP source that identifies itself the way the extractor did.
+     *
+     * ⚠️ **The User-Agent is split out and set through `setUserAgent`; everything else goes to
+     * `setDefaultRequestProperties`.** media3 has both, and rather than depend on which wins when the
+     * same header is given to each, the header is only ever given to one of them. That is the whole
+     * reason this is a function instead of two lines at the call site.
+     *
+     * ⚠️ **A MISSING header set is not an invitation to invent one.** This used to substitute a
+     * desktop-Chrome User-Agent whenever the extractor named no agent, which is worse than sending
+     * nothing: a signed address minted for, say, the `android_vr` client and then fetched by
+     * something claiming to be Chrome on Linux is exactly the mismatch that earns a 403 — and from
+     * the outside it was indistinguishable from the headers being carried correctly. The fallback is
+     * now used only when there are NO headers at all, where some agent must be chosen and the shared
+     * browser string is as good as any. When the extractor supplied headers but no agent, its
+     * headers go out as given and media3 sends its own default agent, which at least does not
+     * impersonate a client the address was not issued to.
+     */
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    private fun httpFactory(app: Context, headers: Map<String, String>): DefaultHttpDataSource.Factory {
+        val agent = headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+        val rest = headers.filterKeys { !it.equals("User-Agent", ignoreCase = true) }
+        val chosen = agent?.takeIf { it.isNotBlank() }
+            ?: MediaHttp.BROWSER_UA.takeIf { headers.isEmpty() }
+        return DefaultHttpDataSource.Factory()
+            .setUserAgent(chosen)
+            .setDefaultRequestProperties(rest)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(MediaHttp.TIMEOUT_MS)
+            .setReadTimeoutMs(MediaHttp.TIMEOUT_MS)
+    }
+
+    /**
+     * The media source for [item] in the current mode.
+     *
+     * Three shapes, and the discriminator is [MediaItem.isAdaptive] rather than "are both addresses
+     * set":
+     *
+     * * **audio-only mode**, or an item with no video at all — one source on the audio track;
+     * * **adaptive** — the video half and the audio half merged, which is what lets this play well
+     *   above the muxed ceiling the extractor used to be limited to;
+     * * **muxed** — one source, exactly as before.
+     *
+     * ⚠️ A muxed stream can sit beside a separate audio-only rendition, which is what LISTEN plays.
+     * Merging *those* would play the audio twice, which is why the flag is set by the extractor —
+     * the only place that knows whether it made an adaptive selection — and not inferred here.
+     *
+     * ⚠️ Each half gets its OWN [httpFactory]. yt-dlp emits headers per format and the video and
+     * audio sets genuinely differ; one shared factory is the obvious shortcut and it fails on
+     * whichever track it does not happen to match.
+     */
+    /**
+     * The header set for the track the CURRENT mode will actually fetch.
+     *
+     * Small, but it exists so that "which track is this mode playing" is answered in one place
+     * rather than re-derived at each call site — which is how the player-level factory came to be
+     * built with the video's headers while playing audio.
+     */
+    private fun headersFor(item: MediaItem): Map<String, String> =
+        if (_state.value.audioOnly && item.audioUrl.isNotBlank()) item.audioHeaders
+        else if (item.streamUrl.isNotBlank()) item.streamHeaders
+        else item.audioHeaders
+
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    private fun sourceFor(app: Context, item: MediaItem): MediaSource {
+        // ⚠️ An address and its headers are ONE thing and are only ever named together. Passing them
+        // as two arguments invites a call site that takes one track's address and the other track's
+        // headers, which is not a compile error and produces a 403 that looks like a dead video.
+        // ⚠️ Progressive is right for a plain file and WRONG for a manifest. yt-dlp hands back an
+        // `.m3u8` for plenty of sources — anything live, and some ordinary videos — and feeding that
+        // to the progressive loader fails as a container-parse error rather than playing.
+        // `media3-exoplayer-hls` is already a dependency; `DefaultMediaSourceFactory` picks the right
+        // loader from the address, which is exactly the judgement wanted here.
+        fun source(track: Pair<String, Map<String, String>>): MediaSource =
+            DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory(app, track.second)))
+                .createMediaSource(ExoMediaItem.fromUri(track.first))
+
+        val video = item.streamUrl to item.streamHeaders
+        val sound = item.audioUrl to item.audioHeaders
+
+        val audioOnly = _state.value.audioOnly && item.audioUrl.isNotBlank()
+        if (audioOnly || item.streamUrl.isBlank()) {
+            return source(if (item.audioUrl.isNotBlank()) sound else video)
+        }
+        if (item.isAdaptive && item.audioUrl.isNotBlank()) {
+            return MergingMediaSource(
+                // ⚠️ `adjustPeriodTimeOffsets` and `clipDurations`, both true. Two renditions of the
+                // same video are not bit-identical in length — they differ by a frame or two — and
+                // without clipping, the merge asserts on the mismatch rather than playing.
+                /* adjustPeriodTimeOffsets = */ true,
+                /* clipDurations = */ true,
+                source(video),
+                source(sound),
+            )
+        }
+        return source(video)
+    }
+
+    /**
+     * The source refused the address. Get a new one, once.
+     *
+     * ⚠️ **Once, and then it fails for good.** A video that has genuinely been taken down refuses
+     * every address anybody can mint for it, so a loop here would be an app that never stops trying
+     * and never says why. One fresh resolve covers the case that is actually recoverable — an
+     * address invalidated earlier than its stated expiry, which the freshness check cannot see —
+     * and anything past that is a real refusal worth reporting.
+     *
+     * The cache entry is evicted first, or [MediaExtractor] would hand back the very address that
+     * just failed: it trusts the stated expiry, and the whole point of this path is that the stated
+     * expiry was wrong.
+     */
+    private fun reResolveOrFail(app: Context, item: MediaItem, reason: String) {
+        if (reResolved) {
+            failPermanently(item, reason)
+            return
+        }
+        reResolved = true
+        val page = item.pageUrl
+        if (page.isBlank()) {
+            // Nothing to re-resolve from — a local file, or an item that arrived already resolved.
+            failPermanently(item, reason)
+            return
+        }
+        // Captured before anything suspends, for the same reason the transient path captures it.
+        val resumeMs = runCatching { player?.currentPosition }.getOrNull() ?: _progress.value.positionMs
+        _state.value = _state.value.copy(status = Status.CONNECTING, detail = "getting a fresh address…")
+        scope.launch {
+            // Reached through the application rather than held as a field: this is a process-wide
+            // object, so a stored container would be one more thing to initialise in the right order
+            // and one more reference outliving whatever set it. `app` is already the app context.
+            val extractor = (app.applicationContext as? PulseApplication)?.container?.mediaExtractor
+            if (extractor == null) {
+                runOnMain { failPermanently(item, reason) }
+                return@launch
+            }
+            extractor.evict(page)
+            val fresh = (extractor.resolve(page) as? MediaResolution.Ready)?.item
+            runOnMain {
+                // The user may have moved on while we were resolving.
+                if (_state.value.item?.id != item.id) return@runOnMain
+                if (fresh == null || !fresh.isResolved) {
+                    failPermanently(item, reason)
+                    return@runOnMain
+                }
+                // ⚠️ copy() from the CURRENT state, so audioOnly survives — the same rule the READY
+                // branch follows, and for the same reason.
+                _state.value = _state.value.copy(item = fresh, detail = null)
+                startPlayer(app, fresh, resumeMs)
+            }
+        }
+    }
 
     /** MUST run on the main thread — ExoPlayer is single-thread-affine. */
     private fun releasePlayerInternal() {

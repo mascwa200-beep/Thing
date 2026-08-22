@@ -45,10 +45,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.StudyProgress
-import dev.mascwa.pulse.data.survival.Guide
-import dev.mascwa.pulse.data.survival.GuideIndexEntry
-import dev.mascwa.pulse.data.survival.SUPERGROUPS
-import dev.mascwa.pulse.data.survival.supergroupOf
+import dev.mascwa.pulse.core.telemetry.Guide
+import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
+import dev.mascwa.pulse.core.telemetry.SUPERGROUPS
+import dev.mascwa.pulse.core.telemetry.supergroupOf
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFillRow

@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -15,8 +16,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import dev.mascwa.pulse.core.telemetry.MediaFloor
-import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
 import dev.mascwa.pulse.data.radio.StreamResolver
 import dev.mascwa.pulse.feature.media.AudioFloor
@@ -70,7 +71,6 @@ object RadioController {
     private val scope = CoroutineScope(SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepJob: Job? = null
-    private var metaJob: Job? = null
     private var player: ExoPlayer? = null
 
     // Auto-recover from a brief live-stream drop (a momentary STATE_ENDED / IO blip) by re-preparing a
@@ -79,11 +79,22 @@ object RadioController {
     // turned "two retries per hiccup" into "two hiccups per listening session": a station left on all
     // evening recovered from the first two drops and then treated the third as permanent.
     private var retries = 0
-    private const val MAX_RETRIES = 2
 
-    // Connection-limited commercial CDNs: a second listener connection makes them drop the audio, so we
-    // never run the side metadata poll for these (they keep playing; just no track text).
-    private val SINGLE_CONNECTION_HOSTS = listOf("streamtheworld", "amperwave")
+    /**
+     * ⚠️ Five, not two, and with a widening delay. Two attempts 1.5 s apart is a recovery window of
+     * about three seconds, which is not a recovery window for live radio at all — a mount that
+     * hiccups, a lift, a handover between Wi-Fi and cellular all take longer than that, and the old
+     * budget turned every one of them into a dead "No signal".
+     */
+    private const val MAX_RETRIES = 5
+
+    /** Backoff for attempt n (1-based): 1s, 2s, 4s, 8s, 8s. Capped so it never feels abandoned. */
+    private fun retryDelayMs(attempt: Int): Long =
+        (1_000L shl (attempt - 1).coerceIn(0, 3))
+
+    /** True once a fresh address has been fetched for this tune; see [refreshAndRetry]. */
+    private var reResolved = false
+
 
     private fun runOnMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
@@ -130,7 +141,6 @@ object RadioController {
         scope.launch {
             val audioUrl = StreamResolver.resolve(station.streamUrl)
             if (_state.value.tuned?.streamUrl != station.streamUrl) return@launch // re-tuned while resolving
-            startMetaPolling(station, audioUrl)
             runOnMain { startPlayer(app, station, audioUrl) }
         }
     }
@@ -141,6 +151,9 @@ object RadioController {
         // A newer tune may have superseded this one while we resolved / posted to main — don't clobber it.
         if (_state.value.tuned?.streamUrl != station.streamUrl) return
         retries = 0
+        // Per TUNE, unlike `retries`: one fresh address per station you choose, so a genuinely
+        // dead mount fails instead of re-resolving forever.
+        reResolved = false
         releasePlayerInternal()
         runCatching {
             val httpFactory = DefaultHttpDataSource.Factory()
@@ -148,11 +161,15 @@ object RadioController {
                 .setAllowCrossProtocolRedirects(true)
                 .setConnectTimeoutMs(MediaHttp.TIMEOUT_MS)
                 .setReadTimeoutMs(MediaHttp.TIMEOUT_MS)
-            // NOTE: we deliberately do NOT request ICY metadata (`Icy-MetaData: 1`). On these
-            // StreamTheWorld/Triton AAC mounts that header makes the server interleave metadata that
-            // ExoPlayer doesn't strip here, breaking the container parse
-            // (ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED). A single audio-only connection parses and
-            // plays continuously; live now-playing text comes from the separate ICY poll.
+            // ⚠️ The ICY request header is NOT set here, and the reason is not the one this comment
+            // used to give. ExoPlayer sets it ITSELF: `ProgressiveMediaPeriod.buildDataSpec` calls
+            // `setHttpRequestHeaders(ICY_METADATA_HEADERS)` unconditionally — verified in the shipped
+            // 1.5.1 bytecode, there is no branch around it — and wraps the stream in `IcyDataSource`
+            // to strip the interleaved blocks when the response carries `icy-metaint`.
+            //
+            // So metadata was always arriving on this connection and nothing was listening; see
+            // `onMetadata` below. Setting the header a SECOND time by hand is what breaks the
+            // container parse, because the player then does not own the metaint it is stripping.
             val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
             val exo = ExoPlayer.Builder(app)
                 .setMediaSourceFactory(sourceFactory)
@@ -163,6 +180,11 @@ object RadioController {
                         .build(),
                     /* handleAudioFocus = */ true,
                 )
+                // ⚠️ Holds a partial wake lock AND a Wi-Fi lock for as long as something is playing.
+                // The foreground service keeps the process alive; it does not keep the radio awake,
+                // and a doze-stalled socket was landing in the retry window as a dropped stream.
+                // Inert without the WAKE_LOCK permission, which the manifest now declares.
+                .setWakeMode(C.WAKE_MODE_NETWORK)
                 .build()
             exo.setMediaItem(MediaItem.fromUri(audioUrl))
             exo.addListener(object : Player.Listener {
@@ -177,17 +199,57 @@ object RadioController {
                         }
                         // A live stream shouldn't end; a brief drop often recovers on a re-prepare, so
                         // retry a couple of times before surfacing it.
-                        Player.STATE_ENDED -> retryOrFail(app, station, audioUrl, "stream ended")
+                        // ⚠️ Ending is not "the song finished" on a live mount — it means the body
+                        // ran out, which for a text file handed over as audio happens immediately.
+                        // Re-preparing the same address would just do it again, so the first end
+                        // gets the sniff and only then falls back to ordinary retries.
+                        Player.STATE_ENDED ->
+                            if (!reResolved) refreshAndRetry(app, station, "stream ended", sniff = true)
+                            else retryOrFail(app, station, audioUrl, "stream ended")
                         else -> {}
+                    }
+                }
+
+                /**
+                 * Now-playing, off the connection that is already open.
+                 *
+                 * ⚠️ This replaces a second HTTP connection to the same mount, opened every 30
+                 * seconds for the whole listening session. That is what stops connection-limited
+                 * stations staying tuned: to the server it is a duplicate listener from one address,
+                 * and the usual response is to drop the older socket — which the app then saw as a
+                 * dropped stream. The title was always available here for free.
+                 */
+                override fun onMetadata(metadata: Metadata) {
+                    if (_state.value.tuned?.streamUrl != station.streamUrl) return
+                    for (i in 0 until metadata.length()) {
+                        val title = (metadata.get(i) as? IcyInfo)?.title?.trim()
+                        // Blank is a real value — stations send an empty StreamTitle between tracks —
+                        // so it clears the line rather than leaving the previous song showing.
+                        if (title != null) {
+                            _nowPlaying.value = title.ifBlank { null }
+                            return
+                        }
                     }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
                     if (_state.value.tuned?.streamUrl != station.streamUrl) return
-                    // Transient network errors recover on a re-prepare; permanent ones (bad status, parse,
-                    // decoder) won't, so fail fast on those with a readable code.
-                    if (isTransient(error)) retryOrFail(app, station, audioUrl, error.errorCodeName)
-                    else failPermanently(app, station, error.errorCodeName)
+                    when {
+                        isTransient(error) -> retryOrFail(app, station, audioUrl, error.errorCodeName)
+                        // ⚠️ The server answered, and said no. Re-preparing the same address is right
+                        // for a stutter and useless here — but the address itself may simply be stale:
+                        // the directory's `url_resolved` comes from a check whose median age is 214
+                        // days, and a dead edge host is a completely ordinary case. So fetch a fresh
+                        // one, ONCE, before giving up.
+                        isRefusal(error) -> refreshAndRetry(app, station, describe(error))
+                        // ⚠️ "I cannot parse this container" is the signature of a PLAYLIST being
+                        // played as audio — a .pls served from an extensionless path, which the
+                        // extension-based detection cannot see. Re-resolve with the sniff on; if it
+                        // really was audio, nothing parses and this fails exactly as before.
+                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ->
+                            refreshAndRetry(app, station, describe(error), sniff = true)
+                        else -> failPermanently(app, station, describe(error))
+                    }
                 }
             })
             exo.playWhenReady = true
@@ -210,6 +272,10 @@ object RadioController {
         error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
             error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
+    private fun isRefusal(error: PlaybackException) = MediaHttp.isRefusal(error)
+
+    private fun describe(error: PlaybackException) = MediaHttp.describe(error)
+
     /** Re-prepare the stream after a short delay, up to [MAX_RETRIES]; otherwise show [reason]. */
     private fun retryOrFail(app: Context, station: RadioStation, audioUrl: String, reason: String) {
         if (retries >= MAX_RETRIES) {
@@ -219,7 +285,7 @@ object RadioController {
         retries++
         _state.value = RadioState(station, Status.TUNING, "reconnecting…")
         scope.launch {
-            delay(1_500)
+            delay(retryDelayMs(retries))
             runOnMain {
                 if (_state.value.tuned?.streamUrl != station.streamUrl) return@runOnMain
                 val exo = player
@@ -239,7 +305,6 @@ object RadioController {
     fun stop(context: Context) {
         sleepJob?.cancel()
         _sleepMinutes.value = null
-        metaJob?.cancel()
         _nowPlaying.value = null
         runOnMain { releasePlayerInternal() }
         _state.value = RadioState(null, Status.IDLE)
@@ -252,19 +317,38 @@ object RadioController {
         AudioFloor.released(MediaFloor.Owner.RADIO)
     }
 
-    /** Poll the tuned station's ICY now-playing title on a separate brief connection — but only for
-     *  stations that tolerate a second connection (skipped for the single-connection commercial CDNs so
-     *  their audio is never disturbed). A short initial delay lets the audio connection settle first. */
-    private fun startMetaPolling(station: RadioStation, audioUrl: String) {
-        metaJob?.cancel()
-        if (SINGLE_CONNECTION_HOSTS.any { audioUrl.contains(it, ignoreCase = true) }) return
-        metaJob = scope.launch {
-            delay(6_000)
-            while (_state.value.tuned?.streamUrl == station.streamUrl) {
-                val title = runCatching { IcyMetadata.nowPlaying(audioUrl) }.getOrNull()
-                if (_state.value.tuned?.streamUrl == station.streamUrl) _nowPlaying.value = title
-                delay(30_000)
+    /**
+     * The address was refused. Ask the directory for a fresh one and try that — once.
+     *
+     * ⚠️ Once, and then it fails for good. A station that has genuinely gone off the air refuses
+     * every address anybody can resolve for it, so looping here would be a radio that never plays
+     * and never says why. The case this covers is the common one: `RadioBrowserRepository` hands out
+     * `url_resolved`, a post-redirect address cached by a directory whose median station check is
+     * over two hundred days old, so a dead edge host is ordinary rather than exotic. Re-resolving
+     * goes back through [StreamResolver], which follows the station's own playlist afresh.
+     */
+    private fun refreshAndRetry(
+        app: Context,
+        station: RadioStation,
+        reason: String,
+        sniff: Boolean = false,
+    ) {
+        if (reResolved) {
+            failPermanently(app, station, reason)
+            return
+        }
+        reResolved = true
+        _state.value = RadioState(station, Status.TUNING, "finding another route…")
+        scope.launch {
+            val fresh = runCatching { StreamResolver.resolve(station.streamUrl, sniff) }.getOrNull()
+            if (_state.value.tuned?.streamUrl != station.streamUrl) return@launch // re-tuned meanwhile
+            if (fresh.isNullOrBlank()) {
+                runOnMain { failPermanently(app, station, reason) }
+                return@launch
             }
+            // A full rebuild rather than a re-prepare: the address changed, so the player is being
+            // pointed somewhere new rather than asked to try the same place again.
+            runOnMain { startPlayer(app, station, fresh) }
         }
     }
 
@@ -272,7 +356,6 @@ object RadioController {
      *  audio focus + decoder) and stop the foreground service. Nothing retries a permanent failure, so
      *  holding either is pure leak — and it left an orphaned `mediaPlayback` service + notification up. */
     private fun failPermanently(app: Context, station: RadioStation, reason: String?) {
-        metaJob?.cancel()
         _nowPlaying.value = null
         runOnMain { releasePlayerInternal() }
         _state.value = RadioState(station, Status.ERROR, reason)

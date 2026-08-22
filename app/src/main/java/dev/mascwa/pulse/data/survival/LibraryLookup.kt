@@ -1,7 +1,9 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.Guide
 import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.LibraryConsult
+import dev.mascwa.pulse.core.telemetry.toSearchEntry
 
 /**
  * Asks the bundled library whether it has anything to say about a question.

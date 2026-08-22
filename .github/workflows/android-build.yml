@@ -8,6 +8,17 @@ on:
     branches:
       - "**"
       - "!debug-reports"
+    # Same reasoning as the branch skip above, applied to a file. CLAUDE.md is the session-handoff
+    # document and carries no code, so a commit touching only it produced a full build that
+    # republished a byte-identical app under a new versionCode — which the in-app updater then
+    # offers as an update, costing a ~158 MB download for nothing. Two of those shipped this
+    # session before it was noticed.
+    #
+    # ⚠️ `paths-ignore` skips a run only when EVERY changed path matches, so a commit that touches
+    # CLAUDE.md alongside real code still builds. That is the property this depends on; do not
+    # widen the list to anything a build could actually depend on.
+    paths-ignore:
+      - "CLAUDE.md"
   workflow_dispatch:
 
 permissions:
@@ -137,6 +148,54 @@ jobs:
             if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
           done
 
+      - name: Fetch quickjs-ng at a pinned tag
+        run: |
+          set -e
+          dir=app/src/main/cpp/quickjs
+          repo=https://github.com/quickjs-ng/quickjs
+          # The JavaScript engine yt-dlp has required for full YouTube support since 2025.11.12.
+          # quickjs-ng rather than Bellard's original because it ships a real CMakeLists (the
+          # original is a Makefile) and because yt-dlp names it among the supported runtimes.
+          #
+          # ⚠️ UNLIKE THE TWO ABOVE, THIS TAG WAS MEASURED, NOT CHOSEN. raw.githubusercontent.com is
+          # reachable from the development container even though the API and codeload are not, so
+          # two candidate versions were fetched, built, and RUN end to end against the real 2.88 MB
+          # YouTube player with real n and sig challenges:
+          #
+          #   quickjs-ng v0.11.0 (-O2)   FAILED - still running at 183 seconds
+          #   quickjs-ng v0.16.0 (-O2)   ok in 7.8 seconds, answers byte-identical to node
+          #   node (reference)           2.1 seconds
+          #
+          # More than a twentyfold difference, and v0.11.0 does not finish at all inside any sane
+          # budget. yt-dlp says as much in its own source — `_QJS_MIN_RECOMMENDED` in
+          # jsc/_builtin/quickjs.py names **(0, 12, 0)** as the floor for quickjs-ng, warning that
+          # older builds are "missing important optimizations and will solve the JS challenges very
+          # slowly". A first draft of this step pinned v0.11.0, which is below that floor; the
+          # measurement is what caught it. **Do not lower this pin.**
+          #
+          # v0.16.0 is the newest tag that exists (v0.17.0 answers 404), and its CMakeLists was
+          # checked to still define the `qjs` library target and both options set in cpp/CMakeLists.
+          TAG="v0.16.0"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "quickjs-ng @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'v*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned quickjs-ng tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: quickjs tree is not present after cloning"; exit 1; }
+          # ⚠️ The STATIC LIBRARY target name, asserted rather than assumed. CMakeLists.txt links
+          # against `qjs`; `qjs_exe` and `qjsc` are the command-line tools and are deliberately not
+          # built. If a future tag renames the library target, the failure would otherwise be a
+          # link error four minutes into the build instead of one line here.
+          grep -qE '^[[:space:]]*add_library\([[:space:]]*qjs\b' "$dir/CMakeLists.txt" || {
+            echo "FAIL: this quickjs-ng defines no static library target named 'qjs'."
+            echo "      Targets it does define:"
+            grep -nE '^ *add_(library|executable)\(' "$dir/CMakeLists.txt" | sed 's/^/        /'
+            exit 1
+          }
+          echo "quickjs tree: $(du -sh "$dir" | cut -f1), library target 'qjs' present"
+
       - name: Check the two ggml copies agree
         run: |
           set -e
@@ -212,7 +271,12 @@ jobs:
         # that mattered was unreachable. pipefail keeps gradle's exit code across the pipe.
         run: |
           set -o pipefail
-          ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
+          # ⚠️ `:core:telemetry:test`, NOT `testDebugUnitTest`. That module is a plain Kotlin/JVM
+          # module now (it is what lets :desktop depend on it directly instead of copying 53 files),
+          # and a JVM module has no build variants — so the Android task name simply does not exist
+          # there any more. Getting this wrong does not fail loudly: gradle would report an unknown
+          # task, and 1,322 core tests would stop being a gate.
+          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
@@ -234,6 +298,13 @@ jobs:
           for f in /tmp/gradle-tests.log /tmp/gradle-build.log; do
             [ -f "$f" ] || continue
             echo "===== $f ====="
+            # ⚠️ The COMPILER's own messages first. "What went wrong" says only "Compilation error.
+            # See log for more details", which is exactly as useless as it sounds — the `e:` lines
+            # naming the file, line and symbol are hundreds of stack frames earlier and a tail of the
+            # log never reaches them. That cost a whole round trip to diagnose a one-line fix.
+            echo "----- compiler errors -----"
+            grep -E "^(e|w): .*: error:|^e: " "$f" | head -40 || true
+            echo "----- gradle's summary -----"
             awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
             echo "----- failing tests, if any -----"
             grep -E "FAILED$|^[A-Za-z].*> .* FAILED" "$f" | head -20 || true
@@ -274,6 +345,25 @@ jobs:
                 fi
               else
                 echo "::warning::built without the adjudicator - see the ggml compatibility step above"
+              fi
+              # ⚠️ `nativeVersion`, NOT `nativeAvailable`, AND THE DIFFERENCE IS THE WHOLE GATE.
+              # `nativeAvailable` is compiled in BOTH CMake branches — it has to be, or the Kotlin
+              # call that asks whether JavaScript exists would raise UnsatisfiedLinkError instead of
+              # answering "no" — so `nm` finding it proves nothing at all, and a check written
+              # against it would pass on a build with no engine in it. `nativeVersion` cannot be
+              # linked without QuickJS, so its presence is a fact about the build.
+              #
+              # Fatal rather than a warning: without JavaScript, yt-dlp says outright that "YouTube
+              # extraction without a JS runtime has been deprecated, and some formats may be
+              # missing" — which is the defect this whole change exists to remove, and it would
+              # ship green.
+              if nm -D --defined-only /tmp/lcarsnative.so | grep -q "JsRuntime_nativeVersion"; then
+                echo "quickjs linked:"
+                nm -D --defined-only /tmp/lcarsnative.so | grep JsRuntime || true
+              else
+                echo "FAIL: liblcarsnative.so shipped WITHOUT QuickJS - the if(EXISTS) guard took"
+                echo "      the engine-less branch, so YouTube extraction would silently lose formats."
+                exit 1
               fi
             else
               echo "FAIL: liblcarsnative.so shipped WITHOUT whisper.cpp - the if(EXISTS) guard took the"
@@ -354,6 +444,43 @@ jobs:
             exit 1
           fi
           echo "the extractor is in $ext"
+
+          # ⚠️ **AND THE JS SOLVER LIBRARY, WHICH IS A SEPARATE WHEEL AND A HARD REQUIREMENT.**
+          # `yt-dlp-ejs` is its own pip requirement, so the `yt_dlp/` probe above does NOT cover it —
+          # measured: that pattern has a trailing slash and `yt_dlp_ejs/` does not contain it.
+          #
+          # Why its absence would be invisible rather than loud: yt-dlp vendors only the solver's
+          # CORE. Measured against the pinned 2026.07.04, its `_builtin/vendor` holds
+          # `yt.solver.core.js` (12,607 bytes) plus `yt.solver.deno.lib.js` (245 bytes) and
+          # `yt.solver.bun.lib.js` (237 bytes) — NPM shims for two runtimes that are not ours. The
+          # real library is `yt_dlp_ejs/yt/solver/lib.min.js`, **151,561 bytes**, and it ships in no
+          # other package. So without this wheel the QuickJS provider still registers, still reports
+          # `javascript: quickjs 0.16.0` in the notes, and has no solver to run — a silent, total
+          # loss of the feature behind a status line that says it is working.
+          #
+          # ⚠️ **THE FULL PATH, not the bare filename, and the reason is subtler than it looks.**
+          # `yt_dlp` itself contains the literal string `lib.min.js` — twice in
+          # `jsc/_builtin/ejs.py` (`ScriptType.LIB: 'yt.solver.lib.min.js'`) and again in its
+          # `.pyc`. Measured, a bare-filename probe does NOT match that today, because those entries
+          # are stored DEFLATED and only entry NAMES sit uncompressed in the header. But that is an
+          # accident of compression, not a property: the day Chaquopy stores one entry uncompressed,
+          # a bare probe starts matching yt-dlp's own source and the gate silently stops failing.
+          # The full path is an entry name no other package has, so it does not rest on that.
+          #
+          # It is also the file rather than the package directory, because a package that shipped
+          # its metadata and not its data files would satisfy the weaker check.
+          lib=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${SOLVER}" /tmp/pyasset.bin; then lib="$entry"; break; fi
+          done
+          if [ -z "$lib" ]; then
+            echo "FAIL: ${SOLVER} is not in any Python asset — yt-dlp-ejs did not ship, so YouTube"
+            echo "      extraction has a JavaScript engine and nothing for it to run."
+            echo "$listing" | grep "assets/chaquopy/" || true
+            exit 1
+          fi
+          echo "the JS solver library is in $lib"
           echo "Python runtime packaged."
 
           # ⚠️ Reported on every build because it is paid on every UPDATE, not once: the APK goes to
@@ -367,6 +494,8 @@ jobs:
         env:
           PROBE: lcars_probe.py
           EXTRACTOR: yt_dlp/
+          # The library file itself, not the package directory — see the assertion above.
+          SOLVER: yt_dlp_ejs/yt/solver/lib.min.js
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4

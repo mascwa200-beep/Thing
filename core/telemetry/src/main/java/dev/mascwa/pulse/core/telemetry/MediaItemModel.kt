@@ -29,6 +29,33 @@ data class MediaItem(
     val streamUrl: String = "",
     /** Audio-only address when the source offers one separately, for listening without the video. */
     val audioUrl: String = "",
+    /**
+     * The headers [streamUrl] must be fetched with.
+     *
+     * ⚠️ **Carrying these is not politeness, it is the difference between playing and a 403.** A
+     * signed media address is minted for the client that asked for it, and a later request with a
+     * different User-Agent — or missing the Accept and Sec-Fetch values the extractor sent — is
+     * refused. The extractor reports exactly what it used; before this existed the app discarded it
+     * and playback failed with a bad HTTP status that named no status.
+     */
+    val streamHeaders: Map<String, String> = emptyMap(),
+    /**
+     * The headers [audioUrl] must be fetched with.
+     *
+     * ⚠️ Separate from [streamHeaders] because they genuinely differ per track. One shared header
+     * set is the obvious shortcut and it half-works, which is the worst kind of wrong.
+     */
+    val audioHeaders: Map<String, String> = emptyMap(),
+    /**
+     * True when [streamUrl] carries video ONLY and [audioUrl] is its other half, so the player has
+     * to merge them.
+     *
+     * ⚠️ Not the same question as "are both set". A muxed stream can sit beside a separate
+     * audio-only rendition — which is what LISTEN plays — and merging those would play the audio
+     * twice. The extractor decides this from whether it made an adaptive selection; nothing
+     * downstream should try to infer it.
+     */
+    val isAdaptive: Boolean = false,
     val uploader: String = "",
     val thumbnailUrl: String = "",
     /** The human-facing page, for handing off to a browser. */
@@ -37,6 +64,18 @@ data class MediaItem(
     val expiresAtMs: Long = 0,
     /** True when the source says this is a live stream, which has no meaningful duration or end. */
     val isLive: Boolean = false,
+    /**
+     * What the extractor said on its way to producing this, with every address removed.
+     *
+     * ⚠️ **Carried on a SUCCESSFUL resolve, which is the point.** The most valuable thing the
+     * extractor has to say — "no JavaScript runtime, so some formats are missing" — arrives on a
+     * resolve that otherwise looks like it worked, and only becomes interesting later, when the
+     * address it handed over is refused. Keeping the notes on the item means the failure can show
+     * the reason instead of a bare status code.
+     *
+     * Empty is the normal case. Never contains a media address — see the extractor's redaction.
+     */
+    val notes: List<String> = emptyList(),
 ) {
     val isResolved: Boolean get() = streamUrl.isNotBlank() || audioUrl.isNotBlank()
 
@@ -75,8 +114,17 @@ data class MediaItem(
 sealed interface MediaResolution {
     data class Ready(val item: MediaItem) : MediaResolution
 
-    /** Named so the surface can say what to do about it. */
-    data class Refused(val reason: Reason, val detail: String = "") : MediaResolution
+    /**
+     * Named so the surface can say what to do about it.
+     *
+     * [notes] is whatever the extractor said on the way down, addresses removed — the difference
+     * between "could not resolve that right now" and a sentence naming the actual obstacle.
+     */
+    data class Refused(
+        val reason: Reason,
+        val detail: String = "",
+        val notes: List<String> = emptyList(),
+    ) : MediaResolution
 
     enum class Reason {
         /** The address was not one this app knows how to resolve. */

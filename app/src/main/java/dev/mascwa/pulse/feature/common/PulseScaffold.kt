@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.mascwa.pulse.navigation.LocalSiblingRail
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
@@ -56,6 +58,15 @@ fun PulseScaffold(
     topBarOverride: (@Composable () -> Unit)? = null,
     /** False for a full-bleed screen — a map — where the horizontal room genuinely cannot be spared. */
     rail: Boolean = true,
+    /**
+     * How wide the rail column and the header's corner block are — ONE number, because they are the
+     * two arms of the same L and the corner does not close if they differ.
+     *
+     * Additive and defaulted, so nothing that does not pass it changes. The MENU passes a wider one
+     * and draws its own column in the rail's place: there the blocks are the group names rather than
+     * decoration, and the labels do not fit in the default width at a legible size.
+     */
+    railWidth: Dp = LcarsRailWidth,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     if (topBarOverride != null) {
@@ -65,6 +76,26 @@ fun PulseScaffold(
         LcarsBareFrame(modifier, topBarOverride, content)
         return
     }
+    // ⚠️ THE ONE DECISION THAT RESHAPED TWENTY-NINE SCREENS, and it is made here rather than in any
+    // of them. Every screen reached from the directory draws this frame, so what the frame puts in
+    // its left column is the layout of all of them at once — decorative blocks on a bottom-nav tab,
+    // and the screens filed beside this one everywhere else.
+    //
+    // Read from a composition local the app root provides, exactly as the section readout and the
+    // stardate are, which is why not one of those twenty-nine files was edited.
+    //
+    // Null on the tabs and on anything the directory does not list; those keep the rail they had.
+    //
+    // ⚠️ And only when the screen has not already claimed the column for itself. The MENU draws its
+    // own group list in that slot at its own width — putting the sibling rail there too would be two
+    // navigation columns side by side on the one screen whose whole job is navigation. The map and
+    // the radar scope pass `rail = false` and keep their whole width, which is also correct.
+    //
+    // A local `val` rather than a separate boolean, so the null check smart-casts into the lambda
+    // below and there is no `!!` standing between the reader and the reasoning.
+    val siblings =
+        if (rail && railWidth == LcarsRailWidth) LocalSiblingRail.current else null
+
     LcarsScreenFrame(
         title = title,
         modifier = modifier,
@@ -75,6 +106,13 @@ fun PulseScaffold(
         onBack = onBack,
         actions = actions,
         rail = rail,
+        // One number for the column and the header's corner block, or the corner does not close.
+        railWidth = if (siblings != null) SiblingRailWidth else railWidth,
+        railContent = if (siblings != null) {
+            { m -> SiblingRail(siblings, m) }
+        } else {
+            null
+        },
     ) {
         // The frame owns its own insets and the host Scaffold already pads above the bottom nav, so
         // there is no inner padding left to hand down.

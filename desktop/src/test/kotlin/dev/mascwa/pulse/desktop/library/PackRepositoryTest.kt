@@ -1,6 +1,6 @@
 package dev.mascwa.pulse.desktop.library
 
-import dev.mascwa.pulse.desktop.telemetry.ContentPack
+import dev.mascwa.pulse.core.telemetry.ContentPack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

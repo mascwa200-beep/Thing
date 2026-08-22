@@ -31,6 +31,7 @@ add_library(lcarsnative SHARED
         lcars_native.cpp
         whisper_jni.cpp
         llama_jni.cpp
+        js_jni.cpp
 )
 
 # ---- whisper.cpp -----------------------------------------------------------------------------
@@ -113,6 +114,52 @@ if(EXISTS ${LLAMA_DIR}/CMakeLists.txt)
     endif()
 else()
     message(STATUS "lcarsnative: no llama.cpp tree - the adjudicator will be absent")
+endif()
+
+# ---- QuickJS ---------------------------------------------------------------------------------
+#
+# The JavaScript engine yt-dlp needs for YouTube. quickjs-ng rather than Bellard's original because
+# it ships a real CMakeLists (the original is a Makefile), and because yt-dlp names it as supported.
+#
+# ⚠️ The static library target is `qjs` — read out of the pinned tag's own CMakeLists, not recalled;
+# `qjs_exe` and `qjsc` are the command-line tools and are deliberately not built. The whole library
+# is a handful of C files, which is also why it can be built and RUN on the host before CI sees it —
+# and doing that is what caught the pin being wrong. See the workflow: v0.11.0 could not solve a real
+# challenge in three minutes where v0.16.0 does it in eight seconds.
+set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs)
+if(EXISTS ${QUICKJS_DIR}/CMakeLists.txt)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    # ⚠️ **THESE NAMES MUST BE RE-READ WHENEVER THE PIN MOVES, and skipping that already produced a
+    # wrong comment here.** An earlier draft checked v0.11.0's CMakeLists, correctly found no
+    # `QJS_ENABLE_INSTALL`, wrote a note saying it "does not exist in this project at all" — and then
+    # the pin moved to v0.16.0, where it DOES exist (CMakeLists:32, defaulting ON). The note survived
+    # the bump and was false for the version actually shipping. Checking the option list is exactly
+    # what that note was warning about, so: read them again at every tag change.
+    #
+    # `QJS_ENABLE_INSTALL` is switched off because its install/EXPORT rules describe a `qjs` nobody
+    # installs. AGP never runs `install`, so this is tidiness rather than a fix.
+    #
+    # `QJS_BUILD_LIBC` already defaults OFF upstream; it is stated anyway so a future flip of that
+    # default cannot quietly pull the file/OS bindings into a JavaScript engine that runs untrusted
+    # player code. That is a security property, not tidiness.
+    set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(QJS_BUILD_LIBC OFF CACHE BOOL "" FORCE)
+    set(QJS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    # ⚠️ Cheap insurance against a link error 20 minutes into a CI round. A static library is being
+    # linked INTO a shared one, which needs position-independent code, and quickjs-ng's CMakeLists
+    # says nothing about PIC either way. The NDK's clang defaults to -fPIC for Android targets, so
+    # this is expected to be redundant — but "expected to be redundant" and "verified" are different
+    # things, and this line costs nothing where the round costs half an hour.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    add_subdirectory(${QUICKJS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/quickjs EXCLUDE_FROM_ALL)
+    target_link_libraries(lcarsnative qjs)
+    target_include_directories(lcarsnative PRIVATE ${QUICKJS_DIR})
+    # Gates the entry points themselves, so the ABSENCE of the symbol from the shipped library is
+    # what CI checks — the same reasoning as HAVE_WHISPER. A runtime flag would be a claim.
+    target_compile_definitions(lcarsnative PRIVATE HAVE_QUICKJS=1)
+    message(STATUS "lcarsnative: quickjs-ng found, JavaScript enabled")
+else()
+    message(STATUS "lcarsnative: no quickjs tree - YouTube extraction will have no JS runtime")
 endif()
 
 set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp)

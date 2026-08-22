@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Transparent lock-screen / glanceable widget. Deliberately over-stuffed for its size: greeting,
-     objective, full weather, markets + breadth, space weather, fuel, economy, news, tasks and device.
-     No background plate — every line carries a drop shadow so it stays legible over any wallpaper.
-     Lines with no data are hidden (GONE) at render time. Resizable, so it can grow to fit it all. -->
+<!--
+  The one widget.
+
+  ⚠️ **The rows are deliberately GENERIC — `widget_row_0`…`widget_row_15`, not `lock_weather`,
+  `lock_market` and so on.** The previous layout named every row after the feed that filled it,
+  which meant the widget could only ever show that exact list in that exact order at every size. A
+  row's meaning now comes from what the provider puts in it: text, colour, size and tap target are
+  all set at render time, so the same resource serves a two-cell widget showing four lines and a
+  full-height one showing sixteen. One layout, four `RemoteViews` built from it, no duplication to
+  drift.
+
+  ⚠️ The id `widget_lock` and the root id `widget_lock_root` are IDENTITY. Renaming either orphans
+  every instance already placed on a home screen, so they survive a rewrite that changed everything
+  else about this file.
+
+  No background plate — the widget sits on the user's own wallpaper — so every row carries the drop
+  shadow defined in `WidgetLine`, which is the only thing guaranteeing contrast over a light one.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_lock_root"
     android:layout_width="match_parent"
@@ -10,171 +24,24 @@
     android:orientation="vertical"
     android:padding="10dp">
 
-    <TextView
-        android:id="@+id/lock_header"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:text="LCARS"
-        android:textColor="#5AD1FF"
-        android:textStyle="bold"
-        android:textSize="13sp"
-        android:letterSpacing="0.06"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_objective"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#E9F4FF"
-        android:textStyle="bold"
-        android:textSize="12sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_wx"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#E9F4FF"
-        android:textSize="12sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_wx2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_market"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#E9F4FF"
-        android:textStyle="bold"
-        android:textSize="12sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_breadth"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_space"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_fuel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_econ"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_news"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:textColor="#E9F4FF"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_task"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#C7D4E6"
-        android:textSize="11sp"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
-
-    <TextView
-        android:id="@+id/lock_sys"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#8FA3BC"
-        android:textSize="10sp"
-        android:letterSpacing="0.04"
-        android:shadowColor="#E6000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4" />
+    <TextView android:id="@+id/widget_row_0" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_1" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_2" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_3" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_4" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_5" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_6" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_7" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_8" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_9" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_10" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_11" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_12" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_13" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_14" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_15" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_16" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_17" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_18" style="@style/WidgetLine.Row" />
+    <TextView android:id="@+id/widget_row_19" style="@style/WidgetLine.Row" />
 </LinearLayout>

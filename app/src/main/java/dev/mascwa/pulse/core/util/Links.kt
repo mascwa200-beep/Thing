@@ -161,19 +161,24 @@ fun requestInstallPermission(context: Context) {
     }
 }
 
-/** Launch the system installer for [file] (an APK). Returns false (and routes to the unknown-sources
- *  screen) when the install permission isn't granted yet; the installer itself is the user's confirm. */
+/**
+ * Install [file] (an APK). Returns false (and routes to the unknown-sources screen) when the install
+ * cannot start for want of permission.
+ *
+ * ⚠️ This no longer hands the file to the system installer. It goes through
+ * [dev.mascwa.pulse.data.update.ApkInstaller], which completes with **no confirmation at all** where
+ * the platform permits it — this app is a device owner on the owner's phone — and falls back to
+ * showing the old dialog where it does not. Both the automatic and the manual UPDATE control come
+ * through here on purpose, so the two can never drift into behaving differently.
+ *
+ * The permission is checked *after* an attempt rather than before it: a device owner does not need
+ * `REQUEST_INSTALL_PACKAGES` to install through a session, and asking first would send such a device
+ * to a settings screen it has no reason to visit.
+ */
 fun installApk(context: Context, file: File): Boolean {
-    if (!canInstallApks(context)) {
-        requestInstallPermission(context)
-        return false
-    }
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/vnd.android.package-archive")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    return runCatching { context.startActivity(intent); true }.getOrDefault(false)
+    if (dev.mascwa.pulse.data.update.ApkInstaller.install(context, file)) return true
+    if (!canInstallApks(context)) requestInstallPermission(context)
+    return false
 }
 
 /**

@@ -53,6 +53,16 @@ data class DesktopSettings(
     val libraryCategory: String = "",
 
     /**
+     * Which Lemmy and Mastodon servers the discussion tabs read.
+     *
+     * Both are federated: there is no single site to point at, and the one you choose decides what you
+     * see. The defaults are the largest general-purpose instance of each, which is what someone who has
+     * never thought about it would want.
+     */
+    val lemmyInstance: String = "lemmy.world",
+    val mastodonInstance: String = "mastodon.social",
+
+    /**
      * Offer live TV channels from the volunteer-maintained public catalogue as well as the handful of
      * broadcasters' own feeds the app ships with.
      *
@@ -75,6 +85,106 @@ data class DesktopSettings(
 
     /** Look for a newer build on launch. The check is one request and never installs anything by itself. */
     val autoCheckUpdates: Boolean = true,
+
+    // ----- Location & units -------------------------------------------------------------------
+    //
+    // ⚠️ A desktop has no GPS. Where it is has to be either guessed from the internet connection or
+    // typed, and the guess is genuinely unreliable — see `IpLocationService`, which measured three
+    // services disagreeing by two thousand miles from one machine because the traffic left through a
+    // proxy. So: guess once to fill the field in, then let it be corrected, and never silently
+    // re-guess over an answer someone typed.
+
+    /** Latitude in degrees. `null` means nothing has established it yet — distinct from 0.0, which is
+     *  a real place in the Gulf of Guinea and the classic wrong answer for "unset". */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+
+    /** "San Francisco, United States" — what to show, so the setting reads as a place not a number pair. */
+    val placeLabel: String = "",
+
+    /** True once a person has edited the place by hand. While this is false the app may fill the fields
+     *  in from the connection; once it is true it must not, ever — overwriting a correction is the one
+     *  behaviour that would make the setting useless. */
+    val placeSetByHand: Boolean = false,
+
+    /** Celsius when false. Named for the departure from the norm rather than as an enum, because there
+     *  are exactly two and a boolean here reads better at the call site than `Units.IMPERIAL`. */
+    val fahrenheit: Boolean = false,
+
+    /** Miles and feet when true, kilometres and metres when false. Separate from [fahrenheit] on
+     *  purpose: plenty of people want °C with miles, and one combined "imperial" switch would deny it. */
+    val miles: Boolean = false,
+
+    /** 12-hour clock when true. */
+    val twelveHourClock: Boolean = false,
+
+    /**
+     * The standby display — what the console shows when nobody is at it.
+     *
+     * ⚠️ Three switches rather than one, because they are three genuinely different mechanisms with
+     * three different failure modes. Windows does not let an application draw on the lock screen at
+     * all (Winlogon owns a separate desktop), so [standbyLockScreen] sets the *picture behind* it,
+     * which an unpackaged process can be refused; [standbyScreenSaver] registers a real `.scr` and
+     * cannot be; and [standbyHud] is just a window of ours. One switch would hide which of them is
+     * actually carrying the display, which is the question a person will have.
+     */
+    val standbyHud: Boolean = false,
+    val standbyScreenSaver: Boolean = false,
+    val standbyLockScreen: Boolean = false,
+
+    /**
+     * ISO-3166 alpha-2, for the figures that belong to a country rather than a coordinate — the
+     * economic indicators and the fuel prices.
+     *
+     * ⚠️ Separate from [latitude]/[longitude] on purpose, and not derived from them. Somebody may
+     * well want the weather where they are sitting and the economy of somewhere else, and deriving
+     * one from the other would take that away while looking like a convenience. The economy screen
+     * was hardcoded to "US" until this existed.
+     */
+    val countryCode: String = "US",
+
+    /**
+     * An optional EIA key, which unlocks weekly US retail pump prices on the fuel screen.
+     *
+     * ⚠️ Stored in plain text, exactly like [githubToken] and for the same reason: this machine has
+     * no secure element to put it behind, and the settings page says so rather than implying a
+     * protection that is not there. It is a free, read-only, rate-limited key.
+     */
+    val eiaKey: String = "",
+
+    /**
+     * Starred radio stations.
+     *
+     * ⚠️ Whole stations, not identifiers, and matched by [dev.mascwa.pulse.data.radio.RadioStation.sameStation]
+     * — the directory's stable uuid where there is one, the stream URL otherwise. Storing only an id
+     * would mean a starred station could not be listed at all until the directory answered.
+     */
+    val favoriteRadio: List<dev.mascwa.pulse.data.radio.RadioStation> = emptyList(),
+
+    // ----- Data & refresh ---------------------------------------------------------------------
+
+    /** How often a live feed re-fetches while its screen is open, in minutes. ⚠️ Only while OPEN —
+     *  off-screen there is no timer at all, which is what makes this cheap. */
+    val refreshMinutes: Int = 5,
+
+    /** Re-fetch the moment a screen is opened if what it holds is older than [refreshMinutes]. Off
+     *  means it shows what it has until the timer comes round, which is quieter on a metered link. */
+    val refreshOnOpen: Boolean = true,
+
+    // ----- The ops wall -----------------------------------------------------------------------
+
+    /**
+     * Which screens the ops wall shows, as [dev.mascwa.pulse.desktop.Screen] names.
+     *
+     * ⚠️ **Names, not ordinals.** An ordinal is a position in an enum, and inserting a screen anywhere
+     * but the end silently rewrites what someone chose — the wall would come back showing a different
+     * set with no way to tell it had changed. A name that no longer exists is simply dropped on load,
+     * which is the honest outcome for a screen that has been removed.
+     *
+     * The default is the four that answer "what is going on" without being asked a question first:
+     * what to do about it, the money, the sky, and the wire.
+     */
+    val opsWall: List<String> = listOf("ADVISORIES", "MARKETS", "WEATHER", "NEWS"),
 )
 
 private val defaultJson = Json {

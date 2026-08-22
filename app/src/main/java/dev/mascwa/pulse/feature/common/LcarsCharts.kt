@@ -15,13 +15,13 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.ui.theme.Pulse
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -433,18 +433,10 @@ fun LcarsMeter(
     }
 }
 
-/** 3.0 -> "3", 3.25 -> "3.3", 0.004 -> "4e-03" — short axis labels that stay honest. */
-internal fun trimNumber(v: Double): String {
-    // roundToInt() throws outright on NaN, and a NaN reaches here whenever any series value is
-    // NaN — minOf/maxOf propagate it straight into the axis ticks.
-    if (!v.isFinite()) return "—"
-    val whole = v.roundToInt()
-    return when {
-        v == 0.0 -> "0"
-        abs(v) >= 100 -> whole.toString()
-        abs(v) >= 1 && v == whole.toDouble() -> whole.toString()
-        abs(v) >= 1 -> String.format(Locale.US, "%.1f", v)
-        abs(v) >= 0.01 -> String.format(Locale.US, "%.2f", v)
-        else -> String.format(Locale.US, "%.0e", v)
-    }
-}
+/**
+ * 3.0 -> "3", 3.25 -> "3.3", 0.004 -> "4e-03" — short axis labels that stay honest.
+ *
+ * The rule itself moved to `Formatters.axisLabel` once the desktop grew a chart kit that draws the
+ * same ticks. This keeps the name its callers already use.
+ */
+internal fun trimNumber(v: Double): String = Formatters.axisLabel(v)

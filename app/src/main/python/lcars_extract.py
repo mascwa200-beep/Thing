@@ -18,10 +18,23 @@ import json
 import re
 from urllib.parse import parse_qs, urlparse
 
-# Prefer a single muxed stream. Separate video and audio would need a merging media source on the
-# player side — real machinery for a first pass — and every site that offers adaptive formats also
-# offers something progressive. The last fallback is "whatever you have".
-FORMAT = "best[ext=mp4][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]/best"
+# Adaptive first, muxed as the fallback.
+#
+# ⚠️ This used to ask only for a muxed stream, on the reasoning that separate tracks would need a
+# merging media source on the player side and "every site that offers adaptive formats also offers
+# something progressive". The second half of that has stopped being true: sites have been retiring
+# muxed formats, and the one that survives is well below the best available — so the app was quietly
+# playing a much worse picture than it could. The player now merges, so ask for the good one.
+#
+# The chain degrades rather than failing: best video + best audio, then a muxed mp4, then anything
+# muxed, then whatever exists at all. A site with no adaptive formats lands on exactly what it landed
+# on before.
+FORMAT = (
+    "bestvideo+bestaudio/"
+    "best[ext=mp4][acodec!=none][vcodec!=none]/"
+    "best[acodec!=none][vcodec!=none]/"
+    "best"
+)
 
 # Matched against the failure text ONLY when the exception type did not already settle it. Ordered,
 # and each is a phrase rather than a word: "private" alone matches "privately owned".
@@ -42,12 +55,46 @@ _BLOCKED_PATTERNS = (
 )
 
 
-class _Silent:
-    """A yt-dlp logger that says nothing.
+# Documentation hosts whose links are worth keeping in a captured note. Anything else that looks
+# like a URL is removed outright — see `_redact`.
+_DOC_HOSTS = ("github.com", "yt-dlp.org")
 
-    yt-dlp calls `debug`/`info`/`warning`/`error` on whatever it is given, so all four have to
-    exist — a partial stub raises AttributeError from inside the extractor, turning a clean refusal
-    into an unrelated crash. Everything worth knowing already comes back in the return value.
+_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+
+
+def _redact(text: str) -> str:
+    """A yt-dlp message with every address that is not documentation taken out of it.
+
+    ⚠️ **This is the whole reason the logger used to say nothing at all.** yt-dlp writes the address
+    it is working on into its own warnings and errors; on Android that would reach logcat, and this
+    app's diagnostic uploader puts its own logcat into the bundles it sends. A media URL is not a
+    credential so the secret scrubber does not catch it — it is viewing history, which is worse to
+    leak by accident because nobody thinks to look for it.
+
+    So: the query string goes from every URL (that is where signed tokens live), and the URL itself
+    survives only when its host is documentation. "See <the yt-dlp wiki page about this>" is the one
+    kind of link that earns its place in a diagnostic.
+    """
+
+    def _one(m: re.Match) -> str:
+        url = m.group(0)
+        bare = url.split("?", 1)[0].split("#", 1)[0]
+        try:
+            host = urlparse(bare).hostname or ""
+        except Exception:  # noqa: BLE001 - an unparseable URL is redacted, not trusted
+            return "<link>"
+        return bare if any(host == h or host.endswith("." + h) for h in _DOC_HOSTS) else "<link>"
+
+    return _URL_RE.sub(_one, text)
+
+
+class _Silent:
+    """A yt-dlp logger that says nothing at all.
+
+    ⚠️ Kept alongside `_Notes` rather than replaced by it, for the browse path specifically. There
+    the target is a **search query**, and a query is viewing history in a way no URL pattern can
+    catch — `_redact` removes addresses, and "warning: no results for <what the user typed>" contains
+    no address at all. Where redaction cannot be relied on, nothing is captured.
     """
 
     def debug(self, msg):  # noqa: D102 - the interface is yt-dlp's
@@ -61,6 +108,147 @@ class _Silent:
 
     def error(self, msg):  # noqa: D102
         pass
+
+
+class _Notes:
+    """A yt-dlp logger that keeps what it is told, minus the addresses.
+
+    yt-dlp calls `debug`/`info`/`warning`/`error` on whatever it is given, so all four have to
+    exist — a partial stub raises AttributeError from inside the extractor, turning a clean refusal
+    into an unrelated crash.
+
+    ⚠️ **`debug` and `info` are still dropped, and that is not laziness.** They are the chatty ones
+    and they carry an address on nearly every line; keeping them would mean redacting a hundred
+    strings per resolve for no diagnostic gain. Warnings and errors are where yt-dlp says something
+    went wrong, and that is the half worth reading.
+
+    ⚠️ The reason this app has never reported, for instance, that it has no JavaScript runtime and
+    YouTube formats are therefore missing, is **only** that the previous logger dropped the message
+    on the floor. It is not the `no_warnings` option: measured against yt-dlp 2026.07.04, that flag
+    makes no difference once a logger is installed — the same warnings arrive either way. Said here
+    because the opposite is the intuitive guess and it is worth not making twice.
+    """
+
+    #: More than this many distinct notes is noise, not a diagnosis.
+    #:
+    #: ⚠️ Raised from 12 with `jsc_trace` on, which adds a few lines of its own. The point of the
+    #: cap is to stop an unbounded log becoming the payload, not to ration a dozen useful facts.
+    MAX = 20
+    #: ⚠️ **Raised from 300, and that number cost a real diagnosis.**
+    #:
+    #: A device report arrived cut off mid-URL at exactly this boundary, and the truncation is what
+    #: hid the engine-status line the whole investigation turned on. 300 was chosen when these
+    #: lines only had to fit a compact failure message under the player; the director's own trace
+    #: is longer than that and is precisely the line worth reading in full.
+    #:
+    #: The trade, stated: a non-YouTube failure with no fallback now shows a longer message under
+    #: the player. That is a failure state where more information is the right answer, and under
+    #: the silent auto-switch the common case shows no message at all.
+    MAX_CHARS = 1200
+
+    def __init__(self):
+        self.notes = []
+
+    def _add(self, level, msg):
+        try:
+            text = _redact(str(msg)).strip()
+        except Exception:  # noqa: BLE001 - a note is never worth failing a resolve over
+            return
+        if not text:
+            return
+        line = "{}: {}".format(level, text[: self.MAX_CHARS])
+        # Deduped: yt-dlp repeats the same warning once per format on some paths, and twelve copies
+        # of one sentence would crowd out the eleven other things it said.
+        if line not in self.notes and len(self.notes) < self.MAX:
+            self.notes.append(line)
+
+    def note(self, text):
+        """Record something this app worked out, rather than something yt-dlp said.
+
+        Same cap and dedupe as everything else here, and no level prefix: a line about our own
+        configuration is not a warning from the extractor and should not read as one.
+        """
+        text = str(text).strip()
+        if text and text not in self.notes and len(self.notes) < self.MAX:
+            self.notes.append(text[: self.MAX_CHARS])
+
+    def debug(self, msg):  # noqa: D102 - the interface is yt-dlp's
+        pass
+
+    def info(self, msg):  # noqa: D102
+        pass
+
+    def warning(self, msg):  # noqa: D102
+        self._add("warning", msg)
+
+    def error(self, msg):  # noqa: D102
+        self._add("error", msg)
+
+
+_js_status = None
+
+#: Bump when this file changes in a way worth telling apart on a device.
+#:
+#: ⚠️ **This exists because "which code is actually running" turned out to be unanswerable.** A
+#: device report showed an extraction warning with no `javascript:` line at all, while the owner's
+#: Settings screen read a build that certainly has one. Two explanations fit — an older screenshot,
+#: or Chaquopy serving Python it extracted from a PREVIOUS install into the app's data directory,
+#: so a new APK would run old Python and every note would describe code that never shipped.
+#: Distinguishing them took forensic work on a character count. This makes it a glance instead.
+_PY_SOURCE = "s2"
+
+
+def _apk_build() -> str:
+    """The APK's build number, or '?' off-device. Paired with [_PY_SOURCE] to expose staleness.
+
+    Read from `BuildConfig` (package `dev.mascwa.pulse` — the namespace; the `.debug`
+    applicationId suffix does not move the class). If the Python is stale its `_PY_SOURCE` will
+    lag while this number moves, and the mismatch is the whole tell.
+    """
+    try:
+        from java import jclass
+        return str(jclass('dev.mascwa.pulse.BuildConfig').VERSION_CODE)
+    except Exception:  # noqa: BLE001 - off-device, or the class moved; neither is worth raising
+        return "?"
+
+
+def _enable_js_runtime() -> str:
+    """Register the in-process JavaScript engine with yt-dlp, and report what happened.
+
+    ⚠️ **Importing the module IS the registration.** `lcars_jsi` decorates its provider class with
+    `@register_provider`, which runs at class-definition time and puts it in a global registry — so
+    nothing here has to be called, only imported. Python caches modules, so repeat calls are free
+    and, more to the point, cannot double-register: yt-dlp *asserts* on a duplicate key, which would
+    turn a second resolve into an exception.
+
+    ⚠️ **The status line is the diagnostic that was missing.** Whether YouTube extraction has a
+    JavaScript engine is the single most useful fact about a failed resolve, and until now the app
+    could not have said either way. It rides in the notes, so it appears exactly where a refusal is
+    already being explained — and it is worth having on a success too, because "the engine is live,
+    so the fault is elsewhere" is as useful an answer as the negative.
+
+    Never raises: an engine that will not load has to cost some formats, not the whole resolve.
+    """
+    global _js_status
+    if _js_status is None:
+        try:
+            import lcars_jsi
+            # ⚠️ The reason comes from `lcars_jsi.status()`, which names ONE cause per branch —
+            # never re-worded here. A first cut rendered every failure as "engine not in this
+            # build", which CI disproves (it asserts the engine's symbol is in the shipped
+            # library), and that wrong sentence cost a real diagnosis.
+            _js_status = "javascript: {}".format(
+                lcars_jsi.status() if lcars_jsi.available()
+                else "NONE ({})".format(lcars_jsi.status()))
+        except Exception as exc:  # noqa: BLE001
+            _js_status = "javascript: NONE (provider failed: {}: {})".format(
+                type(exc).__name__, exc)
+        # ⚠️ Stamped so a stale-Python install is visible rather than inferred. Chaquopy extracts
+        # the app's Python to the data directory; if that copy ever survived an app update, the
+        # new APK would run the OLD extractor and every note would describe code that is not what
+        # shipped. This line makes that state self-announcing instead of a forensic exercise.
+        _js_status += " · py {}/apk {}".format(_PY_SOURCE, _apk_build())
+    return _js_status
 
 
 def _expiry_ms(url: str) -> int:
@@ -85,6 +273,21 @@ def _expiry_ms(url: str) -> int:
     return 0
 
 
+def _earliest_expiry(*urls: str) -> int:
+    """The soonest stated deadline across several addresses, or 0 when none of them says.
+
+    ⚠️ The two halves of an adaptive pair are signed independently and do not have to die together,
+    so the pair is only usable for as long as its shorter-lived half. Taking the video's expiry alone
+    lets the freshness check approve a pair whose audio address is already dead — which surfaces as a
+    video that plays in silence or stops, rather than one that re-resolves.
+
+    Zero from a URL means "did not say", and an unknown deadline must not win a `min()` against a
+    real one — so zeros are dropped rather than compared.
+    """
+    stated = [ms for ms in (_expiry_ms(u) for u in urls if u) if ms > 0]
+    return min(stated) if stated else 0
+
+
 def _classify(exc) -> str:
     """Coarse reason, from the exception type first and its text only as a fallback."""
     name = type(exc).__name__
@@ -102,22 +305,92 @@ def _classify(exc) -> str:
     return "FAILED"
 
 
+def _headers(f: dict) -> dict:
+    """The headers yt-dlp says this format's address must be fetched with.
+
+    ⚠️ **Not optional, and dropping them is what made playback fail with a bad HTTP status.** A signed
+    media URL is minted for the client that asked for it; a later request carrying a different
+    User-Agent — or missing the Accept/Sec-Fetch values the extractor sent — gets refused. yt-dlp
+    knows exactly what it used and puts it in `http_headers`; this app used to throw that away and
+    then wonder why the address it had just been handed came back 403.
+
+    Values are coerced to strings because they cross into Kotlin as JSON and a stray non-string would
+    fail to decode into a Map<String, String> at the far end.
+    """
+    raw = f.get("http_headers") or {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items() if k and v}
+
+
 def _pick(info: dict) -> dict:
-    """The chosen stream, plus an audio-only address when one is separately available."""
+    """The chosen video and audio tracks, each with the headers its address needs.
+
+    Three shapes come back from yt-dlp and all three are handled:
+
+    * a **muxed** selection — one `url` on `info` carrying both, with no separate audio;
+    * an **adaptive** selection — `requested_formats` holding a video half and an audio half, which
+      the player merges;
+    * neither, in which case the best audio-only format in the list is offered on its own so LISTEN
+      still works even when nothing playable as video was found.
+    """
     stream = info.get("url") or ""
+    stream_headers = _headers(info) if stream else {}
     audio = ""
-    for f in info.get("formats") or []:
-        if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none"):
-            # Formats arrive worst-first, so the last audio-only one is the best available.
-            audio = f.get("url") or audio
-    if not stream and info.get("requested_formats"):
-        # A merged selection: take the video half as the stream and the audio half beside it.
+    audio_headers = {}
+    # ⚠️ The question that decides the merge is **"does the chosen stream carry its own audio"**, and
+    # nothing else. An earlier version asked whether both addresses came out of the same adaptive
+    # pair, which is one step removed and gets a real case wrong: when the pair's audio half has no
+    # address, `audio` is filled from the formats list instead, "came from the pair" goes false, and
+    # the player is handed a VIDEO-ONLY address on the muxed branch. It plays perfectly, in silence,
+    # and reports no error. Asking about the stream itself is right in every shape.
+    #
+    # A top-level `url` is a muxed selection, so it has audio unless yt-dlp explicitly says it does
+    # not. `None` means "unknown", which for a muxed pick means yes.
+    stream_has_audio = bool(stream) and info.get("acodec") != "none"
+
+    if info.get("requested_formats"):
+        # An adaptive selection. Take the video half as the stream and the audio half beside it, and
+        # keep each one's OWN headers — yt-dlp emits them per format and the two genuinely differ.
         for f in info["requested_formats"]:
             if f.get("vcodec") not in (None, "none"):
-                stream = f.get("url") or stream
+                if f.get("url"):
+                    stream, stream_headers = f["url"], _headers(f)
+                    # A fully-muxed entry can appear inside `requested_formats`; taken as the video
+                    # half, it must not then be merged with a second audio track.
+                    #
+                    # ⚠️ **An ABSENT `acodec` is read the OPPOSITE way here to the top-level case
+                    # above, deliberately.** There, a bare `url` IS the muxed selection, so silence
+                    # about the audio codec means it has one. Here the entry is one half of a pair
+                    # yt-dlp split precisely BECAUSE the halves are separate, so silence means it
+                    # does not. Each default follows from what its own container implies, and
+                    # levelling them would be wrong in one place or the other — the failure being
+                    # traded is silent video against doubled audio. (In practice yt-dlp populates
+                    # both codecs on every `requested_formats` entry, so this default decides
+                    # nothing today; it is written down so a later reader does not "fix" the
+                    # asymmetry into a real bug.)
+                    stream_has_audio = f.get("acodec") not in (None, "none")
             elif f.get("acodec") not in (None, "none"):
-                audio = f.get("url") or audio
-    return {"stream": stream, "audio": audio}
+                if f.get("url"):
+                    audio, audio_headers = f["url"], _headers(f)
+
+    if not audio:
+        for f in info.get("formats") or []:
+            if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none"):
+                # Formats arrive worst-first, so the last audio-only one is the best available.
+                if f.get("url"):
+                    audio, audio_headers = f["url"], _headers(f)
+
+    return {
+        "stream": stream,
+        "audio": audio,
+        "stream_headers": stream_headers,
+        "audio_headers": audio_headers,
+        # ⚠️ Whether the player has to MERGE, decided here rather than inferred there. "Both fields
+        # are set" is NOT the same question: a muxed stream can sit beside a separate audio-only
+        # rendition for LISTEN, and merging those would play the audio twice.
+        "adaptive": bool(stream) and bool(audio) and not stream_has_audio,
+    }
 
 
 def resolve(url: str) -> str:
@@ -127,17 +400,28 @@ def resolve(url: str) -> str:
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": "{}: {}".format(type(exc).__name__, exc), "kind": "UNAVAILABLE"})
 
+    notes = _Notes()
+    # Registers the in-process JavaScript engine before anything asks YouTube for a format, and
+    # records which way that went. Both halves matter: without a runtime, yt-dlp warns that "some
+    # formats may be missing" — which is the fault this exists to remove — and until now the app
+    # could not have told you either way.
+    notes.note(_enable_js_runtime())
     opts = {
         "quiet": True,
-        "no_warnings": True,
+        # False because we now want the warnings and the flag should agree with the intent.
+        # ⚠️ It is NOT what makes the notes exist — measured, this changes nothing at all once a
+        # logger is installed; the logger is the whole mechanism. Kept as defence in case a later
+        # yt-dlp routes warnings through `report_warning`, which does respect it.
+        "no_warnings": False,
         # ⚠️ A REAL PRIVACY FIX, not tidiness. `quiet` suppresses progress but NOT errors: yt-dlp
         # still writes a failure to stderr, and that line contains the address being resolved.
         # On Android stderr goes to logcat, and this app's diagnostic uploader includes its own
         # logcat in the bundles it sends — so a failed resolve would put a piece of viewing history
         # into an uploaded report. The credential scrubber does not catch it, because a video URL is
-        # not a credential; it is history. Silencing the logger keeps the reason in the return value,
-        # which never leaves the device.
-        "logger": _Silent(),
+        # not a credential; it is history. Routing yt-dlp's output into a logger keeps it off stderr;
+        # `_Notes` then redacts the addresses and hands the reason back in the return value, which
+        # never leaves the device.
+        "logger": notes,
         # And do not let a fatal error print separately either.
         "noprogress": True,
         "skip_download": True,
@@ -149,39 +433,100 @@ def resolve(url: str) -> str:
         # inside the extractor is a confusing way to lose a resolve.
         "cachedir": False,
         "extract_flat": False,
+        # ⚠️ **Makes the JS challenge director state its own case, which is the fastest possible
+        # answer to "is our provider there, and is it available".** Read out of `_director.py`,
+        # this logs `JS Challenge Providers: …` with per-provider availability and the computed
+        # preference scores — captured by the logger above and shown in the Crash Console.
+        #
+        # It is on permanently and deliberately: the whole reason this fault took forensics is
+        # that the evidence was not being collected when it happened. A trace line costs nothing
+        # and is worthless if it has to be switched on AFTER the failure you wanted it for.
+        #
+        # ⚠️ NOT `js_runtimes` — that key would be actively harmful here. `_clean_js_runtimes`
+        # strips any name outside deno/node/bun/quickjs and warns about it, so naming our provider
+        # there would emit a misleading "unsupported runtime" line while changing nothing. Our
+        # `runtime_info` override already bypasses that gate correctly.
+        "extractor_args": {"youtube": {"jsc_trace": ["true"]}},
     }
     try:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as exc:  # noqa: BLE001 - the classification IS the product
-        return json.dumps({"error": str(exc)[:400], "kind": _classify(exc)})
+        return json.dumps({
+            "error": _redact(str(exc))[:400], "kind": _classify(exc), "notes": notes.notes,
+        })
 
     if not info:
-        return json.dumps({"error": "the extractor returned nothing", "kind": "NO_STREAM"})
+        return json.dumps({
+            "error": "the extractor returned nothing", "kind": "NO_STREAM", "notes": notes.notes,
+        })
     # A playlist can still arrive when `noplaylist` could not be honoured; take the first entry.
     if info.get("_type") == "playlist":
         entries = [e for e in (info.get("entries") or []) if e]
         if not entries:
-            return json.dumps({"error": "that address is an empty playlist", "kind": "NO_STREAM"})
+            return json.dumps({
+                "error": "that address is an empty playlist", "kind": "NO_STREAM",
+                "notes": notes.notes,
+            })
         info = entries[0]
 
-    picked = _pick(info)
-    if not picked["stream"] and not picked["audio"]:
-        return json.dumps({"error": "no playable stream in the result", "kind": "NO_STREAM"})
+    # ⚠️ **THE ASSEMBLY IS GUARDED TOO — as a contract, not because a specific field is known to
+    # break.** Everything below reads out of a dictionary this code did not build, while the
+    # docstring above promises never to raise, and the failure mode if it did would be the
+    # misleading kind: the exception crosses back through Chaquopy, `callString` returns null, and
+    # the screen blames the PYTHON RUNTIME for a bridge that worked perfectly.
+    #
+    # ⚠️ **The obvious example is NOT reachable, and saying so is the point of this note.** A first
+    # draft justified this guard with "`float()` on a duration yt-dlp reported as a string". It
+    # cannot be: `extract_info` runs with `process=True` and `extract_flat: False`, so
+    # `process_video_result` always calls `sanitize_numeric_fields`, and `duration` is in
+    # `_NUMERIC_FIELDS` — anything non-numeric becomes `int_or_none(...)`, i.e. None. So `duration`
+    # arrives as int | float | None and `float(x or 0)` is total. `id` is forced through `str()` on
+    # the same path. What remains genuinely unguarded upstream is `_pick` walking
+    # `requested_formats` and `_earliest_expiry` parsing a query string, neither of which yt-dlp
+    # sanitises for us. The guard is cheap, changes nothing on the working path, and makes the
+    # docstring true by construction rather than by argument.
+    try:
+        picked = _pick(info)
+        if not picked["stream"] and not picked["audio"]:
+            return json.dumps({
+                "error": "no playable stream in the result", "kind": "NO_STREAM",
+                "notes": notes.notes,
+            })
+        return _resolved(url, info, picked, notes)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({
+            "error": "could not read the extractor's result: {}: {}".format(
+                type(exc).__name__, _redact(str(exc))[:200]),
+            "kind": "FAILED", "notes": notes.notes,
+        })
 
-    best = picked["stream"] or picked["audio"]
+
+def _resolved(url: str, info: dict, picked: dict, notes: "_Notes") -> str:
+    """The success payload, assembled from what the extractor returned."""
     return json.dumps({
         "id": info.get("id") or "",
         "title": info.get("title") or "",
         "duration": float(info.get("duration") or 0),
         "stream": picked["stream"],
         "audio": picked["audio"],
+        "stream_headers": picked["stream_headers"],
+        "audio_headers": picked["audio_headers"],
+        "adaptive": picked["adaptive"],
         "uploader": info.get("uploader") or info.get("channel") or "",
         "thumbnail": info.get("thumbnail") or "",
         "page": info.get("webpage_url") or url,
-        "expires": _expiry_ms(best),
+        # ⚠️ The EARLIEST of the two, not the video's. Both halves of an adaptive pair are signed
+        # separately and they do not have to die together; reading only the video's expiry lets the
+        # freshness check approve a pair whose audio address is already dead, and the failure then
+        # looks like a video that plays silently or stops rather than one that needed re-resolving.
+        "expires": _earliest_expiry(picked["stream"], picked["audio"]),
         "live": bool(info.get("is_live")),
         "extractor": info.get("extractor_key") or "",
+        # Whatever yt-dlp said along the way, addresses removed. Present on success too: the most
+        # useful note of all — "no JavaScript runtime, formats may be missing" — arrives on a resolve
+        # that otherwise looks like it worked.
+        "notes": notes.notes,
     })
 
 
@@ -208,10 +553,18 @@ def download(url: str, dest_dir: str) -> str:
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": "cannot create {}: {}".format(dest_dir, exc), "kind": "FAILED"})
 
+    notes = _Notes()
+    # Registers the in-process JavaScript engine before anything asks YouTube for a format, and
+    # records which way that went. Both halves matter: without a runtime, yt-dlp warns that "some
+    # formats may be missing" — which is the fault this exists to remove — and until now the app
+    # could not have told you either way.
+    notes.note(_enable_js_runtime())
     opts = {
         "quiet": True,
-        "no_warnings": True,
-        "logger": _Silent(),  # same privacy reason as resolve(): a failure line carries the URL
+        # As in resolve(): the logger is what captures, not this flag. A harvest that fails silently
+        # is exactly as opaque as a resolve that does.
+        "no_warnings": False,
+        "logger": notes,  # same privacy reason as resolve(): a failure line carries the URL
         "noprogress": True,
         "noplaylist": True,
         "format": FORMAT,
@@ -226,11 +579,13 @@ def download(url: str, dest_dir: str) -> str:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if not info:
-                return json.dumps({"error": "the extractor returned nothing", "kind": "NO_STREAM"})
+                return json.dumps({"error": "the extractor returned nothing", "kind": "NO_STREAM",
+                                   "notes": notes.notes})
             if info.get("_type") == "playlist":
                 entries = [e for e in (info.get("entries") or []) if e]
                 if not entries:
-                    return json.dumps({"error": "that address is an empty playlist", "kind": "NO_STREAM"})
+                    return json.dumps({"error": "that address is an empty playlist",
+                                       "kind": "NO_STREAM", "notes": notes.notes})
                 info = entries[0]
             # Where the file actually landed. `requested_downloads` is authoritative on modern
             # yt-dlp (it reflects merges and remuxes); prepare_filename is the documented fallback.
@@ -240,7 +595,8 @@ def download(url: str, dest_dir: str) -> str:
             if not path:
                 path = ydl.prepare_filename(info)
     except Exception as exc:  # noqa: BLE001
-        return json.dumps({"error": str(exc)[:400], "kind": _classify(exc)})
+        return json.dumps({"error": _redact(str(exc))[:400], "kind": _classify(exc),
+                           "notes": notes.notes})
 
     size = 0
     try:
@@ -249,7 +605,8 @@ def download(url: str, dest_dir: str) -> str:
     except Exception:  # noqa: BLE001
         pass
     if not path or size <= 0:
-        return json.dumps({"error": "the download produced no file", "kind": "FAILED"})
+        return json.dumps({"error": "the download produced no file", "kind": "FAILED",
+                           "notes": notes.notes})
     return json.dumps({
         "file": os.path.basename(path),
         "path": path,

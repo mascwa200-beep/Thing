@@ -10,6 +10,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -52,6 +53,9 @@ import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.feature.weather.WeatherScreen
 import dev.mascwa.pulse.feature.weather.WeatherViewModel
 import dev.mascwa.pulse.navigation.LocalConsoleSection
+import dev.mascwa.pulse.navigation.LocalSiblingRail
+import dev.mascwa.pulse.navigation.SiblingRailContext
+import dev.mascwa.pulse.navigation.groupOf
 import dev.mascwa.pulse.navigation.SHORTCUT_ROUTES
 import dev.mascwa.pulse.navigation.sectionOf
 import dev.mascwa.pulse.navigation.Routes
@@ -141,7 +145,21 @@ fun PulseApp(
         //
         // And when you are, by the same route: `ProvideStardate` runs ONE hourly coroutine here
         // rather than a timer per screen, and the header reads it beside the section name.
-        CompositionLocalProvider(LocalConsoleSection provides sectionOf(currentRoute)) {
+        // And which screens sit beside this one, by the same route and for the same reason. The
+        // shared frame turns this into the left column of every screen the directory lists, so
+        // twenty-nine of them changed shape without one being edited — see `SiblingRail`.
+        //
+        // ⚠️ `remember(currentRoute)`: without it every recomposition of this shell mints a fresh
+        // context object, and a composition local whose value is never equal to its last value
+        // invalidates all of its readers on every frame — here, the whole NavHost.
+        val siblings = remember(currentRoute) {
+            val route = currentRoute
+            groupOf(route)?.let { SiblingRailContext(it, route!!, ::openApp) }
+        }
+        CompositionLocalProvider(
+            LocalConsoleSection provides sectionOf(currentRoute),
+            LocalSiblingRail provides siblings,
+        ) {
         ProvideStardate {
         NavHost(
             navController = navController,
@@ -511,18 +529,24 @@ fun PulseApp(
     }
 
     // Deep-link from a notification tap or a launcher shortcut.
+    //
+    // ⚠️ HOME used to be special-cased out of this entirely — the route was recognised, skipped, and
+    // consumed. The reasoning was presumably "the app is already there", which is only true on a
+    // cold start: on a warm one you are wherever you last were, so a deep link to HOME left you on
+    // Settings or MENU and looked like a dead tap. That is not a widget bug, though it is where it
+    // was found — **the one notification board sends `"home"` too**, so its tap had the same
+    // defect. HOME now takes the ordinary top-destination path like every other tab; arriving when
+    // already there is a no-op, because `navigateTopLevel` is `launchSingleTop`.
     LaunchedEffect(startRoute) {
         if (!startRoute.isNullOrBlank()) {
-            if (startRoute != Routes.HOME) {
-                when {
-                    // Legacy "tacnet" deep-links (old shortcuts/notifications) land on the MENU directory.
-                    startRoute.substringBefore('?') == "tacnet" -> navigateTopLevel(Routes.MENU)
-                    TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
-                    // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
-                    // or an argumented one like "survival?guide=fire" — match on the base route).
-                    startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
-                        runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
-                }
+            when {
+                // Legacy "tacnet" deep-links (old shortcuts/notifications) land on the MENU directory.
+                startRoute.substringBefore('?') == "tacnet" -> navigateTopLevel(Routes.MENU)
+                TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
+                // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
+                // or an argumented one like "survival?guide=fire" — match on the base route).
+                startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
+                    runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
             }
             // Consume it so re-tapping the SAME shortcut after navigating away fires again.
             onStartRouteConsumed()

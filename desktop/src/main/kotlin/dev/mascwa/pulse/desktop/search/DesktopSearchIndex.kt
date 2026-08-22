@@ -1,10 +1,10 @@
 package dev.mascwa.pulse.desktop.search
 
 import dev.mascwa.pulse.desktop.library.LibraryRepository
-import dev.mascwa.pulse.desktop.library.toSearchEntry
+import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import dev.mascwa.pulse.desktop.study.StudyStore
-import dev.mascwa.pulse.desktop.telemetry.DeviceSearch
-import dev.mascwa.pulse.desktop.telemetry.DeviceSearch.RecordKind
+import dev.mascwa.pulse.core.telemetry.DeviceSearch
+import dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind
 
 /**
  * Everything this desktop can search, gathered into one list.

@@ -38,6 +38,22 @@ class MediaExtractor(private val python: PythonRuntime) {
     private val cache = LinkedHashMap<String, MediaItem>()
 
     /**
+     * The last extraction's own account of itself, **untruncated**, for the Crash Console.
+     *
+     * ⚠️ **This exists because the compact on-screen text hid the one line that mattered.** The
+     * player folds the extractor's notes into a failure line capped at 300 characters per note,
+     * and a device report arrived cut off mid-URL with the engine status missing entirely —
+     * turning a one-glance diagnosis into forensics. The same data, uncapped, lands here.
+     *
+     * Kept in memory only, and only the most recent one: it is a diagnostic, not a history, and
+     * writing viewing activity to disk is not a trade worth making for it. Every string in it has
+     * already been through `_redact` on the Python side, which strips resolved media addresses.
+     */
+    @Volatile
+    var lastReport: String? = null
+        private set
+
+    /**
      * Resolve [url] to a playable item.
      *
      * Returns a cached item when one is still fresh, so pressing play again on something already
@@ -67,8 +83,17 @@ class MediaExtractor(private val python: PythonRuntime) {
                 "The extractor returned something unreadable.",
             )
         }
+        // ⚠️ Recorded HERE — the one point every resolve reaches, success or refusal — rather than
+        // at each outcome. The engine-status note rides on a SUCCESSFUL resolve too, and that is
+        // exactly the case worth reading: extraction that "worked" while quietly missing formats
+        // is what a dead JavaScript engine looks like from the outside.
+        lastReport = buildString {
+            append("verdict: ").append(wire.kind ?: "ready")
+            wire.error?.takeIf { it.isNotBlank() }?.let { append("\nerror: ").append(it) }
+            wire.notes.forEach { append('\n').append(it) }
+        }
         if (wire.kind != null) {
-            return MediaResolution.Refused(reasonOf(wire.kind), wire.error.orEmpty())
+            return MediaResolution.Refused(reasonOf(wire.kind), wire.error.orEmpty(), wire.notes)
         }
 
         val item = MediaItem(
@@ -79,16 +104,21 @@ class MediaExtractor(private val python: PythonRuntime) {
             durationS = wire.duration.takeIf { it.isFinite() && it > 0 } ?: 0.0,
             streamUrl = wire.stream,
             audioUrl = wire.audio,
+            streamHeaders = wire.stream_headers,
+            audioHeaders = wire.audio_headers,
+            isAdaptive = wire.adaptive,
             uploader = wire.uploader,
             thumbnailUrl = wire.thumbnail,
             pageUrl = wire.page.ifBlank { key },
             expiresAtMs = wire.expires,
             isLive = wire.live,
+            notes = wire.notes,
         )
         if (!item.isResolved) {
             return MediaResolution.Refused(
                 MediaResolution.Reason.NO_STREAM,
                 "Nothing playable in the result.",
+                wire.notes,
             )
         }
         // ⚠️ Only cached when the address states when it dies. Caching an unknown-expiry item would
@@ -112,6 +142,21 @@ class MediaExtractor(private val python: PythonRuntime) {
     suspend fun videoId(url: String): String =
         python.callString(MODULE, "video_id", url.trim())?.trim().orEmpty()
 
+    /**
+     * Forget the cached address for one page, so the next [resolve] genuinely re-resolves.
+     *
+     * ⚠️ For the case the freshness check cannot catch: an address the source refuses *before* its
+     * stated expiry. [MediaItem.isFresh] believes what the extractor said about lifetime, and a
+     * signed URL can be invalidated early — so when playback comes back with a bad HTTP status, the
+     * entry has to be thrown out explicitly or the retry would be handed the same dead address it
+     * just failed on.
+     */
+    suspend fun evict(url: String) {
+        val key = url.trim()
+        if (key.isEmpty()) return
+        mutex.withLock { cache.remove(key) }
+    }
+
     /** Forget every cached address, e.g. when the user wipes state. */
     suspend fun clear() {
         mutex.withLock { cache.clear() }
@@ -131,6 +176,26 @@ class MediaExtractor(private val python: PythonRuntime) {
         val duration: Double = 0.0,
         val stream: String = "",
         val audio: String = "",
+        /**
+         * The headers each address must be fetched with, as the extractor reported them.
+         *
+         * ⚠️ Snake case because these are the Python side's own key names, and the whole point of
+         * this type is to be the literal wire shape rather than a translated one. Defaulted like
+         * every other field, so an older extractor that does not send them still decodes — it just
+         * yields a `MediaItem` with no headers, which is exactly the behaviour that was there before.
+         */
+        val stream_headers: Map<String, String> = emptyMap(),
+        val audio_headers: Map<String, String> = emptyMap(),
+        /** True when [stream] is video-only and [audio] is its other half. See `MediaItem.isAdaptive`. */
+        val adaptive: Boolean = false,
+    /**
+     * Whatever yt-dlp said on the way, addresses already removed on the Python side.
+     *
+     * ⚠️ Present on SUCCESS as well as failure. "No JavaScript runtime, formats may be missing"
+     * arrives on a resolve that otherwise looks fine, and is the sentence that explains a refusal
+     * several seconds later.
+     */
+    val notes: List<String> = emptyList(),
         val uploader: String = "",
         val thumbnail: String = "",
         val page: String = "",

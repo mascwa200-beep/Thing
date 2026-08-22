@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.desktop.remote
 
+import dev.mascwa.pulse.core.telemetry.RemoteCrypto
 import java.io.File
 import java.nio.file.Files
 import java.security.Signature

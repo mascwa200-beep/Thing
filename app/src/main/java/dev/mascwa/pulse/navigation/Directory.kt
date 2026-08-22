@@ -191,3 +191,36 @@ fun sectionOf(route: String?): String? =
  * adding the readout cost no per-screen edit across thirty-five of them.
  */
 val LocalConsoleSection = compositionLocalOf<String?> { null }
+
+/** route → the group it is filed under, built once alongside [SECTION_OF]. */
+private val GROUP_OF: Map<String, MenuGroup> =
+    GROUPS.flatMap { g -> g.entries.map { it.route to g } }.toMap()
+
+/**
+ * The directory group a route belongs to, or null for a bottom-nav tab or an unlisted sub-screen.
+ *
+ * ⚠️ Matches on the base route for the same reason [sectionOf] does: `survival?guide=knots` is still
+ * the Knowledge Library, and a column of siblings that vanished the moment you opened an actual page
+ * would disappear exactly where it is most useful.
+ */
+fun groupOf(route: String?): MenuGroup? =
+    route?.substringBefore('?')?.substringBefore('/')?.let { GROUP_OF[it] }
+
+/** Which group is on screen, which of its entries you are looking at, and how to open another. */
+data class SiblingRailContext(
+    val group: MenuGroup,
+    val route: String,
+    val onOpen: (String) -> Unit,
+)
+
+/**
+ * The siblings of the screen currently on top, or null when it has none.
+ *
+ * ⚠️ Provided ONCE around the NavHost, exactly as [LocalConsoleSection] is, and for the same reason:
+ * it is how twenty-nine screens changed shape without one of them being edited. A screen does not
+ * pass this, does not read it, and does not know it exists — the shared frame does.
+ *
+ * Null for the six bottom-nav tabs and for anything the directory does not list, so those screens
+ * keep the decorative rail they have always had.
+ */
+val LocalSiblingRail = compositionLocalOf<SiblingRailContext?> { null }

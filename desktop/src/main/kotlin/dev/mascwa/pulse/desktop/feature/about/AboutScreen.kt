@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.desktop.telemetry.UpdatePolicy
+import dev.mascwa.pulse.core.telemetry.UpdatePolicy
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.NightwirePalette
@@ -28,6 +28,7 @@ import dev.mascwa.pulse.desktop.theme.LcarsButton
 import dev.mascwa.pulse.desktop.theme.LcarsFillRow
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
+import dev.mascwa.pulse.desktop.update.ScheduledUpdate
 import dev.mascwa.pulse.desktop.theme.LcarsSwitch
 import dev.mascwa.pulse.desktop.theme.LcarsTextField
 import dev.mascwa.pulse.desktop.theme.Pulse
@@ -146,11 +147,53 @@ fun AboutScreen(
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
                     modifier = Modifier.widthIn(max = 620.dp),
                 )
-                Spacer(Modifier.height(10.dp))
+            }
+        }
+
+        // ⚠️ This panel is a READOUT, not the mechanism. Nothing on this page has to be visited for
+        // the machine to stay current — that is the whole point of the hourly task below, and saying
+        // so here is what stops somebody believing they have to come and press CHECK NOW.
+        LcarsFrame(Modifier.fillMaxWidth().padding(top = 12.dp), accent = c.amber) {
+            Column {
                 Text(
-                    "Installing runs the Windows installer, which asks for confirmation and cannot be " +
-                        "skipped — an app is not allowed to replace itself silently.",
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+                    "Upgrading itself",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (ScheduledUpdate.isInstalled()) {
+                        "An hourly task runs as you, with no window: it checks, waits for a build to go " +
+                            "green, downloads it, asks this console to stand down if it is open, upgrades, " +
+                            "and puts it back. Nothing is clicked and nothing is asked."
+                    } else {
+                        // Honest rather than aspirational — a development run has no launcher for a
+                        // task to point at, and claiming otherwise is the failure the standby
+                        // diagnostics exist to prevent.
+                        "The hourly task is not registered on this machine. That is normal for a build " +
+                            "run from source: there is no installed launcher for a task to run. This " +
+                            "console still upgrades itself when you close it."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.muted,
+                    modifier = Modifier.widthIn(max = 620.dp),
+                )
+                ScheduledUpdate.lastPass()?.let { line ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Last pass — $line",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
+                        modifier = Modifier.widthIn(max = 620.dp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    // ⚠️ The one thing about this that IS a hard limit, said plainly. Windows Installer
+                    // cannot write over files a running program holds open, so an upgrade can only
+                    // happen while this console is shut — the task closes it and reopens it, but a
+                    // machine that never idles long enough will simply be upgraded next hour.
+                    "Windows cannot replace files this program has open, so the upgrade happens in the " +
+                        "moment between closing and reopening. Installing needs no confirmation: this is " +
+                        "a per-user install, under your own profile, so there is nothing to elevate.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
                     modifier = Modifier.widthIn(max = 620.dp),
                 )
             }
