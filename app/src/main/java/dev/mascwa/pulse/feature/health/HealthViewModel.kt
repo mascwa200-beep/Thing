@@ -10,6 +10,7 @@ import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.food.Food
+import dev.mascwa.pulse.data.food.FoodLookup
 import dev.mascwa.pulse.data.settings.HealthSettings
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -369,6 +370,41 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     else -> ""
                 },
             )
+        }
+    }
+
+    /**
+     * Look up a scanned barcode.
+     *
+     * ⚠️ Every outcome is a sentence, because Open Food Facts answers a barcode it has never heard of
+     * with **HTTP 200 and `status: 0`** — probed, not assumed. "The request failed" and "nobody has
+     * ever added this product" arrive as the same HTTP code and are completely different things to
+     * tell somebody standing in a supermarket: one means try again, the other means type it in.
+     */
+    fun lookUpBarcode(code: String) {
+        searchJob?.cancel()
+        _search.value = Search(query = code, busy = true)
+        searchJob = viewModelScope.launch {
+            when (val r = c.foodRepository.byBarcode(code)) {
+                is FoodLookup.Found -> {
+                    _search.value = Search()
+                    _picked.value = r.food
+                }
+                is FoodLookup.NoNutrition -> _search.value = Search(
+                    query = code,
+                    note = "${r.food.display} is in the database, but nobody has filled in its " +
+                        "nutrition. QUICK ADD below takes the numbers straight off the label.",
+                )
+                is FoodLookup.NotInDatabase -> _search.value = Search(
+                    query = code,
+                    note = "Barcode $code is not in the packaged-food database. QUICK ADD below " +
+                        "takes the numbers straight off the label.",
+                )
+                is FoodLookup.Unreachable -> _search.value = Search(
+                    query = code,
+                    note = "Could not reach the packaged-food database — ${r.reason}. Worth another try.",
+                )
+            }
         }
     }
 

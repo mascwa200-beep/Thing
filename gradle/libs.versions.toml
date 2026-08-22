@@ -54,6 +54,7 @@ mediapipeGenai = "0.10.27"
 # Sensorium's on-device classifiers (same versions the pre-b9ba600 perception stack shipped with).
 mediapipeTasks = "0.10.21"
 camerax = "1.4.1"
+zxing = "3.5.3"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -135,6 +136,8 @@ mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision"
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }

@@ -997,6 +997,21 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
     val c = Pulse.colors
     val search by vm.search.collectAsStateWithLifecycle()
     val picked by vm.picked.collectAsStateWithLifecycle()
+    var scanning by remember { mutableStateOf(false) }
+
+    // ⚠️ The scanner REPLACES this card rather than sitting inside it. A viewfinder is the whole
+    // screen's worth of attention, and leaving a text field and a result list live underneath it
+    // would mean the camera is holding the floor while somebody types.
+    if (scanning) {
+        BarcodeScanner(
+            onCode = { code ->
+                scanning = false
+                vm.lookUpBarcode(code)
+            },
+            onCancel = { scanning = false },
+        )
+        return
+    }
 
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1009,6 +1024,9 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 vm::onSearchQuery,
                 placeholder = "Chicken breast, olive oil, a brand name…",
             )
+            // Nobody types "Ferrero Nutella hazelnut spread" standing in a kitchen, and Open Food
+            // Facts is organised around barcodes because that is how a shelf identifies itself.
+            LcarsButton(text = "⬚ SCAN A BARCODE", onClick = { scanning = true })
             when {
                 search.busy -> Text(
                     "Looking…",

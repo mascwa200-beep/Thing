@@ -319,6 +319,14 @@ dependencies {
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
+    // The viewfinder for the barcode scanner. A scanner that cannot show what it is aimed at
+    // is not usable, and PreviewView owns the surface lifecycle and transform that doing this
+    // by hand over a raw SurfaceView gets wrong. 111 kB.
+    implementation(libs.androidx.camera.view)
+    // ⚠️ ZXing core, NOT ML Kit. The unbundled ML Kit variant needs Play Services, which is the
+    // wrong bet on GrapheneOS, and the bundled one adds 2-3 MB to an APK the auto-updater
+    // re-downloads in full on every build. This is pure JVM and 608 kB.
+    implementation(libs.zxing.core)
 
     // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
     implementation(libs.maplibre.android)
