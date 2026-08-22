@@ -182,6 +182,13 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     var fat by remember { mutableStateOf("") }
     var carb by remember { mutableStateOf("") }
 
+    // ⚠️ Read HERE, not inside the LazyColumn. A LazyColumn's content is a `LazyListScope.() -> Unit`
+    // — an ordinary lambda, not a composable one — so `collectAsStateWithLifecycle()` inside it is a
+    // compile error rather than something that merely works oddly. Every composable read the list
+    // needs is hoisted into the composable that owns it.
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+    val isToday = day == vm.todayStartMs()
+
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""
     }
@@ -247,8 +254,6 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
-        val day by vm.shownDay.collectAsStateWithLifecycle()
-        val isToday = day == vm.todayStartMs()
         item {
             LcarsHeaderBar(
                 if (isToday) "TODAY" else relativeDay(day).uppercase(),
