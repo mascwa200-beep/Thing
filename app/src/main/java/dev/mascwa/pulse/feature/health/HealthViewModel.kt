@@ -503,18 +503,24 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         searchFor(PickFor.LOG)
     }
 
-    private fun edit(block: (Recipes.Recipe) -> Recipes.Recipe) {
+    /**
+     * ⚠️ `editDraft`, not `edit`. This class already has a private `edit` taking
+     * `(HealthSettings) -> HealthSettings`, and two single-lambda overloads make every `it.copy(...)`
+     * at a call site ambiguous — the compiler cannot tell which receiver `it` is. Grep the class
+     * before adding a private helper to it.
+     */
+    private fun editDraft(block: (Recipes.Recipe) -> Recipes.Recipe) {
         _draft.value = _draft.value?.let(block)
     }
 
-    fun draftName(name: String) = edit { it.copy(name = name) }
+    fun draftName(name: String) = editDraft { it.copy(name = name) }
 
-    fun draftNote(note: String) = edit { it.copy(note = note) }
+    fun draftNote(note: String) = editDraft { it.copy(note = note) }
 
     /** Null clears the weighed yield, which is not the same as weighing it as zero. */
-    fun draftYield(grams: Double?) = edit { it.copy(cookedYieldG = grams) }
+    fun draftYield(grams: Double?) = editDraft { it.copy(cookedYieldG = grams) }
 
-    fun draftServings(n: Int) = edit { it.copy(servings = n.coerceAtLeast(1)) }
+    fun draftServings(n: Int) = editDraft { it.copy(servings = n.coerceAtLeast(1)) }
 
     /**
      * Add a found food to the draft at a weight.
@@ -525,7 +531,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      */
     fun draftAdd(food: Food, amount: Double, unit: FoodPortion.Unit) {
         val grams = FoodPortion.gramsFor(FoodPortion.Portion(amount, unit), food.sizes) ?: return
-        edit {
+        editDraft {
             it.copy(
                 components = it.components + Recipes.Component(
                     foodId = food.id,
@@ -544,7 +550,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      * half the butter in the pastry and half in the filling — and removing by id would silently take
      * both.
      */
-    fun draftRemoveAt(index: Int) = edit {
+    fun draftRemoveAt(index: Int) = editDraft {
         if (index !in it.components.indices) it
         else it.copy(components = it.components.filterIndexed { i, _ -> i != index })
     }

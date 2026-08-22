@@ -12,7 +12,9 @@ Three checks, and each later one exists because an earlier one was not enough:
 
   1. every capitalised symbol used is imported, declared in the same package, or a builtin;
   2. every own-package import actually RESOLVES to a declaration at that path;
-  3. no class declares two `companion object`s — a compile error no other local gate can see.
+  3. no class declares two `companion object`s — a compile error no other local gate can see;
+  4. no file declares two same-named functions that both take a lambda, which makes `it` at a
+     call site ambiguous.
 
 ⚠️ Check 2 was added after CI failed on code this tool had just called clean. An import that
 EXISTS is not an import that RESOLVES: `import dev.mascwa.pulse.feature.common.JetBrainsMono`
@@ -208,6 +210,46 @@ def unresolvable_imports(text: str) -> list:
         if not nested:
             out.append(f"{imp} (no such package)")
     return out
+
+
+def lambda_overloads(text: str) -> list:
+    """Two functions in one file with the same name, each taking a lambda.
+
+    ⚠️ Added after a CI round lost to exactly this. `HealthViewModel` already had a private
+    `edit(block: (HealthSettings) -> HealthSettings)`; a second `edit(block: (Recipes.Recipe) ->
+    Recipes.Recipe)` was added beside it, and every `it.copy(...)` at a call site then failed with
+    "overload resolution ambiguity" — the compiler cannot tell which receiver `it` is when both
+    candidates take a one-argument lambda. Six call sites broke at once.
+
+    Kotlin allows the overload; what it cannot do is infer the receiver at a call site that relies on
+    `it`. So this is a WARNING SHAPE, not a certain error — but it is rare enough to be worth reading:
+    measured across every module, the repo contains exactly zero other instances.
+
+    ⚠️ The parameter list is brace-matched. A `[^)]*` pattern stops at the first `)`, which is inside
+    `(HealthSettings)` — so the naive version cannot see a lambda parameter at all and reports a clean
+    zero on the very code that broke the build. That version was written first, and its silence was
+    nearly taken for evidence.
+    """
+    body = strip(text)
+    byname = {}
+    for m in re.finditer(r'\b(?:private |internal |public )?fun\s+(\w+)\s*\(', body):
+        depth, i = 0, m.end() - 1
+        while i < len(body):
+            if body[i] == "(":
+                depth += 1
+            elif body[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        params = body[m.end():i]
+        if "->" in params:
+            byname.setdefault(m.group(1), []).append(params.strip())
+    return [
+        f"'{n}' is declared {len(v)} times and every one takes a lambda — `it` cannot be inferred "
+        f"at a call site: {v}"
+        for n, v in byname.items() if len(v) > 1
+    ]
 
 
 def duplicate_companions(text: str) -> list:
@@ -451,6 +493,9 @@ def main(pkgdir: pathlib.Path) -> int:
         for dup in duplicate_companions(text):
             bad = True
             print(f"  {f.name}: {dup}")
+        for amb in lambda_overloads(text):
+            bad = True
+            print(f"  {f.name}: {amb}")
         for e in bad_enum_constants(text, enums):
             bad = True
             print(f"  {f.name}: no such enum constant: {e}")
