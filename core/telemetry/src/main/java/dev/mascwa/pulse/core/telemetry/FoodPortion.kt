@@ -88,6 +88,26 @@ object FoodPortion {
         return per100g.scaled(grams / PER)
     }
 
+    /**
+     * The other direction: label figures for a stated weight, back to the per-hundred-gram form
+     * every source in this app is normalised to.
+     *
+     * ⚠️ **Null when the weight is unknown, and that refusal is the whole point.** A saved food is
+     * a density — it has to be, because logging it later means scaling it to whatever is on the
+     * plate — and a density cannot be recovered from "320 calories" alone. The tempting fallback is
+     * to treat the figures as if they were already per hundred grams, which produces a food that
+     * looks right in the list and is wrong by whatever factor the real portion happened to be. A
+     * refusal the surface can explain is worth more than a number nobody can check.
+     *
+     * ⚠️ Returning [NutritionDay.Nutrients] rather than zero for a bad weight, unlike [eaten],
+     * because the two answer different questions: eating nothing genuinely is zero nutrition, and
+     * defining a food out of nothing is not a food.
+     */
+    fun per100gFrom(eaten: NutritionDay.Nutrients, grams: Double): NutritionDay.Nutrients? {
+        if (!grams.isFinite() || grams <= 0.0) return null
+        return eaten.scaled(PER / grams)
+    }
+
     // ------------------------------------------------------------------------ sanity of the data
 
     /**

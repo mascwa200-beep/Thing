@@ -371,7 +371,15 @@ class AppContainer(private val appContext: Context) {
      * are two.
      */
     val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
-        dev.mascwa.pulse.data.health.FoodRepository(appContext, openFoodFacts)
+        dev.mascwa.pulse.data.health.FoodRepository(appContext, openFoodFacts, customFoodStore)
+    }
+
+    /**
+     * Foods somebody typed in themselves. Searched ahead of both databases, because a short list you
+     * named yourself is more likely to be what you meant than one of thirteen thousand generic rows.
+     */
+    val customFoodStore: dev.mascwa.pulse.data.health.CustomFoodStore by lazy {
+        dev.mascwa.pulse.data.health.CustomFoodStore(appContext, json)
     }
 
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }

@@ -194,4 +194,60 @@ class FoodPortionTest {
         assertTrue(s, s.startsWith("1.5 servings"))
         assertTrue(s, s.contains("60 g"))
     }
+
+    // -------------------------------------------------- defining a food from what is on the label
+
+    /**
+     * Label figures for a stated weight become the per-hundred-gram form everything else uses.
+     *
+     * Worked from the rule before the assertion: 40 g of something at 208 kcal is
+     * 208 × 100/40 = 520 kcal per 100 g, and every other field scales by the same 2.5.
+     */
+    @Test
+    fun labelFiguresForAStatedWeightBecomeADensity() {
+        val eaten = NutritionDay.Nutrients(
+            kcal = 208.0, proteinG = 3.2, fatG = 11.6, carbG = 22.0, sodiumMg = 180.0,
+        )
+        val per100 = FoodPortion.per100gFrom(eaten, 40.0)!!
+        assertEquals(520.0, per100.kcal, 1e-9)
+        assertEquals(8.0, per100.proteinG, 1e-9)
+        assertEquals(29.0, per100.fatG, 1e-9)
+        assertEquals(55.0, per100.carbG, 1e-9)
+        assertEquals(450.0, per100.sodiumMg, 1e-9)
+    }
+
+    /** A hundred grams is already the density, so it must come back untouched. */
+    @Test
+    fun aHundredGramLabelIsAlreadyTheAnswer() {
+        val n = NutritionDay.Nutrients(kcal = 389.0, proteinG = 16.9, fatG = 6.9, carbG = 66.3)
+        val per100 = FoodPortion.per100gFrom(n, 100.0)!!
+        assertEquals(389.0, per100.kcal, 1e-9)
+        assertEquals(16.9, per100.proteinG, 1e-9)
+    }
+
+    /**
+     * ⚠️ THE LOAD-BEARING RULE. Without a weight there is no density, and the tempting fallback —
+     * treating the figures as if they were already per hundred grams — makes a food that looks
+     * right in the list and is wrong by whatever the real portion happened to be. Refusing lets
+     * the surface say why; guessing cannot be checked by anybody afterwards.
+     */
+    @Test
+    fun noWeightMeansNoFoodRatherThanAGuessedDensity() {
+        val n = NutritionDay.Nutrients(kcal = 320.0)
+        assertNull(FoodPortion.per100gFrom(n, 0.0))
+        assertNull(FoodPortion.per100gFrom(n, -5.0))
+        assertNull(FoodPortion.per100gFrom(n, Double.NaN))
+    }
+
+    /** And it round-trips with [FoodPortion.eaten], which is the pair that has to agree. */
+    @Test
+    fun definingAFoodAndThenEatingThatMuchOfItGivesTheLabelBack() {
+        val label = NutritionDay.Nutrients(kcal = 137.0, proteinG = 4.4, fatG = 2.1, carbG = 25.0)
+        val per100 = FoodPortion.per100gFrom(label, 62.0)!!
+        val back = FoodPortion.eaten(per100, 62.0)
+        assertEquals(label.kcal, back.kcal, 1e-9)
+        assertEquals(label.proteinG, back.proteinG, 1e-9)
+        assertEquals(label.fatG, back.fatG, 1e-9)
+        assertEquals(label.carbG, back.carbG, 1e-9)
+    }
 }

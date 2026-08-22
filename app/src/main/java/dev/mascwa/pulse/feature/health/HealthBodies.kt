@@ -63,6 +63,7 @@ import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.feature.common.LcarsStatBlock
+import dev.mascwa.pulse.feature.common.LcarsSwitch
 import dev.mascwa.pulse.feature.common.LcarsTimeChart
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -386,11 +387,11 @@ private fun MacroBar(eaten: Double, target: Double, tint: Color) {
 // =================================================================================== INTAKE
 
 /**
- * The log itself.
+ * The log itself: search the databases, scan a barcode, or type four numbers off a label.
  *
- * ⚠️ Only quick-add for now, and the surface says so rather than implying a search box is coming in a
- * moment. The food database is a later slice; typing four numbers off a label is the path that never
- * needs one and never stops working, so it is the one that ships first.
+ * ⚠️ QUICK ADD stays below the search rather than being replaced by it, and that is the point of
+ * having both. A search needs the food to exist somewhere; typing the numbers is the path that never
+ * stops working — no signal, no barcode, a local bakery nobody has photographed.
  */
 @Composable
 fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
@@ -402,6 +403,8 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     var protein by remember { mutableStateOf("") }
     var fat by remember { mutableStateOf("") }
     var carb by remember { mutableStateOf("") }
+    var grams by remember { mutableStateOf("") }
+    var keep by remember { mutableStateOf(false) }
 
     // ⚠️ Read HERE, not inside the LazyColumn. A LazyColumn's content is a `LazyListScope.() -> Unit`
     // — an ordinary lambda, not a composable one — so `collectAsStateWithLifecycle()` inside it is a
@@ -411,7 +414,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val isToday = day == vm.todayStartMs()
 
     fun reset() {
-        name = ""; kcal = ""; protein = ""; fat = ""; carb = ""
+        name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
     }
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -437,10 +440,26 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         NumberCell("P", protein, { protein = it }, Modifier.weight(1f))
                         NumberCell("F", fat, { fat = it }, Modifier.weight(1f))
                         NumberCell("C", carb, { carb = it }, Modifier.weight(1f))
+                        NumberCell("GRAMS", grams, { grams = it }, Modifier.weight(1.2f))
                     }
                     val energy = kcal.toDoubleOrNull()
+                    val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
+                    KeepThisFood(
+                        keep = keep && weight != null,
+                        canKeep = weight != null && name.isNotBlank(),
+                        onToggle = { keep = it },
+                        reason = when {
+                            weight == null ->
+                                "To keep this, say what it weighed. A saved food is a density — that " +
+                                    "is the only way it can be scaled to a different portion later — " +
+                                    "and there is no way to work one out from calories alone. An " +
+                                    "approximate weight is fine."
+                            name.isBlank() -> "Give it a name and it can be kept for next time."
+                            else -> null
+                        },
+                    )
                     LcarsButton(
-                        text = "LOG IT",
+                        text = if (keep && weight != null) "LOG IT AND KEEP IT" else "LOG IT",
                         enabled = energy != null && energy > 0.0,
                         onClick = {
                             vm.quickAdd(
@@ -450,6 +469,11 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                                 fatG = fat.toDoubleOrNull() ?: 0.0,
                                 carbG = carb.toDoubleOrNull() ?: 0.0,
                                 meal = meal,
+                                grams = weight ?: 0.0,
+                                // ⚠️ `keep` can be true with the weight since cleared — the switch
+                                // does not reset itself when the field is emptied, and a save with no
+                                // weight is exactly what the core refuses. Re-checked at the call.
+                                keepAsFood = keep && weight != null,
                             )
                             reset()
                         },
@@ -602,6 +626,31 @@ private fun NumberCell(label: String, value: String, onChange: (String) -> Unit,
             placeholder = "0",
             showClear = false,
         )
+    }
+}
+
+/**
+ * Offer to remember what was just typed, and say plainly when it cannot be.
+ *
+ * ⚠️ The switch is DISABLED with a reason rather than absent. A control that quietly vanishes when
+ * the weight field is empty teaches nothing; one that says why teaches the rule — a saved food is a
+ * density, and a density needs a weight.
+ */
+@Composable
+private fun KeepThisFood(keep: Boolean, canKeep: Boolean, onToggle: (Boolean) -> Unit, reason: String?) {
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Keep this food for next time",
+                modifier = Modifier.weight(1f),
+                fontFamily = ChakraPetch, fontSize = 12.sp, color = if (canKeep) c.ink else c.muted,
+            )
+            LcarsSwitch(checked = keep, onCheckedChange = onToggle, enabled = canKeep)
+        }
+        if (reason != null) {
+            Text(reason, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp)
+        }
     }
 }
 
@@ -1390,6 +1439,13 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
     val picked by vm.picked.collectAsStateWithLifecycle()
     var scanning by remember { mutableStateOf(false) }
 
+    // ⚠️ This card DECLARES what its picks are for rather than relying on the default. The search box
+    // and the picked food are shared with the recipe builder, so opening a builder and then coming
+    // here without closing it left `pickFor` on RECIPE — and the next food chosen for the log would
+    // also drop into the ingredient slot. `searchFor` is a no-op when the target already matches, so
+    // this costs nothing on the ordinary path.
+    LaunchedEffect(Unit) { vm.searchFor(HealthViewModel.PickFor.LOG) }
+
     // ⚠️ The scanner REPLACES this card rather than sitting inside it. A viewfinder is the whole
     // screen's worth of attention, and leaving a text field and a result list live underneath it
     // would mean the camera is holding the floor while somebody types.
@@ -1441,12 +1497,61 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 search.results.take(12).forEach { food ->
                     FoodResultRow(food) { vm.pick(food) }
                 }
+                // ⚠️ Shown only with the box empty, and here rather than on a settings page of its
+                // own. This is where somebody looks for a food, so it is where they will look for
+                // the one they made — and it costs nothing while they are typing, because the
+                // moment there is a query the results replace it.
+                if (search.query.isBlank()) MyFoods(vm)
             } else {
                 PortionPicker(chosen, meal, vm)
             }
         }
     }
 }
+
+/**
+ * Foods typed in by hand — pick one to log it, or forget it.
+ *
+ * ⚠️ Forgetting a food does NOT touch what was logged with it. An entry stores its own numbers, so
+ * the record stays exactly as it was; only the shortcut goes. Deleting a food that quietly rewrote
+ * six months of history would be a far worse thing than a stale list.
+ */
+@Composable
+private fun MyFoods(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val mine by vm.myFoods.collectAsStateWithLifecycle()
+    if (mine.isEmpty()) return
+    Text(
+        "YOUR FOODS",
+        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+        letterSpacing = 1.sp, color = c.muted,
+    )
+    mine.take(MY_FOODS_SHOWN).forEach { food ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { FoodResultRow(food) { vm.pick(food) } }
+            Text(
+                "FORGET",
+                modifier = Modifier
+                    .clickable { vm.forgetFood(food.id) }
+                    .padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+            )
+        }
+    }
+    if (mine.size > MY_FOODS_SHOWN) {
+        Text(
+            "…and ${mine.size - MY_FOODS_SHOWN} more — search to find them.",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+        )
+    }
+}
+
+/**
+ * ⚠️ A list, not a scroll. This sits inside the search card on a page that already scrolls, so an
+ * unbounded personal list would push everything below it — including QUICK ADD, the thing you use
+ * to add to that very list — off the bottom of the page.
+ */
+private const val MY_FOODS_SHOWN = 6
 
 /** One search result: what it is, where the numbers came from, and what it costs per 100 g. */
 @Composable

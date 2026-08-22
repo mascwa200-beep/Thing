@@ -200,6 +200,11 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             if (!pinnedDay) _today.value = todayStartMs()
             c.foodLogStore.load()
             c.bodyStore.all()
+            // ⚠️ Read in explicitly, for [myFoods] rather than for the search: `search()` loads on
+            // demand under its own lock, but the FLOW starts empty and fills on first read, so
+            // without this the saved-foods list renders as "nothing yet" on a cold screen even
+            // though the search behind it can see them.
+            c.customFoodStore.load()
             reloadEntries()
             recompute.value++
         }
@@ -432,6 +437,15 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /**
+     * Log figures taken straight off a label, optionally remembering the food.
+     *
+     * ⚠️ [keepAsFood] is honoured only when [grams] gives a real weight, and the refusal is in
+     * `FoodPortion.per100gFrom` rather than here: a saved food is a density, and there is no honest
+     * way to derive one from "320 calories". The surface disables the switch and says so, and this
+     * re-checks rather than trusting it, because the switch does not clear itself when the weight
+     * field is emptied.
+     */
     fun quickAdd(
         name: String,
         kcal: Double,
@@ -440,11 +454,23 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         carbG: Double,
         meal: NutritionDay.Meal,
         grams: Double = 0.0,
+        keepAsFood: Boolean = false,
     ) {
         val label = name.trim().ifBlank { "Quick add" }
         if (!kcal.isFinite() || kcal < 0.0) return
         val now = System.currentTimeMillis()
+        val eaten = NutritionDay.Nutrients(kcal = kcal, proteinG = proteinG, fatG = fatG, carbG = carbG)
         viewModelScope.launch {
+            // ⚠️ Saved BEFORE the entry, so the log can carry the new food's id. Otherwise the entry
+            // says CUSTOM with no foodId and nothing later can tell that the two are the same food.
+            val saved =
+                if (keepAsFood && name.isNotBlank()) {
+                    FoodPortion.per100gFrom(eaten, grams)?.let { per100 ->
+                        c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
+                    }
+                } else {
+                    null
+                }
             c.foodLogStore.add(
                 NutritionDay.Entry(
                     id = UUID.randomUUID().toString(),
@@ -452,16 +478,24 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     atMs = now,
                     name = label,
                     grams = grams,
-                    nutrients = NutritionDay.Nutrients(
-                        kcal = kcal, proteinG = proteinG, fatG = fatG, carbG = carbG,
-                    ),
+                    nutrients = eaten,
                     meal = meal,
                     source = NutritionDay.Source.CUSTOM,
+                    foodId = saved?.id.orEmpty(),
                 ),
             )
             reloadEntries()
             recompute.value++
         }
+    }
+
+    // ----------------------------------------------------------------------------- your own foods
+
+    /** Foods typed in by hand, newest first. Searched ahead of both databases. */
+    val myFoods: StateFlow<List<Food>> = c.customFoodStore.foods
+
+    fun forgetFood(id: String) {
+        viewModelScope.launch { c.customFoodStore.remove(id) }
     }
 
     fun removeEntry(id: String) {

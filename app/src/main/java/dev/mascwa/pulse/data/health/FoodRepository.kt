@@ -29,6 +29,7 @@ import java.io.BufferedReader
 class FoodRepository(
     private val context: Context,
     private val off: OpenFoodFactsRepository,
+    private val custom: CustomFoodStore,
 ) {
 
     /** What a search turned up, and honestly what it could not reach. */
@@ -106,16 +107,23 @@ class FoodRepository(
      * shuffled list makes it impossible to tell a lab analysis from a photographed label.
      */
     suspend fun search(query: String, online: Boolean): Results {
+        // ⚠️ Your own foods lead, and the cap in CustomFoodStore is what makes that safe. A list you
+        // wrote yourself is a handful of items you named, so anything in it that matches at all is
+        // worth putting in front of thirteen thousand generic rows — but only a handful, or a long
+        // personal list would bury the database behind it. They are ranked by the SAME scorer as the
+        // seed, so this is an ordering decision and not a second, disagreeing search.
+        val mine = custom.search(query)
         val seed = searchSeed(query)
-        if (!online) return Results(query, seed)
+        val local = mine + seed
+        if (!online) return Results(query, local)
         return try {
             val page = off.search(query, limit = OFF_LIMIT)
             // ⚠️ De-duplicated by id, not by name. Two records can legitimately share a name and
             // differ in their numbers, and collapsing those hides the choice rather than tidying it.
-            val ids = seed.mapTo(HashSet()) { it.id }
-            Results(query, seed + page.foods.filterNot { it.id in ids }, onlineConsulted = true)
+            val ids = local.mapTo(HashSet()) { it.id }
+            Results(query, local + page.foods.filterNot { it.id in ids }, onlineConsulted = true)
         } catch (e: Exception) {
-            Results(query, seed, onlineFailure = e.message ?: "could not reach the food database",
+            Results(query, local, onlineFailure = e.message ?: "could not reach the food database",
                 onlineConsulted = true)
         }
     }
