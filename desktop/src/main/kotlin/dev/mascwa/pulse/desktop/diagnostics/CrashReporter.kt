@@ -116,13 +116,16 @@ class CrashReporter(dataDir: File) {
      *
      * The deepest cause rather than the outermost wrapper, because a wrapper is almost always
      * something generic and the cause is the thing that actually went wrong.
+     *
+     * ⚠️ Frames come from [FaultTrace], which is shared with the fault dialog. This used to take
+     * `stackTrace.first()` and so did the dialog — two independent copies of one rule, both wrong the
+     * same way, because for a Compose `require` that frame is always the internal throw helper. One
+     * frame here rather than the dialog's several: this is a single row in a list.
      */
     private fun summaryOf(t: Throwable): String {
-        var cause: Throwable = t
-        var guard = 0
-        while (cause.cause != null && cause.cause !== cause && guard++ < 12) cause = cause.cause!!
-        val where = cause.stackTrace.firstOrNull()?.let { " at ${it.className.substringAfterLast('.')}.${it.methodName}" }
-        return "${cause::class.java.simpleName}: ${cause.message ?: "no message"}${where.orEmpty()}"
+        val cause = FaultTrace.rootCause(t)
+        val where = FaultTrace.locate(cause, max = 1).firstOrNull()?.let { " at $it" }
+        return "${FaultTrace.summary(cause)}${where.orEmpty()}"
     }
 
     private fun firstFault(f: File): String = runCatching {

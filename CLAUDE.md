@@ -8004,3 +8004,74 @@ an intrinsic measurement run with a negative height. Our only intrinsic-forcing 
 remaining failure should now name itself and point at the crash console **without closing the
 console**. **The top entry of MENU → CRASH CONSOLE names the site** and turns this from a defensive
 fix into a real one.
+
+### THE FAULT SAYS WHERE, AND THE HARNESS GAINS THE REAL DIRECTORY (this session, PR #455 follow-up)
+
+Owner sent a second screenshot of the Windows companion — the new "LCARS · a panel failed" dialog
+working, the console still running, the page showing a busy bar — with *"Now at least it says what's
+up."* The console surviving was the fix landing; the line it printed was still useless. **Zero
+subagent spend**, as with every arc since the credit directive.
+
+**⚠️ THE DIALOG COULD NEVER HAVE NAMED THE SITE, AND THAT WAS MY BUG FROM AN HOUR EARLIER.**
+`describe()` took `cause.stackTrace.first()`, and for any Compose `require` that frame is always
+`androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException` — the helper that
+throws, never the code that was wrong. **`CrashReporter.summaryOf` had the identical defect,
+independently**, so every row of the crash-console list *also* named the same helper, making the list
+unreadable precisely when it mattered. Two independent copies of one rule, both wrong the same way —
+the duplicated-definition mistake this project has now corrected six times. `FaultTrace` is the one
+rule, and a test asserts the two agree rather than merely that each is individually sane.
+
+⚠️ **`androidx.compose.ui.node` and `.layout` are deliberately NOT skipped.** For a layout fault those
+frames name the measure policy that produced the bad value, which is the entire answer. Only the throw
+plumbing goes. Stack **order** is kept — a reordered stack is a lie about what called what — and when
+no surviving frame is ours the nearest one that is gets appended, because a layout fault inside
+Compose's own measure pass can genuinely have no app frame near the top.
+
+**The dialog now offers SHOW THE REPORT, and the useful half is not the report.** A panel that throws
+will throw again on the very next frame, so reading the trace and leaving the broken page are the same
+action — the button navigates to CRASH. `FaultReportRequest` is a counter, not a flag: two faults in a
+row must each be able to ask, and a flag would latch. Skipped at zero so a launch cannot navigate to
+the crash console on its own.
+
+**⚠️ THE DISASSEMBLY THAT NARROWS THIS HARD, and it is the reusable part.** From
+`NodeMeasuringIntrinsics` in the shipped `ui-desktop-1.7.3.jar`, reading the default-argument masks
+rather than recalling the signatures:
+
+    minWidth$ui(..., h)  -> Constraints$default(0, 0, 0, h, mask=7)   => Constraints(maxHeight = h)
+    minHeight$ui(..., w) -> Constraints$default(0, w, 0, 0, mask=13)  => Constraints(maxWidth  = w)
+
+So `maxHeight(-12) must be >= than minHeight(0)` is **unambiguously an intrinsic WIDTH query run with a
+negative height** — nothing else in Compose builds a `Constraints` of that shape. And in
+`RowColumnImplKt.intrinsicCrossAxisSize` the non-weighted branch computes
+`remaining = availableSize - fixedSpace` **with no clamp** (offset 123-127), while the weighted branch
+twenty lines later *is* clamped with `Math.max(.., 0)`. For a **Column** the cross axis is width, so
+`VerticalMinWidth`/`VerticalMaxWidth` are the blocks that would pass a negative height into a child's
+`minIntrinsicWidth`.
+
+⚠️ **Also established, and it is why this is still open:** the desktop module contains **no
+intrinsic-width site at all**. `grep` finds exactly two `IntrinsicSize` uses, both
+`height(IntrinsicSize.Min)` (`LcarsGeometry.kt` `LcarsDataRow`, `LcarsFrame.kt` `LcarsDialog`), and no
+custom `Layout`, `Modifier.layout {}` or `SubcomposeLayout` anywhere. Whatever asks for an intrinsic
+width is inside a library component, and the trace on the owner's machine names it.
+
+**The harness gained the real directory** — `Directory`/`DirectoryBlock` are `internal` now rather than
+copied, because a test that lays out a *paraphrase* of the shell proves nothing about the shell, and a
+copied stand-in is what had already failed to reproduce this twice. Also the section readout and the
+stardate, which the header reads from composition locals defaulting to the empty string — empty is the
+one case the real console never shows, and they are text measured inside the same squeezed block. Plus
+a directory-only sweep, kept **as well as** the shell case: if both fail the fault is in the directory,
+if only the shell fails it is in the interaction, and that is a different search.
+
+**Six tests × 45 configurations still pass.** So the reproduction is still not local, and this is
+recorded as an honest negative rather than dressed up: what shipped makes the failure legible and
+survivable, and the trace on the owner's machine is what makes it fixable.
+
+⚠️ **My own expectation was wrong where the code was right, again** (roughly the seventeenth in this
+arc-series): I asserted `locate(max = 1).size == 1`, but `max` bounds the *filtered head* and `locate`
+then still appends the nearest app frame when that head holds none — which is exactly what the dialog
+wants. Asserting on the rendered list row rather than on an intermediate is the fix. **Compute the
+expected value from the shipped function before writing the assertion.**
+
+⚠️ **Owner-verify on Windows, and the ask is unchanged and now one click:** when the dialog appears,
+press **SHOW THE REPORT**. It opens the crash console *and* leaves the failing page. The top entry's
+full trace names the composable, and that is the whole of what is still missing.
