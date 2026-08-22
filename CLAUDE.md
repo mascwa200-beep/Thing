@@ -7531,3 +7531,117 @@ Scheduler **with no UAC prompt**, then leave the machine closed overnight and op
 morning: it should show a night's worth of history it collected while nobody was looking, a
 false-alarm line, a scrubber that genuinely rewinds, and — on the first run at a new location — a
 backfill report saying which weather fields it judged trustworthy **here**.
+
+### SINCE YOU LAST LOOKED — the long watch's last slice (this session, PR #453)
+
+Slice 8 of the LONG WATCH plan, and the one buildable item left in it. Task #274 bundled four things
+and was marked complete when three landed; a grep confirmed no `lastSeen`, no "since you last
+looked", nothing of the kind anywhere in `:desktop`. Slice 10 (co-movement) stays **deliberately
+declined**, for the reason already recorded: done honestly it reports "nothing survived correction"
+every time for months. **Zero subagent spend**, as with every arc since the credit directive.
+
+**What it is, and why it is not a lesser copy of the wall.** ANOMALIES answers *"what is strange
+right now, against everything on record"*. This answers *"what moved in the six hours I was gone"* —
+which catches readings entirely ordinary where they now sit and remarkable only in **how far they
+travelled over the particular interval of the absence**. A pressure that walks from one perfectly
+normal value to another perfectly normal value, quickly, is invisible to the wall and is exactly
+what somebody returning to the machine wants told.
+
+**`Novelty.spanSeries(series, lagMs)` is the heart.** `changeSeries` is single-step and its gap
+guard *discards* differences across a long interval, so it is the wrong tool by design; judging a
+six-hour move against quarter-hour moves would report every absence as extraordinary.
+- ⚠️ **Walked backwards from the newest observation**, so the span being judged is **last** and the
+  caller can use the same `score(series, series.last())` idiom the level and rate paths already use.
+  A forward walk lays the spans on an arbitrary grid and the current move might not be one of them.
+- ⚠️ **Non-overlapping, and that is the load-bearing statistical decision.** A rolling six-hour
+  difference taken every quarter hour yields samples sharing five-sixths of their data, and
+  `effectiveSampleSize` **cannot catch it** — consecutive overlapping spans have different values,
+  so run-counting reads them as independent. Striding by the lag costs sample size, and the refusal
+  floor then declines to judge a window this machine has not watched enough times.
+- ⚠️ The tolerance floors at `0.6 × medianGap` as well as `0.10 × lag`: for a lag near the cadence a
+  bare percentage is smaller than one sampling interval and **nothing would ever pair**.
+
+**`Novelty.spanSentence` exists because `Reading.sentence` must never be printed for a span.** It
+says "Highest on record", which over a difference series means the largest *rise*, and "Lowest on
+record" beside a plunging value reads as a claim about the **level**. It takes the raw change too:
+`direction` is measured against the *median span*, not zero, so on a metric that mostly climbs a flat
+six hours has direction −1 while nothing fell — where the two disagree the wording drops to a
+neutral "move".
+
+**Three numbers, every one measured rather than chosen.**
+
+| | value | why |
+|---|---|---|
+| absence floor | 2 h | slowest domain cadence is 60 min, so anything shorter gives those domains one collection — which the wall's rate reading already covers |
+| absence cap | 7 d | spans do not overlap, so a year holds ~52 weekly ones and only twelve monthly; longer could only produce refusals |
+| the card's bar | **5 bits** | over a real year of London weather a six-hour move clears **4** bits on **9.8%** of hours |
+
+⚠️ **The bar differs from the wall's four, and the plan said to share that constant.** The
+measurement overruled it. Not six either: surprisal is capped at what the sample can resolve, so a
+bar of `b` bits is **unreachable below 2^b − 1 spans** — 127 at six bits, which at a seven-day lag
+could never be reached inside the year the ledger keeps. A bar the record cannot clear is a feature
+that never fires.
+
+**⚠️ RUNNING IT OVER A REAL YEAR OF LONDON WEATHER FOUND A DEFECT NO UNIT TEST WOULD HAVE.** At a
+seven-day lag the record is only 52 non-overlapping spans, so *"the biggest fall on record"* came up
+on **6.8%** of hours — exactly the 2/53 that sample can resolve, and nothing like the once-a-year
+event the bare phrase implies. `spanSentence` now carries the same *"as rare as N readings can
+show"* hedge `sentence` has always had for a record level; dropping it was an overclaim. The probe
+also answered the plan's specific worry: **7 of 306** overnight 05:00 readings would reach the card,
+measured *without* the diurnal bucketing the card really uses, so that is the conservative case.
+Recipe: `scratchpad`-side TSV from the archive endpoint, then the **shipped** core plus a throwaway
+`main` on the compiler classpath.
+
+**⚠️ A FIFTH WAY A GREEN TEST PROVES NOTHING, and it cost a full negative-test round: the expected
+test was ALREADY FAILING.** After adding the hedge, three `NoveltyTest` cases broke; the harness then
+reported all six guards "awake" because the expected test failed in every case — for a reason
+nothing to do with the perturbation. **The tell was only in the detail column**: tests failing under
+perturbations that could not possibly reach them. `scratchpad/negtest.py` now runs the suite
+unperturbed first and refuses to start unless it is green, printing `baseline: N tests, all
+passing`. The four already recorded are: the perturbation never matched the source; it only
+*touched* the code without removing the property; the fixture never reached the branch; the
+assertion was too weak to see the damage.
+
+**And the third mechanism appeared again, in the desktop suite.** The threshold guard came back
+asleep because a clearly-ordinary move scores under two bits, where `spanSentence` already declines
+to speak — so removing the bar changed nothing. It needed a fixture **between** the two bars (98
+history spans cycling −6..+6 plus a +9 and a +10, newest +7.5 → exactly two above → `p = 6/101` →
+4.07 bits). ⚠️ And the *first* attempt at that fixture had only 50 spans, whose **ceiling is 4.64
+bits — below the card's bar**, so every "is it listed" assertion would have passed because the
+ceiling stopped it rather than the rule under test.
+
+⚠️ **An expectation of mine was wrong where the code was right, again** (roughly the sixteenth in
+this arc-series): the linger test jumped three hours from a marker set ten minutes in, which is a
+genuine two-hour-fifty absence, so the card was correctly *recomputed* rather than cleared. **Compute
+the expected value from the shipped function before writing the assertion.**
+
+**Presence is one rule** — a five-minute heartbeat into `DesktopSettings.lastSeenMs` while the window
+has focus (`LocalWindowInfo.isWindowFocused`, confirmed in the pinned ui-desktop 1.7.3 with `javap`).
+⚠️ Writing it on focus loss *and* gain looks cheaper and is wrong in the case that matters: a process
+killed while focused leaves the marker at the last **gain**, so the next launch reports an absence
+including however long the session ran. Zero means never, not the epoch. Only the console writes
+settings — the headless `--collect` process reads and never writes.
+
+**Other decisions worth keeping.** `scanSince` reads a **bounded slice** (`now − 200 × lag`), unlike
+`scanLedger`, which reads every metric whole — a six-hour absence reads fifty days, not a year. Its
+own view model, not a field on `HomeState`, because `refresh` assigns a whole new state object and a
+separately-computed field would be **silently wiped**. The card sits **below** THE COMPUTER'S READ,
+since it arrives asynchronously and would otherwise shove the advisories down as they are read. Two
+declared-and-never-read things were caught by a mechanical sweep before commit — `MoveRow`'s unused
+`lagMs`, and `SinceState.loading`, now feeding Home's busy bar.
+
+**Verification:** `:core:telemetry:test` **1,389** green and `:desktop:build` **240** green, both run
+locally; **12 rules negative-tested**, each confirmed to fail exactly the test that names it against
+a baseline confirmed green first.
+
+⚠️ **A compact way to poll CI, since `list_workflow_runs` blows the tool's token limit even at
+`per_page: 1`:** `pull_request_read` with `method: "get_check_runs"` returns just the run names,
+statuses and ids in a few lines.
+
+⚠️ **Owner-verify on Windows — this container has no GL context.** Leave the console open and
+unfocused for an afternoon, come back, and check the card appears with a plausible window and
+plausible movers; then close it overnight and check the window reads in days rather than minutes. On
+a fresh install expect the "too little recent history" line to dominate until the collector has run
+for a couple of weeks, which is the honest state rather than a fault.
+
+**The LONG WATCH plan is now complete** except slice 10, declined above with its reasoning.
