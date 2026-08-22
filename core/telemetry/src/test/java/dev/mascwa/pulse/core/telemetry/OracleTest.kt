@@ -302,6 +302,44 @@ class OracleTest {
         assertTrue(Oracle.pushWorthy(listOf(hit)).isEmpty())
     }
 
+    // ---- the long watch ------------------------------------------------------------------------
+
+    private fun withLedger(bits: Double) = base().copy(
+        ledgerHeadline = "Kp index: Highest on record — as rare as 400 readings can show.",
+        ledgerBits = bits,
+    )
+
+    @Test fun aStrangeLedgerReadingReachesTheStream() {
+        val i = Oracle.divine(withLedger(7.0)).single { it.id == "ledger_anomaly" }
+        assertEquals(Urgency.NOTABLE, i.urgency)
+        assertEquals("anomalies", i.actionRoute)
+        assertTrue("got '${i.detail}'", i.detail.startsWith("Kp index:"))
+    }
+
+    /**
+     * ⚠️ THE ONE THAT MATTERS. Roughly ninety readings are judged every few minutes, so a merely
+     * unusual one turns up constantly by chance — an advisory that fired on those would be noise
+     * wearing a badge, and it would cost the whole surface its credibility rather than just this line.
+     */
+    @Test fun aMerelyUnusualReadingIsNotWorthInterrupting() {
+        assertTrue(Oracle.divine(withLedger(5.9)).none { it.id == "ledger_anomaly" })
+        assertTrue(Oracle.divine(withLedger(6.0)).any { it.id == "ledger_anomaly" })
+    }
+
+    /** One in a thousand is worth raising even across ninety metrics. */
+    @Test fun aOneInAThousandReadingRises() {
+        assertEquals(Urgency.NOTABLE, Oracle.divine(withLedger(9.9)).single { it.id == "ledger_anomaly" }.urgency)
+        assertEquals(Urgency.IMPORTANT, Oracle.divine(withLedger(10.0)).single { it.id == "ledger_anomaly" }.urgency)
+    }
+
+    /**
+     * ⚠️ The phone never fills this field — a year of every feed needs a machine that is always on,
+     * mains-powered and unmetered. Bits alone, with no headline, must say nothing at all.
+     */
+    @Test fun aMachineWithNoLedgerHearsNothing() {
+        assertTrue(Oracle.divine(base().copy(ledgerBits = 12.0)).none { it.id == "ledger_anomaly" })
+    }
+
     @Test fun everyNewRuleStaysSilentOnAnEmptySnapshot() {
         // The whole contract of this engine: a missing signal means the rule does not fire, never
         // that it fires with a made-up default.

@@ -230,6 +230,11 @@ fun PulseDesktopApp(
         }
         LaunchedEffect(standby) { standby.start() }
 
+        // One ledger for the whole window: the collector writes it, the ANOMALIES page reads it, and
+        // the Oracle takes its strangest line. Sharing the instance is not about cost — it is a plain
+        // file reader — but about there being one answer to "what is odd here" rather than three.
+        val worldLedger = remember { dev.mascwa.pulse.desktop.ledger.WorldLedger() }
+
         // The long watch, while the window is open. Between this and the scheduled task the record
         // has no holes. ⚠️ Built HERE, over the shell's one HTTP client and one disk cache, for the
         // reason the note above the repositories gives — a second set inside the running process
@@ -362,10 +367,13 @@ fun PulseDesktopApp(
                 space = spaceWeatherRepository,
                 news = newsRepository,
                 study = studyStore,
+                // The same ledger the ANOMALIES page reads, so the advisory and the wall can never
+                // disagree about what the strangest reading on this machine is.
+                ledger = worldLedger,
             )
         }
 
-        val anomaliesVm = remember { AnomaliesViewModel(scope, settings) }
+        val anomaliesVm = remember { AnomaliesViewModel(scope, settings, worldLedger) }
 
         val crashVm = remember { CrashViewModel(scope, crashReporter) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }

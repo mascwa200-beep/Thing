@@ -10,6 +10,9 @@ import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.feature.ledger.scanLedger
+import dev.mascwa.pulse.desktop.ledger.MetricRegistry
+import dev.mascwa.pulse.desktop.ledger.WorldLedger
 import dev.mascwa.pulse.desktop.study.StudyStore
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -37,6 +40,13 @@ suspend fun gatherOracleSignals(
     space: SpaceWeatherRepository,
     news: NewsRepository,
     study: StudyStore,
+    /**
+     * The long watch's ledger, when there is one.
+     *
+     * ⚠️ Optional so the standby display — which renders on a timer and has no business scoring
+     * ninety series to draw a HUD — can leave it out and mute the rule entirely.
+     */
+    ledger: WorldLedger? = null,
 ): OracleSignals {
     val now = System.currentTimeMillis()
     val local = LocalDateTime.now()
@@ -94,6 +104,14 @@ suspend fun gatherOracleSignals(
         localDayIndex(progress.lastStudiedAtMs) == today
     val shaky = runCatching { study.weakestGuide() }.getOrNull()
 
+    // The single strangest thing on record, from the SAME scan the wall renders — see scanLedger.
+    val top = ledger?.let { l ->
+        runCatching {
+            scanLedger(l, if (lat != null && lon != null) MetricRegistry.placeKey(lat, lon) else null)
+                .ranked.firstOrNull()
+        }.getOrNull()
+    }
+
     return OracleSignals(
         nowMs = now,
         hourOfDay = local.hour,
@@ -120,6 +138,8 @@ suspend fun gatherOracleSignals(
         reviewsDue = due,
         studyStreakDays = progress?.streakDays ?: 0,
         studiedToday = studiedToday,
+        ledgerHeadline = top?.let { "${it.spec.label}: ${it.reading.sentence}" },
+        ledgerBits = top?.reading?.bits ?: 0.0,
         shakyGuideTitle = shaky?.first,
         shakyGuideDetail = shaky?.second,
     )

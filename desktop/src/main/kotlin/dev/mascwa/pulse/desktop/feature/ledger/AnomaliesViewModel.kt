@@ -110,12 +110,61 @@ class AnomaliesViewModel(
      */
     internal suspend fun rebuildNow(asOfMs: Long? = null) = rebuild(asOfMs)
 
+    companion object {
+        /**
+         * How surprising a reading has to be to reach the wall rather than the quiet list.
+         *
+         * 4 bits is about a 1-in-16 reading. ⚠️ Chosen with the false-alarm line in view rather than
+         * for its own sake: at roughly ninety tested readings it means about six of them are expected
+         * to be chance, which the screen states outright. A higher bar would make the wall emptier and
+         * the arithmetic less honest, not more.
+         */
+        const val THRESHOLD_BITS = 4.0
+
+        /** Readings behind the trace on each row. */
+        const val TRACE_POINTS = 96
+    }
+
     private suspend fun rebuild(asOfMs: Long?) {
         val place = settings.here()
-        val placeKey = place?.let { MetricRegistry.placeKey(it.first, it.second) }
-        val offset = ZoneId.systemDefault().rules.getOffset(Instant.now()).totalSeconds
+        val scan = scanLedger(ledger, place?.let { MetricRegistry.placeKey(it.first, it.second) }, asOfMs)
+        _state.value = AnomaliesState(
+            anomalies = scan.ranked.filter { it.reading.bits >= THRESHOLD_BITS },
+            quiet = scan.ranked.filter { it.reading.bits < THRESHOLD_BITS },
+            notYet = scan.notYet,
+            tested = scan.tested,
+            falseAlarms = Novelty.expectedFalseAlarms(scan.tested, THRESHOLD_BITS),
+            asOfMs = asOfMs ?: scan.newestMs,
+            oldestMs = scan.oldestMs,
+            newestMs = scan.newestMs,
+            ledgerBytes = runCatching { ledger.sizeBytes() }.getOrDefault(0L),
+            watching = settings.current().longWatch,
+            loading = false,
+        )
+    }
+}
 
-        val scored = mutableListOf<Anomaly>()
+/** Everything one pass over the ledger found, already ranked. */
+data class LedgerScan(
+    val ranked: List<Anomaly>,
+    val notYet: List<NotYet>,
+    val tested: Int,
+    val oldestMs: Long,
+    val newestMs: Long,
+)
+
+/**
+ * Score every metric in the ledger and rank the lot.
+ *
+ * ⚠️ A top-level function rather than a method on the view model, because two things need this
+ * answer — the wall and the Oracle's ledger advisory — and a second implementation is exactly how a
+ * page and an advisory end up disagreeing about one machine's own record. The Oracle takes the head
+ * of [LedgerScan.ranked]; the wall renders all of it.
+ */
+suspend fun scanLedger(ledger: WorldLedger, placeKey: String?, asOfMs: Long? = null): LedgerScan {
+    val offset = ZoneId.systemDefault().rules.getOffset(Instant.now()).totalSeconds
+
+    val scored = mutableListOf<Anomaly>()
         val notYet = mutableListOf<NotYet>()
         var oldest = Long.MAX_VALUE
         var newest = 0L
@@ -143,7 +192,7 @@ class AnomaliesViewModel(
                     value = latest.value,
                     atMs = latest.atMs,
                     reading = s.reading,
-                    trace = visible.takeLast(TRACE_POINTS).map { it.value },
+                    trace = visible.takeLast(AnomaliesViewModel.TRACE_POINTS).map { it.value },
                     persistence = persistenceOf(visible, spec, offset),
                 )
             }
@@ -162,7 +211,7 @@ class AnomaliesViewModel(
                         value = newestChange.value,
                         atMs = newestChange.atMs,
                         reading = s.reading,
-                        trace = visible.takeLast(TRACE_POINTS).map { it.value },
+                        trace = visible.takeLast(AnomaliesViewModel.TRACE_POINTS).map { it.value },
                         persistence = 1,
                     )
                 }
@@ -172,60 +221,37 @@ class AnomaliesViewModel(
             }
         }
 
-        val ranked = Novelty.rank(
-            scored.map { it.id to it.reading },
-            scored.associate { it.id to it.persistence },
-        )
-        val byId = scored.associateBy { it.id }
-        val order = ranked.mapNotNull { byId[it] }
+    val ranked = Novelty.rank(
+        scored.map { it.id to it.reading },
+        scored.associate { it.id to it.persistence },
+    )
+    val byId = scored.associateBy { it.id }
+    return LedgerScan(
+        ranked = ranked.mapNotNull { byId[it] },
+        notYet = notYet,
+        tested = tested,
+        oldestMs = if (oldest == Long.MAX_VALUE) 0L else oldest,
+        newestMs = newest,
+    )
+}
 
-        _state.value = AnomaliesState(
-            anomalies = order.filter { it.reading.bits >= THRESHOLD_BITS },
-            quiet = order.filter { it.reading.bits < THRESHOLD_BITS },
-            notYet = notYet,
-            tested = tested,
-            falseAlarms = Novelty.expectedFalseAlarms(tested, THRESHOLD_BITS),
-            asOfMs = asOfMs ?: newest,
-            oldestMs = if (oldest == Long.MAX_VALUE) 0L else oldest,
-            newestMs = newest,
-            ledgerBytes = runCatching { ledger.sizeBytes() }.getOrDefault(0L),
-            watching = settings.current().longWatch,
-            loading = false,
-        )
+
+/**
+ * How many collections in a row this metric has been past the threshold.
+ *
+ * ⚠️ Walked backwards only as far as the credit can reach, because that is all the answer is used for
+ * and a full walk would mean re-scoring every reading of every metric on every render. An anomaly
+ * present in one sample and gone the next is usually noise; one that has held is usually not, and
+ * [Novelty.PERSISTENCE_BITS] deliberately credits that by very little.
+ */
+private fun persistenceOf(series: List<Novelty.Observation>, spec: MetricRegistry.Spec, offset: Int): Int {
+    var held = 0
+    for (i in 0..Novelty.PERSISTENCE_CAP) {
+        val at = series.getOrNull(series.size - 1 - i) ?: break
+        val s = Novelty.score(series.take(series.size - i), at, spec.diurnal, offset)
+        val bits = (s as? Novelty.Score.Scored)?.reading?.bits ?: break
+        if (bits < AnomaliesViewModel.THRESHOLD_BITS) break
+        held++
     }
-
-    /**
-     * How many collections in a row this metric has been past the threshold.
-     *
-     * ⚠️ Walked backwards only as far as the credit can reach, because that is all the answer is used
-     * for and a full walk would mean re-scoring every reading of every metric on every render. An
-     * anomaly present in one sample and gone the next is usually noise; one that has held is usually
-     * not, and [Novelty.PERSISTENCE_BITS] deliberately credits that by very little.
-     */
-    private fun persistenceOf(series: List<Novelty.Observation>, spec: MetricRegistry.Spec, offset: Int): Int {
-        var held = 0
-        for (i in 0..Novelty.PERSISTENCE_CAP) {
-            val at = series.getOrNull(series.size - 1 - i) ?: break
-            val s = Novelty.score(series.take(series.size - i), at, spec.diurnal, offset)
-            val bits = (s as? Novelty.Score.Scored)?.reading?.bits ?: break
-            if (bits < THRESHOLD_BITS) break
-            held++
-        }
-        return held.coerceAtLeast(1)
-    }
-
-    companion object {
-        /**
-         * How surprising a reading has to be to reach the wall rather than the quiet list.
-         *
-         * 4 bits is about a 1-in-16 reading. ⚠️ Chosen with the false-alarm line in view rather than
-         * for its own sake: at roughly ninety tested readings it means about six of them are expected
-         * to be chance, which the screen states outright. A higher bar would make the wall emptier and
-         * the arithmetic less honest, not more.
-         */
-        const val THRESHOLD_BITS = 4.0
-
-        /** Readings behind the trace on each row. */
-        const val TRACE_POINTS = 96
-    }
+    return held.coerceAtLeast(1)
 }

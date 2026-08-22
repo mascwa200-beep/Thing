@@ -109,6 +109,16 @@ data class OracleSignals(
     val envDescription: String? = null,
     val envAnomaly: String? = null,
     val pressureFallingFast: Boolean = false,
+    /**
+     * The strangest reading in the long watch's ledger right now, in words, and how improbable it is
+     * against that metric's own recorded history.
+     *
+     * ⚠️ Defaulted null like every other field here, and the phone simply never fills it: keeping a
+     * year of every feed needs a machine that is always on, mains-powered and unmetered, which is a
+     * tower PC and emphatically not a phone under Doze. A null mutes this rule entirely.
+     */
+    val ledgerHeadline: String? = null,
+    val ledgerBits: Double = 0.0,
     // Study — how the bundled library is actually going. Nulls and zeroes mute their own rules, so a
     // reader who has never studied hears nothing at all from this domain.
     /** Cards ready to be asked right now. */
@@ -137,6 +147,18 @@ object Oracle {
     private const val MOVEMENT_THRESHOLD = Sensorium.MOVEMENT_THRESHOLD
 
     /** Fewer than this and the queue is not worth opening the app for. */
+    /**
+     * How surprising a ledger reading must be before the Oracle mentions it at all.
+     *
+     * 6 bits is about one in sixty. ⚠️ Well above the wall's own listing threshold on purpose: the
+     * wall is a page somebody chose to open and can carry a dozen mild oddities, while this is a line
+     * that arrives unasked in a stream people are meant to keep trusting.
+     */
+    private const val LEDGER_NOTABLE_BITS = 6.0
+
+    /** One in a thousand — worth raising even across ninety metrics tested every few minutes. */
+    private const val LEDGER_IMPORTANT_BITS = 10.0
+
     private const val REVIEWS_WORTH_MENTIONING = 3
 
     /** One day is not a streak; nothing is lost by letting it lapse. */
@@ -534,6 +556,28 @@ object Oracle {
         )
     }
 
+    /**
+     * The strangest thing the long watch has on record right now.
+     *
+     * ⚠️ It rises above NOTABLE only past a high bar, and that bar is about honesty rather than taste:
+     * this machine judges roughly ninety readings every few minutes, so a merely-unusual one turns up
+     * constantly by chance and an advisory that fired on those would be noise wearing a badge. Ten bits
+     * is a one-in-a-thousand reading, which even across ninety metrics is worth a sentence.
+     */
+    private fun ledgerAnomaly(s: OracleSignals): Insight? {
+        val headline = s.ledgerHeadline ?: return null
+        if (s.ledgerBits < LEDGER_NOTABLE_BITS) return null
+        val urgency = if (s.ledgerBits >= LEDGER_IMPORTANT_BITS) Urgency.IMPORTANT else Urgency.NOTABLE
+        return Insight(
+            id = "ledger_anomaly", family = "ledger", kind = InsightKind.ANOMALY, urgency = urgency,
+            title = "Strangest reading on record right now",
+            detail = headline,
+            score = urgency.weight * 1000.0 + s.ledgerBits,
+            actionRoute = "anomalies",
+            sources = listOf("long watch"),
+        )
+    }
+
     // ---- study ---------------------------------------------------------------------------------------
 
     /**
@@ -600,7 +644,7 @@ object Oracle {
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
         ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
-        ::heatStress, ::windChillBite, ::gustWarning, ::coldNight, ::fogLikely,
+        ::heatStress, ::windChillBite, ::gustWarning, ::coldNight, ::fogLikely, ::ledgerAnomaly,
         ::reviewsDue, ::streakAtRisk, ::studyWeakSpot,
     )
 
