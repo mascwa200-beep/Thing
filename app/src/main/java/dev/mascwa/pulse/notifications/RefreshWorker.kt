@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
+import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.QuietHours
 import dev.mascwa.pulse.core.util.Formatters
@@ -56,6 +57,12 @@ class RefreshWorker(
         // OS's 30-minute floor.
         refreshWidgets()
 
+        // ⚠️ ABOVE the notification gates, for the same reason as the two services and the widgets:
+        // staying on the newest build is not a notification preference. Until now the ONLY caller of
+        // the install path was MainActivity, so a phone that was never opened was never updated —
+        // and the check that does sit below these gates only ever posted a note about it.
+        val buildWaiting = installNewestBuild(settings)
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 
@@ -73,11 +80,17 @@ class RefreshWorker(
         var safetyNotice: Pair<String, String>? = null
 
         // --- App update available? Standing ops note while a newer build waits (routine, never buzzes). ---
-        runCatching {
-            val info = container.updateRepository.check().available
-            if (info != null) {
-                opsNotice = "A new app build (#${info.versionCode}) is ready to install in Settings"
-            }
+        //
+        // ⚠️ Reuses what the install pass above already learned rather than asking again. `check()`
+        // sends `Cache-Control: no-cache` on purpose — it must never be answered from a stale disk
+        // entry — so a second call here would be a second live request every worker tick for an
+        // answer already in hand.
+        //
+        // And the note only appears when a build genuinely is WAITING. Most of the time the pass
+        // above has already installed it, in which case saying it is "ready to install in Settings"
+        // would send somebody to press a button for work that is already done.
+        buildWaiting?.let { info ->
+            opsNotice = "A new app build (#${info.versionCode}) is ready — ${info.waitingBecause}"
         }
 
         // --- Self-coding: auto-merge the Computer's own PRs once CI is green (opt-in) ---
@@ -293,6 +306,98 @@ class RefreshWorker(
         }
         return Result.success()
     }
+
+    /**
+     * Fetch and install the newest green build, on a phone nobody has opened.
+     *
+     * ## Why this is here at all
+     *
+     * ⚠️ Until now the only caller of the install path was `MainActivity.maybeAutoUpdate`, so the
+     * app updated itself **only if you opened it**. A phone left in a drawer for a fortnight stayed
+     * on whatever build it had. This worker did already ask `updateRepository.check()` — but below
+     * the notification gates, and only to write a line into the board, so with notifications off it
+     * did not even ask.
+     *
+     * ## What it will not do
+     *
+     * - **Not on a metered connection.** The APK is around 158 MB and CI publishes on every push;
+     *   spending somebody's mobile allowance on that, unasked and unseen, is not a trade to make on
+     *   their behalf. [ConnectivityObserver.isUnmetered] answers false when it cannot classify the
+     *   connection, which is the safe direction and the reason this reads it rather than guessing.
+     * - **Not while the app is on screen.** Installing replaces the running process, so an app
+     *   vanishing mid-sentence reads as a crash. `appForeground` is the same signal the assistant's
+     *   navigation tool uses to tell a visible console from an invisible one.
+     * - **Not twice.** `unconfirmedUpdateCode` is the loop-breaker: it is set when an install is
+     *   committed and cleared the first time the app reaches the foreground afterwards, whichever
+     *   build that turns out to be. While it is set this stands down. ⚠️ It is deliberately NOT a
+     *   claim that a build is bad — nothing here can know that — only that one install is in flight.
+     *   `lastAutoUpdateCode` is the second half: it stops the same build being fetched again.
+     *
+     * The green gate lives in `updateRepository.check()`, which only reports a build whose CI run
+     * actually passed — this must never be the thing that decides that.
+     */
+    private suspend fun installNewestBuild(
+        settings: AppSettings,
+    ): PendingBuild? {
+        // ⚠️ **The loop-breaker has to be clearable without anyone opening the app**, and until this
+        // was written it was not — `MainActivity` cleared it on foreground, which was sufficient
+        // when a visit was the only thing that could ever install. It no longer is: a phone that is
+        // never opened would install exactly once and then be blocked for good, which is precisely
+        // the phone this whole pass exists for.
+        //
+        // The evidence that the install landed is that THIS code is running from it. Comparing the
+        // build we are executing against the one that was committed answers it with no foreground
+        // and no guessing — and if the install genuinely failed, the running build is still the old
+        // one, so it stays blocked, which is the safety property the field is for.
+        var pending = settings.unconfirmedUpdateCode
+        if (pending != 0 && BuildConfig.VERSION_CODE >= pending) {
+            runCatching { container.settingsRepository.update { it.copy(unconfirmedUpdateCode = 0) } }
+            pending = 0
+        }
+
+        // ⚠️ These are ordered cheapest-first and, more importantly, the network request sits behind
+        // all of them: a phone on mobile data must not pay for a check it could never act on.
+        if (pending != 0) return null
+        val foreground = container.appForeground.value
+        val unmetered = container.connectivityObserver.isUnmetered.value
+
+        return runCatching {
+            val info = container.updateRepository.check().available ?: return@runCatching null
+            if (info.versionCode <= settings.lastAutoUpdateCode) return@runCatching null
+
+            if (foreground) return@runCatching PendingBuild(info.versionCode, "waiting until you put the phone down")
+            if (!unmetered) return@runCatching PendingBuild(info.versionCode, "waiting for Wi-Fi")
+
+            val file = container.updateRepository.download(info) { }
+
+            // ⚠️ Written BEFORE the install is committed, and both fields together. The commit
+            // replaces this process, so anything recorded afterwards may simply never happen — and
+            // an install handed to the system with no loop-breaker written would be re-attempted on
+            // the next pass, forever.
+            container.settingsRepository.update {
+                it.copy(lastAutoUpdateCode = info.versionCode, unconfirmedUpdateCode = info.versionCode)
+            }
+
+            // ⚠️ Read again, because downloading 158 MB takes long enough for somebody to have
+            // picked the phone up meanwhile. The check at the top is what avoids starting the work;
+            // this one is what avoids replacing an app being read.
+            if (container.appForeground.value) {
+                return@runCatching PendingBuild(info.versionCode, "downloaded — it will install when you put the phone down")
+            }
+            dev.mascwa.pulse.core.util.installApk(applicationContext, file)
+            null
+        }.getOrNull()
+    }
+
+    /**
+     * A newer build that exists and has not been installed, and the honest reason why not.
+     *
+     * ⚠️ The reason is the point. "A new build is ready to install in Settings" was true when a tap
+     * was the only way it could ever happen; now the ordinary case is that the phone installs it
+     * itself, so a standing note has to say what it is actually waiting for or it sends somebody to
+     * press a button for work already done.
+     */
+    private data class PendingBuild(val versionCode: Int, val waitingBecause: String)
 
     /**
      * Push the widget, so it is not left waiting on the OS's thirty-minute floor.

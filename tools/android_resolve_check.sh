@@ -64,6 +64,21 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # file under test — and a cross-module smart-cast error then vanishes, so the gate would pass on
 # code CI rejects. The three jars below are feeds' own dependencies, needed only so the signatures
 # in those class files resolve.
+# ⚠️ **A GENERATED CLASS CAN NEVER RESOLVE HERE, and the differencing does not save you from it.**
+# `BuildConfig` and `R` are written by the build, so nothing local has them on any classpath. The
+# differencing normally cancels that out — the complaint is present at HEAD too — but a file using
+# one for the FIRST time has no baseline complaint to cancel against, so it is reported as new and
+# looks exactly like a real defect.
+#
+# How to settle it in one command, rather than shrugging: compile a file that ALREADY uses the same
+# generated class and ships green in CI, e.g.
+#
+#     tools/android_compile_check.sh app/src/main/java/dev/mascwa/pulse/crash/CrashReporter.kt
+#
+# That reports `unresolved reference 'BuildConfig'` on its own import line, which is proof the
+# mechanism is generic rather than anything about your edit. Do check the member exists —
+# VERSION_CODE, VERSION_NAME and the flavour fields are the only ones this build generates.
+
 FEEDS=core/feeds/build/classes/kotlin/main
 OKHTTP=$(find "$GC/com.squareup.okhttp3" -name 'okhttp-*.jar' 2>/dev/null | head -1)
 OKIO=$(find "$GC/com.squareup.okio" -name 'okio-jvm-*.jar' 2>/dev/null | head -1)
