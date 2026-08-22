@@ -461,6 +461,93 @@ class UnifiedBriefTest {
         assertNull(UnifiedBriefComposer.compose(routine().copy(lesson = "  "))!!.row(BriefRowKind.LESSON))
     }
 
+    // ------------------------------------------------------------------------------ the HEALTH row
+
+    @Test fun aHealthLineRendersLastAmongTheFacts() {
+        // routine() is four rows; the health line makes exactly five, the layout's capacity, and it
+        // sits after the agenda because it is the reader's own business rather than the world's.
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(healthLine = "1,240 kcal left · 84 g protein to go"),
+        )!!
+        assertEquals(
+            listOf(
+                BriefRowKind.NEWS, BriefRowKind.MARKETS, BriefRowKind.WEATHER,
+                BriefRowKind.AGENDA, BriefRowKind.HEALTH,
+            ),
+            b.rows.map { it.kind },
+        )
+        assertEquals("1,240 kcal left · 84 g protein to go", b.row(BriefRowKind.HEALTH)!!.text)
+    }
+
+    /**
+     * ⚠️ The load-bearing one. Six rows into five slots, and the renderer takes the first five — so
+     * something must go, and HEALTH is second in the ladder after LESSON. Asserting the survivors as
+     * well as the casualty is deliberate: a ladder that dropped MARKETS instead would still leave the
+     * board at five rows and look perfectly healthy from a count.
+     */
+    @Test fun theHealthRowIsShedBeforeAnyFactAboutTheWorld() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(
+                healthLine = "1,240 kcal left · 84 g protein to go",
+                advisory = "Leave in 10 min — 4.2 km and rain at 08:40",
+            ),
+        )!!
+        assertNull(b.row(BriefRowKind.HEALTH))
+        assertEquals(
+            listOf(
+                BriefRowKind.NEWS, BriefRowKind.MARKETS, BriefRowKind.WEATHER,
+                BriefRowKind.AGENDA, BriefRowKind.ADVISORY,
+            ),
+            b.rows.map { it.kind },
+        )
+    }
+
+    /** A lesson goes first, so a board carrying both keeps the calorie count and loses the study line. */
+    @Test fun aLessonIsShedBeforeTheHealthRow() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(healthLine = "310 kcal over · protein met", lesson = "Read: Knots & Cordage"),
+        )!!
+        assertNull(b.row(BriefRowKind.LESSON))
+        assertEquals("310 kcal over · protein met", b.row(BriefRowKind.HEALTH)!!.text)
+    }
+
+    @Test fun noHealthLineMeansNoIntakeRow() {
+        assertNull(UnifiedBriefComposer.compose(routine())!!.row(BriefRowKind.HEALTH))
+        assertNull(UnifiedBriefComposer.compose(routine().copy(healthLine = "  "))!!.row(BriefRowKind.HEALTH))
+    }
+
+    /** A calorie count is a fact about a quiet day. It must never be a reason to buzz. */
+    @Test fun aHealthLineNeverRaisesTheAlertCondition() {
+        val b = UnifiedBriefComposer.compose(
+            BriefSignals(nowMs = NOW, healthLine = "1,240 kcal left · 84 g protein to go"),
+        )!!
+        assertEquals(BriefUrgency.ROUTINE, b.urgency)
+        assertNull(b.urgencyKey)
+    }
+
+    /**
+     * Everything about the world outranks it — but it is above LESSON, so a board carrying only these
+     * two still has a headline. (`firstNotNullOf` throws on a board whose only kind is missing from
+     * the preference list, which is why every kind has to appear in it.)
+     */
+    @Test fun healthOnlyLeadsABoardCarryingLittleElse() {
+        val busy = UnifiedBriefComposer.compose(routine().copy(healthLine = "1,240 kcal left"))!!
+        assertNotEquals("1,240 kcal left", busy.headline)
+
+        val alone = UnifiedBriefComposer.compose(
+            BriefSignals(nowMs = NOW, healthLine = "1,240 kcal left", lesson = "3 questions to answer"),
+        )!!
+        assertEquals("1,240 kcal left", alone.headline)
+    }
+
+    @Test fun aLongHealthLineIsCappedWithAnEllipsis() {
+        // HEALTH_CAP is 70; cap() keeps 69 chars then appends the ellipsis, so 70 total.
+        val text = UnifiedBriefComposer.compose(routine().copy(healthLine = "x".repeat(200)))!!
+            .row(BriefRowKind.HEALTH)!!.text
+        assertEquals(70, text.length)
+        assertTrue(text.endsWith("…"))
+    }
+
     @Test fun aLongAdvisoryIsCappedWithAnEllipsis() {
         // ADVISORY_CAP is 110; cap() keeps 109 chars then appends the ellipsis, so 110 total.
         val long = "x".repeat(200)

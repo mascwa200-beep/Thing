@@ -242,6 +242,14 @@ data class NotificationPrefs(
     val showMarketsRow: Boolean = true,
     val showWeatherRow: Boolean = true,
     val showAgendaRow: Boolean = true,
+    /**
+     * The board's HEALTH row: today's eating against today's target.
+     *
+     * ⚠️ Default ON, but the row is silent until there is both a target and something logged — so a
+     * reader who never opens HEALTH never sees it, and switching this off is for someone who uses the
+     * feature and would rather not have a calorie count on their lock screen.
+     */
+    val showHealthRow: Boolean = true,
     /** Whether a NEW urgent item (due reminder, major emergency, security/safety notice) may re-post the
      *  board with sound and vibration. Off = the board still updates, just always silently. */
     val urgentAlertsEnabled: Boolean = true,

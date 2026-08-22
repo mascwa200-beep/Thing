@@ -607,6 +607,8 @@ fun SettingsScreen(
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showWeatherRow = v)) } })
                     PrefSwitch("Show your agenda on the board", checked = s.notifications.showAgendaRow, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showAgendaRow = v)) } })
+                    PrefSwitch("Show what you have eaten on the board", checked = s.notifications.showHealthRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showHealthRow = v)) } })
                     SingleChoiceRow(
                         "Market row threshold", s.notifications.marketMovePercent,
                         listOf(1.0 to "±1%", 2.0 to "±2%", 3.0 to "±3%", 5.0 to "±5%", 10.0 to "±10%"),

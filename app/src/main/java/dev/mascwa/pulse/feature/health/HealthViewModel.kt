@@ -141,81 +141,19 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             build(p, w, todayEntries)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, State())
 
+    /**
+     * ⚠️ Delegates to [composeHealthReading], which is a TOP-LEVEL function rather than a method
+     * here for one reason: the `health` assistant tool has to answer the same questions, and a
+     * second copy of this arithmetic is how the Computer and the screen start quoting different
+     * calorie targets for the same day. One composition, two readers.
+     */
     private suspend fun build(
         p: HealthSettings,
         w: List<BodyTrend.Weighin>,
         todayEntries: List<NutritionDay.Entry>,
-    ): State {
-        val trend = BodyTrend.estimate(w)
-        val latestKg = (trend as? BodyTrend.Trend.Estimated)?.latest?.trendKg
-        val person = person(p, latestKg)
-        val now = System.currentTimeMillis()
+    ): State = composeHealthReading(p, w, todayEntries, c.foodLogStore, todayStartMs())
 
-        val window = p.expenditureWindowDays.coerceIn(14, 120)
-        val from = todayStartMs() - window * DAY_MS
-        val intake = c.foodLogStore.intakeDays(from, now)
-        val measured = Expenditure.measure(trend, intake, now, window)
 
-        val bmr = person?.let { Body.bmr(it) }
-        val activity = runCatching { Expenditure.Activity.valueOf(p.activity) }
-            .getOrDefault(Expenditure.Activity.LIGHT)
-        val formula = bmr?.takeIf { it.isFinite() }?.let { Expenditure.fromFormula(it, activity) }
-
-        // ⚠️ The blend, not a switch. Inverse-variance weighting hands the answer over as the
-        // measurement tightens, so there is no day on which the number jumps and no threshold to pick.
-        val known = measured as? Expenditure.Estimate.Known
-        val expenditure = when {
-            formula != null && known != null -> Expenditure.blend(formula, known)
-            known != null -> known
-            else -> formula
-        }
-        val share = if (formula != null && known != null) Expenditure.measuredShare(formula, known) else 0.0
-
-        val plan = if (person != null && expenditure != null) {
-            MacroTargets.plan(
-                MacroTargets.Request(
-                    person = person,
-                    expenditure = expenditure,
-                    ratePerWeekKg = p.ratePerWeekKg,
-                    mode = runCatching { MacroTargets.DietMode.valueOf(p.dietMode) }
-                        .getOrDefault(MacroTargets.DietMode.BALANCED),
-                    proteinGPerKgOverride = p.proteinGPerKg.takeIf { it > 0.0 },
-                    goalKg = p.goalKg.takeIf { it > 0.0 },
-                ),
-            )
-        } else {
-            null
-        }
-
-        return State(
-            profile = p,
-            person = person,
-            trend = trend,
-            formula = formula,
-            measured = measured,
-            expenditure = expenditure,
-            measuredShare = share,
-            plan = plan,
-            eatenToday = NutritionDay.total(todayEntries),
-            loggedDaysInWindow = intake.size,
-        )
-    }
-
-    /**
-     * The person the cores need, or null when too little is known.
-     *
-     * ⚠️ The weight comes from the **trend**, not the newest reading. Everything downstream of this —
-     * the resting-rate floor, the protein reference, the rate cap — would otherwise move by a kilogram
-     * or two depending on which morning the scale was stepped on, and a calorie target that changes
-     * because of yesterday's salt is exactly what the trend exists to prevent.
-     */
-    private fun person(p: HealthSettings, trendKg: Double?): Body.Person? {
-        if (p.heightCm <= 0.0 || p.birthYear <= 0 || trendKg == null) return null
-        val age = LocalDate.now(zone).year - p.birthYear
-        val sex = runCatching { Body.Sex.valueOf(p.sex) }.getOrDefault(Body.Sex.UNSPECIFIED)
-        val person = Body.Person(trendKg, p.heightCm, age, sex)
-        return person.takeIf { Body.isPlausible(it) }
-    }
 
     // ------------------------------------------------------------------------------------ actions
 
@@ -533,4 +471,88 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         /** Long enough that an ordinary typist fires one search per word, short enough to feel live. */
         const val DEBOUNCE_MS = 280L
     }
+}
+
+/**
+ * The whole health reading, composed from the raw record by the pure cores.
+ *
+ * ⚠️ **Top-level, and shared with the `health` assistant tool.** Nothing derived is stored anywhere,
+ * so the only way the Computer and the HEALTH screen can disagree about a calorie target is if there
+ * are two copies of this arithmetic. There is one.
+ */
+internal suspend fun composeHealthReading(
+    p: HealthSettings,
+    w: List<BodyTrend.Weighin>,
+    todayEntries: List<NutritionDay.Entry>,
+    foodLog: dev.mascwa.pulse.data.health.FoodLogStore,
+    todayStartMs: Long,
+): HealthViewModel.State {
+    val trend = BodyTrend.estimate(w)
+    val latestKg = (trend as? BodyTrend.Trend.Estimated)?.latest?.trendKg
+    val person = person(p, latestKg)
+    val now = System.currentTimeMillis()
+
+    val window = p.expenditureWindowDays.coerceIn(14, 120)
+    val from = todayStartMs - window * DAY_MS
+    val intake = foodLog.intakeDays(from, now)
+    val measured = Expenditure.measure(trend, intake, now, window)
+
+    val bmr = person?.let { Body.bmr(it) }
+    val activity = runCatching { Expenditure.Activity.valueOf(p.activity) }
+        .getOrDefault(Expenditure.Activity.LIGHT)
+    val formula = bmr?.takeIf { it.isFinite() }?.let { Expenditure.fromFormula(it, activity) }
+
+    // ⚠️ The blend, not a switch. Inverse-variance weighting hands the answer over as the
+    // measurement tightens, so there is no day on which the number jumps and no threshold to pick.
+    val known = measured as? Expenditure.Estimate.Known
+    val expenditure = when {
+        formula != null && known != null -> Expenditure.blend(formula, known)
+        known != null -> known
+        else -> formula
+    }
+    val share = if (formula != null && known != null) Expenditure.measuredShare(formula, known) else 0.0
+
+    val plan = if (person != null && expenditure != null) {
+        MacroTargets.plan(
+            MacroTargets.Request(
+                person = person,
+                expenditure = expenditure,
+                ratePerWeekKg = p.ratePerWeekKg,
+                mode = runCatching { MacroTargets.DietMode.valueOf(p.dietMode) }
+                    .getOrDefault(MacroTargets.DietMode.BALANCED),
+                proteinGPerKgOverride = p.proteinGPerKg.takeIf { it > 0.0 },
+                goalKg = p.goalKg.takeIf { it > 0.0 },
+            ),
+        )
+    } else {
+        null
+    }
+
+    return HealthViewModel.State(
+        profile = p,
+        person = person,
+        trend = trend,
+        formula = formula,
+        measured = measured,
+        expenditure = expenditure,
+        measuredShare = share,
+        plan = plan,
+        eatenToday = NutritionDay.total(todayEntries),
+        loggedDaysInWindow = intake.size,
+    )
+}
+
+/**
+ * The person the cores need, or null when too little is known.
+ *
+ * ⚠️ The weight comes from the **trend**, not the newest reading. Everything downstream of this —
+ * the resting-rate floor, the protein reference, the rate cap — would otherwise move by a kilogram
+ * or two depending on which morning the scale was stepped on, and a calorie target that changes
+ * because of yesterday's salt is exactly what the trend exists to prevent.
+ */    private fun person(p: HealthSettings, trendKg: Double?): Body.Person? {
+    if (p.heightCm <= 0.0 || p.birthYear <= 0 || trendKg == null) return null
+    val age = LocalDate.now(zone).year - p.birthYear
+    val sex = runCatching { Body.Sex.valueOf(p.sex) }.getOrDefault(Body.Sex.UNSPECIFIED)
+    val person = Body.Person(trendKg, p.heightCm, age, sex)
+    return person.takeIf { Body.isPlausible(it) }
 }

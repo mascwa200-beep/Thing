@@ -28,6 +28,7 @@
     <color name="lcars_row_agenda">#8A5CE0</color>
     <color name="lcars_row_advisory">#E0409A</color>
     <color name="lcars_row_lesson">#24C04A</color>
+    <color name="lcars_row_health">#3FBFA0</color>
     <!-- Home-screen widget palette — real TosPalette tokens, under the same rule as the
          notification colours above and for exactly the same reason: a widget is RemoteViews
          inflated from XML and cannot read the Compose palette, so when the palette moves it must

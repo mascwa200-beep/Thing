@@ -30,7 +30,7 @@ enum class BriefUrgency { ROUTINE, YELLOW, RED }
  * every row above it reports the world, and that one reports the Oracle's judgement of it. LESSON is
  * last: it is the only row that is not about today at all.
  */
-enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA, ADVISORY, LESSON }
+enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA, ADVISORY, LESSON, HEALTH }
 
 data class BriefRow(val kind: BriefRowKind, val text: String)
 
@@ -97,6 +97,19 @@ data class BriefSignals(
     val officialAlert: String? = null,
     /** Stable dedup key for [officialAlert] — the issuer's own alert id, so it buzzes once. */
     val officialAlertKey: String? = null,
+    // Health.
+    /**
+     * One line on today's eating against today's target, or null when there is nothing to say.
+     *
+     * ⚠️ **Composed by the caller, never assembled here from parts.** The figures come from the same
+     * composition the HEALTH screen draws, and passing the numbers in separately would be a second
+     * place that decides how they are phrased and rounded — which is how the tray and the screen
+     * start quoting different calorie counts for the same day.
+     *
+     * ⚠️ Null is also the honest value while there is no target and while nothing has been logged.
+     * On this feature a defaulted zero is not a missing figure, it is advice.
+     */
+    val healthLine: String? = null,
     // Markets.
     val movers: List<OracleMover> = emptyList(),
     val moveThresholdPct: Double = 3.0,
@@ -202,6 +215,15 @@ object UnifiedBriefComposer {
     /** A lesson row is a title and nothing else — the reason for it lives on the study screen. */
     private const val LESSON_CAP = 70
 
+    /**
+     * Roomier than a lesson, tighter than an advisory.
+     *
+     * ⚠️ A health row is several numbers and their units — "1,240 left · 84 g protein to go" — and a
+     * cut that lands mid-figure produces a number that is simply wrong rather than merely truncated.
+     * 70 fits the longest line [dev.mascwa.pulse.core.telemetry.NutritionDay] can produce; 60 does not.
+     */
+    private const val HEALTH_CAP = 70
+
     /** The expanded notification layout has exactly this many row slots. See [trimToFive]. */
     private const val MAX_ROWS = 5
 
@@ -302,6 +324,16 @@ object UnifiedBriefComposer {
         // --- AGENDA: next event, else the top task; plus open-task and set-reminder counts. ---
         if (s.showAgenda) agendaText(s)?.let { rows += BriefRow(BriefRowKind.AGENDA, it) }
 
+        // --- HEALTH: today's eating against today's target. A fact, never urgent. ---
+        //
+        // ⚠️ This row exists because the ADVISORY row cannot carry it. Advisories are gated at
+        // IMPORTANT, and the Oracle's health rules are AMBIENT and NOTABLE by design — a calorie
+        // count is worth knowing and never worth interrupting for. Without a row of its own the
+        // figure would be computed on every refresh and reach nobody.
+        s.healthLine?.takeIf { it.isNotBlank() }?.let {
+            rows += BriefRow(BriefRowKind.HEALTH, cap(it.trim(), HEALTH_CAP))
+        }
+
         // --- ADVISORY: the Oracle's call to action, when the caller judged one worth the space. ---
         s.advisory?.takeIf { it.isNotBlank() }?.let {
             rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP))
@@ -328,6 +360,10 @@ object UnifiedBriefComposer {
         val headline = listOf(
             BriefRowKind.ALERT, BriefRowKind.ADVISORY, BriefRowKind.NEWS,
             BriefRowKind.AGENDA, BriefRowKind.WEATHER, BriefRowKind.MARKETS,
+            // ⚠️ Below the world's facts: a calorie count is the reader's own business and a poor
+            // thing to read on a lock screen before anything else. It is above LESSON only so that
+            // a board carrying just these two still has a headline.
+            BriefRowKind.HEALTH,
             // Last, and present only so a board carrying nothing else cannot throw here.
             BriefRowKind.LESSON,
         ).firstNotNullOf { kind -> rows.firstOrNull { it.kind == kind } }.text
@@ -356,8 +392,13 @@ object UnifiedBriefComposer {
      * reason the board is interrupting and the other is the reason it earned the extra line.
      */
     private fun trimToFive(rows: MutableList<BriefRow>) {
+        // ⚠️ Ordered by what is shed FIRST. HEALTH goes second, just after LESSON, and the reason
+        // is decay rather than importance: a calorie count is equally true an hour later, where a
+        // headline, a forecast and an appointment all stop being true. Anything not in this list can
+        // never be dropped, so a new kind missing from it would silently displace a real row on a
+        // busy board -- the layout takes the first five and says nothing about the rest.
         val droppable = listOf(
-            BriefRowKind.LESSON, BriefRowKind.MARKETS, BriefRowKind.NEWS,
+            BriefRowKind.LESSON, BriefRowKind.HEALTH, BriefRowKind.MARKETS, BriefRowKind.NEWS,
             BriefRowKind.WEATHER, BriefRowKind.AGENDA,
         )
         for (kind in droppable) {

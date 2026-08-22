@@ -36,6 +36,7 @@
     <string name="notif_row_agenda">AGENDA</string>
     <string name="notif_row_advisory">ADVISE</string>
     <string name="notif_row_lesson">STUDY</string>
+    <string name="notif_row_health">INTAKE</string>
 
     <!-- The one widget. There used to be three (and before that, seven); a picker offering several
          near-identical entries made the user responsible for a decision the widget can make itself
