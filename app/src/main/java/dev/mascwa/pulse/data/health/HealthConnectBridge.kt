@@ -99,19 +99,20 @@ class HealthConnectBridge(private val context: Context) {
     )
 
     /**
-     * The contract a screen launches to ask for them. Null when there is no provider to ask.
+     * The contract a screen launches to ask for them.
+     *
+     * ⚠️ **Not gated on availability, deliberately.** A contract is a description of an intent, not a
+     * live connection — building one costs nothing and needs no provider. Gating it would force the
+     * caller to create its launcher conditionally, and a `rememberLauncherForActivityResult` that
+     * exists in some compositions and not others is a fragile shape in a file that cannot be
+     * type-checked locally. The gate belongs on the LAUNCH, which the surface already does.
      *
      * ⚠️ The return type is written out rather than inferred. A composable passes this straight to
-     * `rememberLauncherForActivityResult`, whose type parameters come from the contract — leaving it
-     * to inference puts the shape of a public API at the mercy of a library's own generics, and the
-     * failure lands in a Compose file that cannot be type-checked locally.
+     * the launcher, whose type parameters come from the contract — leaving it to inference puts the
+     * shape of a public API at the mercy of a library's own generics.
      */
-    fun permissionContract(): ActivityResultContract<Set<String>, Set<String>>? =
-        if (availability() is Availability.Ready) {
-            runCatching { PermissionController.createRequestPermissionResultContract() }.getOrNull()
-        } else {
-            null
-        }
+    fun permissionContract(): ActivityResultContract<Set<String>, Set<String>> =
+        PermissionController.createRequestPermissionResultContract()
 
     suspend fun granted(): Set<String> = withContext(Dispatchers.IO) {
         runCatching { client()?.permissionController?.getGrantedPermissions().orEmpty() }

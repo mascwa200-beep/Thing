@@ -1538,13 +1538,12 @@ private fun HealthConnectPanel(vm: HealthViewModel) {
     val availability = bridge.availability()
     var granted by remember { mutableStateOf(false) }
 
-    // The contract is null when there is no provider, so the launcher is only built when there is
-    // something to launch. A contract for an absent provider would throw on launch.
-    val contract = remember(availability) { bridge.permissionContract() }
-    val ask = contract?.let { ct ->
-        rememberLauncherForActivityResult(ct) { result ->
-            granted = result.containsAll(bridge.permissions)
-        }
+    // ⚠️ ONE launcher, created unconditionally. A `rememberLauncherForActivityResult` inside a
+    // conditional branch exists in some compositions and not others, which is a fragile thing to
+    // write in a file no local gate can type-check. The contract needs no provider to construct —
+    // it only describes an intent — so the gate lives on the button that launches it.
+    val ask = rememberLauncherForActivityResult(remember { bridge.permissionContract() }) { result ->
+        granted = result.containsAll(bridge.permissions)
     }
     LaunchedEffect(availability) {
         granted = availability is HealthConnectBridge.Availability.Ready && bridge.hasAll()
@@ -1580,8 +1579,7 @@ private fun HealthConnectPanel(vm: HealthViewModel) {
                     if (!granted) {
                         LcarsButton(
                             text = "ALLOW WEIGHT & STEPS",
-                            enabled = ask != null,
-                            onClick = { ask?.launch(bridge.permissions) },
+                            onClick = { runCatching { ask.launch(bridge.permissions) } },
                         )
                     } else {
                         LcarsButton(text = "BRING IN NEW WEIGH-INS", onClick = { vm.importFromHealthConnect() })

@@ -7801,3 +7801,103 @@ dependency, `androidx.camera.view` is implemented, `BarcodeScannerScreen.kt` is 
 message. ZXing core was the right call over ML Kit for the reasons the plan gives: the unbundled ML
 Kit variant needs Play Services, which is the wrong bet on GrapheneOS, and the bundled one adds
 2–3 MB to an APK the auto-updater re-downloads in full on every build.
+
+### THE HEALTH TAB FINISHED — export, custom foods, photographs, Health Connect (this session cont.)
+
+The four items the plan had left. All four shipped, each its own CI-green slice on
+`claude/loving-edison-bd65oa` (PR #454). **Zero subagent spend**, as with every arc since the credit
+directive.
+
+**`532a3a2` — the record leaves the phone.** It is the one dataset in this app that cannot be
+refetched: markets, weather and news all come back from a server, a year of weigh-ins and nine
+thousand meals exist on exactly one device. `HealthExport` (pure, 15 tests) writes food log, daily
+totals, weigh-ins and measurements. Three rules carry it and each has a plausible wrong answer:
+- **RFC 4180 quoting.** The bundled seed contains `Chicken breast, baked, skin not eaten` — commas
+  and all — so an unquoted writer turns one food into three columns and shifts every number two
+  places left, which reads as a data-entry mistake rather than a bug. ⚠️ The test parses the row back
+  with an **independent reader** rather than comparing against a string I typed.
+- **`Locale.US` on every number.** A comma decimal in a comma-separated file is two fields, so this
+  does not misprint a figure, it destroys the row.
+- ⚠️ **A text field beginning `=`, `+`, `-` or `@` is a formula to a spreadsheet.** Open Food Facts is
+  crowd-sourced, so a product name is attacker-controlled text arriving in Excel. Guarded with an
+  apostrophe — and **numeric fields are exempt**, because a minus sign is how a negative number
+  begins and guarding it would turn every loss on the trend into text.
+
+⚠️ `FoodLogStore.allEntries()` opens **every shard**, which is exactly what the sharding exists to
+avoid. Fine for something asked for by name and waited on, terrible for a screen, and the KDoc says
+so. Its month list comes from the **index**, not from the shards already in memory: a cold process
+has opened none, so exporting from those writes a file that looks complete and is not.
+
+⚠️ The trend column is the trend **as it stood at each reading**. `BodyTrend.estimate` runs an RTS
+smoother *backwards* over the whole series, so `points[i]` knows about every later weigh-in — right
+for a chart, wrong here, because somebody comparing the export against a screenshot from that morning
+would find the two disagreeing with nothing to say which was wrong. Readings are sorted at the call
+site, not left to the core, or `trendKgAt(i)` pairs each reading with somebody else's trend. A
+**UTF-8 BOM**, deliberately: Excel on Windows reads a BOM-less UTF-8 CSV as Windows-1252 and mangles
+every accented food name, and the companion runs on Windows; the cost is that naive Python needs
+`utf-8-sig`.
+
+**`a142f90` — a food typed in once, kept.** QUICK ADD wrote one entry and remembered nothing, so
+eating the same thing on Tuesday meant reading the same label again. Saved foods are searched **ahead
+of both databases** (a short list you named yourself beats one of thirteen thousand generic rows), and
+the cap in `CustomFoodStore` is what makes that safe. Both are ranked by the **same** `FoodSearch.score`
+as the seed, so it is an ordering decision and not a second, disagreeing search.
+⚠️ **The load-bearing rule is a refusal.** `FoodPortion.per100gFrom` returns null without a weight,
+because a saved food IS a density and there is no honest way to derive one from "320 calories". The
+switch is disabled **with the reason on screen** rather than absent; the view model re-checks rather
+than trusting it, since the switch does not clear itself when the weight field is emptied. Ids are
+prefixed `own:` — a bare one could collide with a real barcode and attribute a home-made entry to a
+supermarket record. Two defects fixed on the way: `FindAFood` did not declare its pick target, so a
+recipe builder left open sent the next logged food into the ingredient slot; and `IntakeBody`'s KDoc
+still said "only quick-add for now" with the search card three lines below it.
+
+**`06639ee` — photographs.** ⚠️ **The load-bearing decision is where the files live.** This app's
+existing camera helper writes into `cacheDir`, which Android reclaims without asking — a twelve-week
+comparison would lose its "before" at an arbitrary point with no error and no gap in the list. These
+go in `filesDir/progress/`. Not in the MediaStore either, so they never reach the camera roll; the
+screen says that **and** says the cost of the same decision, that uninstalling takes them with it.
+Reserving a slot does not record it — a cancelled capture leaves a zero-byte file the load-time sweep
+cannot catch, because it exists. Thumbnails go through Coil, which downsamples to the drawn size.
+
+**`ee1c276` — Health Connect, entirely behind a capability check.** ⚠️ **The trap that would have
+made it look unsupported on a phone that has it:** `getSdkStatus` resolves the provider BY PACKAGE,
+and Android 11+ package visibility hides it unless the manifest declares
+`<queries><package android:name="com.google.android.apps.healthdata" />`. Without it the call returns
+SDK_UNAVAILABLE on a device with Health Connect installed — a silent false negative indistinguishable
+from a device that genuinely lacks it, on the one call the whole integration is gated behind, and
+exactly the answer I was expecting to get for a different reason. Availability is re-read on every
+call, not cached: it can be installed while the app is alive, and a status decided once leaves the
+panel greyed out after somebody did the thing it told them to. ⚠️ A permission not in the manifest
+cannot be requested at all, so the three there ARE the reach — read weight, write weight, read steps.
+Import checks the permission first and reports it separately (an empty list means both "nothing new"
+and "could not ask"); imports go through `BodyStore.record`, so the same-day replacement rule applies
+and importing twice cannot double a morning.
+
+⚠️ **NEW LOCAL TECHNIQUE, and it cost the one compile error of the arc: `javap` gives the JVM
+accessor name, which is NOT the Kotlin property name when the property carries a `@get:JvmName`.**
+`Mass` disassembles as `getKilograms()` and the Kotlin property is `inKilograms`; the real name is in
+the class file's `@Metadata`, which plain `strings` will show. Same shape on `Energy.inKilocalories`.
+Every other constant, signature and permission string was read out of the real 1.1.0 AAR with javap
+rather than recalled. Measured rather than assumed: guava is already in the graph via media3-common
+so this adds no second copy, and the AAR ships its own consumer proguard rules keeping the protobuf
+members R8 would strip — unlike the JsRuntime case, there is no keep rule to remember.
+
+**Tooling: `tools/android_compile_check.sh` now carries jsoup by default.** It is a dependency of
+`:core:telemetry`, so any run passing the whole core failed wholesale without it and the resulting
+hundreds of Readability errors buried whatever was actually being checked. Cost two rounds here;
+confirmed the gate still catches a planted error afterwards.
+
+**The gate that earned itself again:** `tools/kotlin_import_check.py` caught a missing `LcarsSwitch`
+import — the exact failure it was written for, on a path where the resolve check reports nothing
+because a new file has no baseline.
+
+⚠️ **Owner-verify on the Pixel, in order of risk.** (1) **Does Health Connect exist on this
+GrapheneOS build at all** — that is the one thing nothing here can establish, and the panel will say.
+(2) Photographs: take one, confirm it does **not** appear in the camera roll, and that it survives a
+few days (that is the cacheDir bug not happening). (3) EXPORT EVERYTHING on HABITS → open the zip in
+Excel and check accented food names are intact and the numbers are numbers. (4) QUICK ADD with a
+weight → keep it → search for it tomorrow. Everything above is CI-compile-gated only.
+
+**Open / steerable:** saved *meals* (a group logged as several entries, distinct from a recipe's one)
+were considered and not built — `Recipes` already carries the arithmetic, so it is a `kind` field and
+a branch at the log site whenever the owner wants it. A `health` CSV import has no counterpart.
