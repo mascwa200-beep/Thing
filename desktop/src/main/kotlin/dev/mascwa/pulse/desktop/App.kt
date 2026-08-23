@@ -157,6 +157,11 @@ fun PulseDesktopApp(
     diaryStore: dev.mascwa.pulse.desktop.notes.DiaryStore,
     crashReporter: dev.mascwa.pulse.desktop.diagnostics.CrashReporter,
     /**
+     * Null when the console cannot send — a test, or a build with nothing to send to. The screen
+     * hides the control rather than offering one that does nothing.
+     */
+    crashUploader: dev.mascwa.pulse.desktop.diagnostics.CrashUploader? = null,
+    /**
      * The window's key handler, which the shell fills in — see [ConsoleKeys]. Defaulted so a caller
      * that has no window (a test, a preview) needs to know nothing about shortcuts.
      */
@@ -383,7 +388,7 @@ fun PulseDesktopApp(
         // rather than what is strange right now), and one record must not be read twice.
         val sinceVm = remember { SinceYouLeftViewModel(scope, settings, worldLedger) }
 
-        val crashVm = remember { CrashViewModel(scope, crashReporter) }
+        val crashVm = remember { CrashViewModel(scope, crashReporter, crashUploader) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
         val settingsVm = remember {

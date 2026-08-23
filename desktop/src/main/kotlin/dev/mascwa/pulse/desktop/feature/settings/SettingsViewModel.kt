@@ -104,6 +104,7 @@ class SettingsViewModel(
     fun setStandbyScreenSaver(v: Boolean) = write { it.copy(standbyScreenSaver = v) }
     fun setStandbyLockScreen(v: Boolean) = write { it.copy(standbyLockScreen = v) }
     fun setAutoCheckUpdates(v: Boolean) = write { it.copy(autoCheckUpdates = v) }
+    fun setSendCrashReports(v: Boolean) = write { it.copy(sendCrashReports = v) }
     fun setGithubToken(v: String) = write { it.copy(githubToken = v.trim()) }
 
     /** Upper-cased and clipped to two letters, because that is the whole of an ISO-3166 alpha-2 code

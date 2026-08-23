@@ -24,6 +24,7 @@ import dev.mascwa.pulse.desktop.standby.LockScreenImage
 import dev.mascwa.pulse.desktop.standby.ScreenSaver
 import dev.mascwa.pulse.desktop.standby.StandbyScreenSaverWindow
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.diagnostics.CrashUploader
 import dev.mascwa.pulse.desktop.update.BuildInfo
 import dev.mascwa.pulse.desktop.update.DesktopAutoUpdater
 import dev.mascwa.pulse.desktop.update.DesktopUpdater
@@ -83,6 +84,18 @@ private val diaryStore = DiaryStore()
  * was meant to catch is decoration.
  */
 private val crashReporter = CrashReporter(AppPaths.dataDir.toFile())
+
+/**
+ * ⚠️ Hoisted here beside the reporter, not built in the composition, for the reason every desktop
+ * store here is: `exitApplication` calls `System.exit(0)` immediately, so anything that must run
+ * around startup or shutdown has to be reachable from outside the UI.
+ */
+private val crashUploader = CrashUploader(
+    reporter = crashReporter,
+    dataDir = AppPaths.dataDir.toFile(),
+    token = { runCatching { settingsStore.current().githubToken }.getOrDefault("") },
+    buildLabel = { BuildInfo.display },
+)
 
 /**
  * The window's keyboard shortcuts.
@@ -177,6 +190,17 @@ private val autoUpdater = DesktopAutoUpdater(
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
     crashReporter.install(BuildInfo.display)
+    // Send whatever was written before this launch. ⚠️ Deliberately at startup rather than at the
+    // moment of the fault: a process that has just failed to draw is the worst place to start an
+    // HTTP request, and a fault that kills the process outright would never get its report away.
+    // Best-effort and silent — no token, no network, or the switch off all mean simply nothing.
+    Thread {
+        runBlocking {
+            runCatching {
+                if (settingsStore.current().sendCrashReports) crashUploader.sendQuietly()
+            }
+        }
+    }.apply { isDaemon = true }.start()
     // The clamp in the LCARS kit reports through the same file the fault dialog does. Installed
     // here rather than lazily so the very first frame is already covered; before this call it
     // records nothing at all, which is what keeps tests and headless renders free.
@@ -351,6 +375,7 @@ fun main(args: Array<String>) {
                     notesStore,
                     diaryStore,
                     crashReporter,
+                    crashUploader,
                     consoleKeys,
                     // Handing over to the installer. Flushed the same way the close button does, because an
                     // upgrade that lost the last answered study card would be a poor trade for being current.

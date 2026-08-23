@@ -83,6 +83,15 @@ data class DesktopSettings(
      */
     val githubToken: String = "",
 
+    /**
+     * Send desktop fault reports to the repo's `debug-reports` branch.
+     *
+     * ⚠️ Default ON, matching the phone, and for the same reason: a crash nobody can read is a
+     * crash nobody can fix. Only what the crash console already shows is sent — a header and a
+     * stack trace, scrubbed — and never anything else on this machine.
+     */
+    val sendCrashReports: Boolean = true,
+
     /** Look for a newer build on launch. The check is one request and never installs anything by itself. */
     val autoCheckUpdates: Boolean = true,
 

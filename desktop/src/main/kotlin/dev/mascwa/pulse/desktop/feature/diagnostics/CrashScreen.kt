@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.ElapsedPhrase
 import dev.mascwa.pulse.desktop.diagnostics.CrashEntry
 import dev.mascwa.pulse.desktop.diagnostics.CrashReporter
+import dev.mascwa.pulse.desktop.diagnostics.CrashUploader
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
@@ -49,7 +50,22 @@ import kotlinx.coroutines.withContext
 class CrashViewModel(
     private val scope: CoroutineScope,
     private val reporter: CrashReporter,
+    private val uploader: CrashUploader? = null,
 ) {
+    /** Whether sending is even possible here, so the button is absent rather than inert. */
+    val canSend: Boolean get() = uploader != null
+
+    private val _sendState = MutableStateFlow<String?>(null)
+    val sendState: StateFlow<String?> = _sendState.asStateFlow()
+
+    fun send() {
+        val up = uploader ?: return
+        scope.launch {
+            _sendState.value = "Sending…"
+            _sendState.value = up.send()
+        }
+    }
+
     private val _entries = MutableStateFlow<List<CrashEntry>>(emptyList())
     val entries: StateFlow<List<CrashEntry>> = _entries.asStateFlow()
 
@@ -77,6 +93,7 @@ class CrashViewModel(
     fun clear() {
         scope.launch {
             withContext(Dispatchers.IO) { reporter.clear() }
+            withContext(Dispatchers.IO) { uploader?.forgetSent() }
             _open.value = null
             refresh()
         }
@@ -99,6 +116,7 @@ class CrashViewModel(
 fun CrashScreen(vm: CrashViewModel, modifier: Modifier = Modifier) {
     val entries by vm.entries.collectAsState()
     val open by vm.open.collectAsState()
+    val sendState by vm.sendState.collectAsState()
     val clipboard = LocalClipboardManager.current
     val c = Pulse.colors
     var copied by remember { mutableStateOf(false) }
@@ -115,7 +133,18 @@ fun CrashScreen(vm: CrashViewModel, modifier: Modifier = Modifier) {
                 trailing = if (entries.isEmpty()) null else "${entries.size} OF ${CrashReporter.MAX}",
             )
             LcarsGhostButton("REFRESH", { vm.refresh() })
+            if (vm.canSend && entries.isNotEmpty()) LcarsGhostButton("SEND", { vm.send() })
             if (entries.isNotEmpty()) LcarsGhostButton("CLEAR", { vm.clear() })
+        }
+
+        // What the upload actually did, in a sentence. Silent until something is attempted, so the
+        // screen is unchanged for anyone who never presses it.
+        sendState?.let { note ->
+            Text(
+                note,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
         }
 
         if (entries.isEmpty()) {
@@ -126,9 +155,10 @@ fun CrashScreen(vm: CrashViewModel, modifier: Modifier = Modifier) {
                         fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
                     )
                     Text(
-                        "Faults are written here as they happen, and nothing is sent anywhere. " +
-                            "A failure while drawing does not close the window, so if a page ever " +
-                            "stops working without saying why, this is where the reason will be.",
+                        "Faults are written here as they happen. A failure while drawing does " +
+                            "not close the window, so if a page ever stops working without saying " +
+                            "why, this is where the reason will be — and it can be sent to the " +
+                            "repository so it can actually be read and fixed.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp,
                         color = c.muted, modifier = Modifier.padding(top = 6.dp),
                     )
