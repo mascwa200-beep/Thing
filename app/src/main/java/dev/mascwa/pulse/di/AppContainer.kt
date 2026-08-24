@@ -384,12 +384,30 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
-     * Everything findable: the bundled USDA seed first and always, packaged goods when there is a
-     * network. The one place the two sources are joined, so nothing downstream needs to know there
-     * are two.
+     * The bundled barcode database — ~4.5M retail products, answerable with no network.
+     *
+     * ⚠️ **Lazy, and that is what keeps a 296 MB asset from costing anything on a phone that never
+     * scans.** Room's `createFromAsset` unpacks the whole thing out of the APK the first time the
+     * database is opened, so touching this eagerly would spend that on every cold start. Nothing
+     * reaches it until a barcode or a food search actually needs it.
+     *
+     * ⚠️ Null on a build where the asset never arrived. It is fetched by CI rather than committed,
+     * so a local developer build genuinely has none — see `FoodDatabase.open`.
+     */
+    val offlineFoodStore: dev.mascwa.pulse.data.health.OfflineFoodStore? by lazy {
+        dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
+            ?.let { dev.mascwa.pulse.data.health.OfflineFoodStore(it) }
+    }
+
+    /**
+     * Everything findable: your own foods, then the bundled USDA seed, then ~4.5M bundled retail
+     * products, then the network. The one place the sources are joined, so nothing downstream needs
+     * to know there are four.
      */
     val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
-        dev.mascwa.pulse.data.health.FoodRepository(appContext, openFoodFacts, customFoodStore)
+        dev.mascwa.pulse.data.health.FoodRepository(
+            appContext, openFoodFacts, customFoodStore, offlineFoodStore,
+        )
     }
 
     /**

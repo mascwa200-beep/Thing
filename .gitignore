@@ -72,3 +72,9 @@ scratchpad/fallacy/prose.txt
 # content the app ships. The harnesses that read them ARE committed; the data they read is not.
 scratchpad/**/sb_*.json
 scratchpad/**/corpus.tsv
+
+# The offline food database: ~4.5M retail barcodes, 296 MB. Built by CI (or locally with
+# tools/food/build_food_db.py) and cached between runs — never committed, because GitHub hard-
+# rejects files over 100 MB and this repository has no LFS. The seed.tsv beside it IS committed.
+app/src/main/assets/food/food.db
+app/src/main/assets/food/food.db.gz

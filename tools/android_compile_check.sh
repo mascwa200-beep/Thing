@@ -48,6 +48,8 @@ ANDROID_JAR="$CACHE/android-all-$ANDROID_ALL_VERSION.jar"
 
 libs=()
 plugins=()
+modules=()
+module_cp=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -l) libs+=("$2"); shift 2 ;;
@@ -56,15 +58,33 @@ while [ $# -gt 0 ]; do
     # reference" and a dozen inference failures cascade off it — which reads exactly like a real
     # defect and is not one.
     -s) SERIALIZATION_PLUGIN=1; shift ;;
+    # ⚠️ A project module, as COMPILED CLASSES — never as sources. Passing another module's .kt
+    # files folds it into one compilation unit, which makes it one module, which makes a
+    # cross-module smart-cast error vanish: the gate would then pass on code CI rejects. That trap
+    # is documented on tools/kotlin_jvm_check.sh and is the same one here.
+    #
+    # Build the directory first — `./gradlew :core:feeds:compileKotlin --configure-on-demand
+    # --no-configuration-cache` — then pass
+    # `-m core/feeds/build/classes/kotlin/main`. Both shared cores are plain Kotlin/JVM modules, so
+    # this needs no Android SDK.
+    -m) modules+=("$2"); shift 2 ;;
     *) break ;;
   esac
+done
+for m in "${modules[@]:-}"; do
+  [ -n "$m" ] || continue
+  # ⚠️ A path that does not exist would silently contribute nothing, and every symbol it was meant
+  # to supply would be reported unresolved — indistinguishable from a real defect, and the exact
+  # shape of failure this gate exists to avoid producing.
+  [ -d "$m" ] || { echo "-m $m is not a directory — build the module first" >&2; exit 71; }
+  module_cp="$module_cp:$m"
 done
 if [ -n "${SERIALIZATION_PLUGIN:-}" ]; then
   sp=$(find "$HOME/.gradle/caches/modules-2" -name 'kotlin-serialization-compiler-plugin-embeddable-*.jar' 2>/dev/null | head -1)
   [ -n "$sp" ] || { echo "-s asked for but the serialization compiler plugin is not in the Gradle cache" >&2; exit 70; }
   plugins+=("-Xplugin=$sp")
 fi
-[ $# -ge 1 ] || { echo "usage: $0 [-s] [-l group:artifact:version ...] <file.kt> [more.kt ...]"; exit 64; }
+[ $# -ge 1 ] || { echo "usage: $0 [-s] [-l group:artifact:version ...] [-m module/build/classes/kotlin/main ...] <file.kt> [more.kt ...]"; exit 64; }
 
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "fetching the platform classes (~186 MB, once per cache) …" >&2
@@ -111,7 +131,7 @@ SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.j
 # once. Kept alongside the coroutines/serialization jars for exactly the same reason.
 JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra"
+TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra$module_cp"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
       -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)

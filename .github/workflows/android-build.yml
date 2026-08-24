@@ -278,6 +278,75 @@ jobs:
           # task, and 1,322 core tests would stop being a gate.
           ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
+      # ─────────────────────────── the offline food database ───────────────────────────
+      # ~4.5M retail barcodes, so a scan works in a supermarket basement with no signal. Built
+      # here rather than committed: it is 296 MB and GitHub hard-rejects files over 100 MB, and
+      # this repository has no LFS.
+      #
+      # ⚠️ Placed AFTER the unit tests on purpose. A cold cache spends about a quarter of an hour
+      # downloading 1.7 GB and merging it; a failing test should not have to wait for that first.
+      - name: Restore the food database
+        id: fooddb
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/assets/food/food.db
+          # ⚠️ The salt at the end is a MANUAL rebuild switch. The builder's own hash covers a code
+          # change, but the sources move underneath it — a fresh Open Food Facts export adds real
+          # products and the key would not notice. Bump the salt to take a new snapshot.
+          key: food-db-${{ hashFiles('tools/food/build_food_db.py') }}-off20260824-usda20260430
+
+      - name: Build the food database
+        if: steps.fooddb.outputs.cache-hit != 'true'
+        # ⚠️ NOT a hard gate, and the split matters. This step reaches two servers neither of us
+        # controls, and coupling every build of the whole application to Open Food Facts being up
+        # would be the wrong trade for one feature. A source outage warns loudly and ships without
+        # the bundle — `FoodDatabase.open` returns null and the network path the app has always had
+        # still works. What IS a hard gate is the assertion below: an asset we placed and then
+        # failed to package is a real defect, and that is the silent one.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          echo "disk before:"; df -h / | tail -1
+          work=/tmp/fooddb
+          mkdir -p "$work" app/src/main/assets/food
+
+          # Open Food Facts, ODbL. 302s to S3, hence -L. 1,275,171,186 bytes as of the pin.
+          OFF=https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+          # USDA FoodData Central branded foods, public domain. The date is part of the path.
+          # ⚠️ Probed before pinning: SUPERSEDED RELEASES STAY LIVE (the 2025-04-24 file still
+          # answers 206), so this URL cannot 404 when a newer one lands. Bumping it is a choice
+          # about freshness, never an emergency. 2026-04-30 was the newest on the pin date; the
+          # four plausible later dates all answered 404.
+          USDA=https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_json_2026-04-30.zip
+
+          # ⚠️ Each source is fetched into place only on success. A half-downloaded file is worse
+          # than a missing one: the builder would read it, hit a truncated gzip stream part way
+          # through, and produce a database that looks complete and silently stops at Kellogg's.
+          for pair in "OFF:$OFF:off.csv.gz" "USDA:$USDA:usda_branded.zip"; do
+            label=${pair%%:*}; rest=${pair#*:}; url=${rest%:*}; name=${rest##*:}
+            echo "fetching $label…"
+            if curl -fSL --retry 3 --retry-delay 10 --max-time 1800 -o "$work/$name.part" "$url"; then
+              mv "$work/$name.part" "$work/$name"
+              echo "  $label: $(du -h "$work/$name" | cut -f1)"
+            else
+              rm -f "$work/$name.part"
+              echo "::warning::could not fetch $label — the database will be built without it"
+            fi
+          done
+
+          if python3 tools/food/build_food_db.py --work "$work" --out app/src/main/assets/food/food.db; then
+            echo "food.db: $(du -h app/src/main/assets/food/food.db | cut -f1)"
+          else
+            echo "::warning::the food database did not build — this APK ships without offline barcodes"
+            # ⚠️ Removed rather than left behind. The builder writes as it goes, so a failure can
+            # leave a partial database — which would package, open, and answer a fraction of scans
+            # with silence. No database at all is an honest state the app already handles.
+            rm -f app/src/main/assets/food/food.db
+          fi
+          # 1.7 GB of sources are of no further use and the APK build needs the room.
+          rm -rf "$work"
+          echo "disk after:"; df -h / | tail -1
+
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
         # for PGO-style AOT) but kept on the same package id + debug keystore as before, so it updates in
@@ -376,6 +445,58 @@ jobs:
             unzip -l "$apk" | grep "lib/" || echo "(no native libraries at all)"
             exit 1
           fi
+
+      - name: Verify the food database packaged
+        # ⚠️ THE SPLIT THIS STEP EXISTS FOR. Two things can leave an APK with no offline barcodes and
+        # they deserve opposite treatment:
+        #
+        #   - the source servers were unreachable  → the step above warned; nothing is asserted here,
+        #                                            and the app degrades to the network path
+        #   - we placed the asset and it is not in
+        #     the APK                              → a packaging defect. HARD FAIL.
+        #
+        # The second is the silent one. A 296 MB asset is unlike anything else this build packages,
+        # and an aapt limit, a `noCompress` change or an ignore rule would drop it while the build
+        # stayed perfectly green and every scan quietly failed on the device.
+        run: |
+          set -e
+          asset=app/src/main/assets/food/food.db
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          if [ ! -f "$asset" ]; then
+            echo "::warning::no food.db was placed for this build — the APK has no offline barcodes"
+            echo "Scanning still works with a network. See the build step above for why it is absent."
+            exit 0
+          fi
+          echo "asset on disk: $(du -h "$asset" | cut -f1)"
+          # ⚠️ Read out of the APK's own directory rather than trusting the file we wrote. The
+          # question is what shipped.
+          line=$(unzip -l "$apk" | grep "assets/food/food.db" || true)
+          if [ -z "$line" ]; then
+            echo "FAIL: food.db is on disk but NOT in the APK — packaging dropped it."
+            echo "Assets that did make it:"
+            unzip -l "$apk" | grep "assets/" | head -20
+            exit 1
+          fi
+          size=$(echo "$line" | awk '{print $1}')
+          echo "packaged: $line"
+          # ⚠️ A size floor, because "present" is not "whole". `unzip -l` reports the UNCOMPRESSED
+          # size, so this is the real database and not its ~118 MB deflated form. A truncated or
+          # empty-schema database is a valid SQLite file that answers every barcode with nothing —
+          # it would package, open, and fail silently. 100 MB is far below the real 296 MB and far
+          # above any plausible stub.
+          if [ "$size" -lt 100000000 ]; then
+            echo "FAIL: the packaged food.db is only $size bytes — that is not the full corpus."
+            exit 1
+          fi
+          # ⚠️ The sentinel. Every other gate in this workflow carries one for the same reason: a
+          # matcher that finds anything, or a grep that silently matches nothing, is worse than no
+          # gate at all. If this ever "finds" a file that cannot exist, the check above proves
+          # nothing either.
+          if unzip -l "$apk" | grep -q "assets/food/this-must-not-exist.db"; then
+            echo "FAIL: the sentinel matched — this check cannot distinguish present from absent."
+            exit 1
+          fi
+          echo "food database packaged: $((size / 1048576)) MB uncompressed (sentinel correctly absent)"
 
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
