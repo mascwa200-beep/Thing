@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.core.telemetry
 
+import kotlin.math.abs
+
 /**
  * Ranking a food search, over names written in a style nothing else in this app uses.
  *
@@ -65,6 +67,32 @@ object FoodSearch {
         return kept.ifEmpty { all }
     }
 
+    /**
+     * How much longer than the word a query token may be and still count as the same word.
+     *
+     * ⚠️ **A compound word is not its first component, and the prefix rule could not tell.** The
+     * principle two paragraphs down — "'bean' and 'beans' are one word, where 'corn' and 'cornbread'
+     * are two" — was stated and then not enforced: `token.startsWith(word)` accepted `cornbread`
+     * against `corn` exactly as readily as `cooked` against `cook`. Measured over the real corpus's
+     * 2,936 distinct words, that one line was matching
+     *
+     *     milkshake -> milk        cheeseburger -> cheese      watermelon -> water
+     *     meatballs -> meat        buttermilk   -> butter      grapefruit -> grape
+     *     cornbread -> corn        beansprouts  -> bean        chickpeas  -> chick
+     *     blueberry -> blue        strawberries -> straw
+     *
+     * so a search for a cheeseburger was ranking an antipasto that mentions cheese, and one for a
+     * watermelon was ranking a whiskey sour prepared with water.
+     *
+     * An inflection is a short suffix; a different food is a long one. Three characters covers every
+     * ending this corpus actually uses — cook/cooked/cooking, roast/roasted/roasting, bake/baked,
+     * boil/boiled, grill/grilled, steam/steamed, smoke/smoked — and every pair above is four or
+     * more. Both were measured over the whole corpus rather than reasoned about; the exceptions the
+     * rule still lets through (cook/cookie, bake/bakery) are a stem match at [W_STEM], where an
+     * exact match on the same query outranks them.
+     */
+    private const val MAX_STEM_GAP = 3
+
     /** Below this a singular is too short to strip an "s" from safely — "gas" must not become "ga". */
     private const val MIN_SINGULAR = 3
 
@@ -105,7 +133,8 @@ object FoodSearch {
         word == token -> 2
         singular(word) == token || singular(token) == word -> 2
         word.length >= MIN_STEM && token.length >= MIN_STEM &&
-            (word.startsWith(token) || token.startsWith(word)) -> 1
+            (word.startsWith(token) || token.startsWith(word)) &&
+            abs(word.length - token.length) <= MAX_STEM_GAP -> 1
         else -> 0
     }
 
@@ -273,7 +302,17 @@ object FoodSearch {
             // An earlier version had its own length test here, and it was off by one from the
             // scorer's: "yams" was rejected before scoring even reached it, so a food the ranker
             // would gladly have returned was invisible with nothing to show it had been dropped.
-            lower.contains(term) || singular(term)?.let { lower.contains(it) } == true
+            // ⚠️ And the OTHER prefix direction, which it did not admit. `wordMatch` accepts a
+            // corpus word that the token starts with — "cooked" finds "cook" — but a substring test
+            // for the whole token cannot see that, so those rows were refused before scoring. The
+            // shortest word the gap rule can still reach is `term.take(len - MAX_STEM_GAP)`, so
+            // that prefix is exactly what has to be admitted: tight enough to stay a cheap reject,
+            // wide enough that nothing the scorer would return is invisible.
+            lower.contains(term) || singular(term)?.let { lower.contains(it) } == true ||
+                (
+                    term.length >= MIN_STEM &&
+                        lower.contains(term.take(maxOf(MIN_STEM, term.length - MAX_STEM_GAP)))
+                    )
         }
     }
 }
