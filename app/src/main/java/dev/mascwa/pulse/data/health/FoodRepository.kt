@@ -30,6 +30,15 @@ class FoodRepository(
     private val context: Context,
     private val off: OpenFoodFactsRepository,
     private val custom: CustomFoodStore,
+    /**
+     * The bundled barcode database, or null on a build where the asset never arrived.
+     *
+     * ⚠️ Null is a real state, not a defensive one. The 240 MB database is fetched by CI rather than
+     * committed — GitHub rejects files that size — so a local developer build genuinely has no
+     * bundle, and every path here has to work without it. What that costs is offline scanning; what
+     * it must never cost is the app starting.
+     */
+    private val offline: OfflineFoodStore? = null,
 ) {
 
     /** What a search turned up, and honestly what it could not reach. */
@@ -114,7 +123,13 @@ class FoodRepository(
         // seed, so this is an ordering decision and not a second, disagreeing search.
         val mine = custom.search(query)
         val seed = searchSeed(query)
-        val local = mine + seed
+        // ⚠️ The bundled products come LAST of the three local sources, and that ordering is
+        // deliberate. It is a name-prefix scan with no ranking behind it — the seed and your own
+        // foods are scored by `FoodSearch` — so putting 4.4 million packaged rows above them would
+        // bury a lab analysis of "Egg, whole, raw" under every product whose name starts "Egg".
+        val bundled = offline?.searchByName(query).orEmpty()
+        val seen = (mine + seed).mapTo(HashSet()) { it.id }
+        val local = mine + seed + bundled.filterNot { it.id in seen }
         if (!online) return Results(query, local)
         return try {
             val page = off.search(query, limit = OFF_LIMIT)
@@ -128,8 +143,46 @@ class FoodRepository(
         }
     }
 
-    /** A barcode, which only the online database can answer. */
-    suspend fun byBarcode(barcode: String): FoodLookup = off.byBarcode(barcode)
+    /**
+     * A barcode, answered from the bundle first and the network only if the bundle cannot.
+     *
+     * ⚠️ **This used to be one line delegating straight to the network, and that was the whole
+     * defect.** A supermarket aisle is the place a phone is least likely to have signal and the
+     * place a barcode is most likely to be scanned, so the feature failed exactly where it was
+     * needed. The bundled database now answers ~4.4 million retail products with no request at all.
+     *
+     * The ordering matches the search path directly above: local first and always, network as an
+     * addition rather than a fallback. Putting the fastest and most reliable answer behind the
+     * slowest and least reliable one would be the same mistake in the other direction.
+     *
+     * ⚠️ **A row with no numbers is still an answer.** Only about a fifth of the corpus carries
+     * nutrition, so a bundle of complete rows only would miss four scans in five. Recognising the
+     * product and saying its numbers were never recorded is a different and far more useful thing
+     * than not recognising it — and if the network can fill that gap, it is still asked.
+     *
+     * ⚠️ **A recognised product with no numbers outranks a failed request**, which is the one
+     * judgement call here. When the bundle knows the name and the network could not be reached, this
+     * returns `NoNutrition` rather than `Unreachable`: `Unreachable` renders as "try again" and shows
+     * nothing, while `NoNutrition` names the product and offers to take the numbers. Showing somebody
+     * a blank failure for a product the app can name is the worse of the two, and scanning again
+     * later still reaches the network.
+     */
+    suspend fun byBarcode(barcode: String): FoodLookup {
+        val local = offline?.byBarcode(barcode)
+        // The whole point: a complete bundled row answers with no request at all.
+        if (local != null && local.per100g.kcal > 0.0) return FoodLookup.Found(local)
+
+        // Either nothing local, or a row with a name and no numbers — worth asking whether the live
+        // database has since filled it in. `off.byBarcode` reports its own failures rather than
+        // throwing, so its answer is always one of the four states.
+        val online = off.byBarcode(barcode)
+        if (online is FoodLookup.Found) return online
+
+        return when {
+            local != null -> FoodLookup.NoNutrition(local)
+            else -> online
+        }
+    }
 
     private companion object {
         const val SEED_ASSET = "food/seed.tsv"

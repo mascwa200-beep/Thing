@@ -110,6 +110,25 @@ private fun DrawScope.drawLabel(
         LabelVAlign.Middle -> y - h / 2f
         LabelVAlign.Bottom -> y - h
     }
+    // ⚠️ THIS GUARD IS WHY THE WINDOWS CONSOLE USED TO DIE, and it is not defensive padding.
+    //
+    // `drawText` with the default `size = Size.Unspecified` hands the text layout
+    // `Constraints(0, ceil(canvasWidth - left), 0, ceil(canvasHeight - top))` — read off
+    // `TextPainterKt.textLayoutConstraints`, where `minHeight` is hardcoded zero and the maxima are
+    // computed with no clamp. So a top-left past the far edge produces a NEGATIVE maximum, and the
+    // public four-argument `Constraints` factory rejects it with
+    // `maxHeight(-12) must be >= than minHeight(0)`.
+    //
+    // That throw happens in the DRAW phase, which is what made it so hard to find: layout completes
+    // cleanly, so the window keeps presenting the last frame it managed to paint and simply freezes
+    // there, looking like a screen that never loaded. Four separate hunts searched measure and
+    // intrinsic paths and found nothing, because the fault was never in either.
+    //
+    // A label whose top-left is past the far edge is entirely invisible, so declining to draw it
+    // costs nothing that was ever going to be seen. Overflow toward the near edge is left alone:
+    // a negative `left`/`top` makes the maximum LARGER, which is legal, and the text is then simply
+    // clipped — which is the honest rendering of a label that does not fit.
+    if (left >= size.width || top >= size.height) return
     drawText(measurer, text, topLeft = Offset(left, top), style = style)
 }
 
@@ -274,8 +293,16 @@ fun LcarsGauge(
     Canvas(modifier) {
         val stroke = 9.dp.toPx()
         val inset = stroke / 2 + 2.dp.toPx()
-        val arcSize = Size(size.width - inset * 2, size.width - inset * 2)
-        val topLeft = Offset(inset, inset)
+        // ⚠️ The dial is square, so it must be sized by the SMALLER edge. Deriving both axes from
+        // the width — which this did — draws a dial taller than its own box whenever the box is
+        // wider than it is tall, and every call site is: the one in SPACE WEATHER is 140x110 dp.
+        // The arc was merely clipped, but the caption hangs off `cy + arcSize.height / 2`, so it
+        // landed below the canvas entirely and took the whole draw down with it.
+        val edge = minOf(size.width, size.height)
+        val arcSize = Size(edge - inset * 2, edge - inset * 2)
+        // Centred horizontally, because the readouts are placed at `cx` and a dial pinned to the
+        // left inset would sit off to one side of its own numbers as soon as the box is wide.
+        val topLeft = Offset((size.width - arcSize.width) / 2f, inset)
         val cx = size.width / 2
         val cy = inset + arcSize.height / 2
 

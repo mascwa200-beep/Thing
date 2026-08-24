@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,8 +58,13 @@ class FoodLogStore(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
 
+    // ⚠️ `internal` rather than `private` so a unit test can decode a REAL blob through the REAL
+    // class. These two describe the on-disk shape of a year of somebody's food log, and the risk
+    // worth gating is that a new field makes every prior month undecodable — which a test against a
+    // hand-written copy of this shape could not detect, because the copy would be the thing that
+    // changed. The same reasoning made `Directory` internal for the layout harness.
     @Serializable
-    private data class StoredNutrients(
+    internal data class StoredNutrients(
         val kcal: Double = 0.0,
         val p: Double = 0.0,
         val f: Double = 0.0,
@@ -70,7 +76,7 @@ class FoodLogStore(
     )
 
     @Serializable
-    private data class StoredEntry(
+    internal data class StoredEntry(
         val id: String,
         val day: Long,
         val at: Long,
@@ -82,6 +88,20 @@ class FoodLogStore(
         val meal: String = "SNACK",
         val source: String = "CUSTOM",
         val foodId: String = "",
+
+        /**
+         * Vitamins and minerals in this portion, keyed by `Micronutrients.Micro` name.
+         *
+         * ⚠️ **Defaulted, so every entry logged before this field existed still decodes** — the
+         * whole log is one JSON blob per month, and a required field would make every prior month
+         * unreadable at once. Empty is also the honest value for those entries: nothing recorded
+         * their micronutrients, which is exactly what an absent map means everywhere else.
+         *
+         * ⚠️ Keyed by String rather than the enum for the same reason `Food.micros` is: an
+         * enum-keyed serializer throws on a name it does not know, so renaming a micronutrient
+         * would make a year of logs undecodable. An unknown key is dropped on the way back in.
+         */
+        val micros: Map<String, Double> = emptyMap(),
     )
 
     @Serializable
@@ -126,6 +146,7 @@ class FoodLogStore(
     private fun NutritionDay.Entry.stored() = StoredEntry(
         id, dayStartMs, atMs, name, grams, nutrients.stored(), brand, servingLabel,
         meal.name, source.name, foodId,
+        micros.values.entries.associate { it.key.name to it.value },
     )
 
     private fun StoredEntry.domain() = NutritionDay.Entry(
@@ -140,6 +161,11 @@ class FoodLogStore(
         meal = runCatching { NutritionDay.Meal.valueOf(meal) }.getOrDefault(NutritionDay.Meal.SNACK),
         source = runCatching { NutritionDay.Source.valueOf(source) }.getOrDefault(NutritionDay.Source.CUSTOM),
         foodId = foodId,
+        micros = Micronutrients.Amounts(
+            micros.mapNotNull { (k, v) ->
+                runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { it to v }
+            }.toMap()
+        ),
     )
 
     /** `2026-08`, in UTC. See the class note: this is a filing decision, not a calendar one. */

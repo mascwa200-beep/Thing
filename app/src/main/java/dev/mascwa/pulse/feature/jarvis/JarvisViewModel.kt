@@ -2,13 +2,11 @@ package dev.mascwa.pulse.feature.jarvis
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.withContext
+import dev.mascwa.pulse.core.util.VisionImage
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.jarvis.db.Speaker
@@ -275,13 +273,8 @@ class JarvisViewModel(
     }
 
     /** Read [uri], downscale, and JPEG-encode it as a base64 data URL for the vision API. */
-    private suspend fun encodeImage(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
-            encodeBitmap(downscale(bmp))
-        }.getOrNull()
-    }
+    private suspend fun encodeImage(context: Context, uri: Uri): String? =
+        VisionImage.encode(context, uri)
 
     /** Render up to [MAX_PDF_PAGES] PDF pages to page images (data URLs) for the vision model. */
     private suspend fun renderPdf(context: Context, uri: Uri): List<String> = withContext(Dispatchers.IO) {
@@ -300,7 +293,7 @@ class JarvisViewModel(
                             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                             bmp.eraseColor(android.graphics.Color.WHITE) // PDFs render onto transparency
                             page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                            out.add(encodeBitmap(bmp))
+                            out.add(VisionImage.encodeBitmap(bmp))
                         } finally {
                             page.close()
                         }
@@ -331,18 +324,6 @@ class JarvisViewModel(
         return TEXT_EXTS.any { n.endsWith(it) }
     }
 
-    private fun downscale(bmp: Bitmap): Bitmap {
-        val longest = maxOf(bmp.width, bmp.height)
-        if (longest <= MAX_IMAGE_PX) return bmp
-        val scale = MAX_IMAGE_PX.toFloat() / longest
-        return Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)
-    }
-
-    private fun encodeBitmap(bmp: Bitmap): String {
-        val out = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
-        return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
-    }
 
     /** Normal intent routing for a turn (also the path when a curiosity reply turns out to be a new
      *  request rather than an answer). */
@@ -825,8 +806,10 @@ class JarvisViewModel(
         /** Closes every emergency answer — unless the page's own warning already ends with it. */
         const val NOT_MEDICAL_ADVICE = "This is written guidance, not training and not medical advice."
 
-        // Downscale the long edge of an uploaded image before sending to the vision API (token/cost cap).
-        const val MAX_IMAGE_PX = 1024
+        // Downscale the long edge of an uploaded image before sending to the vision API (token/cost
+        // cap). ⚠️ Not a second constant: the same cap the shared encoder uses, so a PDF page and a
+        // photograph can never be sent at different sizes.
+        val MAX_IMAGE_PX = VisionImage.MAX_PX
         // PDF: render at most this many pages to the vision model (cost cap).
         const val MAX_PDF_PAGES = 3
         // Text file: characters of content fed to the model (cost cap).

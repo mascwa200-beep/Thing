@@ -473,6 +473,13 @@ private fun DrawScope.drawScaleBar(
     val nice = niceNumber(target)
     val px = (nice * unit / mPerPx).toFloat()
     if (!px.isFinite() || px < 10f || px > size.width) return
+    // ⚠️ Same defect class as the one that froze the console: `drawText` builds its layout
+    // constraints from the canvas remaining past the top-left, unclamped, so a text origin outside
+    // the canvas throws `maxWidth(-N) must be >= than minWidth(0)` in the DRAW phase. The guard
+    // above bounds `px`, not the origin — a pane narrower than the 14 px left margin still reaches
+    // the label below with px in [10, width). Refusing to draw a scale bar in a canvas too small to
+    // hold one costs nothing: it would be unreadable at that size anyway.
+    if (size.width < 60f || size.height < 40f) return
 
     val y = size.height - 22f
     val left = 14f

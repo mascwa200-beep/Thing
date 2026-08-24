@@ -230,6 +230,13 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
                     "Look for a newer build on launch", s.autoCheckUpdates, vm::setAutoCheckUpdates,
                     subtitle = "One request. It never installs anything by itself.",
                 )
+                LcarsSwitch(
+                    "Send fault reports so they can be read and fixed",
+                    s.sendCrashReports, vm::setSendCrashReports,
+                    subtitle = "Only what the crash console already shows — a time, a window, a " +
+                        "build and a stack trace — scrubbed, on a branch that triggers no build. " +
+                        "Off means a crash here can only be described, never read.",
+                )
                 Text(
                     // ⚠️ Stated where the token is entered, not buried. The phone puts its copy behind
                     // the Titan M2 secure element; a desktop has no equivalent this module can reach.

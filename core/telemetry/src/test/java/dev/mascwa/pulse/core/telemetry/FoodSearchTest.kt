@@ -121,17 +121,129 @@ class FoodSearchTest {
     @Test
     fun aShortWordIsNeverStemmedIntoALongerOne() {
         assertEquals(0, FoodSearch.wordMatch("oatmeal", "oat"))
-        // ⚠️ "corn" IS four letters, so the prefix rule does reach "cornbread" — a partial match (1),
-        // never an exact one. Measured over the real corpus that is harmless: "corn" still answers
-        // "Corn, raw", because an exactly-matched head outweighs a stemmed one. My first assertion
-        // here claimed 0 and was simply wrong about the rule the code states.
-        assertEquals(1, FoodSearch.wordMatch("cornbread", "corn"))
         assertEquals("Corn, raw", best("corn", "Cornbread, dry mix, enriched", "Corn, raw"))
         // ⚠️ "gas" must not become "ga" — below MIN_SINGULAR nothing is stripped.
         assertEquals(null, FoodSearch.singular("gas"))
         // A double "s" is not a plural marker.
         assertEquals(null, FoodSearch.singular("bass"))
         assertEquals("yam", FoodSearch.singular("yams"))
+    }
+
+    /**
+     * ⚠️ **A compound word is not its first component**, and this test used to assert the
+     * opposite.
+     *
+     * It read `assertEquals(1, wordMatch("cornbread", "corn"))`, with a comment saying an earlier
+     * assertion of 0 "was simply wrong about the rule the code states". The rule the code stated was
+     * the thing that was wrong: measured over the real corpus's 2,936 distinct words, that one line
+     * matched milkshake to milk, cheeseburger to cheese, watermelon to water, meatballs to meat,
+     * buttermilk to butter, grapefruit to grape, blueberry to blue and chickpeas to chick. Finding a
+     * behaviour surprising and pinning it without measuring whether it is correct is how a defect
+     * gets cemented, and this is the record of it happening.
+     */
+    @Test
+    fun aCompoundWordIsNotItsFirstComponent() {
+        for ((compound, component) in listOf(
+            "cornbread" to "corn",
+            "milkshake" to "milk",
+            "cheeseburger" to "cheese",
+            "watermelon" to "water",
+            "meatballs" to "meat",
+            "buttermilk" to "butter",
+            "grapefruit" to "grape",
+            "blueberry" to "blue",
+            "beansprouts" to "bean",
+            "chickpeas" to "chick",
+        )) {
+            assertEquals(
+                "$compound must not match $component",
+                0,
+                FoodSearch.wordMatch(compound, component),
+            )
+            assertEquals(
+                "$component must not match $compound",
+                0,
+                FoodSearch.wordMatch(component, compound),
+            )
+        }
+        // The whole point of the change, end to end: a cheeseburger is no longer an antipasto that
+        // happens to mention cheese.
+        assertEquals(
+            "Cheeseburger, NFS",
+            best("cheeseburger", "Antipasto with ham, fish, cheese, vegetables", "Cheeseburger, NFS"),
+        )
+        assertEquals(
+            "Watermelon, raw",
+            best("watermelon", "Alcoholic beverage, whiskey sour, prepared with water", "Watermelon, raw"),
+        )
+    }
+
+    /**
+     * An inflection IS the same word, and the gap rule keeps every ending this corpus uses.
+     *
+     * ⚠️ These are what stops the fix above from being a blunt "no prefixes at all". Each
+     * pair was taken from the real corpus vocabulary rather than invented.
+     */
+    @Test
+    fun aShortSuffixIsStillTheSameWord() {
+        for ((word, token) in listOf(
+            "cooked" to "cook",
+            "cooking" to "cook",
+            "roasted" to "roast",
+            "roasting" to "roast",
+            "baked" to "bake",
+            "boiled" to "boil",
+            "grilled" to "grill",
+            "steamed" to "steam",
+            "smoked" to "smoke",
+        )) {
+            assertEquals("$word should stem to $token", 1, FoodSearch.wordMatch(word, token))
+            assertEquals("$token should stem to $word", 1, FoodSearch.wordMatch(token, word))
+        }
+    }
+
+    /**
+     * ⚠️ **The cheap reject has to admit everything the scorer would accept**, and in one
+     * direction it did not.
+     *
+     * `wordMatch` accepts a corpus word that the query token starts with — "cooked" finds "cook" —
+     * but `couldMatch` tested for the whole token as a substring, which cannot see that. Measured
+     * over the real 13,186-food corpus across two dozen ordinary queries, **3,031 foods were scored
+     * as results and then refused before the scorer ever saw them**, with nothing on screen to show
+     * anything had been dropped. That is the same defect the "yams" comment on [FoodSearch.singular]
+     * records, one direction over.
+     */
+    @Test
+    fun theCheapRejectAdmitsEverythingTheScorerWouldAccept() {
+        // ⚠️ Real rows, copied out of the bundled corpus, because the first version of this test
+        // used invented ones and was ASLEEP: it queried "cooking" against a row saying "cooked",
+        // and neither word is a prefix of the other, so `score` returned 0 and the assertion below
+        // was never reached. A fixture regular enough to reason about in your head is often too
+        // regular to reach the branch. These pairs were found by running the old reject over the
+        // whole corpus and asking which scored rows it refused.
+        val corpus = listOf(
+            "sr170791\tARBY'S, roast beef sandwich, classic\tFast Foods",
+            "sr173010\tCereals, CREAM OF WHEAT, 1 minute cook time, dry\tBreakfast Cereals",
+            "sr3\tYam, raw\tVegetables",
+        )
+        var reached = 0
+        for (query in listOf("roasted", "roasting", "cooked", "cooking", "yams")) {
+            val terms = FoodSearch.tokens(query)
+            for (line in corpus) {
+                val fields = line.split('\t')
+                val entry = FoodSearch.Entry(fields[0], fields[1], "", fields[2])
+                if (FoodSearch.score(entry, terms) > 0.0) {
+                    reached++
+                    assertTrue(
+                        "'" + query + "' scores \"" + fields[1] + "\" but the cheap reject hides it",
+                        FoodSearch.couldMatch(line, terms),
+                    )
+                }
+            }
+        }
+        // ⚠️ And the guard on the guard: assert the branch was actually entered, so this can never
+        // pass again by scoring nothing at all.
+        assertTrue("no fixture row scored — the assertion above never ran", reached >= 4)
     }
 
     /** A match in the head outranks the same match buried in a qualifier. */

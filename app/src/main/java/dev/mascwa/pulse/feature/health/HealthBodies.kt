@@ -51,10 +51,14 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
+import dev.mascwa.pulse.core.util.createCameraImageUri
+import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.feature.common.ChartSeries
@@ -154,6 +158,21 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         items(guides) { serving -> NutrientRow(serving.guide, serving.eaten) }
         if (eaten.sugarG > 0.0) {
             item { SugarRow(eaten.sugarG) }
+        }
+
+        // ⚠️ Vitamins and minerals, and the thing that makes them honest: how many of today's foods
+        // actually reported each one. Only about a quarter of product records carry calcium, so a
+        // total drawn from one food in six is not the day's calcium — and a screen that shows the
+        // number without the denominator says it is.
+        val micros = state.microsToday
+        val year = LocalDate.now(ZoneId.systemDefault()).year
+        val age = if (state.profile.birthYear > 0) year - state.profile.birthYear else 0
+        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
+            .getOrDefault(Body.Sex.UNSPECIFIED)
+        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
+        if (present.isNotEmpty()) {
+            item { LcarsHeaderBar("VITAMINS AND MINERALS") }
+            items(present) { m -> MicroRow(m, micros, sex, age) }
         }
 
         // The week, which is the question somebody actually has after a fortnight: whether the plan
@@ -337,6 +356,67 @@ private fun NutrientRow(guide: NutrientGuides.Guide, amount: Double) {
 }
 
 /**
+ * One vitamin or mineral: how much, against the usual reference where one exists, and how much of
+ * the day it was actually drawn from.
+ *
+ * ⚠️ **The coverage line is the point of this row, not decoration.** Measured over the bundled
+ * corpus, three product records in four carry no calcium figure. A day totalled from six foods of
+ * which one reported calcium is not the day's calcium, and a bar drawn without saying so is the
+ * app being more confident than its data — the shape this project has corrected five times.
+ *
+ * ⚠️ Two of the eight have no figure to compare against, and say why instead. Cholesterol's 300 mg
+ * ceiling was withdrawn in 2015; trans fat has no allowance because the guidance is elimination,
+ * and a budget on screen reads as permission to spend it. Those get the sentence and no bar.
+ */
+@Composable
+private fun MicroRow(
+    m: Micronutrients.Micro,
+    day: Micronutrients.Day,
+    sex: Body.Sex,
+    ageYears: Int,
+) {
+    val c = Pulse.colors
+    val tally = day[m] ?: return
+    val reference = Micronutrients.reference(m, sex, ageYears)
+    val guide = (reference as? Micronutrients.Reference.Amount)?.guide
+    val fraction = guide?.fractionOf(tally.total) ?: 0.0
+    val tint = if (guide == null) c.ink2 else if (fraction >= 1.0) c.positive else c.sky
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    m.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    Micronutrients.readout(m, tally.total, guide),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = tint,
+                )
+            }
+            // No bar where there is no figure to fill it against — an empty track beside a number
+            // reads as "you have none of your allowance left", which is the opposite of the truth.
+            if (guide != null) MacroBar(tally.total, guide.amount, tint)
+            when (reference) {
+                is Micronutrients.Reference.None -> Text(
+                    reference.why,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+                is Micronutrients.Reference.Amount -> Text(
+                    "${reference.guide.basis} \u00b7 ${reference.guide.source}",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+                )
+            }
+            day.caveat(m)?.let { caveat ->
+                Text(
+                    caveat,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+        }
+    }
+}
+
+/**
  * Sugar: the total, and no bar.
  *
  * ⚠️ Deliberately shaped unlike [NutrientRow], because it is a different kind of statement. Both food
@@ -426,6 +506,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item { Notice(vm) }
         item { DayStepper(vm) }
         item { FindAFood(vm, meal) }
+        item { PhotoOfAMeal(vm, meal) }
         item { EatenBefore(vm, meal) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
@@ -1612,6 +1693,227 @@ internal fun relativeDay(atMs: Long): String {
     }
 }
 
+// -------------------------------------------------------------------------- photograph a meal
+
+/**
+ * Photograph a plate; get proposals to correct and confirm.
+ *
+ * ⚠️ **The model names the foods; the numbers come from real records**, and the surface says so
+ * rather than leaving it to be inferred. A model answering "320 kcal" has weighed nothing and read
+ * no label, and that figure would sit in the log beside a laboratory analysis looking exactly like
+ * one. Every kilocalorie shown here was looked up by name in the bundled corpus.
+ *
+ * ⚠️ Nothing is logged until the button is pressed. A photograph is the least certain input this app
+ * takes — the portion above all — so every weight is editable and every item can be dropped.
+ *
+ * ⚠️ This is the one part of the food half that cannot work offline, and [MealShot.NoVision] says
+ * that in words instead of the button doing nothing.
+ */
+@Composable
+private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val c = Pulse.colors
+    val context = LocalContext.current
+    val shot by vm.mealShot.collectAsStateWithLifecycle()
+    var pending by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        // ⚠️ Read only on success. A cancelled capture leaves a zero-byte file behind, and decoding
+        // one produces a null bitmap — which would surface as "that photograph could not be read"
+        // for a photograph nobody took.
+        val uri = pending
+        pending = null
+        if (ok && uri != null) vm.readMealPhoto(context, uri)
+    }
+
+    fun shoot() {
+        val uri = createCameraImageUri(context) ?: return
+        pending = uri
+        capture.launch(uri)
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(
+                "PHOTOGRAPH A MEAL",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            when (val st = shot) {
+                is HealthViewModel.MealShot.Idle -> {
+                    LcarsButton(text = "◉ PHOTOGRAPH A MEAL", onClick = { shoot() })
+                    Text(
+                        "It names what is on the plate and estimates the weights. Every calorie and " +
+                            "gram comes from a real food record, not from the picture — so check the " +
+                            "weights before logging. Needs a connection and a vision model.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                    )
+                }
+                is HealthViewModel.MealShot.Reading -> Text(
+                    "Reading the photograph…",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+                is HealthViewModel.MealShot.NoVision -> {
+                    Text(
+                        "No vision model is set up, so nothing can look at a photograph. Add a cloud " +
+                            "key in the Computer's setup and this works; everything else in the food " +
+                            "half stays offline either way.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                    )
+                    LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
+                }
+                is HealthViewModel.MealShot.NotFood -> {
+                    Text(
+                        "That does not look like food.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        LcarsButton(text = "TRY AGAIN", onClick = { shoot() })
+                        LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
+                    }
+                }
+                is HealthViewModel.MealShot.Failed -> {
+                    Text(
+                        st.reason,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        LcarsButton(text = "TRY AGAIN", onClick = { shoot() })
+                        LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
+                    }
+                }
+                is HealthViewModel.MealShot.Plate -> PlateReview(st, meal, vm, onRetake = { shoot() })
+            }
+        }
+    }
+}
+
+/**
+ * The review step: what the model saw, what each item was matched to, and what it will log.
+ *
+ * ⚠️ Unmatched items are shown rather than hidden, and counted in the button's own sentence. Quietly
+ * dropping them is how somebody comes to believe a day is fully logged when part of the plate never
+ * reached it.
+ */
+@Composable
+private fun PlateReview(
+    plate: HealthViewModel.MealShot.Plate,
+    meal: NutritionDay.Meal,
+    vm: HealthViewModel,
+    onRetake: () -> Unit,
+) {
+    val c = Pulse.colors
+    val loggable = plate.proposals.count { it.loggable }
+    val unmatched = plate.proposals.size - loggable
+    Text(
+        plate.summary,
+        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink, lineHeight = 14.sp,
+    )
+    plate.proposals.forEachIndexed { i, p ->
+        PlateRow(
+            proposal = p,
+            onGrams = { vm.editMealGrams(i, it) },
+            onDrop = { vm.dropMealItem(i) },
+        )
+    }
+    val total = plate.proposals.sumOf { it.eaten?.kcal ?: 0.0 }
+    if (loggable > 0) {
+        Text(
+            "${total.roundToInt()} kcal across $loggable " + if (loggable == 1) "item" else "items",
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.accent,
+        )
+    }
+    if (unmatched > 0) {
+        Text(
+            "$unmatched " + (if (unmatched == 1) "item has" else "items have") +
+                " no match in the food database and will not be logged. Rename one to something " +
+                "the database knows, or add it below with QUICK ADD.",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        LcarsButton(
+            text = if (loggable > 0) "LOG $loggable TO ${meal.label.uppercase()}" else "NOTHING TO LOG",
+            enabled = loggable > 0,
+            onClick = { vm.logPlate(meal) },
+        )
+        LcarsButton(text = "RETAKE", onClick = onRetake)
+        LcarsButton(text = "DISCARD", onClick = { vm.clearMealShot() })
+    }
+}
+
+/**
+ * One proposed item: the model's words, an editable weight, and what it was matched to.
+ *
+ * ⚠️ The weight is held locally while it is being typed and committed on every parseable keystroke.
+ * Reading it straight out of the view model would fight the typing — a half-typed "1" is a valid
+ * number and would be rounded and written back under the caret.
+ */
+@Composable
+private fun PlateRow(
+    proposal: MealPhotoReader.Proposal,
+    onGrams: (Double) -> Unit,
+    onDrop: () -> Unit,
+) {
+    val c = Pulse.colors
+    // ⚠️ Keyed on the item's name so a DROP, which shifts every later item up one index, re-seeds
+    // the field from the item now at this position rather than leaving the old one's weight behind.
+    var text by remember(proposal.item.name) {
+        mutableStateOf(proposal.item.grams.roundToInt().toString())
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                proposal.item.name,
+                modifier = Modifier.weight(1f),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+            if (proposal.item.confidence == MealPhoto.Confidence.GUESSED) {
+                Text(
+                    "ESTIMATED",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.amber,
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            NumberCell(
+                label = "GRAMS",
+                value = text,
+                onChange = {
+                    text = it
+                    it.toDoubleOrNull()?.let(onGrams)
+                },
+                modifier = Modifier.width(GRAMS_W),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val match = proposal.match
+                val eaten = proposal.eaten
+                if (match != null && eaten != null) {
+                    Text(
+                        "${eaten.kcal.roundToInt()} kcal · P ${eaten.proteinG.roundToInt()} " +
+                            "F ${eaten.fatG.roundToInt()} C ${eaten.carbG.roundToInt()}",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                    )
+                    Text(
+                        // Named so it is obvious WHERE the numbers came from, which is the whole
+                        // reason this feature is trustworthy.
+                        "from ${match.display}",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        "no match — rename or drop it",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber,
+                    )
+                }
+            }
+            LcarsButton(text = "DROP", onClick = onDrop)
+        }
+    }
+}
+
+private val GRAMS_W = 78.dp
+
 // ------------------------------------------------------------------------------- finding a food
 
 /**
@@ -1658,7 +1960,7 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
             LcarsField(
                 search.query,
                 vm::onSearchQuery,
-                placeholder = "Chicken breast, olive oil, a brand name…",
+                placeholder = "Chicken breast, olive oil, a brand, a takeaway…",
             )
             // Nobody types "Ferrero Nutella hazelnut spread" standing in a kitchen, and Open Food
             // Facts is organised around barcodes because that is how a shelf identifies itself.
@@ -1671,7 +1973,16 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 // ⚠️ Only once they have actually typed enough to have searched. "No matches" under a
                 // half-typed word is the screen calling somebody wrong mid-sentence.
                 search.query.trim().length >= 2 && search.results.isEmpty() -> Text(
-                    "No matches. QUICK ADD below takes the numbers straight off a label.",
+                    // ⚠️ Says WHY rather than just "no matches", because the commonest reason is a
+                    // knowable one. Every word has to match: "chipotle burrito bowl" finds nothing
+                    // while "burrito bowl" finds ten. And the free data names only a handful of the
+                    // big American chains — measured, and recorded where the data is built rather
+                    // than listed here, because a list in UI copy drifts from the corpus it
+                    // describes the moment either changes.
+                    "No matches. Every word has to match, so fewer words usually finds more — and " +
+                        "a dish on its own (\"burrito bowl\", \"cheeseburger\") is more likely to be " +
+                        "in there than the name of the place you got it. QUICK ADD below takes the " +
+                        "numbers straight off a label.",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
                 )
             }

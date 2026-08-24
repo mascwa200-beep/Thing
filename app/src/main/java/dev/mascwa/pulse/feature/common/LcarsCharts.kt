@@ -228,8 +228,19 @@ fun LcarsGauge(
     Canvas(modifier) {
         val stroke = 9.dp.toPx()
         val inset = stroke / 2 + 2.dp.toPx()
-        val arcSize = Size(size.width - inset * 2, size.width - inset * 2)
-        val topLeft = Offset(inset, inset)
+        // ⚠️ The dial is square, so it must be sized by the SMALLER edge. Deriving both axes from
+        // the width draws a dial taller than its own box whenever the box is wider than it is tall,
+        // and both call sites are (`fillMaxWidth().height(132.dp)`). Here that only CLIPPED — the
+        // caption goes out through `nativeCanvas.drawText`, which builds no `Constraints` and so
+        // silently draws off-canvas. The desktop twin builds text layout constraints from the
+        // remaining canvas and threw `maxHeight(-12) must be >= than minHeight(0)` in the DRAW
+        // phase, freezing the whole window. Same defect, different blast radius; fixed on both so
+        // that unifying the two kits cannot ship the crash to the phone.
+        val edge = minOf(size.width, size.height)
+        val arcSize = Size(edge - inset * 2, edge - inset * 2)
+        // Centred horizontally: the readouts sit at `cx`, so a dial pinned to the left inset would
+        // sit off to one side of its own numbers as soon as the box is wide.
+        val topLeft = Offset((size.width - arcSize.width) / 2f, inset)
         val cx = size.width / 2
         val cy = inset + arcSize.height / 2
 

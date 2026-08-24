@@ -40,6 +40,35 @@ future USDA release that changes one fails this script instead of shipping a wro
    than carried. A serving weight is a multiplier, so a wrong one is worse than none.
 
 --------------------------------------------------------------------------------------------------
+⚠️ WHAT THIS COVERS FOR EATING OUT, measured over the built seed rather than assumed, because the
+question comes up and the honest answer is specific.
+
+  421 rows in "Fast Foods" and "Restaurant Foods", of which 161 name a chain:
+
+      McDonald's (53)  KFC  Burger King  Subway  Taco Bell  Wendy's  Popeyes  Arby's
+      Chick-fil-A  Pizza Hut  Domino's (10)  Denny's  Applebee's  Cracker Barrel
+      T.G.I. Friday's  Olive Garden  Carrabba's  On The Border
+
+  NOT here: Starbucks, Dunkin', Chipotle, Panera, Five Guys — nor anything outside the United
+  States. That is the limit of the free data, not a selection: this script takes every record both
+  USDA datasets publish, with no cap.
+
+  The rest of the 421 are dishes rather than brands — "Cheeseburger, NFS", "Burrito bowl, chicken",
+  "Pad Thai with meat", "Sushi roll, salmon" — and they are the ones that answer most "what did I
+  eat out" questions, because a search names the food rather than the place.
+
+⚠️ There is no comprehensive free source for chain menus beyond this. MenuStat was probed and
+answers 502 from here (which says nothing certain about the site, only that this network cannot
+reach it); Nutritionix is commercial and its terms forbid bulk caching, which this project will not
+do. The app's empty-search copy therefore steers people toward the dish rather than the brand, and
+QUICK ADD remains the path that always works.
+
+⚠️ Deliberately NOT ALSO LISTED IN THE UI. A chain list in screen copy is a second statement of a
+fact that lives in the data, and it drifts the moment either changes — the duplicated-definition
+mistake this project has corrected several times over. The surface says the shape of the limit; this
+file, beside the thing that produces it, says the specifics.
+
+--------------------------------------------------------------------------------------------------
 OUTPUT is a tab-separated file, not JSON, and that is a memory decision rather than a taste one.
 Around 13,000 records parsed into objects at startup is several megabytes of heap held forever for a
 screen most people open occasionally. A line-oriented file can be scanned as raw text and parsed only
