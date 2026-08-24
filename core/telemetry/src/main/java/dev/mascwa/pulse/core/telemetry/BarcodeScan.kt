@@ -37,12 +37,75 @@ object BarcodeScan {
      *
      * EAN-8 and UPC-E are 8, UPC-A is 12, EAN-13 is 13, and ITF-14 (a shipping carton) is 14.
      *
-     * ⚠️ Nothing here converts between them, and that is a measured decision rather than an omission:
-     * Open Food Facts normalises leading zeros at its own end. Probed against the live API, the same
-     * product answers to `0038000138416`, `038000138416` and `38000138416` alike. A UPC-A-to-EAN-13
-     * conversion would be code written to solve a problem the source does not have.
+     * ⚠️ **This note was written for the network path and is only half the story now.** It said that
+     * nothing here converts between them because Open Food Facts normalises leading zeros at its own
+     * end — probed against the live API, the same product answers to `0038000138416`,
+     * `038000138416` and `38000138416` alike — so a conversion would solve a problem the source did
+     * not have. That remains true of the API. It is **not** true of the bundled offline database,
+     * which is a local table with no server in front of it to be forgiving. See [normalize].
      */
     val PRODUCT_LENGTHS: Set<Int> = setOf(8, 12, 13, 14)
+
+    /**
+     * The one key a barcode maps to, whatever form it was printed or scanned in.
+     *
+     * ⚠️ **This is what makes an integer-keyed offline table correct, not merely compact.** The same
+     * product is `031506599323` on a US packet (UPC-A) and `0031506599323` in a European database
+     * (EAN-13); the two differ by a leading zero and nothing else. Compared as text they are two
+     * different products and half of all US scans miss. Read as numbers they are one value, and the
+     * padding question disappears instead of being handled.
+     *
+     * The same collapse quietly fixes EAN-8 and a GTIN-14 whose indicator digit is zero, since every
+     * one of those forms is the same number wearing different amounts of padding.
+     *
+     * ⚠️ **The check digit is deliberately NOT required here**, and that is the interesting decision.
+     * Requiring it would be redundant on the scan path — ZXing has already validated it before this
+     * is ever called — and actively harmful on the lookup path, because Open Food Facts is
+     * crowd-sourced and genuinely contains rows whose printed code fails the checksum. Rejecting
+     * those would make real products on real shelves unfindable to enforce a rule that has already
+     * been enforced. [checkDigitValid] exists separately for a caller that wants to *report* data
+     * quality rather than act on it.
+     *
+     * ⚠️ **The one form that will not match** is a true carton code — a GTIN-14 with a non-zero
+     * indicator digit, which is a different number from the retail unit inside it. Said plainly here
+     * rather than papered over with a conversion that would guess at pack sizes.
+     *
+     * ⚠️ **Whatever builds the offline database must apply exactly this rule.** A builder that keyed
+     * on text, or padded differently, produces a table that compiles, ships and silently answers
+     * nothing. The rule lives here so both sides can be pinned to it.
+     *
+     * @return the numeric key, or null if [raw] is not a product barcode at all.
+     */
+    fun normalize(raw: String): Long? {
+        val digits = raw.filter { it.isDigit() }
+        if (digits.length !in PRODUCT_LENGTHS) return null
+        // Safe by construction: 14 digits is at most 99,999,999,999,999, four orders of magnitude
+        // below Long.MAX_VALUE.
+        return digits.toLongOrNull()
+    }
+
+    /**
+     * Does this code satisfy the GS1 mod-10 check digit?
+     *
+     * ⚠️ **One rule covers every length, and it is worth knowing why.** Taking the weights from the
+     * RIGHT — 3, 1, 3, 1 … over the digits before the check — is exactly equivalent to zero-padding
+     * the code to thirteen and applying the EAN-13 weighting, because the padding always lands on
+     * the weights it would have had anyway. So EAN-8, UPC-A, EAN-13 and ITF-14 need no special
+     * cases, and the version of this that switches on length is a version with four places to get
+     * it wrong.
+     *
+     * Advisory only — see [normalize] for why nothing is rejected on the strength of it.
+     */
+    fun checkDigitValid(raw: String): Boolean {
+        val digits = raw.filter { it.isDigit() }
+        if (digits.length !in PRODUCT_LENGTHS) return false
+        val body = digits.dropLast(1)
+        var sum = 0
+        for ((fromRight, ch) in body.reversed().withIndex()) {
+            sum += (ch - '0') * if (fromRight % 2 == 0) 3 else 1
+        }
+        return (10 - sum % 10) % 10 == digits.last() - '0'
+    }
 
     /**
      * Could this string be a product barcode at all?

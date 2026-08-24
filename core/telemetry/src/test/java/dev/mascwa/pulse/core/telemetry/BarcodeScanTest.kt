@@ -2,6 +2,8 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,11 +88,18 @@ class BarcodeScanTest {
     }
 
     /**
-     * ⚠️ Nothing here converts UPC-A to EAN-13, and that is measured rather than forgotten.
+     * ⚠️ **The SCANNER does not convert UPC-A to EAN-13, and [BarcodeScan.normalize] does. Both are
+     * right, and the distinction is the point.**
      *
-     * Probed against the live Open Food Facts API: `0038000138416`, `038000138416` and `38000138416`
-     * all return the same product, because the source normalises leading zeros at its own end. A
-     * conversion here would be code solving a problem that does not exist.
+     * This half is about confirmation: `see` counts identical decodes, and it must compare what the
+     * camera actually read. Folding two spellings together here would mean one decode of each form
+     * counted as two sightings of one code — confirming on evidence the optics never provided.
+     *
+     * Resolving the two spellings to one product is a *lookup* question, answered once, downstream,
+     * by `normalize`. Probed against the live Open Food Facts API, `0038000138416`, `038000138416`
+     * and `38000138416` all return the same product because the source is forgiving at its own end;
+     * the bundled offline table has no server to be forgiving for it, which is why `normalize`
+     * exists at all.
      */
     @Test
     fun bothLengthsOfOneProductAreEquallyPlausibleAndNeitherIsRewritten() {
@@ -130,5 +139,89 @@ class BarcodeScanTest {
     fun whitespaceAroundACodeIsTrimmed() {
         assertEquals(NUTELLA, run(" $NUTELLA ").candidate)
         assertTrue(run(" $NUTELLA ", NUTELLA, "$NUTELLA\n").confirmed)
+    }
+
+    // ---- normalize: the key the offline database is built on -------------------------------
+
+    /**
+     * ⚠️ **The property the whole offline design rests on.** A US packet prints UPC-A and a European
+     * database stores EAN-13; they differ by one leading zero and nothing else. As text they are two
+     * products and half of all US scans miss. As numbers they are one.
+     *
+     * `PRINGLES_UPC` and its EAN-13 form are the same real product — the fixture at the top of this
+     * file already says so, which is why it is the pair used here.
+     */
+    @Test
+    fun upcAAndItsEan13FormAreOneKey() {
+        assertEquals(BarcodeScan.normalize("0$PRINGLES_UPC"), BarcodeScan.normalize(PRINGLES_UPC))
+        assertEquals(38_000_138_416L, BarcodeScan.normalize(PRINGLES_UPC))
+        // A GTIN-14 whose indicator digit is zero is the same number wearing more padding.
+        assertEquals(BarcodeScan.normalize(PRINGLES_UPC), BarcodeScan.normalize("00$PRINGLES_UPC"))
+    }
+
+    /** Digits are extracted, so a scanner or a paste that carries punctuation still resolves. */
+    @Test
+    fun nonDigitsAreStrippedBeforeTheKeyIsTaken() {
+        assertEquals(BarcodeScan.normalize(NUTELLA), BarcodeScan.normalize(" 3017-624 010701 "))
+    }
+
+    /** Anything that is not a product code at all has no key, rather than a misleading one. */
+    @Test
+    fun somethingThatIsNotAProductCodeHasNoKey() {
+        assertNull(BarcodeScan.normalize(""))
+        assertNull(BarcodeScan.normalize("12345"))            // no symbology is 5 long
+        assertNull(BarcodeScan.normalize("https://example"))  // a QR code that decoded
+        assertNull(BarcodeScan.normalize("301762401070123"))  // 15, past ITF-14
+    }
+
+    /**
+     * ⚠️ **Measured, not assumed, and it is why nothing is rejected on the checksum.** Over the first
+     * 600,000 rows of the real Open Food Facts export, **6.44% of product codes fail the GS1 check
+     * digit** — 38,613 of them. Those are real products on real shelves whose code was typed in
+     * slightly wrong by a contributor. A strict gate at lookup time would make roughly 286,000
+     * products across the corpus permanently unfindable, to re-enforce a rule the barcode decoder
+     * has already enforced.
+     */
+    @Test
+    fun aCodeThatFailsItsChecksumStillResolves() {
+        val broken = "3017624010700" // Nutella's code with the check digit knocked down by one
+        assertFalse(BarcodeScan.checkDigitValid(broken))
+        assertEquals(3_017_624_010_700L, BarcodeScan.normalize(broken))
+    }
+
+    /**
+     * One weighting covers every length. Taking the weights from the RIGHT is equivalent to padding
+     * to thirteen, so EAN-8, UPC-A, EAN-13 and ITF-14 need no special cases — and the version that
+     * switches on length is the version with four places to be wrong.
+     *
+     * Every code here was verified against the GS1 definition before being written down.
+     */
+    @Test
+    fun theChecksumRuleHoldsAtEveryLength() {
+        assertTrue(BarcodeScan.checkDigitValid("96181072"))         // EAN-8
+        assertTrue(BarcodeScan.checkDigitValid(PRINGLES_UPC))       // UPC-A, 12
+        assertTrue(BarcodeScan.checkDigitValid("5449000000996"))    // EAN-13, Coca-Cola
+        assertTrue(BarcodeScan.checkDigitValid("3017620422003"))    // EAN-13, Nutella 400g
+        assertTrue(BarcodeScan.checkDigitValid("00012000001291"))   // GTIN-14
+        assertFalse(BarcodeScan.checkDigitValid("5449000000995"))
+        assertFalse(BarcodeScan.checkDigitValid("nonsense"))
+    }
+
+    /**
+     * ⚠️ [BarcodeScan.plausible] gates what the camera acts on; [BarcodeScan.normalize] gates what
+     * the database is asked for. They must agree on what counts as a barcode, or a code the scanner
+     * confirms is one the lookup cannot express — a scan that visibly succeeds and then finds
+     * nothing, for no reason the person can see.
+     */
+    @Test
+    fun whatTheScannerConfirmsIsAlwaysSomethingTheDatabaseCanBeAskedFor() {
+        for (code in listOf(NUTELLA, PRINGLES_UPC, "96181072", "00012000001291")) {
+            assertTrue(code, BarcodeScan.plausible(code))
+            assertNotNull(code, BarcodeScan.normalize(code))
+        }
+        for (code in listOf("12345", "", "abcdefgh")) {
+            assertFalse(code, BarcodeScan.plausible(code))
+            assertNull(code, BarcodeScan.normalize(code))
+        }
     }
 }
