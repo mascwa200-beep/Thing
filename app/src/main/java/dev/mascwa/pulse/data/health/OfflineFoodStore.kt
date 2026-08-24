@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.health
 
 import dev.mascwa.pulse.core.telemetry.BarcodeScan
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.db.FoodDatabase
@@ -75,6 +76,9 @@ class OfflineFoodStore(private val db: FoodDatabase) {
 
         /** Grams are stored x10, so 12.3 g is 123. */
         const val G_SCALE = 10.0
+
+        /** Milligrams stored x100, for iron and vitamin C — a fraction of a milligram in most foods. */
+        const val MG_CENTI = 100.0
     }
 
     /**
@@ -103,15 +107,38 @@ class OfflineFoodStore(private val db: FoodDatabase) {
             sodiumMg = row.sod?.toDouble() ?: 0.0,
         ),
         servingGrams = row.servingGrams?.toDouble()?.takeIf { it > 0.0 },
-        // The corpus records a serving mass, never a name for it. A blank label lets
-        // FoodPortion render "1 serving (30 g)" rather than inventing a description of the portion.
-        servingLabel = "",
+        servingLabel = row.servingLabel.orEmpty(),
         packageGrams = row.packageGrams?.toDouble()?.takeIf { it > 0.0 },
         source = when (row.src) {
             FoodRow.SOURCE_USDA -> NutritionDay.Source.USDA
             else -> NutritionDay.Source.OPEN_FOOD_FACTS
         },
+        micros = micros(row),
     )
+
+    /**
+     * The vitamins and minerals this row records — and nothing for the ones it does not.
+     *
+     * ⚠️ **A null column is left out of the map, never entered as zero.** Measured over the whole
+     * corpus, three quarters of products carry no calcium figure; entering those as 0.0 would put a
+     * measurement nobody took on screen with the same confidence as one they did, and summing them
+     * into a day's total would understate it while presenting it as complete.
+     */
+    private fun micros(row: FoodRow): Micronutrients.Amounts {
+        val m = LinkedHashMap<Micronutrients.Micro, Double>(8)
+        fun put(k: Micronutrients.Micro, v: Int?, scale: Double) {
+            if (v != null) m[k] = v / scale
+        }
+        put(Micronutrients.Micro.CALCIUM, row.calcium, 1.0)
+        put(Micronutrients.Micro.IRON, row.iron, MG_CENTI)
+        put(Micronutrients.Micro.POTASSIUM, row.potassium, 1.0)
+        put(Micronutrients.Micro.VITAMIN_A, row.vitA, 1.0)
+        put(Micronutrients.Micro.VITAMIN_C, row.vitC, MG_CENTI)
+        put(Micronutrients.Micro.VITAMIN_D, row.vitD, 1.0)
+        put(Micronutrients.Micro.CHOLESTEROL, row.chol, 1.0)
+        put(Micronutrients.Micro.TRANS_FAT, row.transfat, G_SCALE)
+        return Micronutrients.Amounts(m)
+    }
 
     /** A scaled integer back to the real number, keeping null as "nobody recorded this" → 0.0. */
     private fun scaled(v: Int?, scale: Double): Double = if (v == null) 0.0 else v / scale

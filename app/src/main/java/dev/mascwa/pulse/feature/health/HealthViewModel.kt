@@ -431,6 +431,8 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     servingLabel = food.servingLabel,
                     source = food.source,
                     foodId = food.id,
+                    // Through the same scaling rule as the macros above — see FoodPortion.
+                    micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
                 ),
             )
             _picked.value = null

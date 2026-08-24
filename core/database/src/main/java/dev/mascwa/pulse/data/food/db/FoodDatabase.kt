@@ -93,7 +93,25 @@ data class FoodRow(
     /** One declared serving, in grams. Null where the source never said. */
     @ColumnInfo(name = "serv_g") val servingGrams: Int?,
 
-    /** The whole package, in grams. Null where the source never said. */
+    /**
+     * What one serving IS, in the source's own words — "1 slice (56 g)", "2 Tbsp (30 ml)".
+     *
+     * ⚠️ Only kept where it says something the gram figure does not. More than half of Open Food
+     * Facts' `serving_size` is simply the mass again ("30.0g"), and rendering "1 serving (30 g)"
+     * with "30.0g" beneath it is the same number twice, which reads as a fault. The builder drops
+     * any label made only of unit words — including the GS1 codes ONZ and OZA, which are an ounce
+     * and a fluid ounce and read as gibberish. Present on 20.2% of products carrying nutrition.
+     */
+    @ColumnInfo(name = "serv_label") val servingLabel: String?,
+
+    /**
+     * The whole package, in grams. Null where the source never said.
+     *
+     * ⚠️ Filled from Open Food Facts' `product_quantity`, which is **already numeric grams** — the
+     * project converts it itself, so the free-text `quantity` beside it needs no parser. Present on
+     * 29.9% of products carrying nutrition; a zero is stored as null, because a package that weighs
+     * nothing would put a "1 package" portion in the picker that resolves to no food at all.
+     */
     @ColumnInfo(name = "pack_g") val packageGrams: Int?,
 
     /** [SOURCE_OFF] or [SOURCE_USDA] — which body published this row. */

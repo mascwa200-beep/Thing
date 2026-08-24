@@ -89,6 +89,20 @@ object FoodPortion {
     }
 
     /**
+     * The same conversion for the vitamins and minerals, so there is one scaling rule rather than
+     * two that can drift.
+     *
+     * ⚠️ It sits here, beside [eaten], deliberately. Writing `grams / 100.0` at the call site would
+     * be a second copy of a rule this file's own note says has exactly one home — and the day the
+     * two disagree, the macros and the micronutrients on one entry would describe different
+     * portions of the same food.
+     */
+    fun eatenMicros(per100g: Micronutrients.Amounts, grams: Double): Micronutrients.Amounts {
+        if (!grams.isFinite() || grams <= 0.0) return Micronutrients.Amounts()
+        return per100g.scaled(grams / PER)
+    }
+
+    /**
      * The other direction: label figures for a stated weight, back to the per-hundred-gram form
      * every source in this app is normalised to.
      *

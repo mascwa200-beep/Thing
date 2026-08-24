@@ -101,12 +101,31 @@ object NutritionDay {
         val meal: Meal = Meal.SNACK,
         val source: Source = Source.CUSTOM,
         val foodId: String = "",
+
+        /**
+         * Vitamins and minerals in this portion, where the record carried any.
+         *
+         * ⚠️ Defaulted, so every existing construction site is unchanged — and empty is the honest
+         * value for a food nobody recorded them for. See [Micronutrients]: absent must never be
+         * summed as zero, which is why this is a map rather than more fields on [Nutrients].
+         */
+        val micros: Micronutrients.Amounts = Micronutrients.Amounts(),
     )
 
     // ------------------------------------------------------------------------------------- totals
 
     fun total(entries: List<Entry>): Nutrients =
         entries.fold(Nutrients()) { acc, e -> acc + e.nutrients }
+
+    /**
+     * The day's vitamins and minerals, and how much of the day each was drawn from.
+     *
+     * ⚠️ Separate from [total] because it answers a second question the macros never have to: a
+     * calorie total is complete by construction, and a calcium total is only as complete as the
+     * records that happened to state it. [Micronutrients.Day] carries that alongside the figure.
+     */
+    fun microTotal(entries: List<Entry>): Micronutrients.Day =
+        Micronutrients.of(entries.map { it.micros })
 
     /** Every meal present, in the order a day happens. Absent meals are omitted rather than zeroed. */
     fun byMeal(entries: List<Entry>): Map<Meal, Nutrients> {

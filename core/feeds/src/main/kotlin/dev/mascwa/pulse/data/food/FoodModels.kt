@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.food
 
 import dev.mascwa.pulse.core.telemetry.FoodPortion
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.serialization.Serializable
 
@@ -38,9 +39,33 @@ data class Food(
     /** [NutritionDay.Source] by name — the enum lives in the unserializable core. */
     val sourceName: String = NutritionDay.Source.OPEN_FOOD_FACTS.name,
     val imageUrl: String = "",
+
+    /**
+     * Vitamins and minerals per 100 g, keyed by [Micronutrients.Micro] name — and **only those the
+     * source actually recorded**.
+     *
+     * ⚠️ A map rather than more flat doubles, and that is not a style choice. Measured over the
+     * bundled corpus, three product records in four say nothing about calcium; as a `Double = 0.0`
+     * beside the macros, every one of them would read "0 mg calcium" — a measurement nobody took,
+     * printed as confidently as one they did. A missing key cannot be mistaken for a zero.
+     *
+     * ⚠️ Keyed by String, not by the enum, for the same reason [sourceName] is: this is an on-disk
+     * contract. An enum-keyed serializer throws on a value it does not know, so renaming a
+     * micronutrient would make every previously cached food undecodable. An unknown key here is
+     * simply dropped by [microsPer100g].
+     */
+    val micros: Map<String, Double> = emptyMap(),
 ) {
     val per100g: NutritionDay.Nutrients
         get() = NutritionDay.Nutrients(kcal, proteinG, fatG, carbG, fibreG, sugarG, satFatG, sodiumMg)
+
+    /** The micronutrients this record carries, in the core's own type. Unknown keys are dropped. */
+    val microsPer100g: Micronutrients.Amounts
+        get() = Micronutrients.Amounts(
+            micros.mapNotNull { (k, v) ->
+                runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { it to v }
+            }.toMap()
+        )
 
     val sizes: FoodPortion.Sizes
         get() = FoodPortion.Sizes(servingGrams, servingLabel, packageGrams)
@@ -64,6 +89,7 @@ data class Food(
             packageGrams: Double? = null,
             source: NutritionDay.Source = NutritionDay.Source.OPEN_FOOD_FACTS,
             imageUrl: String = "",
+            micros: Micronutrients.Amounts = Micronutrients.Amounts(),
         ) = Food(
             id = id,
             name = name,
@@ -81,6 +107,7 @@ data class Food(
             packageGrams = packageGrams,
             sourceName = source.name,
             imageUrl = imageUrl,
+            micros = micros.values.entries.associate { it.key.name to it.value },
         )
     }
 }

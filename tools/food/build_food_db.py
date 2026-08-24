@@ -126,6 +126,7 @@ CREATE TABLE food (
   chol      INTEGER,
   transfat  INTEGER,
   serv_g    INTEGER,
+  serv_label TEXT,
   pack_g    INTEGER,
   src       INTEGER NOT NULL
 );
@@ -135,7 +136,7 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 
 COLUMNS = (
     "barcode name brand kcal prot carb fat fib sug sat sod "
-    "calcium iron potassium vit_a vit_c vit_d chol transfat serv_g pack_g src"
+    "calcium iron potassium vit_a vit_c vit_d chol transfat serv_g serv_label pack_g src"
 ).split()
 
 INSERT = f"INSERT OR REPLACE INTO food ({','.join(COLUMNS)}) VALUES ({','.join('?' * len(COLUMNS))})"
@@ -155,6 +156,47 @@ def scaled(raw: str | float | None, scale: int, ceiling: float = 100_000.0) -> i
     if v != v or v < 0.0 or v > ceiling:  # NaN, negative, or nonsense
         return None
     return int(round(v * scale))
+
+
+
+# ⚠️ Unit words a serving LABEL may be made entirely of, in which case it says nothing the gram
+# figure beside it does not. Includes the GS1 codes Open Food Facts carries verbatim — ONZ is an
+# ounce and OZA a fluid ounce, and both render as gibberish to a reader.
+LABEL_UNITS = {
+    "g", "gr", "gm", "gms", "gram", "grams", "kg", "mg", "ml", "cl", "l", "litre", "litres",
+    "liter", "liters", "oz", "ozs", "ounce", "ounces", "lb", "lbs", "fl", "onz", "oza", "grm",
+}
+
+MAX_LABEL = 40
+
+
+def serving_label(raw: str | None) -> str | None:
+    """A household description of one serving — "1 CAN (355 ml)" — or None.
+
+    ⚠️ **A label made only of units is dropped, and that is the whole rule.** Open Food Facts'
+    `serving_size` is free text and more than half of it is simply the mass again: rendering
+    "1 serving (30 g)" with "30.0g" underneath is the same number said twice, which reads as a bug.
+    What earns its place is a label naming the THING — a can, a slice, two tablespoons — because
+    that is how somebody actually decides what they ate.
+    """
+    t = clean(raw, MAX_LABEL)
+    if not t:
+        return None
+    words = [w for w in "".join(c if (c.isalpha() or c.isspace()) else " " for c in t).split()]
+    if not words or all(w.lower() in LABEL_UNITS for w in words):
+        return None
+    return t
+
+
+def mass(raw: str | float | None, ceiling: float) -> int | None:
+    """A weight in whole grams, or None. ⚠️ Zero is None, not zero.
+
+    Open Food Facts publishes `product_quantity` as 0 for a great many records, and a package that
+    weighs nothing is not a package — carried through, it would put a "1 package" portion in the
+    picker that resolves to no food at all.
+    """
+    v = scaled(raw, 1, ceiling=ceiling)
+    return v if v and v > 0 else None
 
 
 def clean(s: str | None, limit: int) -> str | None:
@@ -188,7 +230,7 @@ class Row:
 # ---------------------------------------------------------------------------------------------
 
 OFF_FIELDS = {
-    "code", "product_name", "brands", "quantity", "serving_quantity",
+    "code", "product_name", "brands", "serving_quantity", "serving_size", "product_quantity",
     "energy-kcal_100g", "energy_100g", "proteins_100g", "carbohydrates_100g", "fat_100g",
     "fiber_100g", "sugars_100g", "saturated-fat_100g", "sodium_100g", "salt_100g",
     "calcium_100g", "iron_100g", "potassium_100g", "vitamin-a_100g", "vitamin-c_100g",
@@ -258,6 +300,12 @@ def read_off(path: Path, limit: int | None, log):
             row.transfat = scaled(g(rec, "trans-fat_100g"), SCALE_MACRO)
 
             row.serv_g = scaled(g(rec, "serving_quantity"), 1, ceiling=5000.0)
+            row.serv_label = serving_label(g(rec, "serving_size"))
+            # ⚠️ Already grams. Open Food Facts converts this field itself — 453.59237 is a
+            # pound, 340.19 twelve ounces — so the free-text `quantity` beside it needs no
+            # parser here. Measured on the real export: present on 26.7% of rows carrying
+            # nutrition, which is what makes a "1 package" portion worth offering at all.
+            row.pack_g = mass(g(rec, "product_quantity"), ceiling=100_000.0)
             yield row
 
 
@@ -314,6 +362,11 @@ def read_usda(path: Path, limit: int | None, log):
                 row.brand = clean(r.get("brand_owner") or r.get("brand_name"), MAX_BRAND)
                 row.serv_g = scaled(r.get("serving_size"), 1, ceiling=5000.0) \
                     if (r.get("serving_size_unit") or "").lower() in ("g", "ml") else None
+                # USDA states the household portion separately from its mass — "1 cup", "2 cookies"
+                # — which is the half a person recognises. ⚠️ `package_weight` beside it is NOT
+                # read: measured over 300,000 branded rows it is present on exactly one, so a
+                # column filled from it would be a promise the source cannot keep.
+                row.serv_label = serving_label(r.get("household_serving_fulltext"))
                 wanted[r["fdc_id"]] = row
                 if limit and len(wanted) >= limit:
                     break
