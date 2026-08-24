@@ -218,4 +218,96 @@ class RecipesTest {
             Recipes.summary(stew(yieldG = 600.0, servings = 4)),
         )
     }
+
+    // ------------------------------------------------------------------ vitamins and minerals
+
+    /**
+     * Mince records iron and cholesterol; tomatoes record iron and vitamin C. Arithmetic, before the
+     * assertion:
+     *
+     *   iron        500 g at 2.6 mg/100 g = 13.0   +  400 g at 0.5 = 2.0   -> 15.0 mg
+     *   cholesterol 500 g at  70 mg/100 g = 350.0  +  (not recorded)       -> 350.0 mg
+     *   vitamin C   (not recorded)                 +  400 g at 9.0 = 36.0  ->  36.0 mg
+     */
+    private val minceWithMicros = mince.copy(
+        micros = Micronutrients.Amounts(
+            mapOf(
+                Micronutrients.Micro.IRON to 2.6,
+                Micronutrients.Micro.CHOLESTEROL to 70.0,
+            ),
+        ),
+    )
+    private val tomatoesWithMicros = tomatoes.copy(
+        micros = Micronutrients.Amounts(
+            mapOf(
+                Micronutrients.Micro.IRON to 0.5,
+                Micronutrients.Micro.VITAMIN_C to 9.0,
+            ),
+        ),
+    )
+
+    private fun richStew(yieldG: Double? = null, servings: Int = 4) = Recipes.Recipe(
+        "r1", "Stew", listOf(minceWithMicros, tomatoesWithMicros),
+        cookedYieldG = yieldG, servings = servings,
+    )
+
+    @Test
+    fun thePotSumsWhicheverMicronutrientsTheIngredientsRecorded() {
+        val t = Recipes.totalMicros(richStew())
+        assertEquals(15.0, t[Micronutrients.Micro.IRON]!!, 1e-9)
+        assertEquals(350.0, t[Micronutrients.Micro.CHOLESTEROL]!!, 1e-9)
+        assertEquals(36.0, t[Micronutrients.Micro.VITAMIN_C]!!, 1e-9)
+        // ⚠️ Nothing recorded calcium, so the dish reports none rather than zero. `Day.coverage` is
+        // what tells the reader how much of a total was drawn from — a 0.0 here would claim a
+        // measurement.
+        assertNull(t[Micronutrients.Micro.CALCIUM])
+    }
+
+    /**
+     * ⚠️ **THE LOAD-BEARING RULE: a helping's micronutrients and its calories describe the SAME
+     * portion.** Two routes to one helping — 150 g of a 600 g yield is exactly one of four servings —
+     * and the commonest way this goes wrong is one half scaling by the raw weight while the other uses
+     * the cooked one. The macros already have this test; the micronutrients now share it.
+     *
+     *   yield 600 g, so a 150 g helping is a quarter: iron 15.0 / 4 = 3.75 mg, kcal 1330 / 4 = 332.5
+     */
+    @Test
+    fun aHelpingsMicronutrientsDescribeTheSamePortionAsItsCalories() {
+        val r = richStew(yieldG = 600.0, servings = 4)
+
+        val byGrams = Recipes.eatenGramsMicros(r, 150.0)!!
+        val byServings = Recipes.eatenServingsMicros(r, 1.0)!!
+        assertEquals(3.75, byGrams[Micronutrients.Micro.IRON]!!, 1e-9)
+        assertEquals(byGrams[Micronutrients.Micro.IRON]!!, byServings[Micronutrients.Micro.IRON]!!, 1e-9)
+
+        // And the same fraction as the macros took, which is the property that actually matters.
+        val macroShare = Recipes.eatenGrams(r, 150.0)!!.kcal / Recipes.total(r).kcal
+        val microShare = byGrams[Micronutrients.Micro.IRON]!! /
+            Recipes.totalMicros(r)[Micronutrients.Micro.IRON]!!
+        assertEquals(macroShare, microShare, 1e-12)
+    }
+
+    /**
+     * ⚠️ Every recipe saved before this existed has components with no micronutrients, and must still
+     * work — the field is defaulted for exactly that reason. A dish that records nothing reports
+     * nothing rather than refusing or returning zeros.
+     */
+    @Test
+    fun aRecipeBuiltBeforeMicronutrientsExistedStillWorks() {
+        val old = stew(yieldG = 600.0)
+        assertEquals(332.5, Recipes.perServing(old)!!.kcal, 1e-9)
+        assertTrue(Recipes.totalMicros(old).isEmpty)
+        // Not null — the recipe is perfectly valid, it simply has nothing to report.
+        assertTrue(Recipes.eatenGramsMicros(old, 150.0)!!.isEmpty)
+    }
+
+    /** An empty recipe has no density for micronutrients either, exactly as it has none for macros. */
+    @Test
+    fun anEmptyRecipeRefusesBothHalvesTheSameWay() {
+        val empty = Recipes.Recipe("r0", "Nothing")
+        assertNull(Recipes.per100g(empty))
+        assertNull(Recipes.per100gMicros(empty))
+        assertNull(Recipes.eatenGramsMicros(empty, 100.0))
+        assertNull(Recipes.eatenServingsMicros(empty, 1.0))
+    }
 }

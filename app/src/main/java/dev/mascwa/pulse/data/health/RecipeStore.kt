@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,17 @@ class RecipeStore(
         val sugar: Double = 0.0,
         val satFat: Double = 0.0,
         val sodium: Double = 0.0,
+        /**
+         * The ingredient's vitamins and minerals per 100 g, keyed by [Micronutrients.Micro] NAME.
+         *
+         * ⚠️ Defaulted, so every recipe already on disk decodes unchanged — asserted by a test that
+         * decodes a blob written before this field existed.
+         *
+         * ⚠️ Keyed by String rather than by the enum, for exactly the reason `Food.micros` is: an
+         * enum-keyed serializer THROWS on a value it does not know, so renaming a micronutrient would
+         * make somebody's whole recipe book undecodable. An unknown key here is simply dropped.
+         */
+        val micros: Map<String, Double> = emptyMap(),
     )
 
     @Serializable
@@ -213,6 +225,11 @@ class RecipeStore(
                     fibreG = it.fibre, sugarG = it.sugar, satFatG = it.satFat, sodiumMg = it.sodium,
                 ),
                 grams = it.grams,
+                micros = Micronutrients.Amounts(
+                    it.micros.mapNotNull { (k, v) ->
+                        runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { m -> m to v }
+                    }.toMap(),
+                ),
             )
         },
         cookedYieldG = cookedYieldG,
@@ -229,6 +246,7 @@ class RecipeStore(
                 kcal = it.per100g.kcal, p = it.per100g.proteinG, f = it.per100g.fatG,
                 c = it.per100g.carbG, fibre = it.per100g.fibreG, sugar = it.per100g.sugarG,
                 satFat = it.per100g.satFatG, sodium = it.per100g.sodiumMg,
+                micros = it.micros.values.entries.associate { (m, v) -> m.name to v },
             )
         },
         cookedYieldG = cookedYieldG,

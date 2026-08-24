@@ -34,6 +34,18 @@ object Recipes {
         val name: String,
         val per100g: NutritionDay.Nutrients,
         val grams: Double,
+        /**
+         * The ingredient's vitamins and minerals per 100 g, where its source recorded any.
+         *
+         * ⚠️ **Defaulted, so every recipe already saved decodes unchanged** — the store persists this
+         * type and an added field without a default would make the whole list undecodable. Asserted by
+         * a test against a recipe built the old way.
+         *
+         * ⚠️ Empty is a real state and the commonest one for older recipes: they were built before
+         * anything carried micronutrients, so their component list genuinely has none. That is why
+         * [totalMicros] adds a union rather than refusing on a partial dish.
+         */
+        val micros: Micronutrients.Amounts = Micronutrients.Amounts(),
     )
 
     data class Recipe(
@@ -103,6 +115,42 @@ object Recipes {
      */
     fun eatenServings(r: Recipe, servings: Double): NutritionDay.Nutrients? =
         perServing(r)?.scaled(servings.coerceAtLeast(0.0))
+
+    // ------------------------------------------------------------------ vitamins and minerals
+    //
+    // ⚠️ **A LITERAL MIRROR of the five functions above — same operations, same order, same guards
+    // — and that is the point rather than an accident.** A dish logged as a recipe used to show no
+    // micronutrients at all while its ingredients logged individually showed them, so the same food
+    // read differently depending on how it was entered. What must never happen is the two halves
+    // scaling by different amounts: a helping's calcium would then describe a different portion than
+    // its calories, on one row, with nothing to say which was right. `RecipesTest` pins them together.
+
+    /** Everything in the pot, for the micronutrients its ingredients recorded. */
+    fun totalMicros(r: Recipe): Micronutrients.Amounts =
+        r.components.fold(Micronutrients.Amounts()) { acc, cc ->
+            acc + FoodPortion.eatenMicros(cc.micros, cc.grams)
+        }
+
+    /** The dish's own density, or null when there is nothing to divide by. */
+    fun per100gMicros(r: Recipe): Micronutrients.Amounts? {
+        val y = yieldGrams(r)
+        if (y <= 0.0 || r.components.isEmpty()) return null
+        return totalMicros(r).scaled(FoodPortion.PER / y)
+    }
+
+    /** One portion, or null when the recipe cannot say what a portion is. */
+    fun perServingMicros(r: Recipe): Micronutrients.Amounts? {
+        if (r.components.isEmpty()) return null
+        return totalMicros(r).scaled(1.0 / r.servings.coerceAtLeast(1))
+    }
+
+    /** A weighed helping. */
+    fun eatenGramsMicros(r: Recipe, grams: Double): Micronutrients.Amounts? =
+        per100gMicros(r)?.let { FoodPortion.eatenMicros(it, grams) }
+
+    /** A counted helping. */
+    fun eatenServingsMicros(r: Recipe, servings: Double): Micronutrients.Amounts? =
+        perServingMicros(r)?.scaled(servings.coerceAtLeast(0.0))
 
     /** What one portion weighs, so a serving can be described in grams as well as in portions. */
     fun servingGrams(r: Recipe): Double? {

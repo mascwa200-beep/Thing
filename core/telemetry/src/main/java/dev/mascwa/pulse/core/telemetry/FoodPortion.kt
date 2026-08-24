@@ -202,13 +202,13 @@ object FoodPortion {
      * An unrecognised unit is left unbounded here and caught by a test instead — silently admitting
      * everything is exactly the failure this whole rule exists to stop, so it must not be possible to
      * introduce one quietly.
+     *
+     * ⚠️ The unit-to-scale step itself lives in [Micronutrients.perGram], shared with
+     * [Micronutrients.fromGrams], so a bound and a conversion cannot come to disagree about what a
+     * microgram is.
      */
-    fun maxPer100g(m: Micronutrients.Micro): Double = when (m.unit) {
-        "g" -> MAX_MASS_G_PER_100G
-        "mg" -> MAX_MASS_G_PER_100G * 1_000.0
-        "µg" -> MAX_MASS_G_PER_100G * 1_000_000.0
-        else -> Double.MAX_VALUE
-    }
+    fun maxPer100g(m: Micronutrients.Micro): Double =
+        Micronutrients.perGram(m)?.let { MAX_MASS_G_PER_100G * it } ?: Double.MAX_VALUE
 
     /**
      * [per100g] with anything impossible removed — and nothing, when the record contradicts itself.

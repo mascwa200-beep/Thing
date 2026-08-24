@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.food
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.FoodPortion
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -213,7 +214,43 @@ internal fun parseOffProduct(id: String, p: JsonObject): Food? {
         packageGrams = p.num("product_quantity")?.takeIf { it > 0.0 && it < MAX_PACKAGE_G },
         source = NutritionDay.Source.OPEN_FOOD_FACTS,
         imageUrl = p.str("image_small_url"),
+        micros = offMicros(n),
     )
+}
+
+/**
+ * The vitamins and minerals this record publishes.
+ *
+ * ⚠️ **This path read NONE of them, and the bundled barcode database read all eight from the same
+ * source.** So the same product logged with a signal carried fewer nutrients than logged without one
+ * — which is not a gap in the data, it is the app disagreeing with itself about one shelf item
+ * depending on where the phone happened to be.
+ *
+ * ⚠️ **Every field is in GRAMS, probed against the live API rather than assumed** — the `_unit` value
+ * beside each reads "g", including for calcium and vitamin D. `Micronutrients.fromGrams` is the one
+ * place that conversion lives, and it derives the factor from the micronutrient's own declared unit,
+ * so it cannot come to disagree with the bound `FoodPortion.maxPer100g` applies to the same figure.
+ *
+ * ⚠️ **A recorded zero is KEPT and an absent field is DROPPED**, which `num` already distinguishes and
+ * this must not flatten. Measured on real US products: a bag of crisps publishes `iron: 0` and a
+ * pasta box publishes `vitamin-d: 0` — genuine label statements of none — while most European records
+ * publish nothing at all. "Contains none" and "nobody measured" are different things to sum into a
+ * day's total.
+ */
+private fun offMicros(n: JsonObject): Micronutrients.Amounts {
+    val m = LinkedHashMap<Micronutrients.Micro, Double>(8)
+    fun put(k: Micronutrients.Micro, field: String) {
+        Micronutrients.fromGrams(k, n.num("${field}_100g"))?.let { m[k] = it }
+    }
+    put(Micronutrients.Micro.CALCIUM, "calcium")
+    put(Micronutrients.Micro.IRON, "iron")
+    put(Micronutrients.Micro.POTASSIUM, "potassium")
+    put(Micronutrients.Micro.VITAMIN_A, "vitamin-a")
+    put(Micronutrients.Micro.VITAMIN_C, "vitamin-c")
+    put(Micronutrients.Micro.VITAMIN_D, "vitamin-d")
+    put(Micronutrients.Micro.CHOLESTEROL, "cholesterol")
+    put(Micronutrients.Micro.TRANS_FAT, "trans-fat")
+    return Micronutrients.Amounts(m)
 }
 
 /**

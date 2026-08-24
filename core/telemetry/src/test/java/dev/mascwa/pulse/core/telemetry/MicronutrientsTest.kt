@@ -252,4 +252,41 @@ class MicronutrientsTest {
         assertEquals("310 mg", Micronutrients.readout(Micro.CALCIUM, 310.0, null))
         assertEquals("2.5 mg", Micronutrients.readout(Micro.IRON, 2.46, null))
     }
+
+    // ------------------------------------------------------- a source that publishes in grams
+
+    /**
+     * ⚠️ **THE RULE THIS FILE MOST NEEDED A TEST FOR, and had none until a negative-test run said so.**
+     * Open Food Facts publishes all eight of these in grams. If an absent field became 0.0 on the way
+     * through, EVERY product the app fetched would report zero calcium, zero iron and zero vitamin D —
+     * a measurement nobody took, on every card, indistinguishable from a real label statement of none.
+     * That is the exact defect `Amounts` is a map to prevent.
+     */
+    @Test
+    fun aFigureNobodyPublishedStaysAbsentRatherThanBecomingZero() {
+        assertNull(Micronutrients.fromGrams(Micro.CALCIUM, null))
+        // ⚠️ But a RECORDED zero is kept. Measured on real US products: a bag of crisps publishes
+        // `iron: 0` and a pasta box `vitamin-d: 0` — genuine label statements of none.
+        assertEquals(0.0, Micronutrients.fromGrams(Micro.IRON, 0.0)!!, 1e-12)
+    }
+
+    /** Grams into each micronutrient's own declared unit. 0.12 g of calcium is 120 mg. */
+    @Test
+    fun gramsBecomeTheUnitTheMicronutrientIsStoredIn() {
+        assertEquals(120.0, Micronutrients.fromGrams(Micro.CALCIUM, 0.12)!!, 1e-9)
+        assertEquals(2.6, Micronutrients.fromGrams(Micro.IRON, 0.0026)!!, 1e-9)
+        // 0.0000025 g of vitamin D is 2.5 µg — a fifth of the daily reference, and the figure that
+        // would have been lost entirely to an integer microgram in the barcode database.
+        assertEquals(2.5, Micronutrients.fromGrams(Micro.VITAMIN_D, 0.0000025)!!, 1e-9)
+        // Trans fat is already in grams, so it passes through untouched.
+        assertEquals(0.5, Micronutrients.fromGrams(Micro.TRANS_FAT, 0.5)!!, 1e-12)
+    }
+
+    /** A figure no source should ever send is refused rather than carried. */
+    @Test
+    fun anImpossibleFigureIsRefusedRatherThanConverted() {
+        assertNull(Micronutrients.fromGrams(Micro.CALCIUM, -1.0))
+        assertNull(Micronutrients.fromGrams(Micro.CALCIUM, Double.NaN))
+        assertNull(Micronutrients.fromGrams(Micro.CALCIUM, Double.POSITIVE_INFINITY))
+    }
 }

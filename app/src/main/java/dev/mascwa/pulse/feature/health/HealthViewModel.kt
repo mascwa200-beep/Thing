@@ -897,6 +897,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     name = food.display,
                     per100g = food.per100g,
                     grams = grams,
+                    micros = food.microsPer100g,
                 ),
             )
         }
@@ -946,6 +947,11 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         val eaten = if (byServings) Recipes.eatenServings(recipe, amount)
         else Recipes.eatenGrams(recipe, amount)
         if (eaten == null) return
+        // ⚠️ The SAME branch, so the two halves of one helping cannot describe different portions.
+        // Deriving the micronutrients from the other route — say always by grams — would put a
+        // calcium figure for 200 g beside a calorie figure for two portions on one row.
+        val micros = if (byServings) Recipes.eatenServingsMicros(recipe, amount)
+        else Recipes.eatenGramsMicros(recipe, amount)
         val grams = if (byServings) (Recipes.servingGrams(recipe) ?: return) * amount else amount
         val now = System.currentTimeMillis()
         viewModelScope.launch {
@@ -957,6 +963,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     name = recipe.name.ifBlank { "Recipe" },
                     grams = grams,
                     nutrients = eaten,
+                    micros = micros ?: Micronutrients.Amounts(),
                     meal = meal,
                     // ⚠️ CUSTOM, because it is. The source field says where the numbers came from,
                     // and a dish somebody assembled is not a database record however carefully its
