@@ -9,6 +9,7 @@ import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.data.health.BodyStore
@@ -129,6 +130,14 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         val measuredShare: Double = 0.0,
         val plan: MacroTargets.Plan? = null,
         val eatenToday: NutritionDay.Nutrients = NutritionDay.Nutrients(),
+        /**
+         * Today's vitamins and minerals, and how many of today's foods each was drawn from.
+         *
+         * ⚠️ Separate from [eatenToday] because it answers a question the macros never have to. A
+         * calorie total is complete by construction; a calcium total is only as complete as the
+         * records that happened to state it, and roughly three product records in four do not.
+         */
+        val microsToday: Micronutrients.Day = Micronutrients.Day(),
         val loggedDaysInWindow: Int = 0,
     ) {
         val targets: MacroTargets.Targets? get() = (plan as? MacroTargets.Plan.Set)?.targets
@@ -942,6 +951,7 @@ internal suspend fun composeHealthReading(
         measuredShare = share,
         plan = plan,
         eatenToday = NutritionDay.total(todayEntries),
+        microsToday = NutritionDay.microTotal(todayEntries),
         loggedDaysInWindow = intake.size,
     )
 }

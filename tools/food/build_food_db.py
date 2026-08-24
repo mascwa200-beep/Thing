@@ -342,8 +342,18 @@ def read_usda(path: Path, limit: int | None, log):
         need = ["branded_food.csv", "food.csv", "food_nutrient.csv", "nutrient.csv"]
         for n in need:
             if n not in names:
-                log(f"  USDA: {n} not in the archive — skipping USDA entirely")
-                return
+                # ⚠️ Loud, and a hard failure. A source that was DOWNLOADED and then contributed
+                # nothing is a broken assumption, not an outage — the caller went to the trouble of
+                # fetching 449 MB, so something about the archive is not what this expects. The
+                # first version merely logged one line and returned, and a build that quietly lost
+                # the whole USDA merge went green with 48.8% nutrition coverage instead of 56.3%.
+                # A source that was never provided at all is a different case and is fine: `build`
+                # is called with whichever paths exist.
+                raise SystemExit(
+                    f"USDA archive {path.name} has no {n}.\n"
+                    f"  It contains: {sorted(names)[:6]}\n"
+                    "  This builder parses the CSV release. Check the URL says _csv_ and not _json_."
+                )
 
         # nutrient id -> nutrient number, so the selection above can key on the stable number.
         num_of = {}
@@ -467,13 +477,31 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
     named = cur.execute("SELECT COUNT(*) FROM food WHERE name IS NOT NULL").fetchone()[0]
     served = cur.execute("SELECT COUNT(*) FROM food WHERE serv_g IS NOT NULL").fetchone()[0]
 
+    # ⚠️ **Derived from what actually happened, never asserted.** This line was a hardcoded string
+    # naming both sources, so run 1962 shipped a database claiming USDA data it did not contain —
+    # USDA had been skipped and the meta table said otherwise. A source that contributed nothing is
+    # not named, and its licence is not claimed either.
+    contributed = []
+    if stats.get("off"):
+        contributed.append("Open Food Facts (ODbL)")
+    if stats.get("usda"):
+        contributed.append("USDA FoodData Central (public domain)")
+    attribution = "; ".join(
+        part for part, on in (
+            ("Product data from Open Food Facts, licensed under the Open Database License (ODbL)",
+             stats.get("off")),
+            ("Branded data from USDA FoodData Central, public domain", stats.get("usda")),
+        ) if on
+    ) or "No source contributed to this build."
+
     for k, v in {
         "rows": str(total),
         "with_nutrition": str(with_nut),
         "built_at": time.strftime("%Y-%m-%d", time.gmtime()),
-        "sources": "Open Food Facts (ODbL); USDA FoodData Central (public domain)",
-        "attribution": "Product data from Open Food Facts, licensed under the Open Database "
-                       "License (ODbL). Generic and US branded data from USDA FoodData Central.",
+        "off_rows": str(stats.get("off", 0)),
+        "usda_rows": str(stats.get("usda", 0)),
+        "sources": "; ".join(contributed) or "none",
+        "attribution": attribution + ".",
     }.items():
         cur.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (k, v))
     con.commit()

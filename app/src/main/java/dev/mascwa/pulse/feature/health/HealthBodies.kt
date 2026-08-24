@@ -51,6 +51,7 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
@@ -154,6 +155,21 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         items(guides) { serving -> NutrientRow(serving.guide, serving.eaten) }
         if (eaten.sugarG > 0.0) {
             item { SugarRow(eaten.sugarG) }
+        }
+
+        // ⚠️ Vitamins and minerals, and the thing that makes them honest: how many of today's foods
+        // actually reported each one. Only about a quarter of product records carry calcium, so a
+        // total drawn from one food in six is not the day's calcium — and a screen that shows the
+        // number without the denominator says it is.
+        val micros = state.microsToday
+        val year = LocalDate.now(ZoneId.systemDefault()).year
+        val age = if (state.profile.birthYear > 0) year - state.profile.birthYear else 0
+        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
+            .getOrDefault(Body.Sex.UNSPECIFIED)
+        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
+        if (present.isNotEmpty()) {
+            item { LcarsHeaderBar("VITAMINS AND MINERALS") }
+            items(present) { m -> MicroRow(m, micros, sex, age) }
         }
 
         // The week, which is the question somebody actually has after a fortnight: whether the plan
@@ -332,6 +348,67 @@ private fun NutrientRow(guide: NutrientGuides.Guide, amount: Double) {
                 "${guide.basis} · ${guide.source}",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
             )
+        }
+    }
+}
+
+/**
+ * One vitamin or mineral: how much, against the usual reference where one exists, and how much of
+ * the day it was actually drawn from.
+ *
+ * ⚠️ **The coverage line is the point of this row, not decoration.** Measured over the bundled
+ * corpus, three product records in four carry no calcium figure. A day totalled from six foods of
+ * which one reported calcium is not the day's calcium, and a bar drawn without saying so is the
+ * app being more confident than its data — the shape this project has corrected five times.
+ *
+ * ⚠️ Two of the eight have no figure to compare against, and say why instead. Cholesterol's 300 mg
+ * ceiling was withdrawn in 2015; trans fat has no allowance because the guidance is elimination,
+ * and a budget on screen reads as permission to spend it. Those get the sentence and no bar.
+ */
+@Composable
+private fun MicroRow(
+    m: Micronutrients.Micro,
+    day: Micronutrients.Day,
+    sex: Body.Sex,
+    ageYears: Int,
+) {
+    val c = Pulse.colors
+    val tally = day[m] ?: return
+    val reference = Micronutrients.reference(m, sex, ageYears)
+    val guide = (reference as? Micronutrients.Reference.Amount)?.guide
+    val fraction = guide?.fractionOf(tally.total) ?: 0.0
+    val tint = if (guide == null) c.ink2 else if (fraction >= 1.0) c.positive else c.sky
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    m.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    Micronutrients.readout(m, tally.total, guide),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = tint,
+                )
+            }
+            // No bar where there is no figure to fill it against — an empty track beside a number
+            // reads as "you have none of your allowance left", which is the opposite of the truth.
+            if (guide != null) MacroBar(tally.total, guide.amount, tint)
+            when (reference) {
+                is Micronutrients.Reference.None -> Text(
+                    reference.why,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+                is Micronutrients.Reference.Amount -> Text(
+                    "${reference.guide.basis} \u00b7 ${reference.guide.source}",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+                )
+            }
+            day.caveat(m)?.let { caveat ->
+                Text(
+                    caveat,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
         }
     }
 }

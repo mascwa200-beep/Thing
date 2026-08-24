@@ -317,7 +317,15 @@ jobs:
           # answers 206), so this URL cannot 404 when a newer one lands. Bumping it is a choice
           # about freshness, never an emergency. 2026-04-30 was the newest on the pin date; the
           # four plausible later dates all answered 404.
-          USDA=https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_json_2026-04-30.zip
+          # ⚠️ **_csv_, NOT _json_, and that distinction cost a silently degraded database.** The
+          # first version of this step used the `json` archive because the pin was chosen by date
+          # without checking what the BUILDER reads — and `build_food_db.py` parses
+          # `branded_food.csv`. The json archive holds one 3.3 GB JSON member, so the builder found
+          # no CSV, skipped USDA entirely, and still reported VERIFY PASSED: run 1962 shipped
+          # 48.8% nutrition coverage instead of 56.3%, with the whole 1.5M-row USDA merge missing.
+          # Measured after the fact: the csv archive is 448,767,220 bytes, byte-for-byte what a
+          # local copy of the same release holds. The gate below now makes that failure loud.
+          USDA=https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2026-04-30.zip
 
           # ⚠️ Each source is fetched into place only on success. A half-downloaded file is worse
           # than a missing one: the builder would read it, hit a truncated gzip stream part way
