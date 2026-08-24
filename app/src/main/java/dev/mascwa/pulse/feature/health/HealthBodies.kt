@@ -1960,7 +1960,7 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
             LcarsField(
                 search.query,
                 vm::onSearchQuery,
-                placeholder = "Chicken breast, olive oil, a brand name…",
+                placeholder = "Chicken breast, olive oil, a brand, a takeaway…",
             )
             // Nobody types "Ferrero Nutella hazelnut spread" standing in a kitchen, and Open Food
             // Facts is organised around barcodes because that is how a shelf identifies itself.
@@ -1973,7 +1973,16 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 // ⚠️ Only once they have actually typed enough to have searched. "No matches" under a
                 // half-typed word is the screen calling somebody wrong mid-sentence.
                 search.query.trim().length >= 2 && search.results.isEmpty() -> Text(
-                    "No matches. QUICK ADD below takes the numbers straight off a label.",
+                    // ⚠️ Says WHY rather than just "no matches", because the commonest reason is a
+                    // knowable one. Every word has to match: "chipotle burrito bowl" finds nothing
+                    // while "burrito bowl" finds ten. And the free data names only a handful of the
+                    // big American chains — measured, and recorded where the data is built rather
+                    // than listed here, because a list in UI copy drifts from the corpus it
+                    // describes the moment either changes.
+                    "No matches. Every word has to match, so fewer words usually finds more — and " +
+                        "a dish on its own (\"burrito bowl\", \"cheeseburger\") is more likely to be " +
+                        "in there than the name of the place you got it. QUICK ADD below takes the " +
+                        "numbers straight off a label.",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
                 )
             }
