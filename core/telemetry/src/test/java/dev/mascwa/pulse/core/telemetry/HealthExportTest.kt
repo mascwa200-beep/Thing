@@ -244,4 +244,98 @@ class HealthExportTest {
             HealthExport.summarise(902, 180, 61, 4),
         )
     }
+
+    // ------------------------------------------------------------------- vitamins and minerals
+
+    /**
+     * ⚠️ **THE ONE THAT DECIDES WHETHER THE EXPORT TELLS THE TRUTH IN A SPREADSHEET: an unrecorded
+     * micronutrient is a BLANK CELL, never a zero.**
+     *
+     * `AVERAGE` skips a blank and counts a zero. Two food records in three say nothing about calcium,
+     * so a column of zeros for those would report a deficiency nobody measured — to somebody who
+     * exported the file precisely in order to check.
+     *
+     * The header and the row are read by position through the independent parser, so a column-order
+     * mistake fails here rather than shifting every figure one place.
+     */
+    @Test
+    fun aMicronutrientNobodyRecordedIsBlankAndNotZero() {
+        val partial = entry("Yogurt").copy(
+            micros = Micronutrients.Amounts(
+                mapOf(
+                    Micronutrients.Micro.CALCIUM to 121.0,
+                    // A REAL zero, which must survive as "0.00" — a label statement of none.
+                    Micronutrients.Micro.VITAMIN_D to 0.0,
+                ),
+            ),
+        )
+        val lines = log(partial).trim().lines()
+        val head = parseRow(lines[0])
+        val row = parseRow(lines[1])
+
+        fun cell(column: String) = row[head.indexOf(column)]
+
+        assertEquals("121.0", cell("calcium_mg"))
+        assertEquals("0.00", cell("vitamin_d_ug"))
+        // Nobody measured iron, so nothing is claimed about it.
+        assertEquals("", cell("iron_mg"))
+        assertEquals("", cell("potassium_mg"))
+    }
+
+    /**
+     * ⚠️ The column names carry their units and are ASCII — `vitamin_d_ug`, not `vitamin_d_µg`. A
+     * header whose encoding a parser has to guess is a header somebody's script gets wrong, and a
+     * bare `calcium` invites a comparison against a figure in grams.
+     */
+    @Test
+    fun theMicronutrientColumnsNameTheirUnitsInAscii() {
+        assertEquals(
+            listOf(
+                "calcium_mg", "iron_mg", "potassium_mg", "vitamin_a_ug",
+                "vitamin_c_mg", "vitamin_d_ug", "cholesterol_mg", "trans_fat_g",
+            ),
+            HealthExport.MICRO_COLUMNS,
+        )
+        for (c in HealthExport.MICRO_COLUMNS) {
+            assertTrue("$c is not ASCII", c.all { it.code < 128 })
+        }
+    }
+
+    /**
+     * ⚠️ Iron and vitamin D are fractions of their own units in most foods, so a single decimal would
+     * round a real reading toward nothing — the same defect as the barcode database's integer
+     * microgram. Calcium runs to hundreds and needs none of it.
+     */
+    @Test
+    fun theFineMicronutrientsKeepEnoughDecimalsToSurvive() {
+        val trace = entry("Spinach").copy(
+            micros = Micronutrients.Amounts(
+                mapOf(
+                    Micronutrients.Micro.IRON to 0.27,
+                    Micronutrients.Micro.VITAMIN_D to 0.04,
+                    Micronutrients.Micro.CALCIUM to 99.0,
+                ),
+            ),
+        )
+        val lines = log(trace).trim().lines()
+        val head = parseRow(lines[0])
+        val row = parseRow(lines[1])
+        assertEquals("0.27", row[head.indexOf("iron_mg")])
+        assertEquals("0.04", row[head.indexOf("vitamin_d_ug")])
+        assertEquals("99.0", row[head.indexOf("calcium_mg")])
+    }
+
+    /** The header and every row still describe the same number of columns. */
+    @Test
+    fun everyRowIsStillAsWideAsTheHeader() {
+        val text = log(
+            entry("Oats", id = "a"),
+            entry("Yogurt", id = "b").copy(
+                micros = Micronutrients.Amounts(mapOf(Micronutrients.Micro.CALCIUM to 121.0)),
+            ),
+        )
+        val rows = text.trim().lines().map { parseRow(it) }
+        assertEquals(3, rows.size)
+        assertTrue(rows.all { it.size == rows[0].size })
+    }
 }

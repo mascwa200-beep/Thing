@@ -92,10 +92,17 @@ object HealthExport {
     ): String = buildString {
         append(
             header(
-                "date", "time", "meal", "food", "brand", "serving", "grams",
-                "energy_kcal", "protein_g", "fat_g", "carbs_g",
-                "fibre_g", "sugar_g", "saturated_fat_g", "sodium_mg",
-                "source", "day_epoch_ms", "logged_epoch_ms", "entry_id",
+                *arrayOf(
+                    "date", "time", "meal", "food", "brand", "serving", "grams",
+                    "energy_kcal", "protein_g", "fat_g", "carbs_g",
+                    "fibre_g", "sugar_g", "saturated_fat_g", "sodium_mg",
+                ),
+                // ⚠️ Named from the enum rather than typed out, so a micronutrient added later
+                // appears in the export without anybody remembering to widen this list — and the
+                // header cannot come to disagree with the column order below, which reads the same
+                // `entries`. `calcium_mg`, `vitamin_d_ug`, and so on.
+                *MICRO_COLUMNS.toTypedArray(),
+                *arrayOf("source", "day_epoch_ms", "logged_epoch_ms", "entry_id"),
             ),
         )
         for (e in entries.sortedWith(compareBy({ it.dayStartMs }, { it.atMs }))) {
@@ -118,6 +125,14 @@ object HealthExport {
                         num(n.sugarG),
                         num(n.satFatG),
                         num(n.sodiumMg),
+                    ) + Micronutrients.Micro.entries.map { m ->
+                        // ⚠️ **An unrecorded micronutrient is an EMPTY CELL, never a zero**, and in a
+                        // spreadsheet the difference is the whole point: `AVERAGE` skips a blank and
+                        // counts a zero, so a column of zeros for the two records in three that say
+                        // nothing would report a deficiency nobody measured. This is why
+                        // `Micronutrients.Amounts` is a map rather than eight more doubles.
+                        e.micros[m]?.let { num(it, decimals = microDecimals(m)) } ?: ""
+                    } + listOf(
                         field(e.source.label),
                         e.dayStartMs.toString(),
                         e.atMs.toString(),
@@ -129,11 +144,50 @@ object HealthExport {
     }
 
     /**
+     * `calcium_mg`, `vitamin_d_ug`, … — one column name per micronutrient, carrying its unit.
+     *
+     * ⚠️ Derived from the enum, so the header and the rows cannot drift apart and a ninth
+     * micronutrient reaches the export by existing. The unit is IN the name because a bare `calcium`
+     * column invites somebody to compare it against a figure in grams.
+     */
+    val MICRO_COLUMNS: List<String> = Micronutrients.Micro.entries.map { m ->
+        val unit = when (m.unit) {
+            "µg" -> "ug"   // ⚠️ ASCII in a column name. A header a script has to guess the encoding of
+            else -> m.unit // is a header somebody's parser gets wrong.
+        }
+        m.name.lowercase() + "_" + unit
+    }
+
+    /**
+     * How many decimals a micronutrient's figure is worth.
+     *
+     * ⚠️ Iron and vitamin C are fractions of a milligram in most foods and vitamin D is a fraction of
+     * a microgram, so the default single decimal would round a real reading to nothing — the same
+     * rounding defect the barcode database's integer microgram was. Calcium and potassium run to
+     * hundreds and need none of it.
+     */
+    private fun microDecimals(m: Micronutrients.Micro): Int = when (m) {
+        Micronutrients.Micro.IRON,
+        Micronutrients.Micro.VITAMIN_C,
+        Micronutrients.Micro.VITAMIN_D,
+        Micronutrients.Micro.TRANS_FAT,
+        -> 2
+        else -> 1
+    }
+
+    /**
      * What each day came to.
      *
      * ⚠️ Days with nothing logged are **absent**, exactly as they are everywhere else in this feature.
      * A row of zeros is a measurement nobody made, and a spreadsheet averaging this column would
      * report a starving person for anybody who skipped a weekend.
+     *
+     * ⚠️ **The micronutrients are deliberately NOT summed here**, though the entry sheet carries them.
+     * A day's calcium total is only as complete as the foods that happened to record it, and a single
+     * cell cannot say "310 mg, from two of your six foods" — the distinction `Micronutrients.Tally`
+     * exists to keep. Carrying eight totals plus eight coverage columns would double this sheet's
+     * width for a figure anybody can pivot out of the entry sheet themselves, correctly, with the
+     * blanks visible. A pre-summed total whose completeness is unstated is the worse of the two.
      */
     fun dailyTotals(
         days: Map<Long, NutritionDay.Nutrients>,
