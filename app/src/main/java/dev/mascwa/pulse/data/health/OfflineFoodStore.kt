@@ -1,6 +1,8 @@
 package dev.mascwa.pulse.data.health
 
+import androidx.sqlite.db.SimpleSQLiteQuery
 import dev.mascwa.pulse.core.telemetry.BarcodeScan
+import dev.mascwa.pulse.core.telemetry.FoodSearch
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
@@ -41,10 +43,15 @@ class OfflineFoodStore(private val db: FoodDatabase) {
     /**
      * Bundled products whose names begin with [query].
      *
-     * ⚠️ Deliberately the weakest of the three search paths, and deliberately last. There is no
-     * full-text index on 4.4 million product names — one would cost more than the table — so this is
-     * a prefix scan and it is here so that a product you have *scanned* before can also be found by
-     * typing. The seed and your own foods answer typed searches properly.
+     * ⚠️ Deliberately the weakest of the three as-you-type paths, and deliberately last: a prefix scan
+     * is what a keystroke can afford, and the seed and your own foods answer typed searches properly.
+     * What it CANNOT do is find "Coca-Cola Zero Sugar" from "coke zero" — measured on real names,
+     * word-anywhere matching finds three to ten times as much ("greek yogurt": 48 by prefix against
+     * 405 by words) — and [searchAllProducts] is the deliberate one-shot scan that does.
+     *
+     * ⚠️ **CORRECTION to what this note used to say.** It claimed a full-text index "would cost more
+     * than the table". Measured, it costs about a third; the real reason there is none is on
+     * [searchAllProducts].
      */
     suspend fun searchByName(query: String, limit: Int = SEARCH_LIMIT): List<Food> =
         withContext(Dispatchers.IO) {
@@ -53,6 +60,90 @@ class OfflineFoodStore(private val db: FoodDatabase) {
             runCatching { db.dao().searchByNamePrefix(q, limit) }
                 .getOrDefault(emptyList())
                 .map { toFood(it, it.barcode.toString()) }
+        }
+
+    /**
+     * Every bundled product whose name contains **all** of [query]'s words, ranked.
+     *
+     * ⚠️ **This is a deliberate, one-shot search and not an as-you-type one, and that is the whole
+     * design.** There is no index on 4.4 million product names, so this is a full table scan: measured
+     * at the real column shape, ~320 ms per million rows, so roughly **one to one and a half seconds**
+     * on this hardware and slower on a phone reading it cold. Acceptable for a button somebody pressed;
+     * completely unacceptable for a keystroke, which is why [searchByName] — a fast indexed prefix
+     * scan — remains what the search field calls.
+     *
+     * ⚠️ **THE MEASUREMENT THAT DECIDED AGAINST AN INDEX, recorded so it is not re-litigated from
+     * intuition.** Sized on 113,612 real product names:
+     *
+     *     FTS5 with detail=none            +23.8 B/row  ->  ~107 MB at 4.45M rows
+     *     (word, barcode) WITHOUT ROWID    +61.4 B/row  ->  ~276 MB
+     *     no index, this scan                       0
+     *
+     * The APK already carries 285 MB and the in-app updater re-downloads all of it on **every** build,
+     * so 107 MB in perpetuity buys a lower-latency version of an action somebody deliberately took. The
+     * semantics are identical either way — all words anywhere in the name — so what the index buys is
+     * only speed. If the wait proves intolerable on the device, the index is a builder change plus one
+     * query and the cost above is already known.
+     *
+     * ⚠️ **Ranked by the same `FoodSearch.score` as the seed and your own foods**, unlike
+     * [searchByName]. Returning 4.4 million rows in table order would bury the right answer under
+     * every product that happens to sort early — and since the rows have to be read anyway, ranking
+     * them is nearly free.
+     *
+     * ⚠️ **The words are filtered by SQLite and scored in Kotlin**, which is the same "reject cheaply,
+     * parse the survivors" discipline `FoodRepository.searchSeed` uses over the bundled corpus. A
+     * broad query still matches thousands of rows, so [SCAN_CAP] bounds what crosses the boundary and
+     * [Scan.truncated] SAYS SO — a silently truncated list reads as "this is everything there is".
+     */
+    suspend fun searchAllProducts(query: String, limit: Int = SEARCH_LIMIT): Scan =
+        withContext(Dispatchers.IO) {
+            val terms = FoodSearch.tokens(query)
+            if (terms.isEmpty()) return@withContext Scan(emptyList(), false)
+            val hits = runCatching {
+                db.dao().searchByNameWords(
+                    SimpleSQLiteQuery(
+                        "SELECT * FROM food WHERE kcal IS NOT NULL AND name IS NOT NULL " +
+                            "AND ${sqlFor(terms)} LIMIT $SCAN_CAP",
+                    ),
+                )
+            }.getOrNull() ?: return@withContext Scan(emptyList(), false)
+
+            val scored = hits.mapNotNull { row ->
+                val name = row.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val entry = FoodSearch.Entry(row.barcode.toString(), name, row.brand.orEmpty(), "")
+                val score = FoodSearch.score(entry, terms)
+                if (score > 0.0) FoodSearch.Hit(entry, score) to row else null
+            }
+            Scan(
+                foods = scored.sortedWith(compareBy(FoodSearch.ORDER) { it.first })
+                    .take(limit)
+                    .map { toFood(it.second, it.second.barcode.toString()) },
+                truncated = hits.size >= SCAN_CAP,
+            )
+        }
+
+    /**
+     * What a full scan found, and whether it had to stop early.
+     *
+     * ⚠️ [truncated] is not decoration. "These are the best matches" and "these are the best of the
+     * first few thousand rows that matched" are different claims, and only one of them is true when a
+     * one-word query matches a tenth of a supermarket.
+     */
+    data class Scan(val foods: List<Food>, val truncated: Boolean)
+
+    /**
+     * ⚠️ **Built here rather than passed as a bind list, because the NUMBER of terms varies and SQLite
+     * has no array parameter.** Every term is matched with `instr` against a lower-cased name — a
+     * `LIKE '%x%'` cannot use an index either, so nothing is lost, and `instr` needs no escaping of
+     * `%` or `_`, which a user typing "50% cocoa" would otherwise smuggle into the pattern.
+     *
+     * The terms themselves come from `FoodSearch.tokens`, which keeps only letters and digits, so no
+     * quote can reach here — and they are still embedded through a single-quote doubling to make that
+     * true by construction rather than by trust.
+     */
+    private fun sqlFor(terms: List<String>): String =
+        terms.joinToString(" AND ") { t ->
+            "instr(lower(name), '${t.replace("'", "''")}') > 0"
         }
 
     /** How many products are bundled, for the attribution line. Null if the database will not answer. */
@@ -67,6 +158,16 @@ class OfflineFoodStore(private val db: FoodDatabase) {
 
     private companion object {
         const val SEARCH_LIMIT = 25
+
+        /**
+         * How many name-matching rows a full scan will carry into Kotlin before it stops.
+         *
+         * ⚠️ Measured on real names: "greek yogurt" matches 3,621 rows in a million and "cheerios"
+         * 2,220, so a broad query at 4.4 million matches tens of thousands. Four thousand `Food`
+         * objects is a few hundred kilobytes and comfortably more than anybody reads; past that the
+         * scan is spending memory to rank rows nobody will see. Reaching this sets [Scan.truncated].
+         */
+        const val SCAN_CAP = 4_000
 
         /**
          * ⚠️ A prefix scan on two characters over 4.4M rows visits an enormous slice of the B-tree

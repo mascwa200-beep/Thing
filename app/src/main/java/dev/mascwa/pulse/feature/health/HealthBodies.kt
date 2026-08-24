@@ -1985,6 +1985,36 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
             // Nobody types "Ferrero Nutella hazelnut spread" standing in a kitchen, and Open Food
             // Facts is organised around barcodes because that is how a shelf identifies itself.
             LcarsButton(text = "⬚ SCAN A BARCODE", onClick = { scanning = true })
+            // ⚠️ Offered only once there is a query, and it says what it will cost. The as-you-type
+            // search can only afford a prefix scan of the bundled products — so "coke zero" cannot
+            // reach "Coca-Cola Zero Sugar" — and this reads the whole 4.4-million-row table instead.
+            // A second is worth it for somebody who knows the product is in there; it is not
+            // something to do on a keystroke, which is why it is a button and not a setting.
+            if (search.query.trim().length >= 2 && !search.busy) {
+                LcarsButton(
+                    text = if (search.searchingAll) "SEARCHING EVERY PRODUCT…" else "⌕ SEARCH EVERY PRODUCT",
+                    enabled = !search.searchingAll,
+                    onClick = { vm.searchEveryProduct() },
+                )
+                Text(
+                    if (search.searchingAll) {
+                        "Reading all 4.4 million bundled products. This takes a moment."
+                    } else {
+                        "Typing searches product names that START with what you typed. This one " +
+                            "finds your words anywhere in the name — slower, and finds far more."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                )
+            }
+            if (search.allTruncated) {
+                // ⚠️ Said out loud. A truncated list and a complete one look identical, and letting
+                // somebody believe they have seen everything is the worse of the two.
+                Text(
+                    "Showing the best of the first few thousand matches — there were more. A more " +
+                        "specific query narrows it.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
             when {
                 search.busy -> Text(
                     "Looking…",

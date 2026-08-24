@@ -307,6 +307,23 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         val results: List<Food> = emptyList(),
         val busy: Boolean = false,
         val note: String = "",
+        /**
+         * True while the full 4.4-million-product scan is running.
+         *
+         * ⚠️ Separate from [busy] because the two mean different things to somebody looking at the
+         * screen. [busy] is the as-you-type search and clears in a moment; this one takes a second or
+         * more, was asked for by a button press, and needs to say so — a spinner that appears on a
+         * keystroke and one that appears on a deliberate action cannot share a label.
+         */
+        val searchingAll: Boolean = false,
+        /**
+         * Whether the last full scan stopped at its cap.
+         *
+         * ⚠️ Kept because a truncated list and a complete one look identical, and "these are the best
+         * matches" is a different claim from "these are the best of the first few thousand". A one-word
+         * query against a supermarket-sized corpus reaches the cap easily.
+         */
+        val allTruncated: Boolean = false,
     )
 
     private val _search = MutableStateFlow(Search())
@@ -372,6 +389,50 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     !r.onlineConsulted ->
                         "Offline foods only — no network, so packaged goods are not in this list."
                     else -> ""
+                },
+            )
+        }
+    }
+
+    /**
+     * Search every bundled product, not only the ones whose name starts with what was typed.
+     *
+     * ⚠️ **A deliberate action rather than a keystroke, and the whole design follows from that.** The
+     * as-you-type path can only afford an indexed prefix scan, which cannot find "Coca-Cola Zero
+     * Sugar" from "coke zero"; this is a full table scan over 4.4 million rows, measured at roughly a
+     * second on a desktop and slower on a phone reading it cold. It is worth a second when somebody
+     * pressed a button and knows the product is in there; it would be intolerable per character.
+     *
+     * ⚠️ Results are APPENDED rather than replacing the list, and de-duplicated by id. Somebody who
+     * pressed this has already seen the ranked local answers and is asking for more — throwing those
+     * away to show a different set would lose the row they might have wanted.
+     *
+     * ⚠️ Uses its own [scanJob] rather than [searchJob]. A scan that takes a second must survive the
+     * next keystroke's debounce cancelling the typed search, and equally must not be cancelled by it —
+     * they are two different requests and sharing one handle would have each silently kill the other.
+     */
+    private var scanJob: Job? = null
+
+    fun searchEveryProduct() {
+        val query = _search.value.query.trim()
+        if (query.length < MIN_QUERY) return
+        scanJob?.cancel()
+        _search.value = _search.value.copy(searchingAll = true, allTruncated = false)
+        scanJob = viewModelScope.launch {
+            val scan = c.foodRepository.searchAllBundled(query)
+            // ⚠️ The query may have moved on during the scan — a second is long enough to type in.
+            // Landing these results on a different query would be the "results go backwards" defect
+            // the typed path already guards against, arriving from the other direction.
+            if (_search.value.query.trim() != query) return@launch
+            val seen = _search.value.results.mapTo(HashSet()) { it.id }
+            _search.value = _search.value.copy(
+                results = _search.value.results + scan.foods.filterNot { it.id in seen },
+                searchingAll = false,
+                allTruncated = scan.truncated,
+                note = when {
+                    scan.foods.isEmpty() ->
+                        "No bundled product has all of those words in its name."
+                    else -> _search.value.note
                 },
             )
         }

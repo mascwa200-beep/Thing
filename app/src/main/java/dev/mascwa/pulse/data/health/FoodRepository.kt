@@ -145,6 +145,20 @@ class FoodRepository(
     }
 
     /**
+     * Every bundled product whose name holds all of [query]'s words — the deliberate full scan.
+     *
+     * ⚠️ Kept as its own method rather than folded into [search], because it is not the same kind of
+     * request. [search] answers a keystroke and must return in moments; this reads the whole 4.4
+     * million-row table and takes about a second. A surface that could not tell them apart would
+     * either make typing slow or make this unreachable.
+     *
+     * Empty and not-truncated on a build with no bundle, which is the same honest nothing every other
+     * path here returns for that case.
+     */
+    suspend fun searchAllBundled(query: String): OfflineFoodStore.Scan =
+        offline?.searchAllProducts(query) ?: OfflineFoodStore.Scan(emptyList(), false)
+
+    /**
      * A barcode, answered from the bundle first and the network only if the bundle cannot.
      *
      * ⚠️ **This used to be one line delegating straight to the network, and that was the whole
