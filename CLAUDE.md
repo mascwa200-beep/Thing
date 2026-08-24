@@ -8220,7 +8220,10 @@ limit for our usage plan"*. Chose, via AskUserQuestion: delivery = **all of it i
 three** of full micronutrients, photo-of-a-meal, restaurant/chain menus. **Zero subagent spend.**
 
 **Shipped: 4,524,449 barcodes in the APK**, 92.6% named, 56.3% carrying nutrition (a USDA branded
-merge filled 1,526,969 gaps), 313 MB built and 118 MB gzipped. `barcode INTEGER PRIMARY KEY` makes
+merge filled 1,526,969 gaps), 313 MB built and 118 MB gzipped. ⚠️ **Confirmed from CI's own log on
+build #1967, not inferred:** `food database packaged: 312 MB uncompressed` — the size WITH the USDA
+merge, so the `_csv_` fix below genuinely took effect. **And the APK is now 285 MB (299,510,750
+bytes)**, up from 158 MB before the database, which the auto-updater pulls in full on every build. `barcode INTEGER PRIMARY KEY` makes
 the table its own B-tree — 68.7 B/row, no second index — and it fixes a real bug for free: UPC-A
 `031506599323` and EAN-13 `0031506599323` are one product differing by a leading zero, and as
 integers they are the same key. Verified against the real database that both forms resolve
@@ -8325,6 +8328,19 @@ publish with no cap. MenuStat answers 502 from this network (which says nothing 
 site); Nutritionix is commercial and forbids bulk caching, which this project will not do. ⚠️ The
 specific list lives in `build_seed.py` beside the code that produces it and **deliberately not in
 screen copy**, which would be a second statement of a fact that lives in the data.
+
+⚠️ **A near-miss worth keeping, because I was one step from acting on it.** The food database is
+CI-cached under a key of `hashFiles(build_food_db.py)` + a manual salt — and the salt does NOT cover
+the workflow file that holds the source URLs. Seeing "Build the food database: SKIPPED" on a
+three-second cache hit, I concluded the `_csv_` fix had never rebuilt anything and was about to push
+a salt bump. Checking first showed the opposite: that commit ALSO changed `build_food_db.py`, which
+IS in the key, so it rebuilt cold with the corrected URL — and the 312 MB packaged size proves the
+result. The hazard is real but latent: a URL correction landing on its own would be masked. Fixed by
+saying so on the salt rather than restructuring — the salt already encodes the source dates, so a
+newer release bumps it naturally; only a same-date change of URL *shape* slips through, and that is
+now written where the next person will read it. **Deliberately not hashing the whole workflow into
+the key**: it is edited constantly and a quarter-hour cold rebuild on an unrelated tweak is the wrong
+trade.
 
 **Also this session:** `VisionImage` converges the console's downscale-and-encode step with the
 meal-photo one, so the two cannot ship different size caps; a one-caller delegate and three imports

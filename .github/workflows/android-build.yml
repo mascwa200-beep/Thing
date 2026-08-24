@@ -293,6 +293,20 @@ jobs:
           # ⚠️ The salt at the end is a MANUAL rebuild switch. The builder's own hash covers a code
           # change, but the sources move underneath it — a fresh Open Food Facts export adds real
           # products and the key would not notice. Bump the salt to take a new snapshot.
+          #
+          # ⚠️ **BUMP IT FOR ANY CHANGE TO HOW OR WHAT WE FETCH, not only for a newer release.**
+          # The salt encodes the source DATES, so moving to a later USDA drop is bumped naturally.
+          # What it does not catch is a change to the URL's SHAPE at the same date — which is
+          # exactly the `_json_`→`_csv_` correction below, and that fix reached a real rebuild only
+          # because the same commit happened to touch build_food_db.py and so moved the hash. A URL
+          # correction landing on its own would restore the stale, wrong database and the fix would
+          # do nothing, silently. Verified after the fact rather than assumed: the run on that
+          # commit did rebuild, and the packaged database measures 312 MB — the size with USDA
+          # merged in, not the smaller Open-Food-Facts-only one.
+          #
+          # Deliberately NOT hashing this whole workflow file into the key. It is edited often (every
+          # gate added here would invalidate it), and a quarter-hour cold rebuild on an unrelated
+          # tweak is the wrong trade. The salt is the designed switch; it only needed to say when.
           key: food-db-${{ hashFiles('tools/food/build_food_db.py') }}-off20260824-usda20260430
 
       - name: Build the food database
