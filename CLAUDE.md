@@ -8209,3 +8209,134 @@ remaining unswept ground is a **measure** path (not an intrinsic one) or a subtr
 ⚠️ **Owner-verify on Windows, and it is now one screenshot either way.** If the dialog appears it
 carries the build number and names the window. If the clamp caught it instead, the panel draws and
 MENU → CRASH CONSOLE holds one entry saying where. Either outcome identifies site, window and build.
+
+### EVERY FOOD BARCODE, OFFLINE — and the gate that reported clean having compiled nothing (PR #457)
+
+Owner: *"take every single barcode that could possibly be scanned for food … it has to be a
+completely offline workable thing … only stop when there is literally nothing to do and no more that
+could possibly be added to the health part of the app"*, prefaced with *"without approaching the
+limit for our usage plan"*. Chose, via AskUserQuestion: delivery = **all of it inside the APK**
+(against my flagged cost that the auto-updater re-downloads the whole APK every build); scope = **all
+three** of full micronutrients, photo-of-a-meal, restaurant/chain menus. **Zero subagent spend.**
+
+**Shipped: 4,524,449 barcodes in the APK**, 92.6% named, 56.3% carrying nutrition (a USDA branded
+merge filled 1,526,969 gaps), 313 MB built and 118 MB gzipped. `barcode INTEGER PRIMARY KEY` makes
+the table its own B-tree — 68.7 B/row, no second index — and it fixes a real bug for free: UPC-A
+`031506599323` and EAN-13 `0031506599323` are one product differing by a leading zero, and as
+integers they are the same key. Verified against the real database that both forms resolve
+identically. Room streams it from a compressed asset (`createFromAsset` → `AssetManager.open` →
+`Channels.newChannel`, read out of the bytecode; **not** `openFd`, which is what would have forced
+an uncompressed asset). Deliberately **not** `fallbackToDestructiveMigration`, unlike the two
+existing databases.
+
+**Micronutrients are honest about absence** — measured coverage across the 2,582,583 products
+carrying nutrition is calcium 25.9%, iron 26.1%, cholesterol 26.0%, potassium 19.8%, vitamin C
+18.1%, trans fat 16.7%, vitamin D 12.6%, vitamin A 11.5%. So a missing column is **omitted, never
+entered as zero**: a day's calcium total is only as complete as the records that happened to state
+it, and three product records in four do not. `Micronutrients.reference()` refuses outright for
+cholesterol (the 300 mg ceiling was withdrawn in 2015) and trans fat (the guidance is elimination,
+not a number), refuses below 19, and takes the higher of the two adult figures when sex is unstated
+— saying "the higher of the two" only when they actually differ.
+
+**Photograph a meal** (`core:telemetry/MealPhoto.kt` + `data/health/MealPhotoReader.kt` + a review
+panel on INTAKE). ⚠️ **The model names the foods; every number comes from a real record**, and that
+split is enforced rather than trusted — `MealPhoto.PROMPT` never asks for nutrition and a test
+asserts it never mentions a calorie or a macro. A model answering "320 kcal" has weighed nothing and
+read no label, and that figure would sit in the log beside a laboratory analysis looking exactly like
+one, with the calorie target then built partly on invention. Nothing is logged until the button is
+pressed; each item becomes its own entry (a single "photographed meal" row is unusable for the
+expenditure measurement and the macro breakdown, and cannot be corrected later); an unmatched item
+is shown with no numbers and **counted in the button's own sentence**, because quietly dropping it is
+how somebody comes to believe a day is fully logged. `bestMatch` searches the **seed only** — the
+13,186 laboratory analyses — never the 4.5M product table, whose unranked prefix scan would answer
+"scrambled eggs" with a branded ready meal. This is the one part of the food half that cannot work
+offline, and `NoVision` is its own state rather than a button that does nothing.
+
+**⚠️ THE TOOLING FAILURE THAT INVALIDATED AN EARLIER "VERIFIED" CLAIM, and it is the lesson of the
+session.** `tools/android_compile_check.sh` printed *"compiles clean against android-all (5 files)"*
+for a run in which **the compiler stopped before compiling a line**. Two ways in, both hit:
+
+- A **flag after the first file** was passed to kotlinc as a source path.
+- A **mistyped path** — `VisionEngine.kt` lives in `core/model-inference`, not `app/`.
+
+Either produces `error: source file or directory not found`, which the script's
+`^file.kt:line:col: error:` grep does not match, so it reported success. Both are refused before the
+compiler now, and any unattributed `error:` line is treated as "nothing was compiled"; negative-tested
+in three states. **A gate that reports its own misconfiguration as a pass is worse than no gate**, and
+this one had already been believed once.
+
+**⚠️ And a probe run through the fixed gate immediately paid for itself twice.** It resolved
+`createCameraImageUri`, the `Proposal` members, the widened `NutritionDay.Entry` and every kit call
+site against the real platform and the real project types — which is what proved the resolve check's
+four complaints were its documented app-module cascade rather than defects. Two false-positive
+mechanisms for that tool were confirmed by control runs rather than shrugged at: a **new untracked
+file has no baseline**, and `core:database` is an Android library module that **cannot be built here
+at all**, so every member of `FoodRow` cascades.
+
+**⚠️ A COMPOUND WORD IS NOT ITS FIRST COMPONENT — found by running the shipped ranker over the real
+13,186-food corpus while checking what the app can say about eating out.** `FoodSearch.wordMatch`
+accepted a prefix in either direction, so over the corpus's 2,936 distinct words it matched
+`milkshake→milk`, `cheeseburger→cheese`, `watermelon→water`, `meatballs→meat`, `buttermilk→butter`,
+`cornbread→corn`, `grapefruit→grape`, `blueberry→blue`, `beansprouts→bean`, `chickpeas→chick`,
+`strawberries→straw`. A search for a cheeseburger ranked an antipasto that mentions cheese. The
+file's own principle two paragraphs above that line — *"'bean' and 'beans' are one word, where 'corn'
+and 'cornbread' are two"* — was stated and not enforced. `MAX_STEM_GAP = 3`: three characters covers
+every ending this corpus uses (cook/cooked/cooking, roast/roasted/roasting, bake/baked, boil/boiled,
+grill/grilled, steam/steamed, smoke/smoked) and every wrong pair is four or more. **Both halves
+measured over the whole corpus, not reasoned about.**
+
+⚠️ **The second defect was hidden by the first.** `couldMatch` documents itself as having to admit
+everything `wordMatch` accepts and in one direction did not — the scorer accepts a corpus word the
+query starts with ("roasted" finds "roast beef"), which a substring test for the whole token cannot
+see. **3,031 foods across two dozen ordinary queries were scored as results and then refused before
+the scorer saw them**, with nothing on screen to show anything had been dropped. Same shape as the
+"yams" case already recorded on `singular`, one direction over. After both: zero hidden, and the
+reject still over-admits by only 18%.
+
+⚠️ **THE TEST THAT FAILED WAS ASSERTING THE DEFECT**, and its comment is the record of how:
+`assertEquals(1, wordMatch("cornbread", "corn"))`, annotated *"my first assertion here claimed 0 and
+was simply wrong about the rule the code states"*. The rule the code stated was the wrong thing.
+**Finding a behaviour surprising and pinning it without measuring whether it is correct is how a
+defect gets cemented.**
+
+⚠️ **And the replacement cheap-reject guard was ASLEEP on its first writing** — the third of the four
+recorded ways a green test proves nothing: *the fixture never reached the branch*. It queried
+"cooking" against a row saying "cooked", and neither is a prefix of the other, so nothing scored and
+the assertion never ran. Rewritten with real rows found by running the old reject over the whole
+corpus (`ARBY'S, roast beef sandwich` is hidden from "roasted"), plus an assertion that the branch
+was entered at all. All three rules then negative-tested against a baseline confirmed green first.
+
+**⚠️ RESTAURANT MENUS: the measurement said DO NOT BUILD THE FEATURE.** The obvious improvement is to
+relax the all-terms rule when a query returns nothing, so "chipotle burrito bowl" still finds the
+burrito bowl. Built it as a probe and ran it over the corpus across nineteen realistic queries:
+**five rescued, four of the five worse than silence** — "nandos chicken" returning all 804 chickens
+led by *Chicken, back*; "five guys burger" → *Veggie burger, on bun*; "greggs sausage roll" →
+*Honey roll sausage, beef*. The existing rule's stated reason holds and an honest empty state beats a
+confident wrong one. Not shipped. What ships instead is the empty state saying **why** (every word
+has to match; the dish is likelier to be there than the name of the place).
+
+**What is actually bundled for eating out**, counted rather than claimed: **421 rows**, 161 naming
+one of **eighteen** American chains (McDonald's 53, KFC, Burger King, Subway, Taco Bell, Wendy's,
+Popeyes, Arby's, Chick-fil-A, Pizza Hut, Domino's 10, Denny's, Applebee's, Cracker Barrel, T.G.I.
+Friday's, Olive Garden, Carrabba's, On The Border); the rest dishes rather than brands. **Not there:
+Starbucks, Dunkin', Chipotle, Panera, Five Guys, or anything outside the United States** — the limit
+of the free data, not a selection, since `build_seed.py` takes every record both USDA datasets
+publish with no cap. MenuStat answers 502 from this network (which says nothing certain about the
+site); Nutritionix is commercial and forbids bulk caching, which this project will not do. ⚠️ The
+specific list lives in `build_seed.py` beside the code that produces it and **deliberately not in
+screen copy**, which would be a second statement of a fact that lives in the data.
+
+**Also this session:** `VisionImage` converges the console's downscale-and-encode step with the
+meal-photo one, so the two cannot ship different size caps; a one-caller delegate and three imports
+it had been the only user of were removed with it. And an earlier CI run was **green and wrong** —
+the USDA download was 195 MB rather than 449 MB because the workflow pointed at the `_json_` archive
+while the builder parses CSV, so `branded_food.csv` was absent, USDA was skipped entirely, nutrition
+came out at 48.8% instead of 56.3%, and VERIFY still PASSED. Fixed by correcting the URL, making a
+source that contributes nothing a hard failure, and deriving `meta.sources` from the row counts.
+
+⚠️ **Owner-verify on the Pixel throughout — CI compiles, it cannot scan a barcode or photograph a
+plate.** In order of risk: **aeroplane mode, scan a real product, log it** (that is the whole
+feature); the micronutrient rows on MACROS, and that a food with no calcium figure shows no bar
+rather than a zero; PHOTOGRAPH A MEAL with a cloud key set, checking the proposals are worth
+correcting rather than starting from, and that an unmatched item says so; and a search for
+"cheeseburger" or "watermelon" returning the food rather than something that merely mentions it.
