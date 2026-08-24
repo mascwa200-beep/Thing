@@ -12,6 +12,8 @@ import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
+import dev.mascwa.pulse.core.util.VisionImage
+import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
@@ -537,6 +539,136 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     fun forgetPhoto(id: String) {
         viewModelScope.launch { c.progressPhotoStore.remove(id) }
+    }
+
+    // ------------------------------------------------------------------------ photograph a meal
+
+    /**
+     * What a photograph of a plate has turned into so far.
+     *
+     * ⚠️ **This is a review step, and the state machine is what makes it one.** A [Plate] is a list
+     * of proposals sitting on screen waiting to be corrected; nothing reaches the log until somebody
+     * presses the button. The portion especially is a guess — the model has weighed nothing — so
+     * writing these straight into a day's total would put invented grams beside weighed ones with
+     * no way to tell them apart afterwards.
+     */
+    sealed interface MealShot {
+        data object Idle : MealShot
+        data object Reading : MealShot
+        data class Plate(
+            val proposals: List<MealPhotoReader.Proposal>,
+            val summary: String,
+        ) : MealShot
+
+        /** The model looked and says this is not food. Its own answer, not a failure. */
+        data object NotFood : MealShot
+
+        /** No vision-capable model is configured. The one state that is not an error. */
+        data object NoVision : MealShot
+        data class Failed(val reason: String) : MealShot
+    }
+
+    private val _mealShot = MutableStateFlow<MealShot>(MealShot.Idle)
+    val mealShot: StateFlow<MealShot> = _mealShot.asStateFlow()
+
+    /**
+     * Read a captured photograph into proposals.
+     *
+     * ⚠️ Encoding happens off the main thread — a JPEG off a modern phone camera is several
+     * megapixels and both the decode and the base64 pass are long enough to drop frames. The reader
+     * itself suspends on a network call, so the whole thing belongs in a coroutine regardless.
+     */
+    fun readMealPhoto(context: android.content.Context, uri: android.net.Uri) {
+        mealShotJob?.cancel()
+        _mealShot.value = MealShot.Reading
+        mealShotJob = viewModelScope.launch {
+            val encoded = VisionImage.encode(context, uri)
+            if (encoded == null) {
+                _mealShot.value = MealShot.Failed("That photograph could not be read.")
+                return@launch
+            }
+            _mealShot.value = when (val r = c.mealPhotoReader.read(encoded)) {
+                is MealPhotoReader.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
+                is MealPhotoReader.Result.NotFood -> MealShot.NotFood
+                is MealPhotoReader.Result.NoVision -> MealShot.NoVision
+                is MealPhotoReader.Result.Failed -> MealShot.Failed(r.reason)
+            }
+        }
+    }
+
+    private var mealShotJob: Job? = null
+
+    /** Correct a portion the model guessed at. Nutrition re-derives from the matched record. */
+    fun editMealGrams(index: Int, grams: Double) {
+        val plate = _mealShot.value as? MealShot.Plate ?: return
+        val p = plate.proposals.getOrNull(index) ?: return
+        if (!grams.isFinite() || grams <= 0.0) return
+        _mealShot.value = plate.copy(
+            proposals = plate.proposals.toMutableList().also {
+                it[index] = p.copy(item = p.item.copy(grams = grams))
+            },
+        )
+    }
+
+    /** Drop something the model saw that was not there, or that nobody ate. */
+    fun dropMealItem(index: Int) {
+        val plate = _mealShot.value as? MealShot.Plate ?: return
+        if (index !in plate.proposals.indices) return
+        val left = plate.proposals.toMutableList().also { it.removeAt(index) }
+        _mealShot.value = if (left.isEmpty()) MealShot.Idle else plate.copy(proposals = left)
+    }
+
+    fun clearMealShot() {
+        mealShotJob?.cancel()
+        _mealShot.value = MealShot.Idle
+    }
+
+    /**
+     * Log everything on the plate that has real numbers behind it.
+     *
+     * ⚠️ Each proposal becomes its own entry rather than one combined "meal", and that is
+     * deliberate: the log is what the coach measures expenditure from and what MACROS breaks down,
+     * and a single row reading "photographed meal" is unusable for both. Separate rows are also the
+     * only way to correct one item later without re-photographing the plate.
+     *
+     * ⚠️ Anything unmatched is skipped rather than logged with zeros. Its name is returned so the
+     * surface can say which ones were left behind — silently dropping them is how somebody comes to
+     * believe a day is fully logged when it is not.
+     */
+    fun logPlate(meal: NutritionDay.Meal) {
+        val plate = _mealShot.value as? MealShot.Plate ?: return
+        val loggable = plate.proposals.filter { it.loggable }
+        if (loggable.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val day = _today.value
+        viewModelScope.launch {
+            loggable.forEach { p ->
+                val food = p.match ?: return@forEach
+                val grams = p.item.grams
+                c.foodLogStore.add(
+                    NutritionDay.Entry(
+                        id = UUID.randomUUID().toString(),
+                        dayStartMs = day,
+                        atMs = now,
+                        // ⚠️ The model's words, not the matched record's. "scrambled eggs" is what
+                        // was on the plate; the record it borrowed numbers from may well be called
+                        // "Egg, whole, cooked, scrambled" and reading that back would be a small
+                        // lie about what was photographed.
+                        name = p.item.name,
+                        grams = grams,
+                        nutrients = FoodPortion.eaten(food.per100g, grams),
+                        meal = meal,
+                        servingLabel = food.servingLabel,
+                        source = food.source,
+                        foodId = food.id,
+                        micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
+                    ),
+                )
+            }
+            _mealShot.value = MealShot.Idle
+            reloadEntries()
+            recompute.value++
+        }
     }
 
     // -------------------------------------------------------------------------- Health Connect

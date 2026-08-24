@@ -411,6 +411,17 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * A photograph of a plate, read into proposals.
+     *
+     * ⚠️ The one part of the food half that cannot work offline — it needs a vision-capable cloud
+     * model — and it says so rather than failing quietly. The model names the foods; every number
+     * comes from [foodRepository]'s bundled records.
+     */
+    val mealPhotoReader: dev.mascwa.pulse.data.health.MealPhotoReader by lazy {
+        dev.mascwa.pulse.data.health.MealPhotoReader(inferenceEngine, foodRepository)
+    }
+
+    /**
      * Foods somebody typed in themselves. Searched ahead of both databases, because a short list you
      * named yourself is more likely to be what you meant than one of thirteen thousand generic rows.
      */
