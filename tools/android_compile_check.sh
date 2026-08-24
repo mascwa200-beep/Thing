@@ -71,6 +71,16 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
+# ⚠️ Flags AFTER the first file used to be passed to the compiler as source paths. kotlinc then
+# stopped at "source file or directory not found" — a message this script's error grep does not
+# match — and the run reported "compiles clean" having compiled nothing. A gate that reports its own
+# misconfiguration as a pass is worse than no gate, so a stray flag is now refused outright.
+for a in "$@"; do
+  case "$a" in
+    -*) echo "flags must come BEFORE the file list; found '$a' after it" >&2; exit 64 ;;
+    *) [ -f "$a" ] || { echo "no such source file: $a" >&2; exit 66 ; } ;;
+  esac
+done
 for m in "${modules[@]:-}"; do
   [ -n "$m" ] || continue
   # ⚠️ A path that does not exist would silently contribute nothing, and every symbol it was meant
@@ -156,6 +166,15 @@ fi
 if grep -q 'NoClassDefFoundError\|^exception:' <<<"$out"; then
   echo "COMPILER DID NOT RUN — a jar is missing from its own -cp. This is NOT a pass."
   grep -m2 'NoClassDefFoundError\|^exception:' <<<"$out"
+  exit 2
+fi
+
+# ⚠️ Belt and braces for the same class of failure: any `error:` line the file:line:col grep above
+# could not attribute to a source file. kotlinc emits these for problems with the INVOCATION rather
+# than the code (a missing source path, a bad argument), and they mean nothing was compiled.
+if grep -qE '^error:' <<<"$out"; then
+  echo "COMPILER REFUSED THE INVOCATION — nothing was compiled. This is NOT a pass."
+  grep -m3 -E '^error:' <<<"$out"
   exit 2
 fi
 
