@@ -79,6 +79,17 @@ class OfflineFoodStore(private val db: FoodDatabase) {
 
         /** Milligrams stored x100, for iron and vitamin C — a fraction of a milligram in most foods. */
         const val MG_CENTI = 100.0
+
+        /**
+         * Micrograms stored x100, for vitamin D alone.
+         *
+         * ⚠️ **The inverse of `SCALE_MICRO_CENTI` in `tools/food/build_food_db.py`, and the two must
+         * move in one commit.** The reference intake is 15 µg a day, so this field carries fractions
+         * of a microgram per hundred grams: as a whole integer, a fortified yogurt at 0.4 µg stored as
+         * 0 and vanished. Vitamin A is deliberately NOT scaled — foods run to hundreds of micrograms
+         * against a 900 µg guideline, so a whole microgram there is finer than the sources publish.
+         */
+        const val UG_CENTI = 100.0
     }
 
     /**
@@ -134,7 +145,7 @@ class OfflineFoodStore(private val db: FoodDatabase) {
         put(Micronutrients.Micro.POTASSIUM, row.potassium, 1.0)
         put(Micronutrients.Micro.VITAMIN_A, row.vitA, 1.0)
         put(Micronutrients.Micro.VITAMIN_C, row.vitC, MG_CENTI)
-        put(Micronutrients.Micro.VITAMIN_D, row.vitD, 1.0)
+        put(Micronutrients.Micro.VITAMIN_D, row.vitD, UG_CENTI)
         put(Micronutrients.Micro.CHOLESTEROL, row.chol, 1.0)
         put(Micronutrients.Micro.TRANS_FAT, row.transfat, G_SCALE)
         return Micronutrients.Amounts(m)

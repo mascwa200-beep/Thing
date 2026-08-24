@@ -250,4 +250,120 @@ class FoodPortionTest {
         assertEquals(label.fatG, back.fatG, 1e-9)
         assertEquals(label.carbG, back.carbG, 1e-9)
     }
+
+    // -------------------------------------------------------------- what a hundred grams can hold
+
+    /**
+     * ⚠️ THE REASON THIS RULE EXISTS, in the shape it actually arrived in.
+     *
+     * The barcode builder's one value ceiling was applied to the *raw* figure, so a record saying
+     * `proteins_100g: 5000` — five kilograms of protein in a hundred grams — was stored and rendered
+     * as a food. There is nothing about it on a card that reads as an error.
+     */
+    @Test
+    fun aConstituentCannotOutweighTheFood() {
+        val absurd = NutritionDay.Nutrients(kcal = 250.0, proteinG = 5000.0)
+        assertEquals(0.0, FoodPortion.sane(absurd).proteinG, 1e-9)
+        // ⚠️ And the rest of the record survives. Dropping the food over one bad field would throw
+        // away a perfectly good calorie count, which is the field people actually log.
+        assertEquals(250.0, FoodPortion.sane(absurd).kcal, 1e-9)
+    }
+
+    /**
+     * ⚠️ THE OTHER HALF, and the one a nutritional opinion would get wrong: a genuinely extreme food
+     * passes untouched. A whey isolate really is eighty grams of protein per hundred and olive oil
+     * really is a hundred grams of fat at 884 kcal.
+     *
+     * Figures are the USDA analyses, not round numbers.
+     */
+    @Test
+    fun theDensestRealFoodsAreLeftAlone() {
+        val oil = NutritionDay.Nutrients(kcal = 884.0, fatG = 100.0, satFatG = 13.8)
+        assertEquals(884.0, FoodPortion.sane(oil).kcal, 1e-9)
+        assertEquals(100.0, FoodPortion.sane(oil).fatG, 1e-9)
+
+        val isolate = NutritionDay.Nutrients(kcal = 373.0, proteinG = 80.0, fatG = 5.0, carbG = 8.0)
+        assertEquals(80.0, FoodPortion.sane(isolate).proteinG, 1e-9)
+        assertEquals(373.0, FoodPortion.sane(isolate).kcal, 1e-9)
+    }
+
+    /**
+     * ⚠️ When the macros outweigh the food, the WHOLE nutrition block goes.
+     *
+     * There is no way to know which of the three is wrong, and a record whose macros are impossible
+     * has not earned belief about its energy either. 60 + 60 + 60 is 180 g of constituents in 100 g
+     * of food, and each field on its own is inside every bound.
+     */
+    @Test
+    fun aRecordThatContradictsItselfKeepsNoNumbersAtAll() {
+        val contradictory = NutritionDay.Nutrients(kcal = 800.0, proteinG = 60.0, fatG = 60.0, carbG = 60.0)
+        val out = FoodPortion.sane(contradictory)
+        assertEquals(0.0, out.kcal, 1e-9)
+        assertEquals(0.0, out.proteinG, 1e-9)
+        assertFalse(FoodPortion.isLoggable(out))
+    }
+
+    /** 35 + 35 + 35 is 105 g, which is the slack rounding is allowed. It stays. */
+    @Test
+    fun theSlackForRoundingIsRealSlack() {
+        val dense = NutritionDay.Nutrients(kcal = 500.0, proteinG = 35.0, fatG = 35.0, carbG = 35.0)
+        assertEquals(500.0, FoodPortion.sane(dense).kcal, 1e-9)
+    }
+
+    /**
+     * ⚠️ Every micronutrient is bounded by its own DECLARED unit, so one added later is bounded the
+     * moment it exists. This is the test that makes that safe: an unrecognised unit falls through to
+     * no bound at all, which is exactly the failure the whole rule exists to stop.
+     */
+    @Test
+    fun everyMicronutrientDeclaresAUnitThisRuleUnderstands() {
+        for (m in Micronutrients.Micro.entries) {
+            assertTrue(
+                "${m.name} declares the unit '${m.unit}', which FoodPortion.maxPer100g does not " +
+                    "recognise — it would be admitted unbounded",
+                FoodPortion.maxPer100g(m) < Double.MAX_VALUE,
+            )
+        }
+    }
+
+    /**
+     * The vitamin A case that prompted the micronutrient half: `vitamin-a_100g` is documented in
+     * grams, a contributor typed 1500 international units into it, and the grams-to-micrograms
+     * conversion turned that into one and a half billion micrograms.
+     */
+    @Test
+    fun anImpossibleMicronutrientIsDroppedRatherThanZeroed() {
+        val amounts = Micronutrients.Amounts(
+            mapOf(
+                Micronutrients.Micro.VITAMIN_A to 1_500_000_000.0,
+                Micronutrients.Micro.CALCIUM to 120.0,
+            ),
+        )
+        val out = FoodPortion.saneMicros(amounts)
+        // ⚠️ Absent, not zero. A zero says somebody measured none of it.
+        assertNull(out[Micronutrients.Micro.VITAMIN_A])
+        assertEquals(120.0, out[Micronutrients.Micro.CALCIUM]!!, 1e-9)
+    }
+
+    /**
+     * ⚠️ A person typing their own numbers is TOLD, where a parser is not.
+     *
+     * 320 kcal in 20 g is 1600 per hundred, which nothing edible reaches — and the likeliest cause is
+     * the weight beside it rather than the calories, which is why the sentence says so. Silently
+     * emptying what somebody just entered would look like the app losing their food.
+     */
+    @Test
+    fun aHandEnteredDensityIsRefusedWithAReason() {
+        val eaten = NutritionDay.Nutrients(kcal = 320.0)
+        val density = FoodPortion.per100gFrom(eaten, 20.0)!!
+        val why = FoodPortion.densityLooksWrong(density)
+        assertTrue(why != null && why.contains("1600"))
+        assertTrue(why!!.contains("weight"))
+
+        // An ordinary label says nothing at all.
+        val fine = FoodPortion.per100gFrom(
+            NutritionDay.Nutrients(kcal = 137.0, proteinG = 4.4, fatG = 2.1, carbG = 25.0), 62.0,
+        )!!
+        assertNull(FoodPortion.densityLooksWrong(fine))
+    }
 }

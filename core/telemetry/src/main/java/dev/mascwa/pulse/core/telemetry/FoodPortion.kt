@@ -157,6 +157,127 @@ object FoodPortion {
         per100g.kcal.isFinite() && per100g.kcal > 0.0
 
     /**
+     * A hundred grams of food cannot hold more than a hundred grams of anything.
+     *
+     * ⚠️ **This is the bound nothing in the app had, and a crowd-entered corpus of 4.4 million rows
+     * guarantees it is needed.** The builder's own value ceiling was a single number applied to the
+     * *raw* figure, so `proteins_100g: 5000` — five kilograms of protein in a hundred grams — was
+     * stored as fact, and a vitamin A figure somebody typed in international units into a field
+     * documented as grams became one and a half billion micrograms. Neither reads as an error on a
+     * card. They read as a food.
+     *
+     * ⚠️ **Deliberately physics rather than nutrition.** A tighter ceiling would catch more, and
+     * every tighter ceiling is an opinion that can be wrong about a real food — a protein isolate
+     * really is eighty grams of protein per hundred, and pure oil really is a hundred grams of fat.
+     * What is unarguable is that a constituent cannot outweigh the food, and that alone catches the
+     * whole thousand-fold unit-error family, which is where the wrong numbers actually come from.
+     *
+     * ⚠️ What it does **not** catch is stated plainly rather than left to be discovered: a sodium
+     * figure of forty grams per hundred is inside the bound and outside anything edible. Improbable
+     * needs a nutritional opinion; impossible does not. This is the second kind.
+     */
+    const val MAX_MASS_G_PER_100G: Double = 100.0
+
+    /**
+     * The most energy a hundred grams can carry.
+     *
+     * Pure fat is about 900 kcal per hundred grams and ethanol about 700, so nothing edible reaches
+     * a thousand. The slack above 900 is for a record that rounded rather than one that is wrong.
+     */
+    const val MAX_KCAL_PER_100G: Double = 1000.0
+
+    /**
+     * Protein, fat and carbohydrate are distinct constituents, so together they cannot outweigh the
+     * food either — with slack, because a source may round each of them and some conventions count
+     * fibre inside the carbohydrate figure while others do not.
+     */
+    const val MAX_MACRO_SUM_G: Double = 105.0
+
+    /**
+     * The most of [m] a hundred grams of food could contain, in that micronutrient's own unit.
+     *
+     * ⚠️ **Derived from the declared unit rather than tabulated per micronutrient**, so a
+     * micronutrient added later is bounded the moment it exists. A table would be a second list to
+     * keep in step with [Micronutrients.Micro], and the one that gets forgotten is always the second.
+     * An unrecognised unit is left unbounded here and caught by a test instead — silently admitting
+     * everything is exactly the failure this whole rule exists to stop, so it must not be possible to
+     * introduce one quietly.
+     */
+    fun maxPer100g(m: Micronutrients.Micro): Double = when (m.unit) {
+        "g" -> MAX_MASS_G_PER_100G
+        "mg" -> MAX_MASS_G_PER_100G * 1_000.0
+        "µg" -> MAX_MASS_G_PER_100G * 1_000_000.0
+        else -> Double.MAX_VALUE
+    }
+
+    /**
+     * [per100g] with anything impossible removed — and nothing, when the record contradicts itself.
+     *
+     * ⚠️ **A per-hundred-gram DENSITY only.** It must never be applied to an amount somebody ate:
+     * two thousand kcal is an ordinary day and would be discarded by every rule here. The parsers
+     * and [Food.of] deal in densities; the log deals in amounts, and the two must not share this.
+     *
+     * ⚠️ When protein, fat and carbohydrate together outweigh the food, **the whole nutrition block
+     * goes** rather than one field, because there is no way to know which of them is wrong — and a
+     * record whose macros are impossible has not earned belief about its energy either. That leaves a
+     * food with a name and no numbers, which is a state the app already has a surface for
+     * (`FoodLookup.NoNutrition`) and a far better answer than a plausible-looking calorie count.
+     */
+    fun sane(per100g: NutritionDay.Nutrients): NutritionDay.Nutrients {
+        val macros = bounded(per100g.proteinG, MAX_MASS_G_PER_100G) +
+            bounded(per100g.fatG, MAX_MASS_G_PER_100G) +
+            bounded(per100g.carbG, MAX_MASS_G_PER_100G)
+        if (macros > MAX_MACRO_SUM_G) return NutritionDay.Nutrients()
+        return NutritionDay.Nutrients(
+            kcal = bounded(per100g.kcal, MAX_KCAL_PER_100G),
+            proteinG = bounded(per100g.proteinG, MAX_MASS_G_PER_100G),
+            fatG = bounded(per100g.fatG, MAX_MASS_G_PER_100G),
+            carbG = bounded(per100g.carbG, MAX_MASS_G_PER_100G),
+            fibreG = bounded(per100g.fibreG, MAX_MASS_G_PER_100G),
+            sugarG = bounded(per100g.sugarG, MAX_MASS_G_PER_100G),
+            satFatG = bounded(per100g.satFatG, MAX_MASS_G_PER_100G),
+            sodiumMg = bounded(per100g.sodiumMg, MAX_MASS_G_PER_100G * 1_000.0),
+        )
+    }
+
+    /**
+     * The same rule for the vitamins and minerals.
+     *
+     * ⚠️ An impossible figure is **dropped from the map, not zeroed** — the reason
+     * [Micronutrients.Amounts] is a map at all. A zero says somebody measured none; an absent key says
+     * nobody has a usable figure, and those are different things to put in front of a day's total.
+     */
+    fun saneMicros(micros: Micronutrients.Amounts): Micronutrients.Amounts =
+        Micronutrients.Amounts(
+            micros.values.filter { (m, v) -> v.isFinite() && v >= 0.0 && v <= maxPer100g(m) }
+        )
+
+    /**
+     * Why a hand-entered density cannot be right, or null when it can.
+     *
+     * ⚠️ **The same rule as [sane], reached differently on purpose.** A parser has nobody to tell, so
+     * it drops the field and carries on. A person typing their own numbers has to be told, because
+     * the commonest cause is the weight beside them rather than the numbers themselves — and silently
+     * emptying what they just entered would look like the app losing their food.
+     */
+    fun densityLooksWrong(per100g: NutritionDay.Nutrients): String? {
+        if (per100g.kcal > MAX_KCAL_PER_100G) {
+            return "that works out to ${per100g.kcal.roundToInt()} kcal per 100 g — nothing edible is " +
+                "above about 900. Check the weight."
+        }
+        val macros = per100g.proteinG + per100g.fatG + per100g.carbG
+        if (macros > MAX_MACRO_SUM_G) {
+            return "protein, fat and carbs come to ${macros.roundToInt()} g per 100 g, which is more " +
+                "than the food weighs. Check the weight."
+        }
+        return null
+    }
+
+    /** A figure inside its bound, or zero — NaN and negatives included, which no source should send. */
+    private fun bounded(v: Double, max: Double): Double =
+        if (v.isFinite() && v >= 0.0 && v <= max) v else 0.0
+
+    /**
      * Milligrams of sodium from Open Food Facts' grams.
      *
      * ⚠️ **`sodium_100g` is in GRAMS.** The field sits beside `sodium_unit: "g"` and reads 0.043 for

@@ -530,11 +530,26 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     }
                     val energy = kcal.toDoubleOrNull()
                     val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
+                    // ⚠️ The numbers above are what was EATEN; the density is what a saved food has to
+                    // be. Only the density can be impossible — two thousand calories is an ordinary
+                    // day — so the check happens after the conversion and only when a weight exists.
+                    val typedEaten = NutritionDay.Nutrients(
+                        kcal = energy ?: 0.0,
+                        proteinG = protein.toDoubleOrNull() ?: 0.0,
+                        fatG = fat.toDoubleOrNull() ?: 0.0,
+                        carbG = carb.toDoubleOrNull() ?: 0.0,
+                    )
+                    val densityWrong = weight
+                        ?.let { FoodPortion.per100gFrom(typedEaten, it) }
+                        ?.let { FoodPortion.densityLooksWrong(it) }
                     KeepThisFood(
-                        keep = keep && weight != null,
-                        canKeep = weight != null && name.isNotBlank(),
+                        keep = keep && weight != null && densityWrong == null,
+                        canKeep = weight != null && name.isNotBlank() && densityWrong == null,
                         onToggle = { keep = it },
                         reason = when {
+                            // ⚠️ First, because impossible numbers are a bigger problem than a
+                            // missing name and only one reason is shown.
+                            densityWrong != null -> "Fix the figures below and this can be kept."
                             weight == null ->
                                 "To keep this, say what it weighed. A saved food is a density — that " +
                                     "is the only way it can be scaled to a different portion later — " +
@@ -564,15 +579,20 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             reset()
                         },
                     )
+                    // ⚠️ Shown whether or not the food is being kept: an impossible density means the
+                    // numbers or the weight are wrong, and that is worth saying about a figure going
+                    // into the log either way. The sentence comes from the core so this and the
+                    // parsers cannot come to hold different opinions about what is possible.
+                    if (densityWrong != null) {
+                        Text(
+                            "Per 100 g, $densityWrong",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                        )
+                    }
                     // ⚠️ Only shown once there is something to disagree with. A warning that appears
                     // while somebody is still typing the second field is noise, and they learn to
                     // ignore it before it ever means anything.
-                    val typed = NutritionDay.Nutrients(
-                        kcal = energy ?: 0.0,
-                        proteinG = protein.toDoubleOrNull() ?: 0.0,
-                        fatG = fat.toDoubleOrNull() ?: 0.0,
-                        carbG = carb.toDoubleOrNull() ?: 0.0,
-                    )
+                    val typed = typedEaten
                     if (protein.isNotBlank() && fat.isNotBlank() && carb.isNotBlank() &&
                         NutritionDay.energyLooksWrong(typed)
                     ) {

@@ -481,9 +481,15 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             // says CUSTOM with no foodId and nothing later can tell that the two are the same food.
             val saved =
                 if (keepAsFood && name.isNotBlank()) {
-                    FoodPortion.per100gFrom(eaten, grams)?.let { per100 ->
-                        c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
-                    }
+                    FoodPortion.per100gFrom(eaten, grams)
+                        // ⚠️ Re-checked here as well as on screen, for the same reason the weight is:
+                        // the switch does not clear itself when a figure changes underneath it. And
+                        // an impossible density must not be saved — `Food.of` would sanitise it to a
+                        // food with no numbers at all, which reads as the app having lost it.
+                        ?.takeIf { FoodPortion.densityLooksWrong(it) == null }
+                        ?.let { per100 ->
+                            c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
+                        }
                 } else {
                     null
                 }
