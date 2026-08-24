@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.health
 
 import android.content.Context
 import dev.mascwa.pulse.core.telemetry.FoodSearch
+import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
@@ -191,8 +192,12 @@ class FoodRepository(
          * ⚠️ Must match `tools/food/build_seed.py`. A row with fewer columns is skipped rather than
          * read short — a truncated line read positionally would put a serving weight in the sodium
          * field, which is a wrong number rather than a missing one.
+         *
+         * ⚠️ 13 for a long time, then 21 when the eight micronutrient columns were appended. They go
+         * at the END on purpose: `FoodSearch.Entry` reads fields 0, 1 and 2 positionally, so growing
+         * the row anywhere else would silently re-point the ranker's name and category at nutrients.
          */
-        const val COLUMNS = 13
+        const val COLUMNS = 21
 
         const val SEED_LIMIT = 40
         const val OFF_LIMIT = 20
@@ -222,6 +227,40 @@ class FoodRepository(
             servingGrams = f[11].toDoubleOrNull(),
             servingLabel = f[12],
             source = NutritionDay.Source.OFFLINE,
+            micros = seedMicros(f),
         )
+    }
+
+    /**
+     * The vitamins and minerals this line records — and nothing for the ones it does not.
+     *
+     * ⚠️ **An empty field is ABSENT, not zero, and `toDoubleOrNull` is what draws the line.** The
+     * macros above deliberately fall back to 0.0 because a missing macro is effectively zero for
+     * logging and `Nutrients` has no absent state. A micronutrient is the opposite case and it is the
+     * whole reason [Micronutrients.Amounts] is a map: writing 0.0 for calcium a laboratory never
+     * measured puts a figure nobody took on screen as confidently as one they did, and sums it into a
+     * day's total while presenting that total as complete.
+     *
+     * ⚠️ A real recorded **zero stays** — plenty of foods genuinely contain no vitamin C, and USDA says
+     * so explicitly. "Measured as none" and "not measured" are different facts.
+     *
+     * ⚠️ The order is the on-disk contract with `MICRO_FIELDS` in `tools/food/build_seed.py`. The
+     * builder writes them in this order and asserts the column count; getting them out of step would
+     * report a food's potassium as its calcium, which is a wrong number rather than a missing one.
+     */
+    private fun seedMicros(f: List<String>): Micronutrients.Amounts {
+        val m = LinkedHashMap<Micronutrients.Micro, Double>(8)
+        fun put(k: Micronutrients.Micro, i: Int) {
+            f.getOrNull(i)?.toDoubleOrNull()?.let { m[k] = it }
+        }
+        put(Micronutrients.Micro.CALCIUM, 13)
+        put(Micronutrients.Micro.IRON, 14)
+        put(Micronutrients.Micro.POTASSIUM, 15)
+        put(Micronutrients.Micro.VITAMIN_A, 16)
+        put(Micronutrients.Micro.VITAMIN_C, 17)
+        put(Micronutrients.Micro.VITAMIN_D, 18)
+        put(Micronutrients.Micro.CHOLESTEROL, 19)
+        put(Micronutrients.Micro.TRANS_FAT, 20)
+        return Micronutrients.Amounts(m)
     }
 }

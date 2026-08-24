@@ -77,7 +77,14 @@ already uses for guide bodies, where it keeps memory at O(one shard) whatever th
 
 Columns, in order:
 
-    id  name  category  kcal  protein  fat  carb  fibre  sugar  satfat  sodium_mg  serving_g  serving_label
+    id  name  category  kcal  protein  fat  carb  fibre  sugar  satfat  sodium_mg  serving_g
+    serving_label  calcium_mg  iron_mg  potassium_mg  vitamin_a_ug  vitamin_c_mg  vitamin_d_ug
+    cholesterol_mg  trans_fat_g
+
+⚠️ The eight micronutrient columns are appended at the END and are EMPTY where the source did not
+record the nutrient — never zero. The count is asserted below and mirrored by
+`FoodRepository.COLUMNS`; a truncated line read positionally would put a serving weight in the
+sodium field, which is a wrong number rather than a missing one.
 
 Descriptions are checked for tabs and newlines and stripped if any appear (none do today, in either
 dataset — but a delimiter arriving inside a field shifts every column after it silently, which is a
@@ -103,7 +110,52 @@ NUTRIENTS = {
     1258: ("satfat", "g"),
     # ⚠️ mg, unlike Open Food Facts. See note 2.
     1093: ("sodium", "mg"),
+
+    # --------------------------------------------------------------------- vitamins and minerals
+    #
+    # ⚠️ **Every one of these was chosen by MEASURING coverage over both datasets, not by picking
+    # the nutrient that sounds right.** Percentages are of records in that dataset carrying the
+    # field at all (zero is a measurement and counts):
+    #
+    #                        SR Legacy        FNDDS
+    #     1087 calcium         98.9% mg      100.0% mg
+    #     1089 iron            99.0% mg      100.0% mg
+    #     1092 potassium       96.4% mg      100.0% mg
+    #     1106 vitamin A       88.8% µg      100.0% µg   (retinol activity equivalents)
+    #     1162 vitamin C       94.1% mg      100.0% mg
+    #     1114 vitamin D       66.5% µg      100.0% µg
+    #     1253 cholesterol     94.9% mg      100.0% mg
+    #     1257 trans fat       53.6% g         0.0%     ← see the note below
+    #
+    # ⚠️ **VITAMIN A AND VITAMIN D EACH EXIST UNDER TWO IDS AND ONLY ONE OF EACH PAIR IS USABLE.**
+    # FoodData Central publishes vitamin A as both 1104 (IU) and 1106 (µg RAE), and vitamin D as both
+    # 1110 (IU) and 1114 (µg). Measured: FNDDS carries **1104 on zero records and 1110 on zero
+    # records** — only the µg forms. Reaching for the IU id would therefore have silently lost the
+    # entire FNDDS half of the corpus, 5,432 of 13,225 foods, and precisely the half this file's own
+    # header argues is the more useful one ("foods as EATEN, described the way a person would").
+    # `Micronutrients.Micro` declares µg for both, so the µg ids are also the ones that need no
+    # conversion. Two reasons, same answer.
+    1087: ("calcium", "mg"),
+    1089: ("iron", "mg"),
+    1092: ("potassium", "mg"),
+    1106: ("vita", "µg"),
+    1162: ("vitc", "mg"),
+    1114: ("vitd", "µg"),
+    1253: ("chol", "mg"),
+    # ⚠️ **Trans fat is the one borderline call, and it is included deliberately.** Half the corpus
+    # does not publish it at all, which would ordinarily argue for leaving the column out — a column
+    # present on a handful of records renders as a measurement for the few and as silence for the
+    # rest. It earns its place because the app ALREADY shows trans fat for barcoded products, where
+    # measured coverage is 16.7%; omitting it here would leave the best data in the app with worse
+    # coverage than the worst. `Micronutrients.Day.coverage` reports how much of a day a figure was
+    # drawn from, which is what makes a partial column honest rather than misleading.
+    1257: ("transfat", "g"),
 }
+
+# In the order the TSV writes them, after the macros. ⚠️ Kept as a list because the column ORDER is
+# an on-disk contract with `FoodRepository.parseSeedLine`, and a dict comprehension over NUTRIENTS
+# would tie it to declaration order in a file somebody will reorder one day.
+MICRO_FIELDS = ["calcium", "iron", "potassium", "vita", "vitc", "vitd", "chol", "transfat"]
 
 # Mirrors FoodPortion.MIN_SERVING_G / MAX_SERVING_G. Kept in step by hand; the Kotlin core is the
 # authority and a drift here only means the seed is slightly more or less generous than a scan.
@@ -225,6 +277,14 @@ def rows(data: dict, key: str, tag: str, complaints: list):
             n.get("fibre", 0.0), n.get("sugar", 0.0), n.get("satfat", 0.0), n.get("sodium", 0.0),
             "" if grams is None else grams,
             label,
+            # ⚠️ **A micronutrient nobody measured is written EMPTY, never as zero, and the macros
+            # above are deliberately the other way round.** A missing macro is effectively zero for
+            # logging and `NutritionDay.Nutrients` has no absent state; a missing micronutrient is
+            # the whole reason `Micronutrients.Amounts` is a map. Three product records in four say
+            # nothing about calcium, and rendering those as "0 mg" would put a measurement nobody
+            # took on screen as confidently as one they did — and sum it into a day's total while
+            # presenting that total as complete.
+            *["" if n.get(f) is None else n[f] for f in MICRO_FIELDS],
         ]
 
 
@@ -244,12 +304,25 @@ def main() -> int:
         data = fetch(url, work)
         before = len(lines)
         for r in rows(data, key, tag, complaints):
-            fields = [r[0], r[1], r[2]] + [
-                # Two decimals is finer than any of these measurements, and halves the file.
-                ("" if v == "" else f"{float(v):g}") for v in r[3:12]
-            ] + [r[12]]
+            # Two decimals is finer than any of these measurements, and halves the file. ⚠️ An empty
+            # value stays empty — see the micronutrient note in `rows`; `0.0 == ""` is False in
+            # Python, so a genuine recorded zero still formats as "0" and only an absence is blank.
+            def fmt(v):
+                return "" if v == "" else f"{float(v):g}"
+
+            # ⚠️ **The numeric slices are EXPLICIT and that is exactly how the micronutrient columns
+            # nearly shipped as nothing.** This built `r[3:12] + [r[12]]` and stopped, so the eight new
+            # fields `rows` was already producing were discarded on the way out — and the only thing
+            # that caught it was the tab-count assertion below, which is why that assertion is worth
+            # keeping even though it reads like a formality about delimiters.
+            fields = (
+                [r[0], r[1], r[2]]
+                + [fmt(v) for v in r[3:12]]
+                + [r[12]]
+                + [fmt(v) for v in r[13:21]]
+            )
             line = "\t".join(str(f) for f in fields)
-            assert line.count("\t") == 12, f"delimiter escaped into a field: {line[:120]!r}"
+            assert line.count("\t") == 20, f"delimiter escaped into a field: {line[:120]!r}"
             lines.append(line)
         per_source[tag] = len(lines) - before
 
@@ -270,6 +343,14 @@ def main() -> int:
         print(f"   {tag:6} {n}")
     served = sum(1 for l in lines if l.split("\t")[11])
     print(f"   with a declared serving: {served} ({100 * served // len(lines)}%)")
+    # ⚠️ Per-micronutrient coverage, printed rather than assumed. A column present on a handful of
+    # records renders as a measurement for the few and as silence for the rest, so the number that
+    # decides whether a column belongs here has to be visible in the build that produced it.
+    print("   micronutrients recorded:")
+    for i, field in enumerate(MICRO_FIELDS):
+        col = 13 + i
+        n = sum(1 for l in lines if l.split("\t")[col])
+        print(f"     {field:10} {n:6} ({100 * n // len(lines):3d}%)")
     return 0
 
 
