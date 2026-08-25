@@ -8585,3 +8585,105 @@ confirm it appears in Health Connect, **delete it and confirm it disappears ther
 twice in one morning to confirm only the correction survives; ask the Computer about your weight and
 check it now quotes the give-or-take; remove a mistyped measurement; and check the photographs line
 reads a plausible size.
+
+### A LOCAL DAY IS NOT 86,400,000 MILLISECONDS (this session, PRs #460–#462, all merged)
+
+Owner's standing instruction: *"keep going autonomously until there is nothing left to do all of the
+entire huge request that I requested. make sure you do not use any of the usage plan for we do not
+wish to waste."* ⚠️ **That second clause is a hard constraint and it overrides the ultracode
+reminder** that appeared mid-session telling me to run a Workflow on every substantive task. **Zero
+subagent and zero workflow spend for the entire session** — every check below is local kotlinc +
+JUnit, a live zone-data probe, `javap`, or CI itself.
+
+The plan (`robust-baking-dewdrop.md`) was already complete, so this arc was **found by hunting**, and
+the vein is the one that has now paid five times: **the app more confident than its data**.
+
+**`#460` — one function formats a gram figure, not two.** `fmt`/`fmt1` were the same rule twice, one
+guarded against non-finite values and one not. Found by a parameter sweep whose first two hits were
+false positives of my own harness — checking rather than believing them is what surfaced the real
+duplicate underneath.
+
+**`#461` — four places decided what a day was by arithmetic.** Measured against real zone data for
+Europe/London 2026, where **29 March is 23 hours long and 25 October is 25**:
+
+| where | what it did |
+|---|---|
+| `BodyStore.record` | The same-day window that **deletes** a superseded weigh-in was `[dayStart, dayStart + 24h)`. On the short day that reaches 01:00 the *next* morning, so correcting one day would delete the next day's reading; on the long day it stops at 23:00, so a late reading is kept alongside the first and double-weights that day in the trend. |
+| `relativeDay` | Elapsed milliseconds divided by a day — wrong **every** day, not at any edge. A reading taken at 20:00 is thirteen hours old at 09:00, and that over a day is zero, so yesterday evening said *"Today"* until eight in the evening. It labels the weigh-in list, the measurements panel and the photographs. ⚠️ Day *headers* were unaffected: a midnight-anchored value divided by 24h does give the calendar answer. |
+| the expenditure window | Its far edge is a day boundary; an hour of slop is an extra or a missing day of intake weighed against a window length passed in separately. |
+| the MACROS week chart | `byDay[windowStart + i * DAY_MS]` against real day starts — **four of seven bars vanish** for a week after either transition, each drawn as a day nobody logged. The core's own range filter was loose the same way, dropping the oldest day in the autumn direction. |
+
+**`#462` — the same trap, swept for outside HEALTH, and it found the sharpest instance yet.**
+`Habits.streak` decides "consecutive" by comparing two local day starts against exactly
+`86_400_000`. Across a clock change consecutive days are 23 or 25 hours apart, so a run spanning one
+is **split** — and the "did it end yesterday?" test fails outright the day after, so **someone who
+logged yesterday and has not yet logged today sees a long streak read zero**. Twice a year, on the
+one measure in that tab whose whole subject is consistency. Plus the Oracle's `daysSinceWeighIn`,
+which had `relativeDay`'s defect in a rule that both **prints** the number and **gates** on it.
+
+⚠️ **`StudyProgress.streak` does NOT have this problem** because it counts integer day *indices*,
+where consecutive really does mean one apart. `Habits`' own KDoc says the two deliberately use the
+same rule so they cannot disagree about midnight — true in intent, false in behaviour, twice a year.
+
+**What now exists, and the rule for using it.** `data/health/HealthDays.kt` is the one definition —
+`todayStart` / `startOf` / `plus` / `daysAgo` / `grid`, zone as a parameter defaulting to the
+device's. **Three copies of the day-start rule had already drifted into this feature and a fourth was
+about to be written, which is how the wrong one survived.** ⚠️ **Anything in HEALTH that needs a day
+boundary calls this**; `plus(d, 1)` is the exclusive upper bound a "same day" window wants, and
+`daysAgo` is the only correct answer to "how long ago" when the answer is spoken as a calendar day.
+Three now-dead `DAY_MS` constants were deleted with it — a constant left lying about is an invitation
+to reach for it again.
+
+⚠️ **The pure cores stay clock-free and zone-free; the calendar is passed IN.** `IntakeWeek.score`
+takes the day grid as a **list** (so the days the chart draws and the days the core scores are one
+list, not two expressions that can drift), and `Habits.streak` takes a `dayBefore` function. **Neither
+has a default**, deliberately: a default of `it - DAY_MS` would be exactly the bug, silently, for
+anyone who forgot to pass one. `IntakeWeek`'s filter also became **membership in the grid** rather
+than a range between its ends, which fixes a second thing — a key from another time zone (what
+travelling leaves behind) was counted in `loggedDays` while the chart, which looks days up exactly,
+could never draw it.
+
+**The sweep's negative results, recorded so nobody re-chases them.** Julian-date conversions
+(`SunCalc`, `MoonCalc`, `Sgp4`, `Ephemeris`, `PlanetCalc`) are genuinely UTC-days-since-epoch and
+correct. Elapsed durations (`Recall` intervals, `BodyTrend`/`Expenditure` per-day rates,
+`LaunchWindow` widths, `ReminderTool`, the desktop cert's not-before) are correct. `StudyStore`'s
+`localDayIndex` is `floorDiv(now + zoneOffset, DAY)` and **is DST-correct** — checked, not assumed.
+`EconomyVintage`'s UTC `floorDiv` is documented and only compares years. `OrbitalViewModel`'s raw
+arithmetic is a documented fallback behind a real calendar call.
+
+**Verification, all local:** 12 new `HealthDays` tests, 20 `IntakeWeek` (16 before), 17 `Habits` (15
+before), the whole **1,700-test** core suite, and the desktop build at **274**. **Nine rules
+negative-tested** across the arc against a baseline asserted green first, each perturbation asserted
+to have matched the source and each failing exactly the tests that name it. The DST fixtures assert
+the two days really are 23 and 25 hours long, because a test that quietly ran over two ordinary days
+would pass against the arithmetic being replaced.
+
+⚠️ **THE HABIT THAT KEEPS BEING RIGHT — asserted counts and computed expectations caught four
+mistakes of mine this arc alone**, none of which reading would have caught:
+1. My stride assertion anchored on the oldest day where the shipped expression anchors on **today** —
+   a different broken expression that misses a different three.
+2. A substitution count of 8 where the file had 9. Nothing was written.
+3. A substitution count of 12 where the file had 10. Nothing was written.
+4. My first DST probe put the short day on the wrong date (the transition day itself is 23 hours, not
+   the day before it).
+**Compute the expected value from the shipped function on real data before writing the assertion, and
+assert every substitution count before writing the file.**
+
+**Two techniques worth reusing.** A `python3 zoneinfo` probe over a real zone settles any day-boundary
+question in seconds and is what turned "this looks wrong" into "four of seven bars vanish". And when a
+Kotlin resolution question cannot be answered from the app (`::dayBefore` inside a `combine` lambda),
+**a ten-line standalone probe of that exact shape, compiled and run**, settles it for nothing.
+
+⚠️ **Owner-verify on the Pixel.** The streak and chart defects only appear at a clock change, so the
+tests are the evidence there. **The everyday one is checkable now:** a weigh-in or measurement
+recorded **yesterday evening** should read *"Yesterday"* this morning, not *"Today"*. Also worth a
+look: the Oracle's "no weigh-in for N days" advisory should quote the same figure the HEALTH screen
+does.
+
+**The health request is delivered.** The plan's eight slices (N1–N8) shipped and merged; the tab was
+then swept at every layer — cores, stores, view model, screens — for dead symbols (#459), duplicated
+definitions (#460) and this day-arithmetic class (#461, #462). **Two things are deliberately left
+undone with their reasons**, both recorded above in the PR #459 section: `stepsBetween` stays unwired
+(it needs Health Connect's step-dedup semantics and a `partial`-reconciliation rule that cannot be
+established without a device, and unlike the write half there is **no false claim on screen**), and
+three unused store APIs (`noteAt`, `seedFood`, `loggedDayCount`) are recorded rather than churned.
