@@ -77,6 +77,14 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun dayPlus(dayStartMs: Long, days: Long): Long = HealthDays.plus(dayStartMs, days, zone)
 
     /**
+     * The day before the one starting at [dayStartMs] — what "consecutive" means to a streak.
+     *
+     * A named member rather than a lambda at each call site so the four habit streaks cannot end up
+     * asking four slightly different questions about the same word.
+     */
+    fun dayBefore(dayStartMs: Long): Long = dayPlus(dayStartMs, -1)
+
+    /**
      * The last [days] day-starts ending today, oldest first — the row a windowed chart draws.
      *
      * The calendar lives here rather than in the core, which is deliberately zone-free, and handing
@@ -910,10 +918,10 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                 }.keys
 
             mapOf(
-                Habits.Habit.LOG_EVERY_DAY to Habits.streak(logged, today),
-                Habits.Habit.WEIGH_IN to Habits.streak(weighed, today),
-                Habits.Habit.HIT_PROTEIN to Habits.streak(protein, today),
-                Habits.Habit.STAY_IN_BAND to Habits.streak(inBand, today),
+                Habits.Habit.LOG_EVERY_DAY to Habits.streak(logged, today, ::dayBefore),
+                Habits.Habit.WEIGH_IN to Habits.streak(weighed, today, ::dayBefore),
+                Habits.Habit.HIT_PROTEIN to Habits.streak(protein, today, ::dayBefore),
+                Habits.Habit.STAY_IN_BAND to Habits.streak(inBand, today, ::dayBefore),
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
