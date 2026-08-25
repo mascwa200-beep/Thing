@@ -332,6 +332,13 @@ jobs:
         run: |
           set -o pipefail
           echo "disk before:"; df -h / | tail -1
+          # ⚠️ **Printed because the run before this one died in this step with no log and no
+          # failing command.** `continue-on-error` is set, so a builder that crashed would have been
+          # swallowed and the job would have carried on to the APK — it did not, which means the
+          # runner itself went away rather than the script failing. That is what running out of a
+          # system resource looks like, and nothing recorded which one. These three lines make the
+          # next occurrence say so instead of leaving it to inference.
+          echo "--- before ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
           work=/tmp/fooddb
           mkdir -p "$work" app/src/main/assets/food
 
@@ -367,7 +374,15 @@ jobs:
             fi
           done
 
-          if python3 tools/food/build_food_db.py --work "$work" --out app/src/main/assets/food/food.db; then
+          # ⚠️ `/usr/bin/time -v` reports PEAK resident memory, which is the number that
+          # matters here: the USDA merge holds every branded item in one dict while it makes
+          # three passes over the archive, so this builder's footprint is dominated by one
+          # structure and that structure grows with every column added to it.
+          # ⚠️ Guarded, because a DIAGNOSTIC that can break the build is worse than none:
+          # `/usr/bin/time` is a package rather than the shell builtin, and if a future
+          # runner image drops it an unguarded invocation would fail the whole step.
+          TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+          if $TIMER python3 tools/food/build_food_db.py --work "$work" --out app/src/main/assets/food/food.db 2> >(tee /tmp/fooddb-time.log >&2); then
             echo "food.db: $(du -h app/src/main/assets/food/food.db | cut -f1)"
           else
             echo "::warning::the food database did not build — this APK ships without offline barcodes"
@@ -378,6 +393,8 @@ jobs:
           fi
           # 1.7 GB of sources are of no further use and the APK build needs the room.
           rm -rf "$work"
+          echo "--- after ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
+          grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/fooddb-time.log 2>/dev/null | sed "s/^/    /" || true
           echo "disk after:"; df -h / | tail -1
 
       - name: Build release APK

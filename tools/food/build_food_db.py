@@ -45,6 +45,7 @@ is public domain. Both are recorded in the `meta` table so the app can display t
 from __future__ import annotations
 
 import argparse
+import array
 import csv
 import gzip
 import io
@@ -318,9 +319,22 @@ def clean(s: str | None, limit: int) -> str | None:
 class Row:
     """One product, ready to insert. Ordered to match COLUMNS."""
 
-    # ⚠️ `extras` is NOT a column: it is the sparse side-table payload, a dict of
-    # NutrientSet id -> stored integer, and it travels with the row so a reader fills it in one
-    # place and the insert loop writes it in one place.
+    # ⚠️ `extras` is NOT a column: it is the sparse side-table payload — the NutrientSet id and the
+    # stored integer, interleaved — and it travels with the row so a reader fills it in one place
+    # and the insert loop writes it in one place.
+    #
+    # ⚠️ **An `array("i")`, allocated lazily, and that is a measured decision rather than a taste.**
+    # `read_usda` holds every branded item in one dict while it makes three passes over the archive,
+    # so whatever each row carries is multiplied by about 1.9 million. Measured at that scale with
+    # fourteen figures on each row: a plain `dict` peaks at 2,535 MB, a list of interleaved ints at
+    # 1,963 MB, and this at **968 MB**, against 560 MB for a row carrying no extras at all. So the
+    # dict form added two gigabytes of resident memory to the largest structure in this builder —
+    # and the first CI run after these columns were introduced died in this step with no log and no
+    # failing command, which is what a runner losing a system resource looks like. That is an
+    # inference and not a proven cause; the reduction is worth making either way.
+    #
+    # ⚠️ A C int is exactly the right width by construction: ids run 1..29 and every value comes
+    # from `Nutrient.store`, which is bounded by `stored_ceiling` and can never exceed INT_MAX.
     __slots__ = COLUMNS + ["extras"]
 
     # How many times each field was refused, and how many rows lost their whole nutrition block.
@@ -335,7 +349,30 @@ class Row:
             setattr(self, c, None)
         self.barcode = barcode
         self.src = src
-        self.extras = {}
+        # None until something is actually recorded: most of the corpus records nothing, and an
+        # empty array per row is a hundred megabytes of nothing at this scale.
+        self.extras = None
+
+    def add_extra(self, nutrient_id: int, stored: int) -> None:
+        """Record one further nutrient.
+
+        ⚠️ Unlike the dict this replaced, a repeated id is APPENDED rather than overwritten. In the
+        data that is harmless — the insert is `INSERT OR REPLACE` on (barcode, nutrient), so the
+        last value wins exactly as a dict would have — and it can only arise from a duplicated row
+        in USDA's own `food_nutrient.csv`. The one visible effect is that `EXTRA_KEPT` would count
+        such a figure twice in the build report.
+        """
+        if self.extras is None:
+            self.extras = array.array("i")
+        self.extras.append(nutrient_id)
+        self.extras.append(stored)
+
+    def extra_pairs(self):
+        """The recorded nutrients as (id, stored) pairs, or nothing at all."""
+        e = self.extras
+        if not e:
+            return ()
+        return zip(e[0::2], e[1::2])
 
     def values(self):
         """The row as the INSERT wants it — sanitised, because this is the only way in.
@@ -465,7 +502,7 @@ def read_off(path: Path, limit: int | None, log):
             for n in EXTRAS:
                 v = n.store(g(rec, f"{n.off_field}_100g") or None)
                 if v is not None:
-                    row.extras[n.id] = v
+                    row.add_extra(n.id, v)
                     EXTRA_KEPT[n.id] = EXTRA_KEPT.get(n.id, 0) + 1
                 elif (g(rec, f"{n.off_field}_100g") or "") != "":
                     EXTRA_REFUSED[n.id] = EXTRA_REFUSED.get(n.id, 0) + 1
@@ -642,7 +679,7 @@ def read_usda(path: Path, limit: int | None, log):
                     continue
                 v = extra.store(grams)
                 if v is not None:
-                    row.extras[extra.id] = v
+                    row.add_extra(extra.id, v)
 
         yield from wanted.values()
 
@@ -688,7 +725,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
                 stats["off_nutrition"] += 1
                 complete.add(row.barcode)
             batch.append(vals)
-            extra_batch.extend((row.barcode, k, v) for k, v in row.extras.items())
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extra_pairs())
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
@@ -728,8 +765,8 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
             # ⚠️ Only for rows that are actually inserted. A row skipped because Open Food Facts
             # already has better numbers must not leave its further nutrients behind, pointing at a
             # product row that says something else.
-            extra_batch.extend((row.barcode, k, v) for k, v in row.extras.items())
-            for k in row.extras:
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extra_pairs())
+            for k, _ in row.extra_pairs():
                 EXTRA_KEPT[k] = EXTRA_KEPT.get(k, 0) + 1
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
