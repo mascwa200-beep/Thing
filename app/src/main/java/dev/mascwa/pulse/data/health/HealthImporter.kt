@@ -5,7 +5,6 @@ import android.net.Uri
 import dev.mascwa.pulse.core.telemetry.HealthImport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.Instant
 import java.time.ZoneId
 import java.util.zip.ZipInputStream
 
@@ -39,10 +38,7 @@ class HealthImporter(
     suspend fun import(uri: Uri, zone: ZoneId = ZoneId.systemDefault()): Outcome =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dayStartFor: (Long) -> Long = { ms ->
-                    Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
-                        .atStartOfDay(zone).toInstant().toEpochMilli()
-                }
+                val dayStartFor: (Long) -> Long = { ms -> HealthDays.startOf(ms, zone) }
 
                 val sheets = readSheets(uri)
                     ?: return@runCatching Outcome(false, "Could not open that file.")
