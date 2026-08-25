@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ⚠️ The bundled barcode database is excluded from backup. It is a third of a gigabyte, it is
+  identical on every install, and it is unpacked from the APK's own assets — backing it up would
+  cost the user's cloud quota to restore a file the app can always rebuild for itself.
+-->
+<full-backup-content>
+    <exclude domain="database" path="food.db" />
+    <exclude domain="database" path="food.db-journal" />
+</full-backup-content>

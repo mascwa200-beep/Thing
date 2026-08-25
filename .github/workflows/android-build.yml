@@ -386,7 +386,11 @@ jobs:
         # place. The run number is the versionCode so each build out-versions the last (no downgrades).
         run: |
           set -o pipefail
-          ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-build.log
+          # ⚠️ `:app:assembleRelease`, NOT the root task. The root `assembleRelease` builds EVERY
+          # application module, and there are two of them now — so a bare invocation would build the
+          # standalone nutrition APK on every LCARS commit, adding minutes to each run and producing
+          # an artifact this job neither checks nor publishes. The nutrition workflow builds its own.
+          ./gradlew :app:assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-build.log
 
       - name: Say what actually went wrong
         # ⚠️ Runs ONLY on failure, and exists because the stack trace buries the message. Gradle

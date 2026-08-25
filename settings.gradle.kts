@@ -27,6 +27,11 @@ include(":core:model-inference")
 include(":core:telemetry")
 include(":core:feeds")
 
+// The standalone nutrition app: the health half of :app with none of its novelty, its device gate
+// or its native code, so one universal APK runs on any phone. Shares :core:telemetry and
+// :core:database; deliberately reaches nothing else of the LCARS application.
+include(":nutrition")
+
 // Windows desktop companion (Kotlin/JVM + Compose Multiplatform) — a structurally separate module, no
 // dependency on :app/:core:* on this first pass (see desktop/build.gradle.kts), so it never touches the
 // Android build's plugin/SDK requirements.

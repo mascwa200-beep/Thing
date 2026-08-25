@@ -1,0 +1,201 @@
+name: Nutrition Build
+
+# The standalone nutrition app: the health half of the LCARS application with none of its novelty,
+# its device gate or its native code.
+#
+# ⚠️ **A PATH ALLOWLIST, not "every push".** The LCARS workflow builds on everything because that is
+# the application under continuous work; this one produces a ~150 MB artifact from a much smaller
+# surface, and running it on a news-screen commit would publish an identical APK for nothing. The
+# list is what this module actually reads: itself, the two shared modules, the food-database builder
+# and the declarations it parses, and the build wiring.
+on:
+  push:
+    branches:
+      - "**"
+      - "!debug-reports"
+    paths:
+      - "nutrition/**"
+      - "core/telemetry/**"
+      - "core/database/**"
+      - "tools/food/**"
+      - "gradle/libs.versions.toml"
+      - "settings.gradle.kts"
+      - "build.gradle.kts"
+      - ".github/workflows/nutrition-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ⚠️ Its own group. Sharing the LCARS workflow's would make each cancel the other's in-flight run on
+# a commit that touches both, and the two produce different artifacts.
+concurrency:
+  group: nutrition-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the food database
+        id: fooddb
+        uses: actions/cache@v4
+        with:
+          # ⚠️ **`app/…`, NOT `nutrition/…`, even though this workflow packages the nutrition APK,
+          # and getting this wrong ships a broken artifact greenly.** A cache archive records the
+          # paths it was saved FROM, so a key saved by the LCARS workflow restores to
+          # `app/src/main/assets/food/food.db` wherever it is restored. Declaring a different path
+          # here reports a cache HIT and leaves nothing at that path — and a build step gated on
+          # `cache-hit` would then skip, and the APK would ship with no database at all. The copy
+          # step below is what puts it where this module packages it.
+          path: app/src/main/assets/food/food.db
+          # ⚠️ **Deliberately the SAME key the LCARS workflow uses**, so the two share one cached
+          # database rather than each spending a quarter of an hour downloading 1.7 GB to build a
+          # byte-identical file. Caches are repository-scoped, so whichever workflow builds it first
+          # saves it for the other. The key is about the CONTENT, and the content is the same.
+          #
+          # ⚠️ Every file the builder reads is hashed, including `NutrientSet.kt` — see the same
+          # comment in android-build.yml for why the builder alone was not enough.
+          key: >-
+            food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py',
+            'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt')
+            }}-off20260824-usda20260430
+
+      - name: Build the food database
+        # ⚠️ Gated on the FILE existing, not on `steps.fooddb.outputs.cache-hit`. A restore that
+        # reports a hit and produces no file at the path we asked about is exactly the failure the
+        # note above describes, and asking about the artefact rather than the cache's opinion of
+        # itself is immune to the whole class.
+        if: hashFiles('app/src/main/assets/food/food.db') == ''
+        # Not a hard gate, for the same reason as the LCARS workflow: this reaches two servers
+        # neither of us controls. Without the bundle `FoodDatabase.open` returns null, the app says
+        # so on its own first screen, and everything else still works.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          work=/tmp/fooddb
+          mkdir -p "$work" app/src/main/assets/food
+
+          OFF=https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+          # ⚠️ _csv_, NOT _json_ — the builder parses branded_food.csv, and the json archive holds
+          # one enormous JSON member instead. Getting that wrong once shipped a database missing the
+          # entire USDA merge, and still reported success.
+          USDA=https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2026-04-30.zip
+
+          for pair in "OFF:$OFF:off.csv.gz" "USDA:$USDA:usda_branded.zip"; do
+            label=${pair%%:*}; rest=${pair#*:}; url=${rest%:*}; name=${rest##*:}
+            echo "fetching $label…"
+            # ⚠️ Moved into place only on success. A half-downloaded source is worse than a missing
+            # one: the builder reads it, hits a truncated stream part way through, and produces a
+            # database that looks complete and silently stops.
+            if curl -fSL --retry 3 --retry-delay 10 --max-time 1800 -o "$work/$name.part" "$url"; then
+              mv "$work/$name.part" "$work/$name"
+              echo "  $label: $(du -h "$work/$name" | cut -f1)"
+            else
+              rm -f "$work/$name.part"
+              echo "::warning::could not fetch $label — the database will be built without it"
+            fi
+          done
+
+          if python3 tools/food/build_food_db.py --work "$work" --out app/src/main/assets/food/food.db; then
+            echo "food.db: $(du -h app/src/main/assets/food/food.db | cut -f1)"
+          else
+            echo "::warning::the food database did not build — this APK ships without offline barcodes"
+            rm -f app/src/main/assets/food/food.db
+          fi
+          rm -rf "$work"
+
+      - name: Put the database where this module packages it
+        # ⚠️ Runs whether the step above built it or the cache restored it, because both leave it at
+        # the same `app/…` path and neither leaves it here. A copy rather than a move: the cache's
+        # post-run save reads the original, and moving it would store an empty entry under a key the
+        # LCARS workflow then trusts.
+        run: |
+          src=app/src/main/assets/food/food.db
+          if [ -f "$src" ]; then
+            mkdir -p nutrition/src/main/assets/food
+            cp "$src" nutrition/src/main/assets/food/food.db
+            echo "packaged: $(du -h nutrition/src/main/assets/food/food.db | cut -f1)"
+          else
+            echo "::warning::no food database to package — this APK ships without offline barcodes"
+          fi
+
+      - name: Build the release APK
+        run: |
+          set -o pipefail
+          ./gradlew :nutrition:assembleRelease \
+            -PNUTRITION_VERSION_CODE=${{ github.run_number }} \
+            --stacktrace --no-daemon 2>&1 | tee /tmp/nutrition-build.log
+
+      - name: Say what actually went wrong
+        # ⚠️ Gradle's "What went wrong" says only "Compilation error. See log for more details", and
+        # the `e:` lines naming the file and symbol sit hundreds of stack frames earlier where no
+        # tail of the log will ever reach them. Re-printing them LAST is what makes a failure
+        # diagnosable in one round instead of two.
+        if: failure()
+        run: |
+          f=/tmp/nutrition-build.log
+          [ -f "$f" ] || exit 0
+          echo "----- compiler errors -----"
+          grep -E "^(e|w): .*: error:|^e: " "$f" | head -40 || true
+          echo "----- gradle's summary -----"
+          awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
+
+      - name: Check what actually shipped
+        # ⚠️ **The "runs on any phone" claim, CHECKED rather than asserted.** The whole reason this
+        # module exists is that the LCARS application packages arm64 native libraries and refuses to
+        # start except on one device. If a `lib/` directory ever appears in this APK, something has
+        # pulled in a native dependency and the universal-APK property is gone — silently, because
+        # the build would still be green and the phone it was tested on would still work.
+        run: |
+          apk=$(ls nutrition/build/outputs/apk/release/*.apk | head -1)
+          bytes=$(stat -c%s "$apk")
+          echo "APK: $apk"
+          echo "size: $bytes bytes ($(numfmt --to=iec "$bytes"))"
+
+          if unzip -l "$apk" | grep -q " lib/"; then
+            echo "::error::this APK contains native libraries, so it is no longer architecture-independent"
+            unzip -l "$apk" | grep " lib/" | head -20
+            exit 1
+          fi
+          echo "no native libraries: one APK covers arm64-v8a, armeabi-v7a, x86 and x86_64"
+
+          # And that the database really is inside it. An asset placed and then not packaged is the
+          # silent failure this whole module's first screen exists to catch on the device; catching
+          # it here is better.
+          if unzip -l "$apk" | grep -q "assets/food/food.db"; then
+            unzip -l "$apk" | grep "assets/food/food.db"
+          else
+            echo "::warning::no food database in this APK — barcodes will not be recognised offline"
+          fi
+
+      - name: Publish
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ **Its own tag, never `latest`.** `action-gh-release` rewrites the release NAME on every
+          # publish, and the name is where each app's updater reads its build number — the desktop
+          # companion already learned this. Three publishers sharing one tag would have each
+          # overwrite the others' name, and every updater would then read somebody else's build.
+          tag_name: nutrition-latest
+          name: "Nutrition — build #${{ github.run_number }}"
+          prerelease: true
+          body: |
+            Standalone nutrition app, build #${{ github.run_number }}, from ${{ github.sha }}.
+
+            One APK for every architecture, Android 8.0 and later, no device gate. Installs
+            alongside the LCARS app rather than over it — different package name — so both can be
+            on one phone at once. Sideload it and allow "install unknown apps".
+          files: nutrition/build/outputs/apk/release/*.apk

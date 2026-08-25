@@ -78,3 +78,6 @@ scratchpad/**/corpus.tsv
 # rejects files over 100 MB and this repository has no LFS. The seed.tsv beside it IS committed.
 app/src/main/assets/food/food.db
 app/src/main/assets/food/food.db.gz
+# The standalone nutrition app packages its own copy of the same database, from the same cache.
+nutrition/src/main/assets/food/food.db
+nutrition/src/main/assets/food/food.db.gz

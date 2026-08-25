@@ -7,6 +7,12 @@ ksp = "2.0.21-1.0.25"
 # SDK levels
 compileSdk = "35"
 minSdk = "31"
+# ⚠️ The floor for code that is NOT the LCARS application. `:app` targets one phone and can afford
+# a 2021 minimum; the standalone nutrition app is meant to run anywhere, and the shared modules it
+# uses have to declare a floor at least as low or the manifest merger refuses the build. 26 is where
+# `java.time` becomes available without core library desugaring, and the shared code uses it in a
+# dozen places.
+minSdkWide = "26"
 targetSdk = "35"
 
 # AndroidX core / lifecycle / activity

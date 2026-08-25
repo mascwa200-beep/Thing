@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Only what the window needs before Compose takes over. The colours live in Kotlin, in the
+      Material 3 scheme, so there is one place they are decided.
+    -->
+    <style name="Theme.Nutrition" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
