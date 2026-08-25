@@ -44,6 +44,7 @@ import dev.mascwa.pulse.core.telemetry.MediaItem
 import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
 import dev.mascwa.pulse.core.telemetry.TheaterModel
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFillRow
@@ -367,7 +368,7 @@ private fun HarvestedRow(file: File, onPlay: (File) -> Unit, onDelete: (File) ->
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "%.1f MB · plays offline".format(java.util.Locale.US, file.length() / (1024f * 1024f)),
+                    Formatters.megabytes(file.length()) + " · plays offline",
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                 )
             }
@@ -385,7 +386,11 @@ private fun HarvestLine(state: dev.mascwa.pulse.data.media.MediaHarvester.Harves
         is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Working ->
             StatusLine("Harvesting ${state.title}…", c.violet)
         is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Done ->
-            StatusLine("Saved to this device: ${state.file} · ${state.bytes / (1024 * 1024)} MB", c.positive)
+            // ⚠️ Was integer division, so a 1.9 MB save reported "1 MB".
+            StatusLine(
+                "Saved to this device: ${state.file} · " + Formatters.megabytes(state.bytes),
+                c.positive,
+            )
         is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Failed ->
             StatusLine(
                 "Harvest failed — " + MediaResolution.say(state.reason) +

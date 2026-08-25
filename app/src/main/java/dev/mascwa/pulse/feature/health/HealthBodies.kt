@@ -57,6 +57,7 @@ import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.createCameraImageUri
 import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
@@ -1523,8 +1524,16 @@ private fun Measurements(vm: HealthViewModel) {
                 },
             )
             val latest by vm.measurements.collectAsStateWithLifecycle()
+            // ⚠️ The same removable row the READINGS list uses, and a measurement needs it for its
+            // own reason. A mistyped waist does not pull the trend the way a mistyped weight does —
+            // but this panel shows only the NEWEST of each kind, so a typo permanently hides the
+            // real reading underneath it, and there was no way to take it back.
             latest.forEach { (k, m) ->
-                LcarsDataRow(label = k.label, value = fmt(m.cm) + " cm · " + relativeDay(m.atMs))
+                ReadingRow(
+                    label = k.label + " · " + relativeDay(m.atMs),
+                    value = fmt(m.cm) + " cm",
+                    onRemove = { vm.removeMeasurement(k, m.atMs) },
+                )
             }
             if (latest.isEmpty()) {
                 Text(
@@ -1624,10 +1633,17 @@ private fun ProgressPhotos(vm: HealthViewModel) {
                     )
                 }
             }
+            // ⚠️ How much room they take, said rather than implied — which is what
+            // `ProgressPhotoStore.bytesOnDisk` was written for and nothing called. These are
+            // full-resolution photographs with no cap on how many are kept, so this is the one
+            // thing in the tab that grows on disk without bound, and the reader had no way to
+            // know by how much.
+            val bytes by vm.photoBytes.collectAsStateWithLifecycle()
             Text(
-                "Kept on this phone only — never in the camera roll and never sent anywhere. That " +
-                    "also means uninstalling takes them with it, and the spreadsheet export does " +
-                    "not include them.",
+                (if (bytes > 0L) "${photos.size} kept · ${Formatters.megabytes(bytes)}. " else "") +
+                    "Kept on this phone only — never in the camera roll and never sent anywhere. " +
+                    "That also means uninstalling takes them with it, and the spreadsheet export " +
+                    "does not include them.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
         }

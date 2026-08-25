@@ -87,6 +87,15 @@ class HealthConnectBridge(private val context: Context) {
         }
 
     /**
+     * Permission to write a weigh-in back out.
+     *
+     * ⚠️ Held as its own value rather than rebuilt at each use, because [canPublish] and
+     * [permissions] must be asking about the same string. Declared ABOVE [permissions], since
+     * property initialisers run in source order and a `val` read before its own initialiser is null.
+     */
+    private val writeWeight: String = HealthPermission.getWritePermission(WeightRecord::class)
+
+    /**
      * The permissions this app asks for, in the form the request contract wants.
      *
      * Derived from the record types rather than written out as strings, so the set here and the
@@ -94,7 +103,7 @@ class HealthConnectBridge(private val context: Context) {
      */
     val permissions: Set<String> = setOf(
         HealthPermission.getReadPermission(WeightRecord::class),
-        HealthPermission.getWritePermission(WeightRecord::class),
+        writeWeight,
         HealthPermission.getReadPermission(StepsRecord::class),
     )
 
@@ -121,6 +130,16 @@ class HealthConnectBridge(private val context: Context) {
 
     suspend fun hasAll(): Boolean = granted().containsAll(permissions)
 
+    /**
+     * Whether a weigh-in may be published, which is a NARROWER question than [hasAll].
+     *
+     * ⚠️ Publishing needs one permission, and asking [hasAll] instead would refuse to publish on a
+     * phone where the write permission was granted and read-steps was not — a real combination,
+     * since Health Connect lets somebody grant them one at a time. The import path asks the wider
+     * question because it genuinely reads two record types; this one asks only what it uses.
+     */
+    suspend fun canPublish(): Boolean = granted().contains(writeWeight)
+
     // ------------------------------------------------------------------------------------ reading
 
     /**
@@ -130,6 +149,13 @@ class HealthConnectBridge(private val context: Context) {
      * conflate — importing nothing is safe either way, but a surface that says "no new readings"
      * when the truth is "permission was refused" is the silent-failure shape this repo keeps
      * correcting. The caller checks [hasAll] first and reports the difference itself.
+     *
+     * ⚠️ **"Anything else" is enforced, not merely intended.** `readRecords` returns records from
+     * every origin including this app's own, so once [publishWeight] has a caller the import would
+     * read back what this app itself wrote — reporting "brought in 3 weigh-ins" about its own data,
+     * and resurrecting a reading deleted here the moment it was no longer the newest one held. The
+     * origin is compared against `context.packageName` rather than a literal, because the shipped
+     * build carries an `applicationIdSuffix` and a hardcoded id would match nothing.
      */
     suspend fun weighinsSince(sinceMs: Long): List<BodyTrend.Weighin> = withContext(Dispatchers.IO) {
         runCatching {
@@ -143,7 +169,9 @@ class HealthConnectBridge(private val context: Context) {
             // property carries a `@get:JvmName`, so the JVM accessor and the Kotlin property have
             // DIFFERENT names and the disassembly alone gives the wrong one — the Kotlin name lives
             // in the class file's @Metadata, which `strings` will show. Energy.inKilocalories too.
-            ).records.map { BodyTrend.Weighin(it.time.toEpochMilli(), it.weight.inKilograms) }
+            ).records
+                .filter { it.metadata.dataOrigin.packageName != context.packageName }
+                .map { BodyTrend.Weighin(it.time.toEpochMilli(), it.weight.inKilograms) }
         }.getOrDefault(emptyList())
     }
 
@@ -185,6 +213,38 @@ class HealthConnectBridge(private val context: Context) {
                         weight = Mass.kilograms(kg),
                         metadata = Metadata.manualEntry(),
                     ),
+                ),
+            )
+            true
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Take back weigh-ins this app published between [fromMs] inclusive and [toMs] exclusive.
+     *
+     * Two callers, and the second is the one that makes deletion honest: correcting a reading
+     * withdraws the day's earlier publication before writing the new one, matching `BodyStore`'s own
+     * replace-per-day rule, and deleting a reading takes it out of Health Connect too — otherwise
+     * "delete" would mean "delete here but leave it visible to every other app on the phone".
+     *
+     * ⚠️ **This cannot touch another app's data, and that is the library's own guarantee rather than
+     * an assumption.** `deleteRecords`' KDoc in the shipped 1.1.0-beta01 sources reads: *"Deletes any
+     * Record of the given recordType in the given timeRangeFilter (automatically filtered to Record
+     * belonging to the calling application)."* So a smart scale's reading at the same instant is
+     * untouched even though the window covers it.
+     *
+     * Returns whether it went through. A false is worth knowing but never worth blocking on — the
+     * failure mode is a stale copy in Health Connect, not a lost reading here.
+     */
+    suspend fun withdrawWeightBetween(fromMs: Long, toMs: Long): Boolean = withContext(Dispatchers.IO) {
+        if (toMs <= fromMs) return@withContext false
+        runCatching {
+            val c = client() ?: return@runCatching false
+            c.deleteRecords(
+                recordType = WeightRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(
+                    Instant.ofEpochMilli(fromMs),
+                    Instant.ofEpochMilli(toMs),
                 ),
             )
             true

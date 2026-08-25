@@ -10,7 +10,6 @@ import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.feature.health.composeHealthReading
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -84,23 +83,25 @@ class HealthTool(
     private fun bodyReport(state: dev.mascwa.pulse.feature.health.HealthViewModel.State): String {
         val trend = state.trend
         if (trend is BodyTrend.Trend.TooLittle) return trend.sentence
-        val latest = state.latest ?: return "No weigh-ins recorded yet."
+        // ⚠️ A POSITIVE check, not the exclusion above. Kotlin does not narrow a sealed type by
+        // ruling one branch out — after the return, `trend` is still a `Trend` and reading
+        // `hasRate` off it does not compile. The BODY screen has always tested `!is Estimated` for
+        // the same reason.
+        val estimated = trend as? BodyTrend.Trend.Estimated ?: return "No weigh-ins recorded yet."
+        val latest = estimated.latest
         val unit = state.unit
 
+        // ⚠️ Both lines come from the core rather than being written here, and that is not tidiness.
+        // A rate is quoted only when its own interval excludes zero — `rateIsClear` is the core's
+        // judgement on that, and ignoring it means telling somebody they are losing weight when the
+        // data cannot tell losing from gaining, on a feature whose response is to eat less. This
+        // file used to restate that rule in its own words, which made two places decide how a weight
+        // change is described; they had already drifted, since the copy here dropped the give-or-take
+        // the core deliberately quotes. The screen has always called `rateSentence`, so the assistant
+        // and the BODY page now say the same thing about the same reading.
         return buildString {
-            append("Weight trend ").append(mass(latest.trendKg, unit))
-            append(" (the scale last said ").append(mass(latest.observedKg, unit)).append(")")
-            // ⚠️ A rate is quoted only when its own interval excludes zero. `rateIsClear` is the
-            // core's judgement on that, and ignoring it means telling somebody they are losing
-            // weight when the data cannot tell losing from gaining — on a feature where the
-            // response is to eat less.
-            if (latest.rateIsClear) {
-                val perWeek = latest.ratePerWeekKg
-                append("\n").append(if (perWeek < 0) "Losing " else "Gaining ")
-                append(mass(abs(perWeek), unit)).append(" a week")
-            } else {
-                append("\nNo clear direction yet — the change so far is within the noise.")
-            }
+            append(BodyTrend.trendSentence(latest, unit))
+            append("\n").append(BodyTrend.rateSentence(latest, unit, estimated.hasRate))
             append("\n").append(expenditureLine(state))
         }
     }
@@ -139,6 +140,24 @@ class HealthTool(
             append("Target ").append(t.kcal).append(" kcal a day")
             append("\nProtein ").append(t.proteinG).append(" g · fat ").append(t.fatG)
                 .append(" g · carbs ").append(t.carbG).append(" g")
+            // ⚠️ The share of the day each one is, which is the question three gram figures raise and
+            // which nothing in this app answered — `Targets` has computed the energy split since it
+            // was written and had no reader anywhere.
+            //
+            // Taken as a share of the TARGET rather than of the three added together: the target is
+            // the number being divided up, and nothing guarantees three rounded gram figures add
+            // back to it. Running the shipped core over all five diet modes at three body masses
+            // and three rates — 41 real target sets — they in fact agreed to the calorie every
+            // time, so this denominator costs nothing today and stays correct if that ever slips.
+            //
+            // The three shares therefore need not total exactly 100. Measured across the same 41,
+            // they land between 99 and 101, which is ordinary rounding and honest rather than untidy.
+            if (t.kcal > 0) {
+                fun share(kcal: Int) = (kcal * 100.0 / t.kcal).roundToInt()
+                append(" — ").append(share(t.proteinKcal)).append("% protein · ")
+                append(share(t.fatKcal)).append("% fat · ")
+                append(share(t.carbKcal)).append("% carbs")
+            }
             // ⚠️ Adjustments are surfaced, never swallowed. Every guardrail in MacroTargets is
             // written to be visible, because a silently clamped calorie target is one nobody can
             // question — and this is the part of the app with direct physical consequence.
@@ -148,8 +167,4 @@ class HealthTool(
             }
         }
     }
-
-    /** Kilograms rendered in whichever unit the reader set. */
-    private fun mass(kg: Double, unit: BodyTrend.MassUnit): String =
-        String.format(java.util.Locale.US, "%.1f %s", kg * unit.perKg, unit.label)
 }

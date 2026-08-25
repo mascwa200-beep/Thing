@@ -116,6 +116,11 @@ SERJ=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-json-jvm-*.
 if [ ! -d "$FEEDS" ]; then
   echo "note: $FEEDS not built — run ./gradlew :core:feeds:classes or expect false positives" >&2
 fi
+# ⚠️ STALE, not just missing. These are classes from whenever feeds was last built, so a member you
+# have just ADDED to `core/feeds` source is absent from them and every call to it is reported as a
+# real unresolved reference. It reads exactly like a defect and is not one. Rebuild first:
+#   ./gradlew :core:feeds:classes --configure-on-demand --no-configuration-cache
+# (`:core:telemetry` is passed as SOURCES, so it never has this problem — only feeds does.)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
 TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar"
 

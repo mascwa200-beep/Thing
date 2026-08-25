@@ -240,15 +240,71 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun recordWeighin(kg: Double) {
         if (!kg.isFinite() || kg <= 0.0) return
         val now = System.currentTimeMillis()
-        c.bodyStore.record(now, kg, dayStartOf(now))
+        val day = dayStartOf(now)
+        c.bodyStore.record(now, kg, day)
         _notice.value = "Weigh-in recorded."
+        publishWeighin(now, kg, day)
     }
 
-    fun removeWeighin(atMs: Long) = c.bodyStore.removeWeighin(atMs)
+    /**
+     * Delete a reading here, and take it out of Health Connect too.
+     *
+     * ⚠️ The withdrawal is what stops "delete" meaning "delete here". Without it a reading typed by
+     * mistake stays visible to every other app on the phone, and — since the import asks for
+     * everything newer than the newest reading still held — deleting the newest one would let the
+     * next import bring the mistake straight back.
+     */
+    fun removeWeighin(atMs: Long) {
+        c.bodyStore.removeWeighin(atMs)
+        viewModelScope.launch {
+            if (c.healthConnect.canPublish()) c.healthConnect.withdrawWeightBetween(atMs, atMs + 1)
+        }
+    }
+
+    /**
+     * Send a typed-in reading out, so a scale app or a watch can see it.
+     *
+     * ⚠️ **Gated on the write permission actually being granted, and silent when it is not.** The
+     * panel offers this connection; somebody who never set it up must not be told about Health
+     * Connect every time they step off the scales.
+     *
+     * ⚠️ The day is withdrawn before the new reading is published, because `BodyStore.record`
+     * REPLACES a day's reading rather than appending — weighing twice before breakfast is a
+     * correction here. Publishing without withdrawing would leave the mistaken first number in
+     * Health Connect for good, and the two records would disagree about the same morning.
+     *
+     * A failure sets the sync status rather than the general notice: the status line lives on the
+     * Health Connect panel, which is where somebody can do something about it.
+     *
+     * ⚠️ The window ends at [dayPlus], never at `dayStartMs + 86_400_000`. A local day is 23 hours
+     * the morning the clocks go forward, so a fixed day would reach an hour into tomorrow and
+     * withdraw a reading that belongs to it — the trap this file already warns about at [dayPlus].
+     */
+    private fun publishWeighin(atMs: Long, kg: Double, dayStartMs: Long) {
+        viewModelScope.launch {
+            if (!c.healthConnect.canPublish()) return@launch
+            c.healthConnect.withdrawWeightBetween(dayStartMs, dayPlus(dayStartMs, 1))
+            if (!c.healthConnect.publishWeight(atMs, kg)) {
+                _syncStatus.value = "That weigh-in could not be sent to Health Connect."
+            }
+        }
+    }
 
     fun recordMeasurement(kind: BodyStore.MeasureKind, cm: Double) {
         c.bodyStore.recordMeasurement(System.currentTimeMillis(), kind, cm)
         _notice.value = "${kind.label} recorded."
+    }
+
+    /**
+     * Take a measurement back.
+     *
+     * ⚠️ Keyed on the instant AND the kind, because `recordMeasurement` appends rather than
+     * replacing — several kinds can share a moment if somebody works round themselves with a tape,
+     * and removing by time alone would take the lot.
+     */
+    fun removeMeasurement(kind: BodyStore.MeasureKind, atMs: Long) {
+        c.bodyStore.removeMeasurement(atMs, kind)
+        _notice.value = "${kind.label} removed."
     }
 
     /**
@@ -586,6 +642,21 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     /** Newest first. App-private files, never the camera roll. */
     val photos: StateFlow<List<ProgressPhotoStore.Photo>> = c.progressPhotoStore.photos
 
+    /**
+     * How much disk the photographs are using.
+     *
+     * ⚠️ Derived from the list rather than polled, so it is recomputed exactly when a photograph is
+     * taken or deleted and not once a second for a screen nobody is looking at. Each recomputation
+     * stats every file, which is cheap for the handful this holds and is the reason it hangs off a
+     * change rather than a timer.
+     *
+     * Starts at zero, which is also the honest answer for an empty list — the panel only prints the
+     * figure when there is something to print, so "not measured yet" never renders as "0.0 MB".
+     */
+    val photoBytes: StateFlow<Long> = c.progressPhotoStore.photos
+        .map { c.progressPhotoStore.bytesOnDisk() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+
     fun photoUri(id: String): android.net.Uri? = c.progressPhotoStore.uriFor(id)
 
     /**
@@ -783,15 +854,6 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                 else -> "Brought in ${found.size} weigh-ins."
             }
             recompute.value++
-        }
-    }
-
-    /** Publish a reading so a scale app or a watch can see it. Best-effort and says which. */
-    fun publishToHealthConnect(atMs: Long, kg: Double) {
-        viewModelScope.launch {
-            _syncStatus.value =
-                if (c.healthConnect.publishWeight(atMs, kg)) "Sent to Health Connect."
-                else "Could not send it — check the permission."
         }
     }
 

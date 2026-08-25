@@ -229,10 +229,6 @@ class BodyStore(
         return _measurements.value
     }
 
-    /** The newest reading of each kind, which is what a measurements panel shows. */
-    suspend fun latestMeasurements(): Map<MeasureKind, Measurement> =
-        allMeasurements().groupBy { it.kind }.mapValues { (_, v) -> v.maxBy { it.atMs } }
-
     /** The note left with a weigh-in, if any — kept out of [weighins] so the trend sees only numbers. */
     suspend fun noteAt(atMs: Long): String {
         val s = ensureLoaded()

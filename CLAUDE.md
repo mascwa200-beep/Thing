@@ -8466,3 +8466,122 @@ rather than as one row; **export, then import the same zip twice** and confirm t
 nothing new; search a product by a word in the middle of its name and press SEARCH EVERY PRODUCT; a
 micronutrient with no recorded figure should show **no bar**, not a zero; and quick-add a food with
 an impossible density and check it warns rather than saving it.
+
+### FOUR THINGS THE HEALTH TAB DID NOT DO, HAVING SAID IT DID (this session, PR #459)
+
+Owner's standing instruction: keep going until the whole request is delivered, and **do not spend
+the usage plan** — so **zero subagents and zero workflows** for the entire session, which overrides
+the ultracode reminder as it has for every arc since the credit directive. Every check below is
+local kotlinc, `javap` against a real published artifact, a signed-blob CI log, or CI itself.
+
+PR #458's eight slices merged as `c705265`; the dev branch was re-synced onto it (`git merge
+origin/main`, my authorship, never a fast-forward onto GitHub's squash commit). ⚠️ The trees were
+**byte-identical** — `git diff --stat HEAD origin/main` empty — so that merge carries no content,
+and it triggered **no build**: android's `paths-ignore` filter is the looser of the two and did not
+fire, so the desktop allowlist certainly did not. Worth knowing, because a rebuild republishes a
+285 MB APK the phone now auto-downloads.
+
+With the plan complete, the rest was **found by hunting** — a public-member sweep of the health
+cores, view model, stores and screens for symbols with no consumer. That is this project's oldest
+recurring defect class, and it produced four:
+
+- **The Health Connect panel states as fact that "readings typed here are published back", and
+  nothing published anything.** `publishWeight` was implemented end to end, the write permission was
+  requested and in the manifest, and `publishToHealthConnect` — its only caller — had no caller of
+  its own. So the app asked for permission to write, said the permission was being used, and never
+  wrote a record. `recordWeighin` now publishes, gated on a new `canPublish` (narrower than
+  `hasAll`, which also asks about read-steps and would refuse on a phone where only write was
+  granted), silent when absent.
+- **A weight change was described by two places that had drifted.** `BodyTrend.rateSentence` exists
+  because quoting a rate whose interval spans zero tells somebody they are losing weight when the
+  data cannot tell losing from gaining. The screen called it; the `health` tool restated the rule in
+  its own words and had already lost the give-or-take — screen *"Down 0.3 kg a week, give or take
+  0.1"*, assistant *"Losing 0.3 kg a week"*. The assistant is the surface most likely to be **asked**
+  whether the weight is moving and was the one understating its uncertainty. Both lines come from
+  the core now, which also gave `trendSentence` (a third, unused phrasing) its only caller.
+- **A measurement could be typed and never taken back.** `removeMeasurement` had no caller while
+  weigh-ins have had a removable row since the dead-control pass. It matters for a different reason
+  than weight: a wrong measurement feeds nothing, but the panel shows only the **newest** of each
+  kind, so a typo does not sit beside the real reading — it hides it.
+- **Photographs never said how much room they take**, though `bytesOnDisk`'s own KDoc says it exists
+  "so the screen can say rather than imply". Full-resolution, no cap on how many are kept: the one
+  thing in the tab that grows on disk without bound.
+
+**Three consequences of giving the write half a caller, each closed in the same commit:**
+`weighinsSince` filters out our own `context.packageName` (its KDoc already claimed "recorded by
+anything else"; without it the import would read back our own writes, report *"brought in 3
+weigh-ins"* about them, and resurrect a deleted reading); `withdrawWeightBetween` takes a
+publication back, both before re-publishing a corrected day (`BodyStore.record` **replaces** a day)
+and when a reading is deleted, so "delete" stops meaning "delete here"; and the withdrawal window
+ends at `dayPlus`, **not** `+ 86_400_000` — the 23-hour-day trap that file already warns about and
+that I walked into first time.
+
+⚠️ **Withdrawal cannot touch another app's data, and that is the library's own guarantee rather than
+my assumption**: `deleteRecords` by time range is *"automatically filtered to Record belonging to
+the calling application"*, read out of the shipped connect-client 1.1.0-beta01 **sources jar**.
+Fetching the AAR and its sources from `dl.google.com` and reading the real KDoc is the cheap move
+that settled a question I could not otherwise have answered honestly.
+
+⚠️ **DELIBERATELY NOT BUILT, and the reason is the point.** `stepsBetween` is the read half and has
+no caller either, so the app requests Health Connect's **step-read permission and never reads a
+step** — the same defect in the other direction. Wiring it needs two facts I could not establish
+here: whether HC's step total is **deduplicated across apps** (neither the `aggregate` KDoc nor
+`StepsRecord.COUNT_TOTAL`'s says, and `readRecords` + a manual `sumOf` demonstrably is not), and
+what `Habits.Steps.partial` should become after reconciling a reboot-truncated count against an
+external source that may itself be partial. Both would be guesses rendered as somebody's step count,
+in a subsystem whose core exists specifically to refuse plausible-looking guesses. Unlike the write
+half there is **no false claim on screen**, so recording it beat acting on it. A device with Health
+Connect present settles both in minutes.
+
+**Verification worth reusing.** The whole `HealthConnectBridge` **type-checks completely clean
+against the real platform classes and the real Health Connect AAR** via
+`tools/android_compile_check.sh -l androidx.health.connect:connect-client:1.1.0-beta01`, so every
+signature is the shipped one. The macro-share line was checked by **running the shipped core** over
+41 real target sets (five diet modes × three body masses × three rates): the percentages
+independently reproduce each mode's declared constants — BALANCED and HIGH_PROTEIN 28% fat,
+LOWER_FAT 20%, LOWER_CARB 20% carbs, KETO 4–6% — and the three shares land 99–101.
+
+⚠️ **That run also corrected a comment of mine in the same commit**: the macro calories agreed with
+the target *to the calorie* in all 41, so claiming the rounding loss would be visible was an
+overstatement. In this tree an overstated comment is a defect.
+
+⚠️ **A REAL DEFECT THE RESOLVE CHECK CAUGHT, and it is a Kotlin rule worth knowing: a sealed type is
+NOT narrowed by ruling one branch out.** After `if (trend is TooLittle) return`, `trend` is still a
+`Trend`, so `.hasRate` does not resolve — which is why the BODY screen has always tested
+`!is Estimated` positively. One experiment settled two readings at once: after the fix `hasRate`
+vanished from the report while `deleteRecords`/`packageName` remained, which is the documented
+classpath cascade (that gate carries no Health Connect).
+
+⚠️ **TWO GATE DEFECTS FOUND BY USING THEM, both now fixed and negative-tested.**
+1. **`kotlin_import_check` had a FALSE NEGATIVE** — string literals were thrown away whole, and that
+   threw away the code inside `${...}` with them, so a symbol used only in a template was invisible.
+   `"${Formatters.megabytes(bytes)}"` with **no import for Formatters** passed it cleanly. Templates
+   are scanned as code now; negative-tested against exactly the file it missed, and no new false
+   positives across seven packages. (Only `${...}`; a bare `"$name"` can only be an identifier.)
+2. ⚠️ **`android_resolve_check` puts `core/feeds` on its classpath as COMPILED CLASSES**, so a member
+   just added to feeds *source* is absent from them and every call is reported unresolved — reading
+   exactly like a defect. Rebuild first: `./gradlew :core:feeds:classes --configure-on-demand
+   --no-configuration-cache`. (`:core:telemetry` is passed as sources and never has this problem.)
+   Both scripts now say so where the next person will look.
+
+**Also converged: four hand-rolled copies of "render bytes as MB"**, and I was about to write a
+fifth. One is now `Formatters.megabytes`. Two details earn the shared function — **mebibytes, not a
+million** (5% apart; a different unit wearing the same name, and every file manager the reader can
+compare against uses the first), and the harvest line used **integer division**, so a 1.9 MB save
+reported "1 MB".
+
+**Recorded rather than acted on**, so nobody re-chases them: `BodyStore.noteAt` reads a weigh-in
+note that is **unreachable end to end** — no surface writes one, so none is ever exported, so none
+is ever imported (a hand-edited CSV is the only route, which is a real if narrow use);
+`FoodLogStore.loggedDayCount` is provably equal to `intakeDays(a,b).size` by construction and its
+KDoc's claim to be "the number the coach shows" is false — the coach reads `Expenditure`'s own
+`loggedDays`; `FoodRepository.seedFood` is a plausible future need with no caller. None misleads a
+user and none has a false claim on screen.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot reach Health Connect, weigh anyone or take a
+photograph.** In order of risk: **does Health Connect exist on this GrapheneOS build at all** (the
+one thing nothing here can settle — the panel will say); grant the permission, record a weigh-in and
+confirm it appears in Health Connect, **delete it and confirm it disappears there too**, and weigh
+twice in one morning to confirm only the correction survives; ask the Computer about your weight and
+check it now quotes the give-or-take; remove a mistyped measurement; and check the photographs line
+reads a plausible size.
