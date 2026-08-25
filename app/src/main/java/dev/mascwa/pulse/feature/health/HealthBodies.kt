@@ -254,10 +254,12 @@ private fun WeekPanel(week: IntakeWeek.Week, targetKcal: Int) {
                 verticalAlignment = Alignment.Bottom,
             ) {
                 // ⚠️ Walk the WINDOW, not the logged days, so an unlogged day leaves a hole rather
-                // than being quietly closed up by its neighbours — and take the window's start from
-                // the core rather than deriving it, which is wrong whenever either end is unlogged.
-                for (i in 0 until week.windowDays) {
-                    val day = week.windowStartMs + i * IntakeWeek.DAY_MS
+                // than being quietly closed up by its neighbours — and take the days from the core
+                // rather than deriving them. Deriving them from the logged data is wrong whenever
+                // either end is unlogged, and deriving them by adding a fixed day to the start is
+                // wrong for a week after either daylight-saving transition, when four of these seven
+                // lookups miss and draw a day nobody logged.
+                for (day in week.dayStarts) {
                     val d = byDay[day]
                     val frac = ((d?.kcal ?: 0.0) / peak).toFloat().coerceIn(0f, 1f)
                     val tint = when {

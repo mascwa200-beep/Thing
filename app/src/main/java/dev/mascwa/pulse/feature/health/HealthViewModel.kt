@@ -76,6 +76,15 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      */
     fun dayPlus(dayStartMs: Long, days: Long): Long = HealthDays.plus(dayStartMs, days, zone)
 
+    /**
+     * The last [days] day-starts ending today, oldest first — the row a windowed chart draws.
+     *
+     * The calendar lives here rather than in the core, which is deliberately zone-free, and handing
+     * the whole list across means the days the chart draws and the days the core scores are one list
+     * rather than two expressions that can drift apart.
+     */
+    fun dayGrid(days: Int): List<Long> = HealthDays.grid(todayStartMs(), days, zone)
+
     // -------------------------------------------------------------------------------- the record
 
     val profile: StateFlow<HealthSettings> = c.settingsRepository.settings
@@ -174,7 +183,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      */
     val week: StateFlow<IntakeWeek.Week?> =
         combine(c.foodLogStore.days, state) { byDay, s ->
-            IntakeWeek.score(byDay, s.targets?.kcal, todayStartMs())
+            IntakeWeek.score(byDay, s.targets?.kcal, dayGrid(IntakeWeek.DEFAULT_WINDOW_DAYS))
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
