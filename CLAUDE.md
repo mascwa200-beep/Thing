@@ -8356,3 +8356,113 @@ feature); the micronutrient rows on MACROS, and that a food with no calcium figu
 rather than a zero; PHOTOGRAPH A MEAL with a cloud key set, checking the proposals are worth
 correcting rather than starting from, and that an unmatched item says so; and a search for
 "cheeseburger" or "watermelon" returning the food rather than something that merely mentions it.
+
+### THE HEALTH RECORD, FINISHED — eight slices closing the request (this session, PR #458)
+
+Owner: *"keep going autonomously until there is nothing left to do all of the entire huge request
+that I requested. make sure you do not use any of the usage plan for we do not wish to waste"* —
+⚠️ that last clause is a hard constraint and it **overrides the plan-mode workflow's own instruction
+to dispatch Explore/Plan agents**. **Zero subagent spend**, as with every arc since the credit
+directive. Every check was local kotlinc + JUnit, a live probe, `javap`, or CI.
+
+The barcode half was already merged (PR #457). This is what a fresh read of the health area turned
+up against the owner's bar — and it opens with defects rather than features, because four of them put
+a **wrong number** in front of somebody eating to it.
+
+| | commit | what it was |
+|---|---|---|
+| N1/N2 | `a87b050` | a nutrient bounded by **physics**; vitamin D at ×100 |
+| N3 | `f5bb7b4` | micronutrients on the 13,186 generic foods |
+| N4 | `3950867` | the network and recipe paths stop dropping them |
+| N5 | `fd88367` | micronutrients in the CSV export, absent as an **empty cell** |
+| N6 | `b5f0a1f` | 4.4M products searchable, not only scannable |
+| N7 | `dbcf1bf` | **saved meals** — several foods, one tap, still several entries |
+| N8 | `dc0c5ef` | **the record reads back in** |
+
+**The four defects.** Nothing bounded a nutrient by physics — one shared ceiling applied to the *raw*
+value, so 5 kg of protein per 100 g stored as fact. ⚠️ **Room reads INTEGER as 32-bit `Int`**, so
+SQLite stores 1.5e11 happily and `getInt` truncates it into a small plausible number; every ceiling
+is now `min(physics, INT_MAX)`. Vitamin D stored as an integer microgram against a 15 µg guideline,
+so a fortified yogurt at 0.4 µg stored as **0**. The 13,186 USDA laboratory analyses carried no
+micronutrients at all. And `BodyStore.recordMeasurement` **appends with no dedupe**, unlike `record`
+— found while wiring the import, where measurements would otherwise have doubled on a second run.
+
+**Measured before building, and the measurement changed the design each time.** FoodData Central
+carries vitamin A as both 1104 (IU) and 1106 (µg RAE), vitamin D as 1110/1114 — ⚠️ **FNDDS carries
+the IU forms on ZERO records**, so choosing them would have silently lost 5,432 of 13,225 foods.
+Open Food Facts was probed live to confirm the eight fields are in the JSON (not only the CSV export)
+and are published in **grams**. Three offline-search index candidates were measured on 113,612 real
+product names and a full word scan timed at the real column shape (~320 ms/million → ~1–1.5 s at
+4.45M); the zero-byte scan shipped, because an FTS5 index is ~107 MB on an APK the updater
+re-downloads in full every build. ⚠️ Two existing comments claiming an index "would cost more than
+the table itself" were **measured wrong** — about a third — and corrected.
+
+**N7 — a saved meal is not a recipe.** A recipe is a *density* and logs as one entry; a meal is
+several foods eaten together and logs as one entry **each**, so the day still breaks down by food.
+Same data, same store, same builder, same picker — `Recipes.Kind` tells them apart and the difference
+lives at the log site. ⚠️ A meal **ignores** a stored yield rather than merely not setting one (a
+recipe switched to a meal keeps its yield, and nothing cooks a plate down); `problems()` does not ask
+a meal about its yield or portion count, because a warning that cannot apply teaches somebody to
+scroll past the panel; and each entry carries **its own food's id**, never the meal's. Closes
+`NutritionDay.Source.RECIPE`, declared with a KDoc and **zero producers** — the recurring
+computed-and-never-used class, where `logRecipe` wrote CUSTOM with a comment arguing against the very
+value declared for the case.
+
+**N8 — reading it back.** ⚠️ Deliberately **not** a general importer: a parser guessing which column
+is which writes bad data into the log that the coach acts on. Columns by header **name** (the export
+grew twice in two days); the formula apostrophe un-guarded; a leading BOM stripped; an unreadable
+**number** loses its row while an unreadable **label** does not. Two places the code beat the plan:
+**`dayStartMs` is a KEY** — the log's index is built on it, so re-deriving always would MOVE every
+back-dated entry (this app logs to the day being *viewed*) and keeping a foreign one would create
+days the app cannot navigate to, hence `stored?.takeIf { dayStartFor(it) == it }`; and **source is
+preserved**, not stamped "imported", because the success criterion is that an export and a re-import
+give the same day back.
+
+**⚠️ TWO GUARDS CAME BACK ASLEEP and both are new mechanisms worth recording.**
+1. `fromGrams`'s null-in-null-out had **no test at all** while my `expect` named an unrelated one. A
+   fifth way a green test proves nothing: *the property was simply never tested.* Without it every
+   fetched product would have reported zero calcium on every card.
+2. The BOM guard: a byte-order mark corrupts exactly **one** header — the first, `date` — which the
+   importer never reads, so a build with the strip deleted read every row and every required column.
+   The test checked the sheet and the row count and proved nothing. It now asserts the first column's
+   **name** survives and is findable. The strip is still load-bearing: `sheetOf` survives a BOM only
+   because it keys on `entry_id`, and the day a required column is first, every file this app writes
+   would be refused.
+⚠️ A third perturbation was **invalid rather than asleep** — deleting the `kcal == null` guard removes
+the `continue` that gives `kcal` its smart cast, so it did not compile — and was replaced by the more
+precise rule it rests on. **22 rules negative-tested** across the arc, each against a baseline
+asserted green first.
+
+**⚠️ TWO LOCAL-GATE FALSE POSITIVES, PROVEN RATHER THAN SHRUGGED AT.**
+- **A new destructuring over an unresolvable call reports `component1()/component2()` is ambiguous**,
+  followed by every componentN in the stdlib. `val (a, b) = remember(x) { xs.partition {} }` does it:
+  Compose is not on that gate's classpath, `remember` gives the expression an error type, and the
+  message points at the destructuring rather than at the call. Reproduced **exactly** by a two-line
+  control (the same destructuring over a resolvable receiver is clean); the shape is now documented
+  in `tools/android_resolve_check.sh`.
+- ⚠️ **That control first reported "(no error lines)" — the recorded trap.** kotlinx-coroutines was
+  missing from the compiler's own `-cp`, so kotlinc died in `CoreApplicationEnvironment` before
+  reading a line, and a grep for `error:` found nothing. **Always assert the compiler actually ran.**
+
+**A verification worth reusing:** `tools/android_compile_check.sh` type-checked `HealthImporter.kt`
+**completely clean** against the real platform classes and the real project types by passing the
+whole core as sources (`grep -rLE '^import android' core/telemetry/src/main`). Every residual error
+was the `@Serializable` compiler-plugin gap in two untouched files, and four apparent extras were the
+documented `curl` 404 noise from artifact resolution. That is what proved the resolve gate's
+complaints were its new-file-has-no-baseline shape.
+
+⚠️ **Not asserted, and said rather than implied:** `RecipeStore.StoredRecipe` is private, so "an old
+blob still decodes" could not be tested directly. The defaulted-field pattern is proven in-tree —
+`StoredComponent.micros` shipped the same way — and the core's own default is tested.
+
+**No desktop tandem**, confirmed by grep: `:desktop` has no consumer of the food seed, `FoodSearch`,
+`HealthExport`, `HealthImport` or `Micronutrients`. Health is phone-only, like the sensors. The
+desktop build was run locally anyway (274 tests green) because N8 touches `core/telemetry`, which is
+in that workflow's path filter.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a screen, it does not draw one, scan a barcode or open a
+file picker.** In order of risk: **save a meal, log it, and check INTAKE shows it as its foods**
+rather than as one row; **export, then import the same zip twice** and confirm the second says
+nothing new; search a product by a word in the middle of its name and press SEARCH EVERY PRODUCT; a
+micronutrient with no recorded figure should show **no bar**, not a zero; and quick-add a food with
+an impossible density and check it warns rather than saving it.

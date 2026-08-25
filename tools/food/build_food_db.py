@@ -96,6 +96,19 @@ SCALE_SODIUM = 1        # already milligrams
 SCALE_MICRO = 100       # milligram-scale micros x100
 SCALE_MICROGRAM = 1     # microgram-scale micros, stored as-is
 
+# ⚠️ **Vitamin D is x100 and every other microgram-scale field is not, and that is measured rather
+# than inconsistent.** The reference intake is 15 ug a DAY, so the numbers this field carries are
+# fractions of a microgram per hundred grams: a fortified yogurt at 0.4 ug stored as an integer
+# microgram becomes 0 and vanishes, and 1.2 ug becomes 1, a seventeen per cent error on the tightest
+# micronutrient in the set relative to its own guideline. Vitamin A is the opposite case — foods run
+# to hundreds of micrograms against a 900 ug guideline — so a whole microgram there is already finer
+# than the sources publish.
+#
+# ⚠️ The inverse of this lives in `OfflineFoodStore.micros`, in Kotlin, and the two must move in one
+# commit. A scale is the one kind of constant where a second copy left behind does not fail — it
+# quietly divides somebody's intake by a hundred.
+SCALE_MICRO_CENTI = 100  # microgram-scale micros x100 -> 0.01 ug
+
 SOURCE_OFF = 1
 SOURCE_USDA = 2
 
@@ -143,6 +156,70 @@ INSERT = f"INSERT OR REPLACE INTO food ({','.join(COLUMNS)}) VALUES ({','.join('
 
 MAX_NAME = 90
 MAX_BRAND = 60
+
+
+INT_MAX = 2_147_483_647
+
+# ---------------------------------------------------------------------------------------------
+# What a hundred grams of food can possibly hold
+# ---------------------------------------------------------------------------------------------
+#
+# ⚠️ **This did not exist, and a crowd-entered corpus of 4.4 million rows guarantees it is needed.**
+# `scaled` took one ceiling of 100,000 applied to the RAW figure, so `proteins_100g: 5000` — five
+# kilograms of protein in a hundred grams — was stored as fact, and a vitamin A figure somebody typed
+# in international units into a field documented as grams became one and a half billion micrograms.
+# Neither reads as an error on a card. Both read as a food.
+#
+# ⚠️ **Deliberately physics rather than nutrition, exactly as `FoodPortion.MAX_MASS_G_PER_100G` says
+# in Kotlin — these are two implementations of ONE rule and are kept aligned field for field.** A
+# tighter bound would catch more and every tighter bound is an opinion that can be wrong about a real
+# food: a protein isolate really is eighty grams of protein per hundred, pure oil really is a hundred
+# grams of fat. What is unarguable is that a constituent cannot outweigh the food, and that alone
+# catches the whole thousand-fold unit-error family, which is where the wrong numbers come from.
+#
+# ⚠️ **The second reason is not nutritional at all: Room reads these columns as 32-bit `Int`.** SQLite
+# will store 1.5e11 happily in a 64-bit integer and `Cursor.getInt` will then hand Kotlin a truncated
+# value — a garbage figure arriving on the phone as a small, plausible one. So every ceiling is capped
+# at `INT_MAX` too, and a column that could exceed it is a defect whatever its physics.
+def _ceiling(natural_max: float, scale: int) -> int:
+    return int(min(natural_max * scale, INT_MAX))
+
+
+CEILINGS = {
+    # Energy is not a mass. Pure fat is ~900 kcal per 100 g and ethanol ~700, so nothing edible
+    # reaches a thousand; the slack above 900 is for a record that rounded, not one that is wrong.
+    "kcal": _ceiling(1_000.0, SCALE_KCAL),
+    # Grams, bounded by the weight of the food itself.
+    "prot": _ceiling(100.0, SCALE_MACRO),
+    "carb": _ceiling(100.0, SCALE_MACRO),
+    "fat": _ceiling(100.0, SCALE_MACRO),
+    "fib": _ceiling(100.0, SCALE_MACRO),
+    "sug": _ceiling(100.0, SCALE_MACRO),
+    "sat": _ceiling(100.0, SCALE_MACRO),
+    "transfat": _ceiling(100.0, SCALE_MACRO),
+    # Milligrams: 100 g is 100,000 mg.
+    "sod": _ceiling(100_000.0, SCALE_SODIUM),
+    "calcium": _ceiling(100_000.0, 1),
+    "potassium": _ceiling(100_000.0, 1),
+    "chol": _ceiling(100_000.0, 1),
+    "iron": _ceiling(100_000.0, SCALE_MICRO),
+    "vit_c": _ceiling(100_000.0, SCALE_MICRO),
+    # Micrograms: 100 g is 100,000,000 ug — a bound INT_MAX tightens further, which is the point.
+    "vit_a": _ceiling(100_000_000.0, SCALE_MICROGRAM),
+    "vit_d": _ceiling(100_000_000.0, SCALE_MICRO_CENTI),
+}
+
+# Protein, fat and carbohydrate are distinct constituents, so together they cannot outweigh the food
+# either — with slack, because a source may round each of them and some conventions count fibre inside
+# the carbohydrate figure while others do not. Mirrors FoodPortion.MAX_MACRO_SUM_G.
+MAX_MACRO_SUM_G = 105.0
+
+# The nutrition block, in the order the schema declares it. When the macros contradict the food's own
+# weight there is no way to know WHICH of them is wrong, so the whole block goes and the row keeps its
+# name — the state the app already renders as `FoodLookup.NoNutrition`, and a far better answer than a
+# plausible-looking calorie count. Micronutrients are left alone, exactly as `FoodPortion.sane` leaves
+# them, because they are bounded individually and none of them is implicated by a macro sum.
+NUTRITION_FIELDS = ("kcal", "prot", "carb", "fat", "fib", "sug", "sat", "sod")
 
 
 def scaled(raw: str | float | None, scale: int, ceiling: float = 100_000.0) -> int | None:
@@ -211,6 +288,13 @@ class Row:
 
     __slots__ = COLUMNS
 
+    # How many times each field was refused, and how many rows lost their whole nutrition block.
+    # ⚠️ Class-level rather than passed around, because it belongs with the rule and the rule has to
+    # sit where nothing can go round it. A build reports these; a ceiling that dropped nothing is not
+    # evidence it was unnecessary, so the report names the ones that never fired too.
+    DROPPED: dict[str, int] = {}
+    IMPOSSIBLE_MACROS = 0
+
     def __init__(self, barcode: int, src: int):
         for c in COLUMNS:
             setattr(self, c, None)
@@ -218,7 +302,29 @@ class Row:
         self.src = src
 
     def values(self):
+        """The row as the INSERT wants it — sanitised, because this is the only way in.
+
+        ⚠️ The bounds are applied HERE rather than at each reader. Both `read_off` and `read_usda`
+        end in `row.values()` and a third source added later will too, which is the difference
+        between a rule and a rule somebody remembered.
+        """
+        self._bound()
         return tuple(getattr(self, c) for c in COLUMNS)
+
+    def _bound(self):
+        for field, ceiling in CEILINGS.items():
+            v = getattr(self, field)
+            if v is not None and (v < 0 or v > ceiling):
+                setattr(self, field, None)
+                Row.DROPPED[field] = Row.DROPPED.get(field, 0) + 1
+
+        macros = sum(
+            (getattr(self, f) or 0) for f in ("prot", "carb", "fat")
+        ) / SCALE_MACRO
+        if macros > MAX_MACRO_SUM_G:
+            for f in NUTRITION_FIELDS:
+                setattr(self, f, None)
+            Row.IMPOSSIBLE_MACROS += 1
 
     @property
     def has_nutrition(self) -> bool:
@@ -295,7 +401,9 @@ def read_off(path: Path, limit: int | None, log):
             row.potassium = scaled(g(rec, "potassium_100g"), 1000)    # g -> mg
             row.vit_a = scaled(g(rec, "vitamin-a_100g"), 1_000_000)   # g -> ug
             row.vit_c = scaled(g(rec, "vitamin-c_100g"), 1000 * 100)  # g -> mg x100
-            row.vit_d = scaled(g(rec, "vitamin-d_100g"), 1_000_000)   # g -> ug
+            # g -> ug x100. See SCALE_MICRO_CENTI: a whole microgram is too coarse for a nutrient
+            # whose daily reference is fifteen of them.
+            row.vit_d = scaled(g(rec, "vitamin-d_100g"), 1_000_000 * SCALE_MICRO_CENTI)
             row.chol = scaled(g(rec, "cholesterol_100g"), 1000)       # g -> mg
             row.transfat = scaled(g(rec, "trans-fat_100g"), SCALE_MACRO)
 
@@ -329,7 +437,7 @@ USDA_NUTRIENTS = {
     "306": ("potassium", 1),           # mg
     "320": ("vit_a", 1),               # ug RAE
     "401": ("vit_c", SCALE_MICRO),     # mg x100
-    "328": ("vit_d", 1),               # ug
+    "328": ("vit_d", SCALE_MICRO_CENTI),  # ug x100 — see SCALE_MICRO_CENTI
     "601": ("chol", 1),                # mg
     "605": ("transfat", SCALE_MACRO),
 }
@@ -434,10 +542,16 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         batch = []
         for row in read_off(off_path, limit, log):
             stats["off"] += 1
+            # ⚠️ **`values()` is what applies the bounds, so it has to come BEFORE `has_nutrition` is
+            # read.** The other way round — which is how this loop was first written after the bounds
+            # landed — a row whose macros outweigh the food counts as complete and enters `complete`,
+            # blocking a perfectly good USDA row from filling the gap, and THEN has its nutrition
+            # stripped. The row ends up with no numbers and no second chance at them.
+            vals = row.values()
             if row.has_nutrition:
                 stats["off_nutrition"] += 1
                 complete.add(row.barcode)
-            batch.append(row.values())
+            batch.append(vals)
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
@@ -454,6 +568,8 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         batch = []
         for row in read_usda(usda_path, limit, log):
             stats["usda"] += 1
+            # ⚠️ Same order as above, and for the same reason.
+            vals = row.values()
             if not row.has_nutrition:
                 continue
             stats["usda_nutrition"] += 1
@@ -462,7 +578,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
             if row.barcode in complete:
                 continue
             stats["replaced_by_usda"] += 1
-            batch.append(row.values())
+            batch.append(vals)
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
@@ -471,6 +587,16 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         con.commit()
         log(f"  {stats['usda']:,} items, {stats['replaced_by_usda']:,} filled a gap "
             f"({time.time() - t0:.0f}s)")
+
+    # ⚠️ Reported even when nothing was refused, and every ceiling is named either way. A ceiling that
+    # dropped nothing is not evidence it was unnecessary — it is evidence about this release of these
+    # sources — and a report that lists only the ones that fired cannot tell the two apart.
+    log("bounds:")
+    for field in CEILINGS:
+        n = Row.DROPPED.get(field, 0)
+        log(f"  {field:<10} ceiling {CEILINGS[field]:>12,}  refused {n:,}")
+    log(f"  macros outweighed the food on {Row.IMPOSSIBLE_MACROS:,} rows "
+        f"(nutrition dropped, name kept)")
 
     total = cur.execute("SELECT COUNT(*) FROM food").fetchone()[0]
     with_nut = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL AND kcal > 0").fetchone()[0]

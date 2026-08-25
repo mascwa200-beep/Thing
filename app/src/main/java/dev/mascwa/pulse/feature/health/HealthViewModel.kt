@@ -307,6 +307,23 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         val results: List<Food> = emptyList(),
         val busy: Boolean = false,
         val note: String = "",
+        /**
+         * True while the full 4.4-million-product scan is running.
+         *
+         * ⚠️ Separate from [busy] because the two mean different things to somebody looking at the
+         * screen. [busy] is the as-you-type search and clears in a moment; this one takes a second or
+         * more, was asked for by a button press, and needs to say so — a spinner that appears on a
+         * keystroke and one that appears on a deliberate action cannot share a label.
+         */
+        val searchingAll: Boolean = false,
+        /**
+         * Whether the last full scan stopped at its cap.
+         *
+         * ⚠️ Kept because a truncated list and a complete one look identical, and "these are the best
+         * matches" is a different claim from "these are the best of the first few thousand". A one-word
+         * query against a supermarket-sized corpus reaches the cap easily.
+         */
+        val allTruncated: Boolean = false,
     )
 
     private val _search = MutableStateFlow(Search())
@@ -372,6 +389,50 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     !r.onlineConsulted ->
                         "Offline foods only — no network, so packaged goods are not in this list."
                     else -> ""
+                },
+            )
+        }
+    }
+
+    /**
+     * Search every bundled product, not only the ones whose name starts with what was typed.
+     *
+     * ⚠️ **A deliberate action rather than a keystroke, and the whole design follows from that.** The
+     * as-you-type path can only afford an indexed prefix scan, which cannot find "Coca-Cola Zero
+     * Sugar" from "coke zero"; this is a full table scan over 4.4 million rows, measured at roughly a
+     * second on a desktop and slower on a phone reading it cold. It is worth a second when somebody
+     * pressed a button and knows the product is in there; it would be intolerable per character.
+     *
+     * ⚠️ Results are APPENDED rather than replacing the list, and de-duplicated by id. Somebody who
+     * pressed this has already seen the ranked local answers and is asking for more — throwing those
+     * away to show a different set would lose the row they might have wanted.
+     *
+     * ⚠️ Uses its own [scanJob] rather than [searchJob]. A scan that takes a second must survive the
+     * next keystroke's debounce cancelling the typed search, and equally must not be cancelled by it —
+     * they are two different requests and sharing one handle would have each silently kill the other.
+     */
+    private var scanJob: Job? = null
+
+    fun searchEveryProduct() {
+        val query = _search.value.query.trim()
+        if (query.length < MIN_QUERY) return
+        scanJob?.cancel()
+        _search.value = _search.value.copy(searchingAll = true, allTruncated = false)
+        scanJob = viewModelScope.launch {
+            val scan = c.foodRepository.searchAllBundled(query)
+            // ⚠️ The query may have moved on during the scan — a second is long enough to type in.
+            // Landing these results on a different query would be the "results go backwards" defect
+            // the typed path already guards against, arriving from the other direction.
+            if (_search.value.query.trim() != query) return@launch
+            val seen = _search.value.results.mapTo(HashSet()) { it.id }
+            _search.value = _search.value.copy(
+                results = _search.value.results + scan.foods.filterNot { it.id in seen },
+                searchingAll = false,
+                allTruncated = scan.truncated,
+                note = when {
+                    scan.foods.isEmpty() ->
+                        "No bundled product has all of those words in its name."
+                    else -> _search.value.note
                 },
             )
         }
@@ -481,9 +542,15 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
             // says CUSTOM with no foodId and nothing later can tell that the two are the same food.
             val saved =
                 if (keepAsFood && name.isNotBlank()) {
-                    FoodPortion.per100gFrom(eaten, grams)?.let { per100 ->
-                        c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
-                    }
+                    FoodPortion.per100gFrom(eaten, grams)
+                        // ⚠️ Re-checked here as well as on screen, for the same reason the weight is:
+                        // the switch does not clear itself when a figure changes underneath it. And
+                        // an impossible density must not be saved — `Food.of` would sanitise it to a
+                        // food with no numbers at all, which reads as the app having lost it.
+                        ?.takeIf { FoodPortion.densityLooksWrong(it) == null }
+                        ?.let { per100 ->
+                            c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
+                        }
                 } else {
                     null
                 }
@@ -823,6 +890,31 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /**
+     * Read a record back in from a file the reader chose.
+     *
+     * ⚠️ Shares [exporting] and [exportStatus] rather than adding a second pair, and that is a
+     * behavioural decision as much as a tidy one: the two buttons sit beside each other and touch the
+     * same stores, so one busy flag means neither can run while the other is walking the log. Two
+     * flags would let somebody export and import at once, over the same shards, for no gain.
+     */
+    fun importRecord(uri: android.net.Uri) {
+        if (_exporting.value) return
+        _exporting.value = true
+        _exportStatus.value = ""
+        viewModelScope.launch {
+            try {
+                _exportStatus.value = c.healthImporter.import(uri).message
+                // The day on screen may have gained entries, and the coach's numbers are built on
+                // days that just changed underneath it.
+                reloadEntries()
+                recompute.value++
+            } finally {
+                _exporting.value = false
+            }
+        }
+    }
+
     // --------------------------------------------------------------------------------- recipes
 
     /** Every saved recipe, newest first. */
@@ -838,8 +930,8 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     private val _draft = MutableStateFlow<Recipes.Recipe?>(null)
     val draft: StateFlow<Recipes.Recipe?> = _draft.asStateFlow()
 
-    fun newRecipe() {
-        _draft.value = Recipes.Recipe(id = UUID.randomUUID().toString(), name = "")
+    fun newRecipe(kind: Recipes.Kind = Recipes.Kind.RECIPE) {
+        _draft.value = Recipes.Recipe(id = UUID.randomUUID().toString(), name = "", kind = kind)
         searchFor(PickFor.RECIPE)
     }
 
@@ -876,6 +968,16 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun draftServings(n: Int) = editDraft { it.copy(servings = n.coerceAtLeast(1)) }
 
     /**
+     * Switch a draft between a dish and a group of foods eaten together.
+     *
+     * ⚠️ The yield and the portion count are **left on the draft** rather than cleared. Nothing reads
+     * them for a meal — `Recipes.yieldGrams` ignores a meal's yield outright, and `problems` does not
+     * ask either question of one — so keeping them means somebody who flips the toggle to look, and
+     * flips it straight back, still has the numbers they typed.
+     */
+    fun draftKind(kind: Recipes.Kind) = editDraft { it.copy(kind = kind) }
+
+    /**
      * Add a found food to the draft at a weight.
      *
      * ⚠️ Goes through [FoodPortion.gramsFor] like every other portion in this feature, so a
@@ -891,6 +993,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     name = food.display,
                     per100g = food.per100g,
                     grams = grams,
+                    micros = food.microsPer100g,
                 ),
             )
         }
@@ -940,6 +1043,11 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         val eaten = if (byServings) Recipes.eatenServings(recipe, amount)
         else Recipes.eatenGrams(recipe, amount)
         if (eaten == null) return
+        // ⚠️ The SAME branch, so the two halves of one helping cannot describe different portions.
+        // Deriving the micronutrients from the other route — say always by grams — would put a
+        // calcium figure for 200 g beside a calorie figure for two portions on one row.
+        val micros = if (byServings) Recipes.eatenServingsMicros(recipe, amount)
+        else Recipes.eatenGramsMicros(recipe, amount)
         val grams = if (byServings) (Recipes.servingGrams(recipe) ?: return) * amount else amount
         val now = System.currentTimeMillis()
         viewModelScope.launch {
@@ -951,16 +1059,70 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     name = recipe.name.ifBlank { "Recipe" },
                     grams = grams,
                     nutrients = eaten,
+                    micros = micros ?: Micronutrients.Amounts(),
                     meal = meal,
-                    // ⚠️ CUSTOM, because it is. The source field says where the numbers came from,
-                    // and a dish somebody assembled is not a database record however carefully its
-                    // ingredients were looked up.
-                    source = NutritionDay.Source.CUSTOM,
+                    // ⚠️ **RECIPE, and this used to say CUSTOM with a comment arguing against the very
+                    // enum value that exists for this case.** `Source` answers "where did this record
+                    // come from, so the surface can say how much to trust it", and a dish somebody
+                    // assembled out of looked-up ingredients is neither a database record nor a figure
+                    // typed off a label — which is exactly what `Source.RECIPE` was declared to mean.
+                    // It had no producer at all until now.
+                    //
+                    // Safe in both directions: `FoodLogStore` persists source by enum NAME with a
+                    // `getOrDefault(CUSTOM)` fallback, so an entry written by this build decodes as
+                    // CUSTOM on any build that lacks the value rather than failing to decode.
+                    source = NutritionDay.Source.RECIPE,
                     foodId = recipe.id,
                 ),
             )
             reloadEntries()
             recompute.value++
+        }
+    }
+
+    /**
+     * Log a saved meal — every food in it, in one tap.
+     *
+     * ⚠️ **This is the whole difference between a meal and a recipe, and it is deliberately not one
+     * entry.** A recipe is a density and becomes a single row, because a bolognese is one dish. A
+     * meal is several foods that happen to arrive together, and logging it as one row would leave
+     * INTAKE unable to say what was eaten and the macro panel unable to say which food the protein
+     * came from — which is the entire reason somebody would break a day down by food at all.
+     *
+     * ⚠️ Each entry carries **its own food's id**, never the meal's. Stamping them all with the meal
+     * would make porridge, a banana and a coffee look like the same food to recents, favourites and
+     * "log this again".
+     *
+     * ⚠️ The arithmetic is [Recipes.eatenComponents], which is pure and tested and pins that the
+     * portions sum to the meal. Looping over the components here would be a second definition of
+     * "this much of that food", and the two would eventually disagree.
+     */
+    fun logMeal(recipe: Recipes.Recipe, scale: Double, meal: NutritionDay.Meal) {
+        val parts = Recipes.eatenComponents(recipe, scale)
+        if (parts.isEmpty()) return
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            parts.forEach { p ->
+                c.foodLogStore.add(
+                    NutritionDay.Entry(
+                        id = UUID.randomUUID().toString(),
+                        dayStartMs = _today.value,
+                        atMs = now,
+                        name = p.name,
+                        grams = p.grams,
+                        nutrients = p.nutrients,
+                        micros = p.micros,
+                        meal = meal,
+                        source = NutritionDay.Source.RECIPE,
+                        foodId = p.foodId,
+                    ),
+                )
+            }
+            reloadEntries()
+            recompute.value++
+            _notice.value =
+                "Logged ${parts.size} ${if (parts.size == 1) "food" else "foods"} " +
+                    "from ${recipe.name.ifBlank { "your meal" }}."
         }
     }
 

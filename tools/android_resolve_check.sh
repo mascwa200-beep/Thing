@@ -50,6 +50,19 @@ set -uo pipefail
 # only in `Exception during IR lowering` while inlining `items$default`, which is exactly what a
 # correct @Composable does without the Compose plugin. Reaching lowering IS the pass.
 #
+# ⚠️ A SECOND SHAPE OF THE SAME CASCADE, and it names nothing Compose at all: a NEW destructuring
+# whose right-hand side is an unresolvable call reports
+#
+#     function 'component1()' is ambiguous for this expression:
+#     function 'component2()' is ambiguous for this expression:
+#
+# followed by a wall of every componentN in the stdlib. `val (a, b) = remember(x) { xs.partition {} }`
+# does it. The unresolved `remember` gives the expression an error type, and destructuring an error
+# type matches every componentN at once — so the message points at the destructuring and never at the
+# call that caused it, and the `remember` itself is invisible because it already existed at HEAD and
+# cancels in the differencing. Confirmed with a two-line control: the identical destructuring over a
+# RESOLVABLE receiver is clean, and swapping in an undefined function reproduces both lines exactly.
+#
 # Adding the Compose artifacts here is not worth it — foundation, foundation-layout, ui, ui-unit,
 # ui-graphics, ui-text, material3 and their transitives, resolved per run, to type-check files that
 # CI compiles properly in minutes. Recognise the shape instead, and settle a doubtful one with

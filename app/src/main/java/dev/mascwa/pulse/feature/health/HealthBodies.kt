@@ -530,11 +530,26 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     }
                     val energy = kcal.toDoubleOrNull()
                     val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
+                    // ⚠️ The numbers above are what was EATEN; the density is what a saved food has to
+                    // be. Only the density can be impossible — two thousand calories is an ordinary
+                    // day — so the check happens after the conversion and only when a weight exists.
+                    val typedEaten = NutritionDay.Nutrients(
+                        kcal = energy ?: 0.0,
+                        proteinG = protein.toDoubleOrNull() ?: 0.0,
+                        fatG = fat.toDoubleOrNull() ?: 0.0,
+                        carbG = carb.toDoubleOrNull() ?: 0.0,
+                    )
+                    val densityWrong = weight
+                        ?.let { FoodPortion.per100gFrom(typedEaten, it) }
+                        ?.let { FoodPortion.densityLooksWrong(it) }
                     KeepThisFood(
-                        keep = keep && weight != null,
-                        canKeep = weight != null && name.isNotBlank(),
+                        keep = keep && weight != null && densityWrong == null,
+                        canKeep = weight != null && name.isNotBlank() && densityWrong == null,
                         onToggle = { keep = it },
                         reason = when {
+                            // ⚠️ First, because impossible numbers are a bigger problem than a
+                            // missing name and only one reason is shown.
+                            densityWrong != null -> "Fix the figures below and this can be kept."
                             weight == null ->
                                 "To keep this, say what it weighed. A saved food is a density — that " +
                                     "is the only way it can be scaled to a different portion later — " +
@@ -564,15 +579,20 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             reset()
                         },
                     )
+                    // ⚠️ Shown whether or not the food is being kept: an impossible density means the
+                    // numbers or the weight are wrong, and that is worth saying about a figure going
+                    // into the log either way. The sentence comes from the core so this and the
+                    // parsers cannot come to hold different opinions about what is possible.
+                    if (densityWrong != null) {
+                        Text(
+                            "Per 100 g, $densityWrong",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                        )
+                    }
                     // ⚠️ Only shown once there is something to disagree with. A warning that appears
                     // while somebody is still typing the second field is noise, and they learn to
                     // ignore it before it ever means anything.
-                    val typed = NutritionDay.Nutrients(
-                        kcal = energy ?: 0.0,
-                        proteinG = protein.toDoubleOrNull() ?: 0.0,
-                        fatG = fat.toDoubleOrNull() ?: 0.0,
-                        carbG = carb.toDoubleOrNull() ?: 0.0,
-                    )
+                    val typed = typedEaten
                     if (protein.isNotBlank() && fat.isNotBlank() && carb.isNotBlank() &&
                         NutritionDay.energyLooksWrong(typed)
                     ) {
@@ -1275,6 +1295,14 @@ private fun ExportPanel(vm: HealthViewModel) {
     val save = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri -> if (uri != null) vm.exportRecord(uri) }
+    // ⚠️ `*/*` rather than a list of types, and that is not laziness. A zip arrives as
+    // application/zip, application/x-zip-compressed or octet-stream depending on which app wrote it,
+    // and a CSV as text/csv, text/comma-separated-values or text/plain — a picker that filters on
+    // type greys out the very file this app produced, on some devices only. The importer identifies
+    // what it has been given by reading it, which is the check that actually works.
+    val open = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> if (uri != null) vm.importRecord(uri) }
 
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -1291,6 +1319,18 @@ private fun ExportPanel(vm: HealthViewModel) {
                 text = if (busy) "GATHERING…" else "EXPORT EVERYTHING",
                 onClick = { save.launch("lcars-health.zip") },
                 enabled = !busy,
+            )
+            LcarsButton(
+                text = if (busy) "WORKING…" else "IMPORT A RECORD",
+                onClick = { open.launch(arrayOf("*/*")) },
+                enabled = !busy,
+            )
+            Text(
+                "Reads a zip this app wrote, or a single sheet out of one. Entries you already have " +
+                    "are recognised and left alone, so importing the same file twice changes nothing. " +
+                    "Anything else is refused rather than guessed at, and it will say which column it " +
+                    "could not understand.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
             if (busy) {
                 // ⚠️ Said out loud because this genuinely takes a while: it opens every month of the
@@ -1965,6 +2005,36 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
             // Nobody types "Ferrero Nutella hazelnut spread" standing in a kitchen, and Open Food
             // Facts is organised around barcodes because that is how a shelf identifies itself.
             LcarsButton(text = "⬚ SCAN A BARCODE", onClick = { scanning = true })
+            // ⚠️ Offered only once there is a query, and it says what it will cost. The as-you-type
+            // search can only afford a prefix scan of the bundled products — so "coke zero" cannot
+            // reach "Coca-Cola Zero Sugar" — and this reads the whole 4.4-million-row table instead.
+            // A second is worth it for somebody who knows the product is in there; it is not
+            // something to do on a keystroke, which is why it is a button and not a setting.
+            if (search.query.trim().length >= 2 && !search.busy) {
+                LcarsButton(
+                    text = if (search.searchingAll) "SEARCHING EVERY PRODUCT…" else "⌕ SEARCH EVERY PRODUCT",
+                    enabled = !search.searchingAll,
+                    onClick = { vm.searchEveryProduct() },
+                )
+                Text(
+                    if (search.searchingAll) {
+                        "Reading all 4.4 million bundled products. This takes a moment."
+                    } else {
+                        "Typing searches product names that START with what you typed. This one " +
+                            "finds your words anywhere in the name — slower, and finds far more."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                )
+            }
+            if (search.allTruncated) {
+                // ⚠️ Said out loud. A truncated list and a complete one look identical, and letting
+                // somebody believe they have seen everything is the worse of the two.
+                Text(
+                    "Showing the best of the first few thousand matches — there were more. A more " +
+                        "specific query narrows it.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
             when {
                 search.busy -> Text(
                     "Looking…",

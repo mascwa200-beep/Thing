@@ -275,6 +275,47 @@ class FoodLogStore(
         scheduleFlush()
     }
 
+    /**
+     * Put back a whole record read from a file. Returns how many were new.
+     *
+     * ⚠️ **NOT [add] in a loop, and the difference is not a micro-optimisation.** Every `add` takes the
+     * mutex, re-indexes its day, publishes the day map and schedules a flush; a year of logging is
+     * several thousand entries, so the loop would be several thousand mutex round-trips and several
+     * thousand index publications for one action somebody is standing there waiting on. This takes the
+     * lock once, groups by the shard each entry belongs in, and re-indexes each touched day exactly
+     * once.
+     *
+     * ⚠️ **Deduped by id against the days being written into**, so importing the same file twice adds
+     * nothing the second time. The check reads `shardLocked` for the months involved — never
+     * [allEntries], which opens every month there has ever been and is exactly what the sharding
+     * exists to avoid.
+     */
+    suspend fun importEntries(entries: List<NutritionDay.Entry>): Int {
+        if (entries.isEmpty()) return 0
+        var added = 0
+        mutex.withLock {
+            val map = indexLocked()
+            val touchedDays = mutableSetOf<Long>()
+            for ((month, batch) in entries.groupBy { monthOf(it.dayStartMs) }) {
+                val shard = shardLocked(month)
+                val existing = shard.entries.mapTo(HashSet()) { it.id }
+                // ⚠️ Also deduped WITHIN the batch, not only against what is on disk. A file holding
+                // the same id twice would otherwise land twice and be counted twice.
+                val fresh = batch.filter { existing.add(it.id) }
+                if (fresh.isEmpty()) continue
+                shards[month] = shard.copy(entries = shard.entries + fresh.map { it.stored() })
+                dirtyShards += month
+                added += fresh.size
+                fresh.forEach { touchedDays += it.dayStartMs }
+            }
+            // ⚠️ After every shard is in place, so a day whose entries arrived in more than one batch
+            // is counted once and correctly. Re-indexing inside the loop would publish a half-built day.
+            touchedDays.forEach { day -> reindexLocked(day, shardLocked(monthOf(day)), map) }
+        }
+        if (added > 0) scheduleFlush()
+        return added
+    }
+
     /** Copy a whole day onto another, which is how "same as yesterday" works. Returns how many landed. */
     suspend fun copyDay(fromDayStartMs: Long, toDayStartMs: Long, nowMs: Long, newId: () -> String): Int {
         val source = entriesFor(fromDayStartMs)

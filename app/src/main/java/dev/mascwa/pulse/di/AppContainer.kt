@@ -355,6 +355,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.HealthExporter(appContext, foodLogStore, bodyStore)
     }
 
+    /** The other direction: reading a record back in. Lazy for the same reason as the exporter. */
+    val healthImporter: dev.mascwa.pulse.data.health.HealthImporter by lazy {
+        dev.mascwa.pulse.data.health.HealthImporter(appContext, foodLogStore, bodyStore)
+    }
+
     /**
      * Health Connect, behind a capability check.
      *

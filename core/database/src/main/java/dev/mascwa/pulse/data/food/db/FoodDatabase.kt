@@ -7,8 +7,10 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteQuery
 
 /**
  * The bundled barcode database: ~4.4 million retail products, answerable with no network at all.
@@ -140,19 +142,42 @@ interface FoodDao {
     suspend fun byBarcode(barcode: Long): FoodRow?
 
     /**
-     * Name search over the bundled products.
+     * Name search over the bundled products, fast enough for a keystroke.
      *
-     * ⚠️ **Deliberately a prefix-anchored LIKE and deliberately capped.** There is no full-text
-     * index on this table, because one over 4.4M product names would cost more than the table
-     * itself and this is the secondary path — the bundled seed and the custom foods answer typed
-     * searches, and this is here so a product you have scanned before can also be found by typing.
-     * An unanchored `%term%` over 4.4M rows is a full scan and would be visibly slow.
+     * ⚠️ **Deliberately a prefix-anchored LIKE and deliberately capped.** An unanchored `%term%` over
+     * 4.4M rows is a full table scan, and one of those per keystroke would be visibly slow — so this
+     * is what the search FIELD calls, and `OfflineFoodStore.searchAllProducts` is the deliberate
+     * one-shot scan that finds the rest.
+     *
+     * ⚠️ **CORRECTION to what this note used to claim.** It said a full-text index "would cost more
+     * than the table itself". Measured on 113,612 real product names, an FTS5 index with
+     * `detail=none` costs **23.8 bytes a row against the table's 68.7** — about a third, not more. The
+     * reason there is still no index is different and is recorded on `searchAllProducts`: it is ~107 MB
+     * on an APK the in-app updater re-downloads in full on every build, to make an action somebody
+     * deliberately took faster rather than possible.
      */
     @Query(
         "SELECT * FROM food WHERE name LIKE :prefix || '%' AND kcal IS NOT NULL " +
             "ORDER BY LENGTH(name) LIMIT :limit"
     )
     suspend fun searchByNamePrefix(prefix: String, limit: Int): List<FoodRow>
+
+    /**
+     * Every row whose name satisfies a caller-built predicate. The full-scan path.
+     *
+     * ⚠️ **A raw query because the number of search terms varies and SQLite has no array parameter.**
+     * The predicate is assembled by `OfflineFoodStore.sqlFor` from `FoodSearch.tokens`, which keeps
+     * only letters and digits — so nothing a person can type reaches SQL as syntax. That is stated
+     * where the predicate is built as well as here, because a raw query is the one place in this app
+     * where it would matter.
+     *
+     * ⚠️ `kcal IS NOT NULL` matches the prefix path: a row with a name and no numbers is worth
+     * returning for a SCAN (that is the "recognised, tap to add the numbers" case) but not for a
+     * search somebody expects to log from. Both paths agree, so a product does not appear in one and
+     * vanish from the other.
+     */
+    @RawQuery
+    suspend fun searchByNameWords(query: SupportSQLiteQuery): List<FoodRow>
 
     @Query("SELECT COUNT(*) FROM food")
     suspend fun count(): Int

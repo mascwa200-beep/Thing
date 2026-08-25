@@ -78,7 +78,21 @@ data class Food(
     val display: String get() = if (brand.isBlank()) name else "$brand · $name"
 
     companion object {
-        /** The one place a [NutritionDay.Nutrients] becomes a storable [Food]. */
+        /**
+         * The one place a [NutritionDay.Nutrients] becomes a storable [Food].
+         *
+         * ⚠️ **Every figure passes [FoodPortion.sane] on the way in, and this is the only place that
+         * has to be true.** All four parsers — the bundled seed, the barcode database, Open Food
+         * Facts and a food you saved yourself — construct through here and nothing else calls the
+         * data class directly, so a source that publishes five kilograms of protein per hundred
+         * grams cannot reach the log however it arrives. Doing it at each parser instead would be
+         * four copies of one rule and a fifth parser later that forgets it.
+         *
+         * ⚠️ It sanitises **silently**, which is right for a parser and wrong for a person. A path
+         * where somebody typed the numbers must ask [FoodPortion.densityLooksWrong] *before* getting
+         * here and say what is wrong, because the likeliest cause is the weight they entered beside
+         * them — see `CustomFoodStore`. This is the backstop, not the conversation.
+         */
         fun of(
             id: String,
             name: String,
@@ -90,25 +104,29 @@ data class Food(
             source: NutritionDay.Source = NutritionDay.Source.OPEN_FOOD_FACTS,
             imageUrl: String = "",
             micros: Micronutrients.Amounts = Micronutrients.Amounts(),
-        ) = Food(
-            id = id,
-            name = name,
-            brand = brand,
-            kcal = per100g.kcal,
-            proteinG = per100g.proteinG,
-            fatG = per100g.fatG,
-            carbG = per100g.carbG,
-            fibreG = per100g.fibreG,
-            sugarG = per100g.sugarG,
-            satFatG = per100g.satFatG,
-            sodiumMg = per100g.sodiumMg,
-            servingGrams = servingGrams,
-            servingLabel = servingLabel,
-            packageGrams = packageGrams,
-            sourceName = source.name,
-            imageUrl = imageUrl,
-            micros = micros.values.entries.associate { it.key.name to it.value },
-        )
+        ): Food {
+            val n = FoodPortion.sane(per100g)
+            return Food(
+                id = id,
+                name = name,
+                brand = brand,
+                kcal = n.kcal,
+                proteinG = n.proteinG,
+                fatG = n.fatG,
+                carbG = n.carbG,
+                fibreG = n.fibreG,
+                sugarG = n.sugarG,
+                satFatG = n.satFatG,
+                sodiumMg = n.sodiumMg,
+                servingGrams = servingGrams,
+                servingLabel = servingLabel,
+                packageGrams = packageGrams,
+                sourceName = source.name,
+                imageUrl = imageUrl,
+                micros = FoodPortion.saneMicros(micros).values.entries
+                    .associate { it.key.name to it.value },
+            )
+        }
     }
 }
 

@@ -61,6 +61,44 @@ object Micronutrients {
     }
 
     /**
+     * How many of [m]'s own units are in one gram, or null if its unit is not one this understands.
+     *
+     * ⚠️ **The single derivation two separate rules rest on**, so neither can be right while the
+     * other is wrong: `FoodPortion.maxPer100g` bounds a figure by the weight of the food, and
+     * [fromGrams] converts a source that publishes in grams. Written as a table of eight entries
+     * instead, it would be two tables — and the one that gets forgotten is always the second.
+     *
+     * ⚠️ Null rather than a default, and the null is load-bearing: silently assuming grams for an
+     * unrecognised unit would admit a figure a thousand times too small AND bound it a thousand times
+     * too loosely, in one stroke. `FoodPortionTest` fails the build if any declared micronutrient
+     * lands here, so a ninth entry cannot introduce one quietly.
+     */
+    fun perGram(m: Micro): Double? = when (m.unit) {
+        "g" -> 1.0
+        "mg" -> 1_000.0
+        "µg" -> 1_000_000.0
+        else -> null
+    }
+
+    /**
+     * A figure a source published in GRAMS, in the unit this app stores [m] in.
+     *
+     * ⚠️ Named rather than inlined at the call site, for exactly the reason
+     * `FoodPortion.sodiumMgFromGrams` gives about itself: it is the kind of conversion that gets
+     * quietly dropped in a refactor, and a dropped thousandfold makes every food look free of
+     * something. Open Food Facts publishes all eight of these in grams — probed against the live API,
+     * where the `_unit` field beside each reads "g" — so this is the whole of what that path needs.
+     *
+     * ⚠️ Null in, null out. Zero is a claim that a food contains none of something, which is a
+     * different fact from nobody having measured it.
+     */
+    fun fromGrams(m: Micro, grams: Double?): Double? {
+        val g = grams ?: return null
+        if (!g.isFinite() || g < 0.0) return null
+        return perGram(m)?.let { g * it }
+    }
+
+    /**
      * What one food records, per whatever quantity the caller is talking about.
      *
      * ⚠️ A key that is not here was never measured. Callers must render that as "not recorded" and
@@ -77,6 +115,23 @@ object Micronutrients {
         fun scaled(factor: Double): Amounts {
             if (!factor.isFinite() || factor < 0.0) return Amounts()
             return Amounts(values.mapValues { it.value * factor })
+        }
+
+        /**
+         * Two records added — an ingredient onto a running total.
+         *
+         * ⚠️ **The union, not the intersection, and absent stays absent on both sides.** If one
+         * ingredient records calcium and another does not, the sum is the one figure there is, and
+         * [Day.coverage] is what says how much of the dish that figure was drawn from. Treating the
+         * silent ingredient as zero would understate the total; refusing to add at all would report
+         * nothing for a dish that partly knows.
+         */
+        operator fun plus(other: Amounts): Amounts {
+            if (values.isEmpty()) return other
+            if (other.values.isEmpty()) return this
+            val out = LinkedHashMap(values)
+            for ((k, v) in other.values) out[k] = (out[k] ?: 0.0) + v
+            return Amounts(out)
         }
     }
 
