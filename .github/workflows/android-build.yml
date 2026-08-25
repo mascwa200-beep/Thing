@@ -19,6 +19,14 @@ on:
     # widen the list to anything a build could actually depend on.
     paths-ignore:
       - "CLAUDE.md"
+      # ⚠️ The standalone nutrition app cannot affect this one, and it is worth being precise about
+      # why rather than trusting the module boundary: this job builds `:app:assembleRelease`, which
+      # never reaches `:nutrition`, and `:nutrition` depends on `:core:telemetry` and
+      # `:core:database` rather than the other way round. So a commit touching only that module or
+      # its workflow has nothing here to rebuild. `settings.gradle.kts` and the version catalog are
+      # shared and deliberately NOT listed — a change to either can move this build.
+      - "nutrition/**"
+      - ".github/workflows/nutrition-build.yml"
   workflow_dispatch:
 
 permissions:

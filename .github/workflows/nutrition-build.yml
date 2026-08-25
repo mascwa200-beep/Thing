@@ -182,12 +182,36 @@ jobs:
           echo "APK: $apk"
           echo "size: $bytes bytes ($(numfmt --to=iec "$bytes"))"
 
-          if unzip -l "$apk" | grep -q " lib/"; then
-            echo "::error::this APK contains native libraries, so it is no longer architecture-independent"
-            unzip -l "$apk" | grep " lib/" | head -20
-            exit 1
+          # ⚠️ **The rule is "every architecture", not "no native code", and the first version of
+          # this check had it wrong — it failed on the presence of any `lib/` directory at all.**
+          # That reasoning does not hold: Compose UI depends transitively on
+          # `androidx.graphics:graphics-path`, which ships a small `.so`, and it ships one for all
+          # four architectures, so the APK still runs everywhere. What would genuinely take the
+          # property away is a library present for SOME architectures and not others, or an
+          # `abiFilters` narrowing the build — so the check is per-library now.
+          abis="arm64-v8a armeabi-v7a x86 x86_64"
+          # ⚠️ `.+` after the ABI, so a DIRECTORY entry (`lib/`, `lib/arm64-v8a/`) is not mistaken
+          # for a library. AGP's own APKs carry no directory entries, but a check that fails on a
+          # zip written by any other tool is a check nobody will trust — found by running this
+          # against a synthetic APK with all four architectures present, which it rejected.
+          libs=$(unzip -l "$apk" | awk '$4 ~ /^lib\/[^\/]+\/.+/ {print $4}')
+          if [ -z "$libs" ]; then
+            echo "no native libraries at all: one APK covers $abis"
+          else
+            missing=""
+            for so in $(echo "$libs" | sed 's|^lib/[^/]*/||' | sort -u); do
+              for abi in $abis; do
+                echo "$libs" | grep -qx "lib/$abi/$so" || missing="$missing lib/$abi/$so"
+              done
+            done
+            if [ -n "$missing" ]; then
+              echo "::error::this APK is not architecture-independent — absent:$missing"
+              echo "$libs" | sed 's/^/    /'
+              exit 1
+            fi
+            echo "every native library is present for all four architectures:"
+            echo "$libs" | sed 's/^/    /'
           fi
-          echo "no native libraries: one APK covers arm64-v8a, armeabi-v7a, x86 and x86_64"
 
           # And that the database really is inside it. An asset placed and then not packaged is the
           # silent failure this whole module's first screen exists to catch on the device; catching

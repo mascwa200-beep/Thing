@@ -27,8 +27,14 @@ android {
         //
         // ⚠️ And 26 is NOT what makes this run on "every type of phone" — that was never the
         // version. `:app` is arm64-only and refuses to start except on one Pixel model running
-        // GrapheneOS. This module has no native code at all, so ONE universal APK covers arm64,
-        // arm32, x86 and x86_64, and there is no device gate to pass.
+        // GrapheneOS. This module compiles no native code of its own and narrows nothing, so ONE
+        // universal APK covers arm64, arm32, x86 and x86_64, and there is no device gate to pass.
+        //
+        // ⚠️ It is not literally free of native libraries, and the first version of this comment
+        // said it was. Measured from the shipped artifact: Compose UI depends transitively on
+        // `androidx.graphics:graphics-path`, whose ~10 kB `.so` is packaged — for all four
+        // architectures, which is why the property still holds. The CI check enforces exactly that:
+        // every native library present for every architecture, never the absence of all of them.
         minSdk = libs.versions.minSdkWide.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = nutritionBuildNumber
