@@ -1295,6 +1295,14 @@ private fun ExportPanel(vm: HealthViewModel) {
     val save = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri -> if (uri != null) vm.exportRecord(uri) }
+    // ⚠️ `*/*` rather than a list of types, and that is not laziness. A zip arrives as
+    // application/zip, application/x-zip-compressed or octet-stream depending on which app wrote it,
+    // and a CSV as text/csv, text/comma-separated-values or text/plain — a picker that filters on
+    // type greys out the very file this app produced, on some devices only. The importer identifies
+    // what it has been given by reading it, which is the check that actually works.
+    val open = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> if (uri != null) vm.importRecord(uri) }
 
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -1311,6 +1319,18 @@ private fun ExportPanel(vm: HealthViewModel) {
                 text = if (busy) "GATHERING…" else "EXPORT EVERYTHING",
                 onClick = { save.launch("lcars-health.zip") },
                 enabled = !busy,
+            )
+            LcarsButton(
+                text = if (busy) "WORKING…" else "IMPORT A RECORD",
+                onClick = { open.launch(arrayOf("*/*")) },
+                enabled = !busy,
+            )
+            Text(
+                "Reads a zip this app wrote, or a single sheet out of one. Entries you already have " +
+                    "are recognised and left alone, so importing the same file twice changes nothing. " +
+                    "Anything else is refused rather than guessed at, and it will say which column it " +
+                    "could not understand.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
             if (busy) {
                 // ⚠️ Said out loud because this genuinely takes a while: it opens every month of the

@@ -890,6 +890,31 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /**
+     * Read a record back in from a file the reader chose.
+     *
+     * ⚠️ Shares [exporting] and [exportStatus] rather than adding a second pair, and that is a
+     * behavioural decision as much as a tidy one: the two buttons sit beside each other and touch the
+     * same stores, so one busy flag means neither can run while the other is walking the log. Two
+     * flags would let somebody export and import at once, over the same shards, for no gain.
+     */
+    fun importRecord(uri: android.net.Uri) {
+        if (_exporting.value) return
+        _exporting.value = true
+        _exportStatus.value = ""
+        viewModelScope.launch {
+            try {
+                _exportStatus.value = c.healthImporter.import(uri).message
+                // The day on screen may have gained entries, and the coach's numbers are built on
+                // days that just changed underneath it.
+                reloadEntries()
+                recompute.value++
+            } finally {
+                _exporting.value = false
+            }
+        }
+    }
+
     // --------------------------------------------------------------------------------- recipes
 
     /** Every saved recipe, newest first. */

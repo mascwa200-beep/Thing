@@ -150,12 +150,22 @@ object HealthExport {
      * micronutrient reaches the export by existing. The unit is IN the name because a bare `calcium`
      * column invites somebody to compare it against a figure in grams.
      */
-    val MICRO_COLUMNS: List<String> = Micronutrients.Micro.entries.map { m ->
+    val MICRO_COLUMNS: List<String> = Micronutrients.Micro.entries.map(::microColumn)
+
+    /**
+     * The column name for one micronutrient.
+     *
+     * ⚠️ **Split out so the reader can ask for a column BY MICRONUTRIENT rather than by position.**
+     * `HealthImport` used to pair `Micro.entries[i]` with `MICRO_COLUMNS[i]`, which is exactly the
+     * positional coupling this format's first rule forbids: correct only for as long as two lists
+     * stay in lockstep, and silently wrong the moment one of them does not.
+     */
+    fun microColumn(m: Micronutrients.Micro): String {
         val unit = when (m.unit) {
             "µg" -> "ug"   // ⚠️ ASCII in a column name. A header a script has to guess the encoding of
             else -> m.unit // is a header somebody's parser gets wrong.
         }
-        m.name.lowercase() + "_" + unit
+        return m.name.lowercase() + "_" + unit
     }
 
     /**
