@@ -905,8 +905,8 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     private val _draft = MutableStateFlow<Recipes.Recipe?>(null)
     val draft: StateFlow<Recipes.Recipe?> = _draft.asStateFlow()
 
-    fun newRecipe() {
-        _draft.value = Recipes.Recipe(id = UUID.randomUUID().toString(), name = "")
+    fun newRecipe(kind: Recipes.Kind = Recipes.Kind.RECIPE) {
+        _draft.value = Recipes.Recipe(id = UUID.randomUUID().toString(), name = "", kind = kind)
         searchFor(PickFor.RECIPE)
     }
 
@@ -941,6 +941,16 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun draftYield(grams: Double?) = editDraft { it.copy(cookedYieldG = grams) }
 
     fun draftServings(n: Int) = editDraft { it.copy(servings = n.coerceAtLeast(1)) }
+
+    /**
+     * Switch a draft between a dish and a group of foods eaten together.
+     *
+     * ⚠️ The yield and the portion count are **left on the draft** rather than cleared. Nothing reads
+     * them for a meal — `Recipes.yieldGrams` ignores a meal's yield outright, and `problems` does not
+     * ask either question of one — so keeping them means somebody who flips the toggle to look, and
+     * flips it straight back, still has the numbers they typed.
+     */
+    fun draftKind(kind: Recipes.Kind) = editDraft { it.copy(kind = kind) }
 
     /**
      * Add a found food to the draft at a weight.
@@ -1026,15 +1036,68 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     nutrients = eaten,
                     micros = micros ?: Micronutrients.Amounts(),
                     meal = meal,
-                    // ⚠️ CUSTOM, because it is. The source field says where the numbers came from,
-                    // and a dish somebody assembled is not a database record however carefully its
-                    // ingredients were looked up.
-                    source = NutritionDay.Source.CUSTOM,
+                    // ⚠️ **RECIPE, and this used to say CUSTOM with a comment arguing against the very
+                    // enum value that exists for this case.** `Source` answers "where did this record
+                    // come from, so the surface can say how much to trust it", and a dish somebody
+                    // assembled out of looked-up ingredients is neither a database record nor a figure
+                    // typed off a label — which is exactly what `Source.RECIPE` was declared to mean.
+                    // It had no producer at all until now.
+                    //
+                    // Safe in both directions: `FoodLogStore` persists source by enum NAME with a
+                    // `getOrDefault(CUSTOM)` fallback, so an entry written by this build decodes as
+                    // CUSTOM on any build that lacks the value rather than failing to decode.
+                    source = NutritionDay.Source.RECIPE,
                     foodId = recipe.id,
                 ),
             )
             reloadEntries()
             recompute.value++
+        }
+    }
+
+    /**
+     * Log a saved meal — every food in it, in one tap.
+     *
+     * ⚠️ **This is the whole difference between a meal and a recipe, and it is deliberately not one
+     * entry.** A recipe is a density and becomes a single row, because a bolognese is one dish. A
+     * meal is several foods that happen to arrive together, and logging it as one row would leave
+     * INTAKE unable to say what was eaten and the macro panel unable to say which food the protein
+     * came from — which is the entire reason somebody would break a day down by food at all.
+     *
+     * ⚠️ Each entry carries **its own food's id**, never the meal's. Stamping them all with the meal
+     * would make porridge, a banana and a coffee look like the same food to recents, favourites and
+     * "log this again".
+     *
+     * ⚠️ The arithmetic is [Recipes.eatenComponents], which is pure and tested and pins that the
+     * portions sum to the meal. Looping over the components here would be a second definition of
+     * "this much of that food", and the two would eventually disagree.
+     */
+    fun logMeal(recipe: Recipes.Recipe, scale: Double, meal: NutritionDay.Meal) {
+        val parts = Recipes.eatenComponents(recipe, scale)
+        if (parts.isEmpty()) return
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            parts.forEach { p ->
+                c.foodLogStore.add(
+                    NutritionDay.Entry(
+                        id = UUID.randomUUID().toString(),
+                        dayStartMs = _today.value,
+                        atMs = now,
+                        name = p.name,
+                        grams = p.grams,
+                        nutrients = p.nutrients,
+                        micros = p.micros,
+                        meal = meal,
+                        source = NutritionDay.Source.RECIPE,
+                        foodId = p.foodId,
+                    ),
+                )
+            }
+            reloadEntries()
+            recompute.value++
+            _notice.value =
+                "Logged ${parts.size} ${if (parts.size == 1) "food" else "foods"} " +
+                    "from ${recipe.name.ifBlank { "your meal" }}."
         }
     }
 

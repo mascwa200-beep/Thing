@@ -38,10 +38,15 @@ import kotlin.math.roundToInt
 private val Pad = PaddingValues(13.dp)
 
 /**
- * The dishes you make more than once.
+ * The dishes you make more than once, and the groups of foods you eat together.
  *
  * A bolognese is eleven ingredients, and logging it as eleven entries every Tuesday is what makes
  * people stop logging. Built once here, it is a single tap on INTAKE afterwards.
+ *
+ * ⚠️ **Two kinds, and the difference is what logging one means.** A RECIPE is a density and becomes
+ * one entry, because a bolognese is one dish. A MEAL is several foods that arrive together and
+ * becomes one entry each, so the day still breaks down by food. They share this page, the builder
+ * and the food picker because they are the same data — see [Recipes.Kind].
  *
  * Every number on this page comes from the CI-tested [Recipes] core. Nothing is computed inline —
  * the whole point of that core is that the two ways to take a helping, weighed and counted, cannot
@@ -58,25 +63,59 @@ fun RecipesBody(vm: HealthViewModel) {
         return
     }
 
+    // Split here rather than inside the list: `partition` on every recomposition of a lazy item
+    // would run once per visible row for an answer that is the same for all of them.
+    val (dishes, meals) = remember(saved) { saved.partition { !Recipes.isMeal(it) } }
+
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        item { LcarsButton(text = "＋ BUILD A RECIPE", onClick = vm::newRecipe) }
-        if (saved.isEmpty()) {
-            item {
-                NotYet(
-                    "No recipes yet. Build one from the foods you already search for, weigh the pot " +
-                        "when it comes off the heat, and say how many it serves — then a helping is " +
-                        "one entry rather than eleven.",
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LcarsButton(
+                    text = "＋ RECIPE",
+                    onClick = { vm.newRecipe(Recipes.Kind.RECIPE) },
+                    modifier = Modifier.weight(1f),
+                )
+                LcarsButton(
+                    text = "＋ MEAL",
+                    onClick = { vm.newRecipe(Recipes.Kind.MEAL) },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
-        items(saved, key = { it.id }) { r -> SavedRecipe(vm, r) }
+        if (saved.isEmpty()) {
+            item {
+                NotYet(
+                    "Nothing saved yet. A RECIPE is a dish you cook — weigh the pot when it comes " +
+                        "off the heat, say how many it serves, and a helping is one entry rather " +
+                        "than eleven. A MEAL is the foods you eat together — the same breakfast " +
+                        "every morning goes in with one tap, and still shows up as each food.",
+                )
+            }
+        }
+        if (dishes.isNotEmpty()) {
+            item { SectionLabel("RECIPES") }
+            items(dishes, key = { it.id }) { r -> SavedRecipe(vm, r) }
+        }
+        if (meals.isNotEmpty()) {
+            item { SectionLabel("SAVED MEALS") }
+            items(meals, key = { it.id }) { r -> SavedRecipe(vm, r) }
+        }
     }
 }
 
-/** One saved dish: what a portion of it is, and the two ways to log one. */
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = Pulse.colors.muted,
+    )
+}
+
+/** One saved dish or meal: what it is, and how to put it in the day. */
 @Composable
 private fun SavedRecipe(vm: HealthViewModel, r: Recipes.Recipe) {
     val c = Pulse.colors
+    val meal = Recipes.isMeal(r)
     var open by remember(r.id) { mutableStateOf(false) }
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -87,7 +126,7 @@ private fun SavedRecipe(vm: HealthViewModel, r: Recipes.Recipe) {
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        r.name.ifBlank { "Unnamed recipe" },
+                        r.name.ifBlank { if (meal) "Unnamed meal" else "Unnamed recipe" },
                         fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
                     )
                     // The core's own one-line summary, so the list and the builder agree by
@@ -105,14 +144,20 @@ private fun SavedRecipe(vm: HealthViewModel, r: Recipes.Recipe) {
                         fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink, lineHeight = 14.sp,
                     )
                 }
-                Recipes.per100g(r)?.let { per ->
-                    Text(
-                        "Per 100 g · ${per.kcal.roundToInt()} kcal · " +
-                            "P ${per.proteinG.roundToInt()} F ${per.fatG.roundToInt()} C ${per.carbG.roundToInt()}",
-                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
-                    )
+                // ⚠️ Only for a dish. A per-100-gram figure is what a recipe IS; for a group of foods
+                // it is an average of things nobody eats by the 100 g, and printing it would invite
+                // somebody to log a meal by weight — which is the one thing a meal cannot express.
+                if (!meal) {
+                    Recipes.per100g(r)?.let { per ->
+                        Text(
+                            "Per 100 g · ${per.kcal.roundToInt()} kcal · " +
+                                "P ${per.proteinG.roundToInt()} F ${per.fatG.roundToInt()} " +
+                                "C ${per.carbG.roundToInt()}",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                        )
+                    }
                 }
-                LogAHelping(vm, r)
+                if (meal) LogTheMeal(vm, r) else LogAHelping(vm, r)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     LcarsButton(text = "EDIT", onClick = { vm.editRecipe(r) }, modifier = Modifier.weight(1f))
                     LcarsButton(text = "DELETE", onClick = { vm.deleteRecipe(r.id) }, modifier = Modifier.weight(1f))
@@ -165,11 +210,57 @@ private fun LogAHelping(vm: HealthViewModel, r: Recipes.Recipe) {
     }
 }
 
+/**
+ * A whole meal, in one tap.
+ *
+ * ⚠️ **No amount field, and that is the feature rather than an omission.** The point of saving a meal
+ * is that it is the same every time; asking for a number before logging the breakfast somebody has
+ * eaten two hundred mornings running would put the work straight back. The one concession is HALF,
+ * for the morning it was a smaller bowl.
+ *
+ * ⚠️ The preview counts the ENTRIES it is about to write, because that is the surprising part: a meal
+ * is several rows in the day, not one, and somebody should see that before it happens rather than
+ * discover it on INTAKE.
+ */
+@Composable
+private fun LogTheMeal(vm: HealthViewModel, r: Recipes.Recipe) {
+    val c = Pulse.colors
+    var scale by remember(r.id) { mutableStateOf(1.0) }
+    var meal by remember(r.id) { mutableStateOf(NutritionDay.Meal.BREAKFAST) }
+    val parts = remember(r, scale) { Recipes.eatenComponents(r, scale) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            NutritionDay.Meal.entries.forEach { m -> LcarsChip(m.label, meal == m, { meal = m }) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            LcarsChip("ALL OF IT", scale == 1.0, { scale = 1.0 })
+            LcarsChip("HALF", scale == 0.5, { scale = 0.5 })
+        }
+        Text(
+            if (parts.isEmpty()) {
+                "Nothing in this meal has a weight yet."
+            } else {
+                "${parts.size} ${if (parts.size == 1) "entry" else "entries"} · " +
+                    "${parts.sumOf { it.nutrients.kcal }.roundToInt()} kcal · " +
+                    "P ${parts.sumOf { it.nutrients.proteinG }.roundToInt()}"
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+        )
+        LcarsButton(
+            text = "LOG THE WHOLE MEAL",
+            enabled = parts.isNotEmpty(),
+            onClick = { vm.logMeal(r, scale, meal) },
+        )
+    }
+}
+
 // ==================================================================================== builder
 
 @Composable
 private fun RecipeBuilder(vm: HealthViewModel, d: Recipes.Recipe) {
     val c = Pulse.colors
+    val meal = Recipes.isMeal(d)
     val problems = remember(d) { Recipes.problems(d) }
     val total = remember(d) { Recipes.total(d) }
 
@@ -178,23 +269,55 @@ private fun RecipeBuilder(vm: HealthViewModel, d: Recipes.Recipe) {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "THE DISH",
+                        if (meal) "THE MEAL" else "THE DISH",
                         fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
                     )
-                    LcarsField(d.name, vm::draftName, placeholder = "Bolognese, overnight oats, the good curry…")
-                    // ⚠️ Blank clears the weighed yield rather than setting it to zero. "I did not
-                    // weigh it" and "it weighed nothing" are different facts, and the core treats
-                    // the first as "assume nothing was lost" and refuses the second.
-                    YieldField(d, vm)
-                    ServingsField(d, vm)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LcarsChip("A DISH", !meal, { vm.draftKind(Recipes.Kind.RECIPE) })
+                        LcarsChip("FOODS TOGETHER", meal, { vm.draftKind(Recipes.Kind.MEAL) })
+                    }
+                    Text(
+                        if (meal) {
+                            "Logs as one entry per food, so the day still breaks down by what you ate."
+                        } else {
+                            "Cooked down into one thing, so it logs as one entry with its own numbers."
+                        },
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                    )
+                    LcarsField(
+                        d.name,
+                        vm::draftName,
+                        placeholder = if (meal) {
+                            "Usual breakfast, gym snack, Sunday fry-up…"
+                        } else {
+                            "Bolognese, overnight oats, the good curry…"
+                        },
+                    )
+                    // ⚠️ Neither field is shown for a meal, and the core agrees rather than merely
+                    // being unasked: `Recipes.yieldGrams` ignores a meal's stored yield outright, and
+                    // `problems` does not ask either question of one. Nothing cooks a plate down, and
+                    // nothing divides it into helpings.
+                    if (!meal) {
+                        // ⚠️ Blank clears the weighed yield rather than setting it to zero. "I did not
+                        // weigh it" and "it weighed nothing" are different facts, and the core treats
+                        // the first as "assume nothing was lost" and refuses the second.
+                        YieldField(d, vm)
+                        ServingsField(d, vm)
+                    }
                 }
             }
         }
-        item { FindAnIngredient(vm) }
+        item { FindAnIngredient(vm, meal) }
         if (d.components.isNotEmpty()) {
             item {
                 Text(
-                    "IN THE POT · ${Recipes.rawGrams(d).roundToInt()} g raw · ${total.kcal.roundToInt()} kcal",
+                    if (meal) {
+                        "ON THE PLATE · ${Recipes.rawGrams(d).roundToInt()} g · " +
+                            "${total.kcal.roundToInt()} kcal"
+                    } else {
+                        "IN THE POT · ${Recipes.rawGrams(d).roundToInt()} g raw · " +
+                            "${total.kcal.roundToInt()} kcal"
+                    },
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.muted,
                 )
             }
@@ -309,7 +432,7 @@ private fun ServingsField(d: Recipes.Recipe, vm: HealthViewModel) {
  * portion picker — one search box serving two destinations with nothing saying which.
  */
 @Composable
-private fun FindAnIngredient(vm: HealthViewModel) {
+private fun FindAnIngredient(vm: HealthViewModel, meal: Boolean) {
     val c = Pulse.colors
     val search by vm.search.collectAsStateWithLifecycle()
     val picked by vm.picked.collectAsStateWithLifecycle()
@@ -318,10 +441,18 @@ private fun FindAnIngredient(vm: HealthViewModel) {
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "ADD AN INGREDIENT",
+                if (meal) "ADD A FOOD" else "ADD AN INGREDIENT",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
             )
-            LcarsField(search.query, vm::onSearchQuery, placeholder = "Mince, tinned tomatoes, olive oil…")
+            LcarsField(
+                search.query,
+                vm::onSearchQuery,
+                placeholder = if (meal) {
+                    "Porridge oats, a banana, black coffee…"
+                } else {
+                    "Mince, tinned tomatoes, olive oil…"
+                },
+            )
             val chosen = picked.takeIf { target == HealthViewModel.PickFor.RECIPE }
             if (chosen == null) {
                 search.results.take(8).forEach { food ->
@@ -336,7 +467,7 @@ private fun FindAnIngredient(vm: HealthViewModel) {
                     }
                 }
             } else {
-                HowMuchWentIn(chosen, vm)
+                HowMuchWentIn(chosen, vm, meal)
             }
         }
     }
@@ -344,7 +475,7 @@ private fun FindAnIngredient(vm: HealthViewModel) {
 
 /** The weight that went in, in whatever unit the food can actually express. */
 @Composable
-private fun HowMuchWentIn(food: Food, vm: HealthViewModel) {
+private fun HowMuchWentIn(food: Food, vm: HealthViewModel, meal: Boolean) {
     val c = Pulse.colors
     val units = remember(food.id) { FoodPortion.unitsFor(food.sizes) }
     var unit by remember(food.id) { mutableStateOf(units.first()) }
@@ -359,7 +490,8 @@ private fun HowMuchWentIn(food: Food, vm: HealthViewModel) {
             LcarsField(amount, { amount = it }, modifier = Modifier.weight(1f))
         }
         Text(
-            grams?.let { "${it.roundToInt()} g into the pot" } ?: "Type an amount.",
+            grams?.let { "${it.roundToInt()} g ${if (meal) "on the plate" else "into the pot"}" }
+                ?: "Type an amount.",
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

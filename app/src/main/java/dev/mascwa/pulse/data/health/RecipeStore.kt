@@ -36,7 +36,13 @@ import kotlinx.serialization.json.Json
 private val Context.recipeDataStore: DataStore<Preferences> by preferencesDataStore(name = "pulse_recipes")
 
 /**
- * The dishes you make more than once.
+ * The dishes you make more than once, and the groups of foods you eat together.
+ *
+ * ⚠️ **Both, in one store, deliberately.** A saved meal is the same data as a recipe — a named list
+ * of foods at weights — and differs only in what logging it means (see [Recipes.Kind]). A second
+ * store would mean a second DataStore file, a second builder and a second food picker for a
+ * difference of one branch at one call site. ⚠️ The file name stays `pulse_recipes`: it is
+ * **identity**, and renaming it would orphan everything already saved.
  *
  * A single blob, unlike [FoodLogStore] beside it, and that is the ordinary case rather than the
  * exception: this holds tens of records that change when somebody edits a recipe, where the log
@@ -95,6 +101,16 @@ class RecipeStore(
         val note: String = "",
         /** When it was last saved, so the list can lead with what you are actually cooking. */
         val savedAtMs: Long = 0L,
+        /**
+         * `RECIPE` or `MEAL` — see [Recipes.Kind].
+         *
+         * ⚠️ Defaulted, so every recipe already on disk decodes as what it was. And a **String**
+         * rather than the enum, for the reason stated on [StoredComponent.micros] and on the log's
+         * own `source`: an enum-valued serializer THROWS on a name it does not know, so a future
+         * third kind read by an older build would make somebody's whole recipe book undecodable
+         * rather than merely puzzling. An unrecognised value falls back to `RECIPE` below.
+         */
+        val kind: String = "RECIPE",
     )
 
     @Serializable
@@ -235,6 +251,7 @@ class RecipeStore(
         cookedYieldG = cookedYieldG,
         servings = servings,
         note = note,
+        kind = runCatching { Recipes.Kind.valueOf(kind) }.getOrDefault(Recipes.Kind.RECIPE),
     )
 
     private fun Recipes.Recipe.stored(nowMs: Long) = StoredRecipe(
@@ -253,6 +270,7 @@ class RecipeStore(
         servings = servings,
         note = note,
         savedAtMs = nowMs,
+        kind = kind.name,
     )
 
     private companion object {
