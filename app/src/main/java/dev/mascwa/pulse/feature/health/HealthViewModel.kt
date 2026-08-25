@@ -296,6 +296,18 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     /**
+     * Take a measurement back.
+     *
+     * ⚠️ Keyed on the instant AND the kind, because `recordMeasurement` appends rather than
+     * replacing — several kinds can share a moment if somebody works round themselves with a tape,
+     * and removing by time alone would take the lot.
+     */
+    fun removeMeasurement(kind: BodyStore.MeasureKind, atMs: Long) {
+        c.bodyStore.removeMeasurement(atMs, kind)
+        _notice.value = "${kind.label} removed."
+    }
+
+    /**
      * Log something by its numbers alone.
      *
      * The whole food database arrives in a later slice; this is the path that never needs one and never

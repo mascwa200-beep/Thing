@@ -1523,8 +1523,16 @@ private fun Measurements(vm: HealthViewModel) {
                 },
             )
             val latest by vm.measurements.collectAsStateWithLifecycle()
+            // ⚠️ The same removable row the READINGS list uses, and a measurement needs it for its
+            // own reason. A mistyped waist does not pull the trend the way a mistyped weight does —
+            // but this panel shows only the NEWEST of each kind, so a typo permanently hides the
+            // real reading underneath it, and there was no way to take it back.
             latest.forEach { (k, m) ->
-                LcarsDataRow(label = k.label, value = fmt(m.cm) + " cm · " + relativeDay(m.atMs))
+                ReadingRow(
+                    label = k.label + " · " + relativeDay(m.atMs),
+                    value = fmt(m.cm) + " cm",
+                    onRemove = { vm.removeMeasurement(k, m.atMs) },
+                )
             }
             if (latest.isEmpty()) {
                 Text(
