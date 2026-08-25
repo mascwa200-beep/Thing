@@ -62,6 +62,7 @@ import dev.mascwa.pulse.core.util.createCameraImageUri
 import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
+import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.feature.common.ChartSeries
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
@@ -253,10 +254,12 @@ private fun WeekPanel(week: IntakeWeek.Week, targetKcal: Int) {
                 verticalAlignment = Alignment.Bottom,
             ) {
                 // ⚠️ Walk the WINDOW, not the logged days, so an unlogged day leaves a hole rather
-                // than being quietly closed up by its neighbours — and take the window's start from
-                // the core rather than deriving it, which is wrong whenever either end is unlogged.
-                for (i in 0 until week.windowDays) {
-                    val day = week.windowStartMs + i * IntakeWeek.DAY_MS
+                // than being quietly closed up by its neighbours — and take the days from the core
+                // rather than deriving them. Deriving them from the logged data is wrong whenever
+                // either end is unlogged, and deriving them by adding a fixed day to the start is
+                // wrong for a week after either daylight-saving transition, when four of these seven
+                // lookups miss and draw a day nobody logged.
+                for (day in week.dayStarts) {
                     val d = byDay[day]
                     val frac = ((d?.kcal ?: 0.0) / peak).toFloat().coerceIn(0f, 1f)
                     val tint = when {
@@ -1736,9 +1739,16 @@ private fun HealthConnectPanel(vm: HealthViewModel) {
 internal fun fmt(v: Double): String =
     if (!v.isFinite()) "—" else String.format(java.util.Locale.US, "%.1f", v)
 
-/** "today" / "yesterday" / "12 days ago" — the same phrasing the rest of the app uses for a record. */
+/**
+ * "today" / "yesterday" / "12 days ago" — the same phrasing the rest of the app uses for a record.
+ *
+ * ⚠️ **Calendar days, not elapsed time.** This used to divide the elapsed milliseconds by a day, which
+ * is wrong every single day rather than at any edge: a reading taken at eight last night is thirteen
+ * hours old at nine this morning, and thirteen hours divided by a day is zero, so it said "Today"
+ * right through until eight in the evening. [HealthDays.daysAgo] asks a calendar.
+ */
 internal fun relativeDay(atMs: Long): String {
-    val days = ((System.currentTimeMillis() - atMs) / 86_400_000L).toInt()
+    val days = HealthDays.daysAgo(atMs)
     return when {
         days <= 0 -> "Today"
         days == 1 -> "Yesterday"

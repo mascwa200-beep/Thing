@@ -16,6 +16,7 @@ import dev.mascwa.pulse.core.util.VisionImage
 import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
+import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
@@ -61,11 +62,9 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      * person actually is — a day taken in UTC is a day out for most of the world, which this repo has
      * already shipped twice.
      */
-    fun todayStartMs(): Long = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+    fun todayStartMs(): Long = HealthDays.todayStart(zone)
 
-    fun dayStartOf(epochMs: Long): Long =
-        java.time.Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
-            .atStartOfDay(zone).toInstant().toEpochMilli()
+    fun dayStartOf(epochMs: Long): Long = HealthDays.startOf(epochMs, zone)
 
     /**
      * The day [days] before or after the one starting at [dayStartMs].
@@ -75,9 +74,16 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      * after next or lands back inside the same one — and the visible symptom is a log that skips a day,
      * or a "next day" button that will not move. `LocalDate.plusDays` has no such failure.
      */
-    fun dayPlus(dayStartMs: Long, days: Long): Long =
-        java.time.Instant.ofEpochMilli(dayStartMs).atZone(zone).toLocalDate()
-            .plusDays(days).atStartOfDay(zone).toInstant().toEpochMilli()
+    fun dayPlus(dayStartMs: Long, days: Long): Long = HealthDays.plus(dayStartMs, days, zone)
+
+    /**
+     * The last [days] day-starts ending today, oldest first — the row a windowed chart draws.
+     *
+     * The calendar lives here rather than in the core, which is deliberately zone-free, and handing
+     * the whole list across means the days the chart draws and the days the core scores are one list
+     * rather than two expressions that can drift apart.
+     */
+    fun dayGrid(days: Int): List<Long> = HealthDays.grid(todayStartMs(), days, zone)
 
     // -------------------------------------------------------------------------------- the record
 
@@ -177,7 +183,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
      */
     val week: StateFlow<IntakeWeek.Week?> =
         combine(c.foodLogStore.days, state) { byDay, s ->
-            IntakeWeek.score(byDay, s.targets?.kcal, todayStartMs())
+            IntakeWeek.score(byDay, s.targets?.kcal, dayGrid(IntakeWeek.DEFAULT_WINDOW_DAYS))
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
@@ -1236,13 +1242,6 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 /**
- * ⚠️ File-level rather than in the companion, because [composeHealthReading] is top-level and a
- * PRIVATE companion const is invisible to it. Kept as one definition rather than two: a day is a day
- * on both sides of the class boundary, and a second copy is a second thing to get wrong.
- */
-private const val DAY_MS = 86_400_000L
-
-/**
  * The whole health reading, composed from the raw record by the pure cores.
  *
  * ⚠️ **Top-level, and shared with the `health` assistant tool.** Nothing derived is stored anywhere,
@@ -1262,7 +1261,10 @@ internal suspend fun composeHealthReading(
     val now = System.currentTimeMillis()
 
     val window = p.expenditureWindowDays.coerceIn(14, 120)
-    val from = todayStartMs - window * DAY_MS
+    // The window's far edge is a day boundary, so it comes from a calendar. An hour of slop there
+    // is an extra or a missing day of intake at the far end, which is a day the measurement then
+    // weighs against a window length it was told separately.
+    val from = HealthDays.plus(todayStartMs, -window.toLong())
     val intake = foodLog.intakeDays(from, now)
     val measured = Expenditure.measure(trend, intake, now, window)
 

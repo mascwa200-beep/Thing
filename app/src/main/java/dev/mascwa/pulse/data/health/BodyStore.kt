@@ -166,7 +166,10 @@ class BodyStore(
         scope.launch {
             mutex.withLock {
                 val s = loadLocked()
-                val dayEnd = dayStartMs + DAY_MS
+                // ⚠️ Where the day genuinely ends, from a calendar — never `dayStartMs + DAY_MS`. This
+                // window DELETES, and a fixed day reaches an hour into the next one after the clocks
+                // go forward, so correcting one morning would take the next morning's reading with it.
+                val dayEnd = HealthDays.plus(dayStartMs, 1)
                 val kept = s.weighins.filterNot { it.atMs in dayStartMs until dayEnd }
                 val next = s.copy(weighins = (kept + StoredWeighin(atMs, kg, note)).sortedBy { it.atMs })
                 loaded = next
@@ -276,6 +279,5 @@ class BodyStore(
 
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
-        const val DAY_MS = 86_400_000L
     }
 }

@@ -27,8 +27,6 @@ import kotlin.math.roundToInt
  */
 object IntakeWeek {
 
-    const val DAY_MS = 86_400_000L
-
     /** A week, because that is the unit people plan food in. */
     const val DEFAULT_WINDOW_DAYS = 7
 
@@ -74,16 +72,19 @@ object IntakeWeek {
      */
     data class Week(
         /**
-         * The first day the window covers.
+         * Every day the window covers, oldest first — the row a chart draws, one bar per entry.
          *
-         * ⚠️ Carried rather than left to the caller. A chart drawing one bar per day has to know
-         * where the row starts, and the obvious way to guess — the oldest logged day, or the newest
-         * minus the window — is wrong the moment either end of the window has nothing logged: the
-         * whole row shifts and the gaps land on the wrong days. This is the only correct answer and
-         * `score` already has it.
+         * ⚠️ **The whole list, not a start and a stride.** A chart cannot reconstruct these by adding
+         * a fixed day to [windowStartMs]: a local day is 23 hours the morning the clocks go forward
+         * and 25 the morning they go back, so every slot past a transition sits an hour away from the
+         * day it is meant to name, and an exact lookup against [days] then misses. Measured on real
+         * zone data, four of a seven-day row vanish for a week after either transition, each reading
+         * as a day nobody logged.
+         *
+         * It also cannot guess from the data — the oldest logged day, or the newest minus the window,
+         * is wrong the moment either end of the window has nothing logged, and the whole row shifts.
          */
-        val windowStartMs: Long,
-        val windowDays: Int,
+        val dayStarts: List<Long>,
         val loggedDays: Int,
         val onTargetDays: Int,
         val overDays: Int,
@@ -94,6 +95,12 @@ object IntakeWeek {
         val meanCarbG: Double,
         val days: List<DayScore>,
     ) {
+        /** The first day the window covers. */
+        val windowStartMs: Long get() = dayStarts.first()
+
+        /** How many days the window is. */
+        val windowDays: Int get() = dayStarts.size
+
         /** How much of the window has anything in it, 0..1. */
         val completeness: Double get() = if (windowDays <= 0) 0.0 else loggedDays.toDouble() / windowDays
 
@@ -109,33 +116,43 @@ object IntakeWeek {
      *
      * @param byDay the store's per-day totals, keyed by local day start.
      * @param targetKcal the plan's calorie target, or null when there is no plan.
+     * @param dayStarts every day the window covers, oldest first, the last being today. This module
+     *   is deliberately clock-free and zone-free, so the calendar belongs to the caller — which also
+     *   means the days the chart draws and the days this scores are one list rather than two
+     *   expressions that can disagree.
      *
      * Returns null with no target: "on target" needs a target, and there is no sensible default —
-     * substituting one would report adherence to a plan nobody made.
+     * substituting one would report adherence to a plan nobody made. Null with no days, for the same
+     * reason: a window of nothing has no shape to report.
      */
     fun score(
         byDay: Map<Long, NutritionDay.Nutrients>,
         targetKcal: Int?,
-        todayStartMs: Long,
-        windowDays: Int = DEFAULT_WINDOW_DAYS,
+        dayStarts: List<Long>,
     ): Week? {
         val target = targetKcal?.takeIf { it > 0 } ?: return null
-        val window = windowDays.coerceAtLeast(1)
-        val from = todayStartMs - (window - 1) * DAY_MS
+        if (dayStarts.isEmpty()) return null
+        val grid = dayStarts.distinct().sorted()
+        val today = grid.last()
+        val covered = grid.toSet()
 
+        // ⚠️ Membership in the grid, not a range between its ends. A range admits a key that is not
+        // one of these days — a day start recorded in another time zone, which is what travelling
+        // leaves behind — and such a day would then be counted in `loggedDays` while the chart, which
+        // looks its days up exactly, could never draw it. The count and the picture would disagree.
+        //
         // ⚠️ `kcal > 0` is what "logged" means, matching the store's own intake series exactly. A day
         // present in the map with nothing in it is a day somebody opened and did not use.
         val scored = byDay.entries
-            .filter { it.key in from..todayStartMs && it.value.kcal > 0.0 }
+            .filter { it.key in covered && it.value.kcal > 0.0 }
             .sortedBy { it.key }
-            .map { (day, n) -> DayScore(day, n.kcal, partial = day == todayStartMs) to n }
+            .map { (day, n) -> DayScore(day, n.kcal, partial = day == today) to n }
 
         val judged = scored.filterNot { it.first.partial }
         val standings = judged.map { it.first.standing(target) }
 
         return Week(
-            windowStartMs = from,
-            windowDays = window,
+            dayStarts = grid,
             loggedDays = scored.size,
             onTargetDays = standings.count { it == Standing.ON_TARGET },
             overDays = standings.count { it == Standing.OVER },
