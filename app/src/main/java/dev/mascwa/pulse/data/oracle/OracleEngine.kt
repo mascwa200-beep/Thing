@@ -16,6 +16,7 @@ import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.UsageInsights
 import dev.mascwa.pulse.core.telemetry.UserProfile
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.usage.FeatureCatalog
@@ -150,9 +151,11 @@ object OracleEngine {
         }.getOrNull()
         val healthReading = health?.first
         val loggedToday = health?.second ?: false
-        val daysSinceWeighIn = health?.third?.let {
-            ((System.currentTimeMillis() - it) / 86_400_000L).toInt().coerceAtLeast(0)
-        }
+        // ⚠️ Calendar days, not elapsed. The rule this feeds prints the number and gates on it, and
+        // dividing elapsed milliseconds by a day calls a weigh-in taken yesterday evening "0 days ago"
+        // right through the following day — so the nudge arrives late and quotes a figure that is
+        // short by one for most of every day.
+        val daysSinceWeighIn = health?.third?.let { HealthDays.daysAgo(it) }
         // "Studied today" is decided by the same local-day index the deck itself counts by — deriving a
         // day boundary here from UTC would tell somebody outside Greenwich their streak was at risk on
         // the wrong evening.

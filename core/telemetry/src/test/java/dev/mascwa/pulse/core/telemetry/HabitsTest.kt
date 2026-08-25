@@ -12,14 +12,23 @@ import org.junit.Test
  */
 class HabitsTest {
 
-    private val TODAY = 1_700_000_000_000L / Habits.DAY_MS * Habits.DAY_MS
-    private fun d(n: Int) = TODAY - n * Habits.DAY_MS
+    private val DAY_MS = 86_400_000L
+    private val TODAY = 1_700_000_000_000L / DAY_MS * DAY_MS
+    private fun d(n: Int) = TODAY - n * DAY_MS
+
+    /**
+     * The calendar these fixtures live in — UTC, where every day really is 86,400,000 ms.
+     *
+     * ⚠️ That is exactly why the parameter exists rather than being assumed: on a real device it is
+     * NOT true, and `theStreakSurvivesADaylightSavingTransition` below builds a grid where it is not.
+     */
+    private val evenDays: (Long) -> Long = { it - DAY_MS }
 
     // ------------------------------------------------------------------------------- the streak
 
     @Test
     fun nothingLoggedIsNoStreakRatherThanADivisionByZero() {
-        val s = Habits.streak(emptySet(), TODAY)
+        val s = Habits.streak(emptySet(), TODAY, evenDays)
         assertEquals(0, s.current)
         assertEquals(0, s.longest)
         assertNull(s.lastMs)
@@ -30,7 +39,7 @@ class HabitsTest {
     @Test
     fun aRunEndingTodayCountsToday() {
         // today, -1, -2 = three consecutive days ending today.
-        val s = Habits.streak(setOf(TODAY, d(1), d(2)), TODAY)
+        val s = Habits.streak(setOf(TODAY, d(1), d(2)), TODAY, evenDays)
         assertEquals(3, s.current)
         assertEquals(3, s.longest)
         assertTrue(s.doneToday)
@@ -43,7 +52,7 @@ class HabitsTest {
      */
     @Test
     fun aRunEndingYesterdayIsStillCurrent() {
-        val s = Habits.streak(setOf(d(1), d(2), d(3)), TODAY)
+        val s = Habits.streak(setOf(d(1), d(2), d(3)), TODAY, evenDays)
         assertEquals(3, s.current)
         assertFalse("today is genuinely not logged", s.doneToday)
         assertEquals("3 days, up to yesterday.", Habits.summary(s))
@@ -53,7 +62,7 @@ class HabitsTest {
     @Test
     fun aWholeMissedDayBreaksTheRun() {
         // Newest is two days ago: yesterday passed with nothing logged.
-        val s = Habits.streak(setOf(d(2), d(3), d(4)), TODAY)
+        val s = Habits.streak(setOf(d(2), d(3), d(4)), TODAY, evenDays)
         assertEquals(0, s.current)
         // The run itself still happened, so the record of it stands.
         assertEquals(3, s.longest)
@@ -68,22 +77,22 @@ class HabitsTest {
     fun theLongestRunIsNotTheCurrentOne() {
         // A 5-day run at days 20..16, a gap, then 2 days ending today.
         val days = (16..20).map { d(it) }.toSet() + setOf(TODAY, d(1))
-        val s = Habits.streak(days, TODAY)
+        val s = Habits.streak(days, TODAY, evenDays)
         assertEquals(2, s.current)
         assertEquals(5, s.longest)
     }
 
     @Test
     fun oneDayReadsAsOneDay() {
-        assertEquals("Today.", Habits.summary(Habits.streak(setOf(TODAY), TODAY)))
-        assertEquals("Yesterday.", Habits.summary(Habits.streak(setOf(d(1)), TODAY)))
+        assertEquals("Today.", Habits.summary(Habits.streak(setOf(TODAY), TODAY, evenDays)))
+        assertEquals("Yesterday.", Habits.summary(Habits.streak(setOf(d(1)), TODAY, evenDays)))
     }
 
     /** Out-of-order input is a set, and a set has no order. The rule must not depend on one. */
     @Test
     fun theInputOrderCannotChangeTheAnswer() {
-        val a = Habits.streak(linkedSetOf(d(2), TODAY, d(1)), TODAY)
-        val b = Habits.streak(linkedSetOf(TODAY, d(1), d(2)), TODAY)
+        val a = Habits.streak(linkedSetOf(d(2), TODAY, d(1)), TODAY, evenDays)
+        val b = Habits.streak(linkedSetOf(TODAY, d(1), d(2)), TODAY, evenDays)
         assertEquals(a, b)
         assertEquals(3, a.current)
     }
@@ -94,7 +103,7 @@ class HabitsTest {
      */
     @Test
     fun aBrokenStreakSaysNothingAtAll() {
-        assertNull(Habits.summary(Habits.streak(setOf(d(9)), TODAY)))
+        assertNull(Habits.summary(Habits.streak(setOf(d(9)), TODAY, evenDays)))
     }
 
     // -------------------------------------------------------------------------------- the steps
@@ -184,5 +193,59 @@ class HabitsTest {
             assertTrue(h.label.isNotBlank())
             assertTrue("${h.name} has no blurb", h.blurb.length > 20)
         }
+    }
+
+    // ----------------------------------------------------------------------- the uneven calendar
+
+    /**
+     * ⚠️ **The reason [Habits.streak] asks the caller what "the day before" means.**
+     *
+     * These day starts are the ones a real calendar produces around a clock change — the run below
+     * spans a 23-hour day, so two of its consecutive days are 23 hours apart and none of the usual
+     * `difference == 86,400,000` tests hold. Comparing against a constant splits the run there, and
+     * worse, the "ended yesterday" test fails outright the following day, so a long streak reads
+     * **zero** to somebody who logged yesterday and has not yet logged today.
+     */
+    private val short = 23 * 3_600_000L
+
+    /** Day starts for five consecutive days where the middle one was only 23 hours long. */
+    private fun unevenWeek(today: Long) = listOf(
+        today - 24 * 3_600_000L - 24 * 3_600_000L - short - 24 * 3_600_000L, // d-4
+        today - 24 * 3_600_000L - 24 * 3_600_000L - short,                   // d-3
+        today - 24 * 3_600_000L - 24 * 3_600_000L,                           // d-2
+        today - 24 * 3_600_000L,                                             // d-1
+        today,                                                               // today
+    )
+
+    /** The caller's calendar: the day before each of the above is the previous entry. */
+    private fun unevenDayBefore(days: List<Long>): (Long) -> Long = { d ->
+        val i = days.indexOf(d)
+        if (i > 0) days[i - 1] else d - DAY_MS
+    }
+
+    @Test
+    fun theStreakSurvivesADaylightSavingTransition() {
+        val days = unevenWeek(TODAY)
+        val s = Habits.streak(days.toSet(), TODAY, unevenDayBefore(days))
+        assertEquals("five consecutive days is five", 5, s.current)
+        assertEquals(5, s.longest)
+
+        // And the arithmetic this replaced splits it: only the two 24-hour gaps at the end survive,
+        // so the run reads three rather than five.
+        val byStride = Habits.streak(days.toSet(), TODAY, evenDays)
+        assertEquals("the constant-difference rule loses the days before the change", 3, byStride.current)
+    }
+
+    @Test
+    fun aRunEndingYesterdayIsStillCurrentAcrossATransition() {
+        // Nothing logged today. Yesterday is 23 hours before today, not 24.
+        val today = TODAY
+        val days = listOf(today - short - 24 * 3_600_000L, today - short)
+        val s = Habits.streak(days.toSet(), today, unevenDayBefore(days + today))
+        assertEquals("logged yesterday, so the run is still alive", 2, s.current)
+        assertFalse(s.doneToday)
+
+        // The constant-difference rule cannot even see yesterday, so it reports the streak broken.
+        assertEquals(0, Habits.streak(days.toSet(), today, evenDays).current)
     }
 }

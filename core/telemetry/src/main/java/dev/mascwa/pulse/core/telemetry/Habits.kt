@@ -17,8 +17,6 @@ package dev.mascwa.pulse.core.telemetry
  */
 object Habits {
 
-    const val DAY_MS = 86_400_000L
-
     /**
      * A habit, and what keeping it actually buys.
      *
@@ -68,8 +66,23 @@ object Habits {
      * whole day has passed with nothing in it. This is the same rule [StudyProgress] uses for its
      * streak, deliberately — two streak counters in one app that disagree about midnight would be
      * worse than either.
+     *
+     * @param dayBefore the day-start before a given one, from the caller's calendar.
+     *
+     * ⚠️ **Consecutive is what the calendar says, not a fixed 86,400,000 apart.** These keys are local
+     * day starts, and a local day is 23 hours the morning the clocks go forward and 25 the morning
+     * they go back, so consecutive days across a transition are NEVER exactly a day apart. Comparing
+     * the difference against a constant therefore splits every run that spans one — and worse, the
+     * "ended yesterday" test fails outright on the day after, so somebody who logged yesterday and
+     * has not yet logged today sees a long streak read **zero**. Twice a year, on the one measure in
+     * this tab whose entire subject is consistency.
+     *
+     * [StudyProgress.streak] does not have this problem because it counts integer day indices, where
+     * consecutive really does mean one apart. This module is clock-free and zone-free, so the calendar
+     * comes from the caller — with no default, because a default of `it - DAY_MS` would be exactly the
+     * bug, silently, for anyone who forgot to pass one.
      */
-    fun streak(days: Set<Long>, todayStartMs: Long): Streak {
+    fun streak(days: Set<Long>, todayStartMs: Long, dayBefore: (Long) -> Long): Streak {
         if (days.isEmpty()) return Streak(0, 0, null, false)
         val sorted = days.sorted()
         val last = sorted.last()
@@ -77,17 +90,17 @@ object Habits {
         var longest = 1
         var run = 1
         for (i in 1 until sorted.size) {
-            run = if (sorted[i] - sorted[i - 1] == DAY_MS) run + 1 else 1
+            run = if (sorted[i - 1] == dayBefore(sorted[i])) run + 1 else 1
             if (run > longest) longest = run
         }
 
         // The current run is only the trailing one, and only if it reaches today or yesterday.
-        val current = if (last != todayStartMs && last != todayStartMs - DAY_MS) {
+        val current = if (last != todayStartMs && last != dayBefore(todayStartMs)) {
             0
         } else {
             var n = 1
             var i = sorted.size - 1
-            while (i > 0 && sorted[i] - sorted[i - 1] == DAY_MS) {
+            while (i > 0 && sorted[i - 1] == dayBefore(sorted[i])) {
                 n++
                 i--
             }
