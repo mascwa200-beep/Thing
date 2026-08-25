@@ -307,7 +307,18 @@ jobs:
           # Deliberately NOT hashing this whole workflow file into the key. It is edited often (every
           # gate added here would invalidate it), and a quarter-hour cold rebuild on an unrelated
           # tweak is the wrong trade. The salt is the designed switch; it only needed to say when.
-          key: food-db-${{ hashFiles('tools/food/build_food_db.py') }}-off20260824-usda20260430
+          #
+          # ⚠️ **THE HASH COVERS EVERY FILE THE BUILDER READS, WHICH IS NOW THREE.** The builder
+          # takes its list of further nutrients out of `NutrientSet.kt` — that Kotlin file is the
+          # single declaration of each one's permanent id, unit and scale — via `nutrient_set.py`.
+          # With only the builder hashed, adding a nutrient to the enum, or correcting a scale,
+          # would restore the STALE database and the change would do nothing at all, silently. That
+          # is the same trap the paragraph above records about a URL correction, and this one would
+          # be worse: a scale correction that never takes effect leaves a wrong number on screen.
+          key: >-
+            food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py',
+            'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt')
+            }}-off20260824-usda20260430
 
       - name: Build the food database
         if: steps.fooddb.outputs.cache-hit != 'true'

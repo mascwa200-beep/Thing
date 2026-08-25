@@ -194,7 +194,7 @@ object HealthExport {
      *
      * ⚠️ **The micronutrients are deliberately NOT summed here**, though the entry sheet carries them.
      * A day's calcium total is only as complete as the foods that happened to record it, and a single
-     * cell cannot say "310 mg, from two of your six foods" — the distinction `Micronutrients.Tally`
+     * cell cannot say "310 mg, from two of your six foods" — the distinction `NutrientTally`
      * exists to keep. Carrying eight totals plus eight coverage columns would double this sheet's
      * width for a figure anybody can pivot out of the entry sheet themselves, correctly, with the
      * blanks visible. A pre-summed total whose completeness is unstated is the worse of the two.

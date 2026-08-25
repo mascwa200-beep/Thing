@@ -17,11 +17,17 @@ import androidx.sqlite.db.SupportSQLiteQuery
  *
  * ## ⚠️ This is the project's first PREBUILT database, and it is unlike the other two
  *
- * `JarvisDatabase` and `TranscriptDatabase` are both built empty and filled at runtime, and both
- * use `fallbackToDestructiveMigration` because the state they hold is small and regenerable. **This
- * one must not copy either habit.** It ships with its content already inside it, shipped as an
- * asset, and it is never written to — so it is opened read-only, and a schema change means a new
- * asset rather than a migration.
+ * `JarvisDatabase` and `TranscriptDatabase` are both built empty and filled at runtime. This one
+ * ships with its content already inside it, as an asset, and is never written to — so a schema
+ * change means a **new asset** rather than a migration.
+ *
+ * ⚠️ **CORRECTION to what this paragraph used to say.** It claimed this database "must not copy
+ * either habit" and in particular must not use `fallbackToDestructiveMigration`. That was wrong,
+ * and the version-2 bump is what proved it: without that call Room refuses to replace the copied
+ * file and then demands a migration that cannot exist, so the app throws on every phone that
+ * already has the old asset. The reasoning was right — a migration path here would be a fiction —
+ * and the conclusion drawn from it was backwards. The mechanism is spelled out at the call site,
+ * read out of the room-runtime bytecode.
  *
  * Verified against the shipped room-runtime 2.6.1 artifact before this was written:
  * `RoomDatabase.Builder.createFromAsset` exists, and `FileUtil.copy` performs the unpack with
@@ -179,19 +185,79 @@ interface FoodDao {
     @RawQuery
     suspend fun searchByNameWords(query: SupportSQLiteQuery): List<FoodRow>
 
+    /**
+     * Every further nutrient recorded for one product, in whatever order the table holds them.
+     *
+     * ⚠️ **An empty list is the ordinary answer and never an error.** Roughly two products in three
+     * have none of these, and the surface must render that as nothing rather than as zeroes — a food
+     * with no magnesium row has not been measured for magnesium, which is a different fact from
+     * containing none. This is the same rule `Micronutrients` argues at length for its eight.
+     *
+     * A separate read rather than a join: the caller already has the [FoodRow], the common case is
+     * a single scanned barcode, and joining would repeat the whole product row once per nutrient.
+     */
+    @Query("SELECT * FROM food_extra WHERE barcode = :barcode")
+    suspend fun extrasFor(barcode: Long): List<FoodExtraRow>
+
     @Query("SELECT COUNT(*) FROM food")
     suspend fun count(): Int
+
+    @Query("SELECT COUNT(*) FROM food_extra")
+    suspend fun extraCount(): Int
 
     /** Attribution and build date, so the app can display where this came from. */
     @Query("SELECT value FROM meta WHERE key = :key LIMIT 1")
     suspend fun meta(key: String): String?
 }
 
+/**
+ * One further nutrient of one product — the sparse layer beside [FoodRow]'s sixteen.
+ *
+ * ## ⚠️ A side table because 29 more columns would cost 128 MB of nothing
+ *
+ * Measured, not reasoned about. SQLite spends a byte of record header on a column even when it is
+ * NULL, so at 4,524,449 rows the widened shape costs about a byte per row per column whatever it
+ * holds. Built both ways over 200,000 realistic rows and extrapolated:
+ *
+ * | | cost above the plain food table |
+ * |---|---|
+ * | 29 always-NULL columns | **+127.9 MB**, carrying nothing |
+ * | this side table | **+44.7 MB**, carrying every figure there is |
+ *
+ * The densest of the twenty-nine is recorded on 5.7% of products and most are near 2%, so the
+ * sparse shape is not a marginal win — it is the difference between the feature being affordable
+ * and not.
+ *
+ * ⚠️ **`WITHOUT ROWID`, and that halves it again.** With an ordinary rowid table the pair would need
+ * a separate unique index, and the index would then hold a second copy of both key columns: measured
+ * at **4.27 MB against 1.98 MB** for the same 121,147 rows. The primary key IS the B-tree here, the
+ * same reasoning that makes `barcode INTEGER PRIMARY KEY` the right shape for [FoodRow].
+ *
+ * ⚠️ Room does not emit `WITHOUT ROWID` and does not need to: this table arrives inside the
+ * prebuilt asset, and Room's schema validation reads `PRAGMA table_info`, which says nothing about
+ * rowid-ness. The builder is what declares it.
+ *
+ * @param nutrient `NutrientSet.Nutrient.id` — a permanent number, never the enum's ordinal. It is
+ *   written into an asset of millions of rows, so reordering that enum would silently re-label
+ *   every value here; `NutrientSetTest` pins the whole mapping to stop it.
+ * @param value the figure in that nutrient's own unit, scaled by `NutrientSet.Unit.scale`.
+ */
+@Entity(tableName = "food_extra", primaryKeys = ["barcode", "nutrient"])
+data class FoodExtraRow(
+    val barcode: Long,
+    val nutrient: Int,
+    val value: Int,
+)
+
 /** A row of the `meta` table — attribution, build date, corpus counts. */
 @Entity(tableName = "meta")
 data class FoodMetaRow(@PrimaryKey val key: String, val value: String?)
 
-@Database(entities = [FoodRow::class, FoodMetaRow::class], version = 1, exportSchema = false)
+@Database(
+    entities = [FoodRow::class, FoodExtraRow::class, FoodMetaRow::class],
+    version = 2,
+    exportSchema = false,
+)
 abstract class FoodDatabase : RoomDatabase() {
     abstract fun dao(): FoodDao
 
@@ -223,10 +289,27 @@ abstract class FoodDatabase : RoomDatabase() {
                 val db = runCatching {
                     Room.databaseBuilder(app, FoodDatabase::class.java, "food.db")
                         .createFromAsset(ASSET)
-                        // ⚠️ NOT fallbackToDestructiveMigration, unlike the other two databases in
-                        // this project. This one is shipped rather than accumulated: there is
-                        // nothing of the user's in it to destroy, and a version bump means a new
-                        // asset, so a migration path would be a fiction.
+                        // ⚠️ **This is what makes a version bump WORK, and without it the bump
+                        // crashes every phone that already unpacked the asset.** Read out of the
+                        // shipped room-runtime 2.6.1 bytecode rather than recalled, because the
+                        // comment that used to sit here asserted the opposite:
+                        //
+                        //   SQLiteCopyOpenHelper.verifyDatabaseFile — file absent, copy; else read
+                        //   the on-device version; equal, return; else if
+                        //   DatabaseConfiguration.isMigrationRequired(current, wanted) return
+                        //   WITHOUT copying; only otherwise deleteDatabase() and copy the asset.
+                        //
+                        //   isMigrationRequired = requireMigration && current not in
+                        //   migrationNotRequiredFrom — so with no fallback it is TRUE, the fresh
+                        //   asset is never copied, and Room then opens the stale file, wants a
+                        //   migration from 1 to 2, finds none and throws.
+                        //
+                        // fallbackToDestructiveMigration() sets requireMigration = false (and
+                        // allowDestructiveMigrationOnDowngrade = true), so the answer is false, the
+                        // old file is deleted and the new asset lands. On a database that is shipped
+                        // rather than accumulated that is not destruction — there is nothing of the
+                        // user's in here — it is the only way to hand them the new content at all.
+                        .fallbackToDestructiveMigration()
                         .setJournalMode(JournalMode.TRUNCATE)
                         .build()
                 }.getOrNull() ?: return null

@@ -109,6 +109,16 @@ SCALE_MICROGRAM = 1     # microgram-scale micros, stored as-is
 # quietly divides somebody's intake by a hundred.
 SCALE_MICRO_CENTI = 100  # microgram-scale micros x100 -> 0.01 ug
 
+import nutrient_set
+
+# ⚠️ **Loaded at import, before anything is downloaded, and a bad parse is fatal here.** These 29
+# nutrients are declared once, in `NutrientSet.kt`, because the app reads every one of their ids,
+# units and scales at runtime — a second table in Python would be the same facts twice, and the
+# failure mode is the worst kind: magnesium written under phosphorus's id across millions of rows
+# with nothing anywhere to notice. `tools/kb/ci_parity_lint.py` reads its allowlist out of Kotlin
+# for the same reason.
+EXTRAS = nutrient_set.load()
+
 SOURCE_OFF = 1
 SOURCE_USDA = 2
 
@@ -144,6 +154,27 @@ CREATE TABLE food (
   src       INTEGER NOT NULL
 );
 
+-- Every further nutrient, sparsely: a row only where a figure exists.
+--
+-- ⚠️ **A side table because 29 more columns on `food` would cost 128 MB of nothing.** SQLite
+-- spends a byte of record header on a column even when it is NULL. Measured both ways over
+-- 200,000 realistic rows and extrapolated to the real 4.5M: the widened shape is +127.9 MB
+-- carrying nothing, this one is +44.7 MB carrying every figure there is. The densest of the 29
+-- is recorded on 5.7% of products and most are near 2%.
+--
+-- ⚠️ **WITHOUT ROWID, which halves it again.** An ordinary rowid table would need a separate
+-- unique index on the pair, and that index holds a second copy of both key columns: measured at
+-- 4.27 MB against 1.98 MB for the same 121,147 rows. Here the primary key IS the B-tree, the same
+-- reasoning that makes `barcode INTEGER PRIMARY KEY` right for `food`.
+--
+-- `nutrient` is NutrientSet.Nutrient.id — a permanent number, never an ordinal.
+CREATE TABLE food_extra (
+  barcode  INTEGER NOT NULL,
+  nutrient INTEGER NOT NULL,
+  value    INTEGER NOT NULL,
+  PRIMARY KEY (barcode, nutrient)
+) WITHOUT ROWID;
+
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -153,6 +184,7 @@ COLUMNS = (
 ).split()
 
 INSERT = f"INSERT OR REPLACE INTO food ({','.join(COLUMNS)}) VALUES ({','.join('?' * len(COLUMNS))})"
+EXTRA_INSERT = "INSERT OR REPLACE INTO food_extra (barcode,nutrient,value) VALUES (?,?,?)"
 
 MAX_NAME = 90
 MAX_BRAND = 60
@@ -286,7 +318,10 @@ def clean(s: str | None, limit: int) -> str | None:
 class Row:
     """One product, ready to insert. Ordered to match COLUMNS."""
 
-    __slots__ = COLUMNS
+    # ⚠️ `extras` is NOT a column: it is the sparse side-table payload, a dict of
+    # NutrientSet id -> stored integer, and it travels with the row so a reader fills it in one
+    # place and the insert loop writes it in one place.
+    __slots__ = COLUMNS + ["extras"]
 
     # How many times each field was refused, and how many rows lost their whole nutrition block.
     # ⚠️ Class-level rather than passed around, because it belongs with the rule and the rule has to
@@ -300,6 +335,7 @@ class Row:
             setattr(self, c, None)
         self.barcode = barcode
         self.src = src
+        self.extras = {}
 
     def values(self):
         """The row as the INSERT wants it — sanitised, because this is the only way in.
@@ -341,9 +377,15 @@ OFF_FIELDS = {
     "fiber_100g", "sugars_100g", "saturated-fat_100g", "sodium_100g", "salt_100g",
     "calcium_100g", "iron_100g", "potassium_100g", "vitamin-a_100g", "vitamin-c_100g",
     "vitamin-d_100g", "cholesterol_100g", "trans-fat_100g",
-}
+} | {f"{n.off_field}_100g" for n in EXTRAS}
 
 KJ_PER_KCAL = 4.184
+
+# How many figures each further nutrient contributed, and how many were refused as unbelievable.
+# ⚠️ Reported for every one of the 29 whether it fired or not — a nutrient that yielded nothing is
+# the thing most worth knowing about, and a report listing only the ones that worked cannot say it.
+EXTRA_KEPT: dict[int, int] = {}
+EXTRA_REFUSED: dict[int, int] = {}
 
 
 def read_off(path: Path, limit: int | None, log):
@@ -414,6 +456,20 @@ def read_off(path: Path, limit: int | None, log):
             # parser here. Measured on the real export: present on 26.7% of rows carrying
             # nutrition, which is what makes a "1 package" portion worth offering at all.
             row.pack_g = mass(g(rec, "product_quantity"), ceiling=100_000.0)
+
+            # ⚠️ **Open Food Facts publishes every one of these in GRAMS**, whatever unit the app
+            # stores them in — `Nutrient.store` is the single conversion and it is the twin of
+            # `NutrientSet.fromGrams`/`sane`/`store` in Kotlin. An absent or unbelievable figure
+            # yields None and no row at all: absent is not zero, and the app renders the two
+            # differently on purpose.
+            for n in EXTRAS:
+                v = n.store(g(rec, f"{n.off_field}_100g") or None)
+                if v is not None:
+                    row.extras[n.id] = v
+                    EXTRA_KEPT[n.id] = EXTRA_KEPT.get(n.id, 0) + 1
+                elif (g(rec, f"{n.off_field}_100g") or "") != "":
+                    EXTRA_REFUSED[n.id] = EXTRA_REFUSED.get(n.id, 0) + 1
+
             yield row
 
 
@@ -443,6 +499,64 @@ USDA_NUTRIENTS = {
 }
 
 
+# ⚠️ **Measured, not recalled.** Both USDA generic datasets were downloaded and every nutrient id
+# they publish was enumerated, then each of the 29 was matched by NAME and its real coverage read
+# off. That is where these numbers come from; the file's own rule above — select by NUMBER, never by
+# name, because names drift between releases — still holds for the selection itself.
+#
+# ⚠️ **Three of the 29 are Open Food Facts only, and that is a measured absence rather than an
+# omission**: neither USDA dataset publishes ADDED SUGARS (it has only "Sugars, total including
+# NLEA"), IODINE (nothing at all), or POLYOLS (no sugar alcohol, sorbitol, xylitol or maltitol under
+# any name). Nothing here can fill those.
+#
+# ⚠️ The value's UNIT is NOT hardcoded. `nutrient.csv` states it per nutrient and the conversion is
+# derived from that — riboflavin arrives in milligrams where this app stores micrograms, and a
+# hardcoded scale is exactly how a thousandfold error gets into a column and stays plausible. A unit
+# this does not understand is SKIPPED and reported, never guessed at.
+USDA_EXTRA_NUMBERS = {
+    "209": "STARCH",
+    "210": "SUCROSE",
+    "211": "GLUCOSE",
+    "212": "FRUCTOSE",
+    "213": "LACTOSE",
+    "214": "MALTOSE",
+    "287": "GALACTOSE",
+    "645": "MONOUNSATURATED_FAT",
+    "646": "POLYUNSATURATED_FAT",
+    "304": "MAGNESIUM",
+    "305": "PHOSPHORUS",
+    "309": "ZINC",
+    "315": "MANGANESE",
+    "312": "COPPER",
+    "317": "SELENIUM",
+    "404": "VITAMIN_B1",
+    "405": "VITAMIN_B2",       # ⚠️ USDA publishes milligrams; this app stores micrograms.
+    "406": "NIACIN",
+    "410": "PANTOTHENIC_ACID",
+    "415": "VITAMIN_B6",
+    "417": "FOLATE",           # "Folate, total" — NOT 435 (DFE) or 432 (food), which are different figures.
+    "418": "VITAMIN_B12",      # NOT 578, which is "Vitamin B-12, added".
+    "323": "VITAMIN_E",        # alpha-tocopherol. NOT the gamma/beta/delta tocopherols beside it.
+    "430": "VITAMIN_K1",       # phylloquinone, the same substance the OFF column names.
+    "321": "BETA_CAROTENE",
+    "255": "WATER",
+}
+
+# How many grams one of each unit USDA may state is. ⚠️ Anything not here is refused rather than
+# assumed, because assuming grams for an unrecognised unit is a thousandfold error in the safe-
+# looking direction.
+GRAMS_PER_USDA_UNIT = {"g": 1.0, "mg": 1e-3, "\u00b5g": 1e-6, "ug": 1e-6, "mcg": 1e-6}
+
+EXTRA_BY_NAME = {n.name: n for n in EXTRAS}
+_unknown = sorted(set(USDA_EXTRA_NUMBERS.values()) - set(EXTRA_BY_NAME))
+if _unknown:
+    raise SystemExit(
+        f"build_food_db: USDA_EXTRA_NUMBERS names {_unknown}, which NutrientSet.kt does not declare.\n"
+        "  A name that resolves to nothing would silently contribute nothing, in a green build."
+    )
+USDA_EXTRA_SKIPPED: dict[str, int] = {}
+
+
 def read_usda(path: Path, limit: int | None, log):
     """Stream the USDA branded zip. Joins branded_food -> food_nutrient by fdc_id."""
     with zipfile.ZipFile(path) as zf:
@@ -464,10 +578,13 @@ def read_usda(path: Path, limit: int | None, log):
                 )
 
         # nutrient id -> nutrient number, so the selection above can key on the stable number.
-        num_of = {}
+        num_of, unit_of = {}, {}
         with zf.open(names["nutrient.csv"]) as fh:
             for r in csv.DictReader(io.TextIOWrapper(fh, "utf-8", errors="replace")):
                 num_of[r["id"]] = r.get("nutrient_nbr", "").strip()
+                # ⚠️ The unit the archive itself states, so no scale for a further nutrient is ever
+                # written down twice. See GRAMS_PER_USDA_UNIT.
+                unit_of[r["id"]] = r.get("unit_name", "").strip()
 
         # fdc_id -> barcode + serving, for branded items that actually carry a GTIN/UPC.
         wanted: dict[str, Row] = {}
@@ -501,13 +618,31 @@ def read_usda(path: Path, limit: int | None, log):
                 row = wanted.get(r.get("fdc_id", ""))
                 if row is None:
                     continue
-                spec = USDA_NUTRIENTS.get(num_of.get(r.get("nutrient_id", ""), ""))
-                if spec is None:
+                number = num_of.get(r.get("nutrient_id", ""), "")
+                spec = USDA_NUTRIENTS.get(number)
+                if spec is not None:
+                    field, scale = spec
+                    v = scaled(r.get("amount"), scale)
+                    if v is not None:
+                        setattr(row, field, v)
                     continue
-                field, scale = spec
-                v = scaled(r.get("amount"), scale)
+
+                extra = EXTRA_BY_NAME.get(USDA_EXTRA_NUMBERS.get(number, ""))
+                if extra is None:
+                    continue
+                # ⚠️ The archive states the unit; convert THROUGH grams, which is the one currency
+                # `Nutrient.store` speaks. An unknown unit is counted and dropped.
+                per_g = GRAMS_PER_USDA_UNIT.get(unit_of.get(r.get("nutrient_id", ""), "").lower())
+                if per_g is None:
+                    USDA_EXTRA_SKIPPED[extra.name] = USDA_EXTRA_SKIPPED.get(extra.name, 0) + 1
+                    continue
+                try:
+                    grams = float(r.get("amount") or "") * per_g
+                except (TypeError, ValueError):
+                    continue
+                v = extra.store(grams)
                 if v is not None:
-                    setattr(row, field, v)
+                    row.extras[extra.id] = v
 
         yield from wanted.values()
 
@@ -540,6 +675,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"OFF   {off_path.name} ({off_path.stat().st_size / 1e6:.0f} MB gz)")
         t0 = time.time()
         batch = []
+        extra_batch = []
         for row in read_off(off_path, limit, log):
             stats["off"] += 1
             # ⚠️ **`values()` is what applies the bounds, so it has to come BEFORE `has_nutrition` is
@@ -552,13 +688,22 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
                 stats["off_nutrition"] += 1
                 complete.add(row.barcode)
             batch.append(vals)
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extras.items())
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
+                # ⚠️ The extras go in with the product batch, never afterwards from a list held
+                # over the whole stream: at ~2 million of them that list is the one structure in
+                # this builder big enough to matter.
+                if extra_batch:
+                    cur.executemany(EXTRA_INSERT, extra_batch)
+                    extra_batch.clear()
                 if stats["off"] % 500_000 == 0:
                     log(f"  {stats['off']:,} products  ({time.time() - t0:.0f}s)")
         if batch:
             cur.executemany(INSERT, batch)
+        if extra_batch:
+            cur.executemany(EXTRA_INSERT, extra_batch)
         con.commit()
         log(f"  {stats['off']:,} products in {time.time() - t0:.0f}s")
 
@@ -566,6 +711,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"USDA  {usda_path.name} ({usda_path.stat().st_size / 1e6:.0f} MB zip)")
         t0 = time.time()
         batch = []
+        extra_batch = []
         for row in read_usda(usda_path, limit, log):
             stats["usda"] += 1
             # ⚠️ Same order as above, and for the same reason.
@@ -579,11 +725,22 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
                 continue
             stats["replaced_by_usda"] += 1
             batch.append(vals)
+            # ⚠️ Only for rows that are actually inserted. A row skipped because Open Food Facts
+            # already has better numbers must not leave its further nutrients behind, pointing at a
+            # product row that says something else.
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extras.items())
+            for k in row.extras:
+                EXTRA_KEPT[k] = EXTRA_KEPT.get(k, 0) + 1
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
+                if extra_batch:
+                    cur.executemany(EXTRA_INSERT, extra_batch)
+                    extra_batch.clear()
         if batch:
             cur.executemany(INSERT, batch)
+        if extra_batch:
+            cur.executemany(EXTRA_INSERT, extra_batch)
         con.commit()
         log(f"  {stats['usda']:,} items, {stats['replaced_by_usda']:,} filled a gap "
             f"({time.time() - t0:.0f}s)")
@@ -597,6 +754,25 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"  {field:<10} ceiling {CEILINGS[field]:>12,}  refused {n:,}")
     log(f"  macros outweighed the food on {Row.IMPOSSIBLE_MACROS:,} rows "
         f"(nutrition dropped, name kept)")
+
+    # ⚠️ Every one of the 29 is named whether it contributed or not. A nutrient that yielded
+    # nothing at all is the single most useful line in this report — it means either the column
+    # moved or the whole feature is inert for it — and a report listing only what worked cannot
+    # tell that from a nutrient nobody has ever recorded.
+    if USDA_EXTRA_SKIPPED:
+        log("USDA figures dropped because their unit was not one this understands:")
+        for name, n in sorted(USDA_EXTRA_SKIPPED.items()):
+            log(f"  {name:<22} {n:,}")
+
+    kept_total = sum(EXTRA_KEPT.values())
+    log(f"further nutrients: {kept_total:,} figures across {len(EXTRAS)} nutrients")
+    for n in EXTRAS:
+        kept = EXTRA_KEPT.get(n.id, 0)
+        refused = EXTRA_REFUSED.get(n.id, 0)
+        seen = stats.get("off", 0) + stats.get("replaced_by_usda", 0)
+        share = (kept / seen * 100) if seen else 0.0
+        flag = "   <-- NOTHING" if kept == 0 else ""
+        log(f"  {n.id:>2} {n.name:<22} {kept:>10,}  {share:5.2f}%  refused {refused:,}{flag}")
 
     total = cur.execute("SELECT COUNT(*) FROM food").fetchone()[0]
     with_nut = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL AND kcal > 0").fetchone()[0]
@@ -626,6 +802,8 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         "built_at": time.strftime("%Y-%m-%d", time.gmtime()),
         "off_rows": str(stats.get("off", 0)),
         "usda_rows": str(stats.get("usda", 0)),
+        "extra_rows": str(cur.execute("SELECT COUNT(*) FROM food_extra").fetchone()[0]),
+        "extra_nutrients": str(len(EXTRAS)),
         "sources": "; ".join(contributed) or "none",
         "attribution": attribution + ".",
     }.items():
@@ -703,6 +881,38 @@ def verify(out: Path) -> bool:
     withk = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL").fetchone()[0]
     print(f"energy sanity: {hot:,} of {withk:,} rows above 1000 kcal/100g "
           f"({100 * hot / max(withk, 1):.3f}%)")
+
+    # ⚠️ **The side table is checked against the Kotlin that defines it, not against itself.**
+    # Every nutrient id present has to be one this build knows, every value has to fit the column
+    # Room reads as a 32-bit Int, and — the one that matters most — the table must not be EMPTY.
+    # A silent under-parse upstream would ship a feature that does nothing, in a green build.
+    known = {n.id: n for n in EXTRAS}
+    extra_rows = cur.execute("SELECT COUNT(*) FROM food_extra").fetchone()[0]
+    distinct = cur.execute("SELECT COUNT(DISTINCT nutrient) FROM food_extra").fetchone()[0]
+    print(f"\nfurther nutrients: {extra_rows:,} figures, {distinct} of {len(known)} nutrients present")
+    if extra_rows == 0:
+        print("  FAIL: the side table is empty — the extraction did not run")
+        ok = False
+    stray = cur.execute(
+        "SELECT DISTINCT nutrient FROM food_extra WHERE nutrient NOT IN "
+        f"({','.join(str(i) for i in known)})"
+    ).fetchall() if known else []
+    if stray:
+        print(f"  FAIL: unknown nutrient ids in the side table: {[r[0] for r in stray]}")
+        ok = False
+    for nid, n in known.items():
+        hi = cur.execute("SELECT MAX(value) FROM food_extra WHERE nutrient=?", (nid,)).fetchone()[0]
+        if hi is not None and hi > n.stored_ceiling:
+            print(f"  FAIL: {n.name} holds {hi:,}, past its ceiling of {n.stored_ceiling:,}")
+            ok = False
+    # Every barcode in the side table must be a product this database actually has, or the figure
+    # is unreachable — a row nothing can ever join to.
+    orphans = cur.execute(
+        "SELECT COUNT(*) FROM food_extra WHERE barcode NOT IN (SELECT barcode FROM food)"
+    ).fetchone()[0]
+    if orphans:
+        print(f"  FAIL: {orphans:,} figures belong to barcodes not in the product table")
+        ok = False
 
     con.close()
     print("\nVERIFY " + ("PASSED" if ok else "FAILED"))
