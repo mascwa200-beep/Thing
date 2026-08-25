@@ -2157,7 +2157,7 @@ private fun FoodResultRow(food: Food, onPick: () -> Unit) {
             // ⚠️ Always says per 100 g. Two rows showing "148" mean nothing to each other unless the
             // basis is stated, and this corpus mixes foods whose natural portion differs tenfold.
             "${food.per100g.kcal.roundToInt()} kcal / 100 g · " +
-                "P ${fmt1(food.per100g.proteinG)} F ${fmt1(food.per100g.fatG)} C ${fmt1(food.per100g.carbG)}" +
+                "P ${fmt(food.per100g.proteinG)} F ${fmt(food.per100g.fatG)} C ${fmt(food.per100g.carbG)}" +
                 " · ${food.source.label}",
             fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
         )
@@ -2196,8 +2196,8 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
         NumberCell("HOW MUCH", amount, { amount = it }, Modifier.fillMaxWidth())
         if (eaten != null) {
             Text(
-                "${eaten.kcal.roundToInt()} kcal · P ${fmt1(eaten.proteinG)} " +
-                    "F ${fmt1(eaten.fatG)} C ${fmt1(eaten.carbG)}",
+                "${eaten.kcal.roundToInt()} kcal · P ${fmt(eaten.proteinG)} " +
+                    "F ${fmt(eaten.fatG)} C ${fmt(eaten.carbG)}",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
             )
             Text(
@@ -2218,8 +2218,6 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
 }
 
 /** One decimal, and never the device locale — these sit beside numbers rendered elsewhere. */
-private fun fmt1(v: Double): String = String.format(java.util.Locale.US, "%.1f", v)
-
 /**
  * One tap to log something eaten before.
  *
