@@ -4,6 +4,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import dev.mascwa.pulse.core.telemetry.BarcodeScan
 import dev.mascwa.pulse.core.telemetry.FoodSearch
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.db.FoodDatabase
@@ -37,7 +38,38 @@ class OfflineFoodStore(private val db: FoodDatabase) {
      */
     suspend fun byBarcode(barcode: String): Food? = withContext(Dispatchers.IO) {
         val key = BarcodeScan.normalize(barcode) ?: return@withContext null
-        runCatching { db.dao().byBarcode(key) }.getOrNull()?.let { toFood(it, barcode) }
+        val row = runCatching { db.dao().byBarcode(key) }.getOrNull() ?: return@withContext null
+        // ⚠️ The further nutrients are a SECOND read, and only on this path. A scan is one product
+        // and the person is about to look at it; a search is twenty rows nobody will read a
+        // magnesium figure off, and doing this per row would be a query per result per keystroke.
+        // `extrasFor` is public so a detail opened from a search result can ask for them.
+        toFood(row, barcode, extras(key))
+    }
+
+    /**
+     * The further nutrients recorded for one barcode, or nothing.
+     *
+     * ⚠️ **An empty record is the ordinary answer, not a failure.** Roughly two products in three
+     * carry none of these at all, and the surface must render that as silence rather than as zeroes.
+     */
+    suspend fun extrasFor(barcode: String): NutrientSet.Amounts = withContext(Dispatchers.IO) {
+        val key = BarcodeScan.normalize(barcode) ?: return@withContext NutrientSet.Amounts()
+        extras(key)
+    }
+
+    private suspend fun extras(key: Long): NutrientSet.Amounts {
+        val rows = runCatching { db.dao().extrasFor(key) }.getOrDefault(emptyList())
+        if (rows.isEmpty()) return NutrientSet.Amounts()
+        val m = LinkedHashMap<NutrientSet.Nutrient, Double>(rows.size)
+        for (r in rows) {
+            // ⚠️ An id this build does not know is DROPPED rather than guessed at. The database is
+            // a shipped asset and the app that reads it can be older or newer than the build that
+            // wrote it, so a nutrient added after this APK was compiled will appear here — and a
+            // figure whose unit and scale are unknown is not a figure.
+            val n = NutrientSet.byId(r.nutrient) ?: continue
+            m[n] = NutrientSet.read(n, r.value)
+        }
+        return NutrientSet.Amounts(m)
     }
 
     /**
@@ -204,7 +236,11 @@ class OfflineFoodStore(private val db: FoodDatabase) {
      * log stores and what a later lookup uses, and a US packet's printed UPC-A is what somebody would
      * recognise if they ever saw it. `normalize` resolves the spellings; it does not replace them.
      */
-    private fun toFood(row: FoodRow, scanned: String): Food = Food.of(
+    private fun toFood(
+        row: FoodRow,
+        scanned: String,
+        extras: NutrientSet.Amounts = NutrientSet.Amounts(),
+    ): Food = Food.of(
         id = scanned.filter { it.isDigit() }.ifEmpty { row.barcode.toString() },
         name = row.name?.takeIf { it.isNotBlank() } ?: "Product ${row.barcode}",
         brand = row.brand.orEmpty(),
@@ -226,6 +262,7 @@ class OfflineFoodStore(private val db: FoodDatabase) {
             else -> NutritionDay.Source.OPEN_FOOD_FACTS
         },
         micros = micros(row),
+        extras = extras,
     )
 
     /**

@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.FoodSearch
+import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import kotlinx.coroutines.CoroutineScope
@@ -98,6 +100,11 @@ class CustomFoodStore(
      *   normalised to at its parser. A caller holding label figures for some other weight converts
      *   through `FoodPortion.per100gFrom`, which refuses when the weight is unknown rather than
      *   inventing a density.
+     * @param micros and @param extras whatever else the label stated, per hundred grams and in each
+     *   nutrient's own unit. ⚠️ **Sparse, and only what was actually typed.** A label that says
+     *   nothing about magnesium must leave no magnesium key here — a zero would be this app
+     *   asserting a measurement nobody took, which is the one thing the whole sparse layer exists to
+     *   make impossible.
      * @return the stored food, so the caller can log a portion of it straight away.
      */
     suspend fun save(
@@ -106,6 +113,8 @@ class CustomFoodStore(
         brand: String = "",
         servingGrams: Double? = null,
         servingLabel: String = "",
+        micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+        extras: NutrientSet.Amounts = NutrientSet.Amounts(),
     ): Food {
         val food = Food.of(
             id = ID_PREFIX + UUID.randomUUID().toString(),
@@ -115,6 +124,8 @@ class CustomFoodStore(
             servingGrams = servingGrams?.takeIf { it.isFinite() && it > 0.0 },
             servingLabel = servingLabel.trim(),
             source = NutritionDay.Source.CUSTOM,
+            micros = micros,
+            extras = extras,
         )
         mutex.withLock {
             val s = loadLocked()

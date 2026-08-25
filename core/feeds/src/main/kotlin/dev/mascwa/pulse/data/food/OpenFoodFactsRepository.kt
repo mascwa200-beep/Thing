@@ -4,6 +4,7 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -215,6 +216,7 @@ internal fun parseOffProduct(id: String, p: JsonObject): Food? {
         source = NutritionDay.Source.OPEN_FOOD_FACTS,
         imageUrl = p.str("image_small_url"),
         micros = offMicros(n),
+        extras = offExtras(n),
     )
 }
 
@@ -237,6 +239,26 @@ internal fun parseOffProduct(id: String, p: JsonObject): Food? {
  * publish nothing at all. "Contains none" and "nobody measured" are different things to sum into a
  * day's total.
  */
+/**
+ * The further nutrients this record carries.
+ *
+ * ⚠️ **The field list is not written down here — it comes from the declaration.** Each nutrient
+ * knows its own Open Food Facts column, and the offline database's builder reads that same
+ * declaration, so the network path and the bundled path cannot end up looking at different columns.
+ * That divergence is exactly the defect this project corrected when the network lookup was found to
+ * be dropping micronutrients the offline one kept.
+ *
+ * ⚠️ Open Food Facts publishes every one of these in GRAMS, as it does the micronutrients above;
+ * [NutrientSet.fromGrams] is the one conversion into the unit each is stored in.
+ */
+private fun offExtras(n: JsonObject): NutrientSet.Amounts {
+    val m = LinkedHashMap<NutrientSet.Nutrient, Double>()
+    for (nutrient in NutrientSet.Nutrient.entries) {
+        NutrientSet.fromGrams(nutrient, n.num("${nutrient.offField}_100g"))?.let { m[nutrient] = it }
+    }
+    return NutrientSet.Amounts(m)
+}
+
 private fun offMicros(n: JsonObject): Micronutrients.Amounts {
     val m = LinkedHashMap<Micronutrients.Micro, Double>(8)
     fun put(k: Micronutrients.Micro, field: String) {

@@ -120,6 +120,18 @@ fi
 # have just ADDED to `core/feeds` source is absent from them and every call to it is reported as a
 # real unresolved reference. It reads exactly like a defect and is not one. Rebuild first:
 #   ./gradlew :core:feeds:classes --configure-on-demand --no-configuration-cache
+#
+# ⚠️ **AND A FALSE POSITIVE THAT LOOKS LIKE NOTHING ELSE: "argument type mismatch: actual type is
+# X, but X was expected."** `core/telemetry` is compiled here FROM SOURCE alongside the target
+# files, while `core/feeds` is on the classpath as CLASSES — and those classes were compiled
+# against their own copy of `core/telemetry`. So a `:core:telemetry` type passed through a
+# `:core:feeds` signature has two definitions in one compilation, and the compiler says so in the
+# most confusing way available. `method 'iterator()' is ambiguous` on a perfectly ordinary `for`
+# loop is the same thing wearing a different hat.
+#
+# Settle it the documented way rather than shrugging: a typed probe compiled against the COMPILED
+# classes of both modules, which has only one definition of each. If the probe compiles and runs,
+# the complaint was this.
 # (`:core:telemetry` is passed as SOURCES, so it never has this problem — only feeds does.)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
 TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar"

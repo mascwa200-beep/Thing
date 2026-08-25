@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -52,6 +55,7 @@ import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
@@ -68,6 +72,7 @@ import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsDataRow
+import dev.mascwa.pulse.feature.common.LcarsDialog
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.LcarsFrame
@@ -175,6 +180,21 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         if (present.isNotEmpty()) {
             item { LcarsHeaderBar("VITAMINS AND MINERALS") }
             items(present) { m -> MicroRow(m, micros, sex, age) }
+        }
+
+        // ⚠️ **Everything else the records happened to carry, and ONLY what they carried.** Twenty-
+        // nine further nutrients are declared; the densest of them is recorded on 5.7% of products
+        // and most are near 2%, so on an ordinary day this section is absent entirely — which is
+        // correct. A row per nutrient with a dash in it would be twenty-nine lines of nothing.
+        //
+        // ⚠️ No reference intake beside them, unlike the eight above, because there is none this app
+        // can honestly state for most of them. What each row CAN say is how much of the day it was
+        // drawn from, which is the same caveat and the more important one here.
+        val extras = state.extrasToday
+        val extrasPresent = NutrientSet.Nutrient.entries.filter { extras[it] != null }
+        if (extrasPresent.isNotEmpty()) {
+            item { LcarsHeaderBar("EVERYTHING ELSE RECORDED") }
+            items(extrasPresent) { n -> ExtraNutrientRow(n, extras) }
         }
 
         // The week, which is the question somebody actually has after a fortnight: whether the plan
@@ -372,6 +392,40 @@ private fun NutrientRow(guide: NutrientGuides.Guide, amount: Double) {
  * ceiling was withdrawn in 2015; trans fat has no allowance because the guidance is elimination,
  * and a budget on screen reads as permission to spend it. Those get the sentence and no bar.
  */
+/**
+ * One further nutrient across today, with the denominator that makes it honest.
+ *
+ * ⚠️ **No percentage of anything.** [MicroRow] above compares against a published reference intake
+ * and can say "62% of the guideline"; for most of these twenty-nine there is no figure current
+ * guidance states, and inventing one to fill the same shape would be the exact dishonesty this
+ * whole feature set is built to avoid. The number and where it came from is all there is to say.
+ */
+@Composable
+private fun ExtraNutrientRow(n: NutrientSet.Nutrient, day: NutrientSet.Day) {
+    val c = Pulse.colors
+    val tally = day[n] ?: return
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    n.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    "${Formatters.number(tally.total, 2)} ${n.unit.symbol}",
+                    fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink,
+                )
+            }
+            // ⚠️ The denominator, or nothing. `caveat` is silent once a figure is well covered,
+            // which is right: a line under every row is a line nobody reads, and its whole force
+            // is for the day a total came from one food in six.
+            day.caveat(n)?.let {
+                Text(it, fontFamily = ChakraPetch, fontSize = 10.sp, color = c.muted)
+            }
+        }
+    }
+}
+
 @Composable
 private fun MicroRow(
     m: Micronutrients.Micro,
@@ -494,6 +548,10 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     var carb by remember { mutableStateOf("") }
     var grams by remember { mutableStateOf("") }
     var keep by remember { mutableStateOf(false) }
+    // Whatever else was on the label, keyed by [LabelNutrient.key] and held as the text somebody
+    // typed rather than a parsed number — so a half-finished "0." is not silently a zero, and a
+    // field that is present but empty is still a nutrient they chose to add and have not filled in.
+    var labelled by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     // ⚠️ Read HERE, not inside the LazyColumn. A LazyColumn's content is a `LazyListScope.() -> Unit`
     // — an ordinary lambda, not a composable one — so `collectAsStateWithLifecycle()` inside it is a
@@ -504,6 +562,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
+        labelled = emptyMap()
     }
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -532,6 +591,11 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         NumberCell("C", carb, { carb = it }, Modifier.weight(1f))
                         NumberCell("GRAMS", grams, { grams = it }, Modifier.weight(1.2f))
                     }
+                    MoreFromTheLabel(
+                        typed = labelled,
+                        onChange = { key, v -> labelled = labelled + (key to v) },
+                        onRemove = { key -> labelled = labelled - key },
+                    )
                     val energy = kcal.toDoubleOrNull()
                     val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
                     // ⚠️ The numbers above are what was EATEN; the density is what a saved food has to
@@ -579,6 +643,14 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                                 // does not reset itself when the field is emptied, and a save with no
                                 // weight is exactly what the core refuses. Re-checked at the call.
                                 keepAsFood = keep && weight != null,
+                                // ⚠️ A field left blank yields no key at all rather than a zero, and
+                                // that falls out of `toDoubleOrNull` rather than being enforced here.
+                                // It is the whole discipline of the sparse layer: a nutrient nobody
+                                // typed was not measured, and "0 mg magnesium" is a claim about a
+                                // food that nobody made. A typed 0 is different and is kept — "0 g
+                                // trans fat" is printed on labels and is a real measurement.
+                                micros = typedMicros(labelled),
+                                extras = typedExtras(labelled),
                             )
                             reset()
                         },
@@ -721,6 +793,177 @@ private fun CopyDay(vm: HealthViewModel, day: Long) {
                     "changes nothing.",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
             )
+        }
+    }
+}
+
+/**
+ * One flat list of every nutrient a label can state and this app can hold.
+ *
+ * ⚠️ **It spans two enums, and that is deliberate rather than an oversight to converge.**
+ * [Micronutrients.Micro] holds eight figures that have a published reference intake to compare
+ * against — that comparison, and the two refusals inside `Micronutrients.reference`, are the whole
+ * reason that type exists. [NutrientSet.Nutrient] holds twenty-nine more that have no figure current
+ * guidance states. Folding them into one enum would mean either inventing guidelines for the
+ * twenty-nine or discarding the eight real ones, so the picker joins them and only the eight ever
+ * get a percentage drawn beside them.
+ *
+ * ⚠️ Sorted by label, not by declaration. Somebody hunting for magnesium is reading, and the
+ * declaration order encodes measured corpus coverage — useful to the builder, meaningless here.
+ */
+private class LabelNutrient(
+    val key: String,
+    val label: String,
+    val unit: String,
+    val micro: Micronutrients.Micro?,
+    val extra: NutrientSet.Nutrient?,
+)
+
+/**
+ * ⚠️ Keys are prefixed by which enum they came from. The two are disjoint today; a prefix means
+ * they can never collide even if a name were repeated, and it is what lets one typed map carry both.
+ */
+private val LabelNutrients: List<LabelNutrient> = buildList {
+    Micronutrients.Micro.entries.forEach { add(LabelNutrient("M:" + it.name, it.label, it.unit, it, null)) }
+    NutrientSet.Nutrient.entries.forEach {
+        add(LabelNutrient("E:" + it.name, it.label, it.unit.symbol, null, it))
+    }
+}.sortedBy { it.label.lowercase() }
+
+/**
+ * What was typed, as the vitamins and minerals.
+ *
+ * ⚠️ **A blank field yields no key**, which falls out of `toDoubleOrNull` rather than being
+ * enforced, and is the whole discipline of the sparse layer: absent means nobody measured it. A
+ * typed **0** is a different thing and is kept — "0 g trans fat" is printed on real labels.
+ */
+private fun typedMicros(typed: Map<String, String>): Micronutrients.Amounts =
+    Micronutrients.Amounts(
+        LabelNutrients.mapNotNull { n ->
+            val m = n.micro ?: return@mapNotNull null
+            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
+        }.toMap(),
+    )
+
+/** The twin of [typedMicros] for the twenty-nine further nutrients. */
+private fun typedExtras(typed: Map<String, String>): NutrientSet.Amounts =
+    NutrientSet.Amounts(
+        LabelNutrients.mapNotNull { n ->
+            val e = n.extra ?: return@mapNotNull null
+            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
+        }.toMap(),
+    )
+
+/**
+ * The rest of what is printed on the packet, for the path where somebody is typing it in.
+ *
+ * ⚠️ **Nothing is shown until it is asked for.** Thirty-seven number fields under QUICK ADD would
+ * bury the four that matter, and the point of that card is that it is the path which never stops
+ * working — no signal, no barcode, a local bakery nobody has photographed. So the default is a
+ * single button, and each nutrient appears only once it has been picked.
+ *
+ * ⚠️ The figures here are what was **eaten**, exactly like the four macro cells above them, and the
+ * conversion to a density happens once — in the view model, against the same weight. Asking for
+ * per-hundred-gram figures here would be a second unit convention on one card.
+ */
+@Composable
+private fun MoreFromTheLabel(
+    typed: Map<String, String>,
+    onChange: (String, String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    val c = Pulse.colors
+    var picking by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val chosen = LabelNutrients.filter { typed.containsKey(it.key) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        chosen.forEach { n ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    n.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(Modifier.width(92.dp)) {
+                    LcarsField(
+                        value = typed[n.key].orEmpty(),
+                        onValueChange = { onChange(n.key, it.filter { ch -> ch.isDigit() || ch == '.' }.take(8)) },
+                        placeholder = "0",
+                        showClear = false,
+                    )
+                }
+                Text(n.unit, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                Text(
+                    "REMOVE",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.amber,
+                    modifier = Modifier.clickable { onRemove(n.key) },
+                )
+            }
+        }
+        LcarsButton(
+            text = if (chosen.isEmpty()) "MORE FROM THE LABEL" else "ADD ANOTHER",
+            color = c.muted,
+            onClick = { query = ""; picking = true },
+        )
+    }
+
+    if (picking) {
+        LcarsDialog(title = "Add a nutrient", onDismiss = { picking = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                LcarsField(value = query, onValueChange = { query = it }, placeholder = "Search")
+                val q = query.trim()
+                val available = LabelNutrients.filter {
+                    !typed.containsKey(it.key) && (q.isBlank() || it.label.contains(q, ignoreCase = true))
+                }
+                if (available.isEmpty()) {
+                    Text(
+                        if (q.isBlank()) "Every one of them is already on the card."
+                        else "Nothing left matching that.",
+                        fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted,
+                    )
+                } else {
+                    // ⚠️ **A scrolling Column, and emphatically NOT a LazyColumn.** `LcarsDialog`
+                    // measures itself with `height(IntrinsicSize.Min)` — it is one of only two
+                    // intrinsic-forcing sites in the whole app — and a lazy list is a
+                    // `SubcomposeLayout`, which refuses an intrinsic query outright: "Asking for
+                    // intrinsic measurements of SubcomposeLayout layouts is not supported", read out
+                    // of the shipped compose-ui bytecode rather than recalled. It compiles perfectly
+                    // and throws the moment the dialog is opened. The message's own suggested
+                    // mitigation — a size modifier that fast-returns — does not apply either: a
+                    // `heightIn(max =)` is not a FIXED height, so `SizeNode` still delegates to the
+                    // child and the query reaches the lazy list anyway. Thirty-seven rows is nothing
+                    // to compose eagerly, so the honest fix is not to use a lazy list at all.
+                    //
+                    // Bounded all the same, because thirty-seven rows is taller than a phone and a
+                    // dialog that runs off the screen takes its own buttons with it.
+                    Column(
+                        Modifier
+                            .heightIn(max = 300.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        available.forEach { n ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    // Added with an empty value, not a zero: choosing to record a
+                                    // nutrient is not the same as saying the food has none of it.
+                                    .clickable { onChange(n.key, ""); picking = false }
+                                    .padding(vertical = 7.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(n.label, fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink)
+                                Text(n.unit, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.util.VisionImage
@@ -154,6 +155,14 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
          * records that happened to state it, and roughly three product records in four do not.
          */
         val microsToday: Micronutrients.Day = Micronutrients.Day(),
+        /**
+         * The further nutrients today's foods recorded, and how much of the day each came from.
+         *
+         * ⚠️ Kept apart from [microsToday] rather than merged: those eight have reference intakes to
+         * compare against and these twenty-nine have none this app can honestly state, so one list
+         * would mean either inventing guidelines or dropping the real ones.
+         */
+        val extrasToday: NutrientSet.Day = NutrientSet.Day(),
         val loggedDaysInWindow: Int = 0,
     ) {
         val targets: MacroTargets.Targets? get() = (plan as? MacroTargets.Plan.Set)?.targets
@@ -575,6 +584,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     foodId = food.id,
                     // Through the same scaling rule as the macros above — see FoodPortion.
                     micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
+                    extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
                 ),
             )
             _picked.value = null
@@ -602,6 +612,8 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         meal: NutritionDay.Meal,
         grams: Double = 0.0,
         keepAsFood: Boolean = false,
+        micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+        extras: NutrientSet.Amounts = NutrientSet.Amounts(),
     ) {
         val label = name.trim().ifBlank { "Quick add" }
         if (!kcal.isFinite() || kcal < 0.0) return
@@ -619,7 +631,18 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                         // food with no numbers at all, which reads as the app having lost it.
                         ?.takeIf { FoodPortion.densityLooksWrong(it) == null }
                         ?.let { per100 ->
-                            c.customFoodStore.save(name = label, per100g = per100, servingGrams = grams)
+                            c.customFoodStore.save(
+                                name = label,
+                                per100g = per100,
+                                servingGrams = grams,
+                                // ⚠️ Converted, not passed through. Everything typed above is what was
+                                // EATEN; a saved food is a density. Handing the eaten figures straight
+                                // to the store would record a 30 g biscuit's magnesium as if it were a
+                                // hundred grams of it — and the macros beside them, which do convert,
+                                // would then describe a different portion of the same food.
+                                micros = FoodPortion.per100gMicrosFrom(micros, grams),
+                                extras = FoodPortion.per100gExtrasFrom(extras, grams),
+                            )
                         }
                 } else {
                     null
@@ -633,6 +656,8 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                     grams = grams,
                     nutrients = eaten,
                     meal = meal,
+                    micros = micros,
+                    extras = extras,
                     source = NutritionDay.Source.CUSTOM,
                     foodId = saved?.id.orEmpty(),
                 ),
@@ -814,6 +839,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
                         source = food.source,
                         foodId = food.id,
                         micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
+                    extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
                     ),
                 )
             }
@@ -1318,6 +1344,7 @@ internal suspend fun composeHealthReading(
         plan = plan,
         eatenToday = NutritionDay.total(todayEntries),
         microsToday = NutritionDay.microTotal(todayEntries),
+        extrasToday = NutritionDay.extraTotal(todayEntries),
         loggedDaysInWindow = intake.size,
     )
 }

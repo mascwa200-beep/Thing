@@ -219,6 +219,24 @@ object NutrientSet {
         return v
     }
 
+    /**
+     * A whole record with the unbelievable figures dropped.
+     *
+     * ⚠️ **Dropped, not clamped, and the parser boundary is where this belongs.** A record claiming
+     * three kilograms of added sugar in a hundred grams is not a record that needs the number
+     * shaving down to a hundred — nothing about it can be believed, so the honest thing is that the
+     * food has no added-sugar figure at all, which the map expresses and a clamped number cannot.
+     *
+     * The sibling for the eight micronutrients is `FoodPortion.saneMicros`, and the two exist for
+     * the same reason: every path a food takes into this app converts through one boundary
+     * function, so a source that publishes nonsense cannot reach the log however it arrives.
+     */
+    fun sane(amounts: Amounts): Amounts {
+        if (amounts.isEmpty) return amounts
+        val kept = amounts.values.mapNotNull { (n, v) -> sane(n, v)?.let { n to it } }
+        return if (kept.size == amounts.values.size) amounts else Amounts(kept.toMap())
+    }
+
     /** A believable figure as the integer the database stores, or null. */
     fun store(n: Nutrient, value: Double?): Int? {
         val v = sane(n, value) ?: return null
@@ -300,4 +318,7 @@ object NutrientSet {
      */
     fun add(day: Day, amounts: Amounts): Day =
         Day(SparseNutrition.tally(day.tallies, amounts.values), day.entries + 1)
+
+    /** A whole day, folded from what each portion recorded. */
+    fun of(portions: List<Amounts>): Day = portions.fold(Day()) { d, a -> add(d, a) }
 }

@@ -110,6 +110,15 @@ object NutritionDay {
          * summed as zero, which is why this is a map rather than more fields on [Nutrients].
          */
         val micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+
+        /**
+         * The twenty-nine further nutrients in this portion, where the record carried any.
+         *
+         * ⚠️ Defaulted for the same reason [micros] is, and sparser still: the densest of these is
+         * recorded on 5.7% of products. Empty is what a food nobody measured them for honestly
+         * holds, and it is what every entry logged before this field existed decodes to.
+         */
+        val extras: NutrientSet.Amounts = NutrientSet.Amounts(),
     )
 
     // ------------------------------------------------------------------------------------- totals
@@ -126,6 +135,17 @@ object NutritionDay {
      */
     fun microTotal(entries: List<Entry>): Micronutrients.Day =
         Micronutrients.of(entries.map { it.micros })
+
+    /**
+     * The day's further nutrients, and how much of the day each was drawn from.
+     *
+     * ⚠️ Separate from [microTotal] rather than merged into it, because the two are keyed by
+     * different enums for a reason: the eight micronutrients have reference intakes to compare a
+     * day against and these twenty-nine have none this app can honestly state. A screen that showed
+     * them in one list would have to either invent guidelines or drop the real ones.
+     */
+    fun extraTotal(entries: List<Entry>): NutrientSet.Day =
+        NutrientSet.of(entries.map { it.extras })
 
     /** Every meal present, in the order a day happens. Absent meals are omitted rather than zeroed. */
     fun byMeal(entries: List<Entry>): Map<Meal, Nutrients> {

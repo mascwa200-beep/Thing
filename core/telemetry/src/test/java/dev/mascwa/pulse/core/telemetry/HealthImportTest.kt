@@ -36,6 +36,7 @@ class HealthImportTest {
         atMs: Long,
         dayStartMs: Long = dayStartFor(atMs),
         micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+        extras: NutrientSet.Amounts = NutrientSet.Amounts(),
         meal: NutritionDay.Meal = NutritionDay.Meal.LUNCH,
         source: NutritionDay.Source = NutritionDay.Source.OFFLINE,
         brand: String = "",
@@ -55,6 +56,7 @@ class HealthImportTest {
         meal = meal,
         source = source,
         micros = micros,
+        extras = extras,
     )
 
     private val hazards = listOf(
@@ -70,6 +72,15 @@ class HealthImportTest {
                 mapOf(
                     Micronutrients.Micro.CALCIUM to 120.0,
                     Micronutrients.Micro.VITAMIN_D to 0.75,
+                ),
+            ),
+            // ⚠️ Two of the twenty-nine, at the two ends of the precision range: added sugars in
+            // whole-ish grams, and vitamin B12 at a hundredth of a microgram — which is where a
+            // fixed single decimal would round the figure to nothing on the way out.
+            extras = NutrientSet.Amounts(
+                mapOf(
+                    NutrientSet.Nutrient.ADDED_SUGARS to 7.89,
+                    NutrientSet.Nutrient.VITAMIN_B12 to 0.0861,
                 ),
             ),
         ),
@@ -161,6 +172,27 @@ class HealthImportTest {
         // And an entry that recorded none reports none rather than eight zeros.
         assertTrue(HealthImport.foodLog(exported(), dayStartFor)
             .entries.first { it.id == "e1" }.micros.values.isEmpty())
+    }
+
+    /**
+     * The same rule for the twenty-nine further nutrients, and the precision that makes it real.
+     *
+     * ⚠️ **0.0861 µg is the case that matters.** The export chooses its decimals from each
+     * nutrient's own measured typical value, so B12 gets four; the fixed single decimal the
+     * micronutrient columns start from would have written `0.1`, and a round trip would then have
+     * quietly changed somebody's figure by sixteen per cent. Asserting to 1e-9 is what makes that
+     * a failure rather than a shrug.
+     */
+    @Test
+    fun anUnrecordedFurtherNutrientStaysUnrecorded() {
+        val got = HealthImport.foodLog(exported(), dayStartFor).entries.first { it.id == "e4" }
+        assertEquals(7.89, got.extras[NutrientSet.Nutrient.ADDED_SUGARS]!!, 1e-9)
+        assertEquals(0.0861, got.extras[NutrientSet.Nutrient.VITAMIN_B12]!!, 1e-9)
+        assertNull(got.extras[NutrientSet.Nutrient.MAGNESIUM])
+        assertNull(got.extras[NutrientSet.Nutrient.WATER])
+        // And an entry that recorded none reports none rather than twenty-nine zeros.
+        assertTrue(HealthImport.foodLog(exported(), dayStartFor)
+            .entries.first { it.id == "e1" }.extras.values.isEmpty())
     }
 
     /**

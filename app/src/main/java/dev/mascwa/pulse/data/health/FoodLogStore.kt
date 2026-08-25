@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -102,6 +103,15 @@ class FoodLogStore(
          * would make a year of logs undecodable. An unknown key is dropped on the way back in.
          */
         val micros: Map<String, Double> = emptyMap(),
+
+        /**
+         * The further nutrients in this portion, keyed by `NutrientSet.Nutrient` name.
+         *
+         * ⚠️ Defaulted and String-keyed for exactly the reasons above — a required field would make
+         * every month logged before this existed unreadable in one go, and an enum-keyed serializer
+         * would do the same the day a nutrient is renamed.
+         */
+        val extras: Map<String, Double> = emptyMap(),
     )
 
     @Serializable
@@ -147,6 +157,7 @@ class FoodLogStore(
         id, dayStartMs, atMs, name, grams, nutrients.stored(), brand, servingLabel,
         meal.name, source.name, foodId,
         micros.values.entries.associate { it.key.name to it.value },
+        extras.values.entries.associate { it.key.name to it.value },
     )
 
     private fun StoredEntry.domain() = NutritionDay.Entry(
@@ -164,6 +175,13 @@ class FoodLogStore(
         micros = Micronutrients.Amounts(
             micros.mapNotNull { (k, v) ->
                 runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { it to v }
+            }.toMap()
+        ),
+        // ⚠️ An unrecognised name is dropped, never guessed at. The log outlives any one build, so
+        // a figure whose nutrient this version does not know is a figure with no unit.
+        extras = NutrientSet.Amounts(
+            extras.mapNotNull { (k, v) ->
+                runCatching { NutrientSet.Nutrient.valueOf(k) }.getOrNull()?.let { it to v }
             }.toMap()
         ),
     )

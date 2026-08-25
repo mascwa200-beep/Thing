@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.food
 
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.serialization.Serializable
 
@@ -55,6 +56,20 @@ data class Food(
      * simply dropped by [microsPer100g].
      */
     val micros: Map<String, Double> = emptyMap(),
+
+    /**
+     * Every FURTHER nutrient per 100 g, keyed by `NutrientSet.Nutrient` name — added sugars, the
+     * individual sugars, the rest of the B vitamins, the trace minerals, water.
+     *
+     * ⚠️ Same shape and same reasoning as [micros], one tier sparser. The densest of these is
+     * recorded on 5.7% of products and most are near 2%, so a flat double defaulting to zero would
+     * be a false statement about ninety-eight products in a hundred.
+     *
+     * ⚠️ Keyed by String and **defaulted**, both deliberately: this is an on-disk contract, so an
+     * enum-keyed serializer would throw on a name it did not know, and a non-defaulted field would
+     * make every food cached before this existed undecodable.
+     */
+    val extras: Map<String, Double> = emptyMap(),
 ) {
     val per100g: NutritionDay.Nutrients
         get() = NutritionDay.Nutrients(kcal, proteinG, fatG, carbG, fibreG, sugarG, satFatG, sodiumMg)
@@ -64,6 +79,14 @@ data class Food(
         get() = Micronutrients.Amounts(
             micros.mapNotNull { (k, v) ->
                 runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { it to v }
+            }.toMap()
+        )
+
+    /** The further nutrients this record carries, in the core's own type. Unknown keys are dropped. */
+    val extrasPer100g: NutrientSet.Amounts
+        get() = NutrientSet.Amounts(
+            extras.mapNotNull { (k, v) ->
+                runCatching { NutrientSet.Nutrient.valueOf(k) }.getOrNull()?.let { it to v }
             }.toMap()
         )
 
@@ -104,6 +127,7 @@ data class Food(
             source: NutritionDay.Source = NutritionDay.Source.OPEN_FOOD_FACTS,
             imageUrl: String = "",
             micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+            extras: NutrientSet.Amounts = NutrientSet.Amounts(),
         ): Food {
             val n = FoodPortion.sane(per100g)
             return Food(
@@ -124,6 +148,8 @@ data class Food(
                 sourceName = source.name,
                 imageUrl = imageUrl,
                 micros = FoodPortion.saneMicros(micros).values.entries
+                    .associate { it.key.name to it.value },
+                extras = NutrientSet.sane(extras).values.entries
                     .associate { it.key.name to it.value },
             )
         }
