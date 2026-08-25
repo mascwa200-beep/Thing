@@ -99,6 +99,9 @@ import sys
 import urllib.request
 import zipfile
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nutrient_set  # noqa: E402
+
 # ⚠️ Selected by ID. See note 1 above: `Energy` is also nutrient 1062, in kJ.
 NUTRIENTS = {
     1008: ("kcal", "kcal"),
@@ -157,6 +160,35 @@ NUTRIENTS = {
 # would tie it to declaration order in a file somebody will reorder one day.
 MICRO_FIELDS = ["calcium", "iron", "potassium", "vita", "vitc", "vitd", "chol", "transfat"]
 
+# ⚠️ **Imported from the branded builder rather than restated here, and the odd direction is
+# deliberate.** USDA's nutrient NUMBERS are a fact about USDA, not about `NutrientSet.kt`, so
+# `nutrient_set.py` — whose whole doc argues against a second table of the Kotlin's own facts — is
+# the wrong home for them. A second copy in this file would be the drift this project has corrected
+# six times, and the failure mode is the worst kind: magnesium written under phosphorus's column
+# across thirteen thousand foods with nothing anywhere to notice. `build_food_db.py` derived that
+# table against USDA's own CSVs and guards it at import — a name `NutrientSet.kt` does not declare
+# is fatal there — so importing gets the validation as well as the table.
+#
+# ⚠️ Safe to import: everything at its module level is constants and that one guard, `main()` sits
+# behind an `if __name__` check, and nothing is downloaded or opened until it is called.
+from build_food_db import GRAMS_PER_USDA_UNIT, USDA_EXTRA_NUMBERS  # noqa: E402
+
+EXTRA_BY_NAME = {n.name: n for n in nutrient_set.load()}
+
+# ⚠️ **All twenty-nine, in ID order, and both halves of that matter.**
+#
+# By id rather than by declaration order because `NutrientSet.kt` gives every nutrient a permanent
+# explicit id for exactly this reason — the column order here is an on-disk contract with
+# `FoodRepository.seedExtras`, and an id cannot silently change when somebody alphabetises the enum.
+# `MICRO_FIELDS` above has to be a hand-kept list precisely because `Micronutrients.Micro` has no
+# such id; this set does, so it can be derived, and derived is better.
+#
+# ALL of them rather than only the twenty-six USDA publishes, because "which subset, in what order"
+# would be a second implicit contract for the reader to get right. Three columns — added sugars,
+# iodine, polyols — are empty on every row, which is ~40 kB of tabs and is what an unrecorded
+# measurement is supposed to look like anyway. If USDA ever publishes them the column is waiting.
+EXTRA_ORDER = sorted(EXTRA_BY_NAME.values(), key=lambda n: n.id)
+
 # Mirrors FoodPortion.MIN_SERVING_G / MAX_SERVING_G. Kept in step by hand; the Kotlin core is the
 # authority and a drift here only means the seed is slightly more or less generous than a scan.
 MIN_SERVING_G = 4.0
@@ -208,6 +240,42 @@ def nutrients_of(record: dict, complaints: list) -> dict:
             complaints.append(f"{field}: expected {expect}, got {unit!r} in fdcId {record.get('fdcId')}")
             continue
         out[field] = float(amount)
+    return out
+
+
+def extras_of(record: dict, complaints: list) -> dict:
+    """Every further nutrient this record states, in the unit `NutrientSet.kt` stores it in.
+
+    ⚠️ **Keyed on the nutrient NUMBER, where [nutrients_of] above keys on the id, and the two
+    conventions in one file are not an inconsistency.** That one has to use ids because `Energy`
+    appears twice under one name; this one uses numbers because the number is what the branded
+    builder's table speaks, and one shared table beats two that agree until they do not. Measured
+    before relying on it: every one of the 997,140 nutrient entries across both datasets carries a
+    `number`, so nothing is lost by keying on it.
+
+    ⚠️ **The unit is converted through grams rather than assumed to match**, and exactly one of the
+    twenty-six needs it: USDA publishes riboflavin in milligrams and this app stores micrograms, a
+    thousandfold error in the direction that looks like a food simply containing none. Doing it from
+    the declared unit rather than a per-nutrient exception list means the next mismatch is handled
+    too. An unrecognised unit is a complaint, never a guess — `build_food_db.py` gives the same
+    reason at greater length.
+    """
+    out = {}
+    for n in record.get("foodNutrients", []):
+        nu = n.get("nutrient", {})
+        name = USDA_EXTRA_NUMBERS.get(str(nu.get("number")))
+        if name is None:
+            continue
+        amount = n.get("amount")
+        if amount is None:
+            continue
+        per_gram = GRAMS_PER_USDA_UNIT.get((nu.get("unitName") or "").lower())
+        if per_gram is None:
+            complaints.append(
+                f"{name}: unrecognised unit {nu.get('unitName')!r} in fdcId {record.get('fdcId')}"
+            )
+            continue
+        out[name] = float(amount) * per_gram * EXTRA_BY_NAME[name].per_gram
     return out
 
 
@@ -263,6 +331,7 @@ def rows(data: dict, key: str, tag: str, complaints: list):
         if not name:
             continue
         n = nutrients_of(record, complaints)
+        e = extras_of(record, complaints)
         # A record with no energy is not something anybody can log. FNDDS carries a handful
         # deliberately empty (human milk, with a footnote saying so).
         if not n.get("kcal") and not n.get("protein") and not n.get("fat") and not n.get("carb"):
@@ -285,6 +354,11 @@ def rows(data: dict, key: str, tag: str, complaints: list):
             # took on screen as confidently as one they did — and sum it into a day's total while
             # presenting that total as complete.
             *["" if n.get(f) is None else n[f] for f in MICRO_FIELDS],
+            # ⚠️ Same rule again for the twenty-nine further nutrients: recorded or empty, never
+            # zero. The density here is nothing like the barcoded corpus — measured over both
+            # datasets, 68% of these cells carry a real laboratory figure, against roughly 2% for
+            # the same nutrients on Open Food Facts. Generic foods are analysed; packets are typed in.
+            *["" if e.get(x.name) is None else e[x.name] for x in EXTRA_ORDER],
         ]
 
 
@@ -320,9 +394,18 @@ def main() -> int:
                 + [fmt(v) for v in r[3:12]]
                 + [r[12]]
                 + [fmt(v) for v in r[13:21]]
+                + [fmt(v) for v in r[21:]]
             )
             line = "\t".join(str(f) for f in fields)
-            assert line.count("\t") == 20, f"delimiter escaped into a field: {line[:120]!r}"
+            # ⚠️ **Derived from the two nutrient lists, not a literal, and it still catches the
+            # failure it was written for.** A slice left off the assembly above makes the count
+            # short and this fires — which is precisely what happened to the micronutrients — while
+            # a tab that escaped into a field makes it long. Deriving it means the number cannot go
+            # stale as either set grows, which a hand-written 49 certainly would.
+            expected = 13 + len(MICRO_FIELDS) + len(EXTRA_ORDER) - 1
+            assert line.count("\t") == expected, (
+                f"expected {expected} tabs, got {line.count(chr(9))}: {line[:120]!r}"
+            )
             lines.append(line)
         per_source[tag] = len(lines) - before
 
@@ -351,6 +434,18 @@ def main() -> int:
         col = 13 + i
         n = sum(1 for l in lines if l.split("\t")[col])
         print(f"     {field:10} {n:6} ({100 * n // len(lines):3d}%)")
+    # ⚠️ The same figure for the twenty-nine, for the same reason: what decides whether a column
+    # belongs in a shipped asset is its measured density, and that number has to be visible in the
+    # build that produced it rather than remembered from the session that added it.
+    print("   further nutrients recorded:")
+    base = 13 + len(MICRO_FIELDS)
+    filled = 0
+    for i, nut in enumerate(EXTRA_ORDER):
+        n = sum(1 for l in lines if l.split("\t")[base + i])
+        filled += n
+        print(f"     {nut.name.lower():22} {n:6} ({100 * n // len(lines):3d}%) {nut.symbol}")
+    cells = len(lines) * len(EXTRA_ORDER)
+    print(f"   further-nutrient cells filled: {filled} of {cells} ({100 * filled // cells}%)")
     return 0
 
 

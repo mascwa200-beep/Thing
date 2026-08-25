@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.health
 import android.content.Context
 import dev.mascwa.pulse.core.telemetry.FoodSearch
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
@@ -242,6 +243,7 @@ class FoodRepository(
             servingLabel = f[12],
             source = NutritionDay.Source.OFFLINE,
             micros = seedMicros(f),
+            extras = seedExtras(f),
         )
     }
 
@@ -277,4 +279,56 @@ class FoodRepository(
         put(Micronutrients.Micro.TRANS_FAT, 20)
         return Micronutrients.Amounts(m)
     }
+
+    /**
+     * The twenty-nine further nutrients this line records — added sugars, the individual sugars, the
+     * rest of the B vitamins, the trace minerals, water.
+     *
+     * ⚠️ **The column order is [NutrientSet.Nutrient.id], not declaration order, and that is the
+     * whole contract.** `build_seed.py` sorts by the same id. [seedMicros] above has to hand-write
+     * its eight indices because `Micronutrients.Micro` carries no id and its builder keeps a
+     * hand-ordered list to match; this set was given permanent explicit ids in `NutrientSet.kt`
+     * precisely so an asset could be ordered by something that cannot change when somebody
+     * alphabetises the enum. Derived beats hand-kept wherever the data allows it.
+     *
+     * ⚠️ **All twenty-nine have a column even though USDA publishes twenty-six.** Added sugars,
+     * iodine and polyols are empty on every row — measured, not assumed — and that is exactly what
+     * an unrecorded measurement is supposed to look like here. Writing only the subset would make
+     * "which ones, in what order" a second implicit contract for this function to get right.
+     *
+     * ⚠️ **Read with `getOrNull`, and [COLUMNS] deliberately still requires only 21.** A line whose
+     * trailing nutrients are absent would end in a run of tabs, and anything that trimmed trailing
+     * whitespace — an editor, a future `.gitattributes` — would shorten it. Gating the whole food on
+     * the full width would then make every such food VANISH from the bundle; tolerating a short line
+     * loses only the nutrients that were not there anyway.
+     *
+     * ⚠️ Measured rather than assumed, and it corrects the sentence above: **no line in the shipped
+     * seed ends in a tab today** — water is the last column and USDA records it on all 13,186 foods,
+     * so there is nothing at the end to trim. The guard is kept because a future food without a
+     * water figure reintroduces the case immediately, and because the builder asserting the full
+     * width and the parser tolerating less is belt and braces rather than one loose check.
+     *
+     * ⚠️ An empty field is ABSENT, not zero, for the reason [seedMicros] argues at length; a
+     * recorded zero stays.
+     */
+    private fun seedExtras(f: List<String>): NutrientSet.Amounts {
+        val m = LinkedHashMap<NutrientSet.Nutrient, Double>(SEED_EXTRAS.size)
+        SEED_EXTRAS.forEachIndexed { i, n ->
+            f.getOrNull(EXTRA_BASE + i)?.toDoubleOrNull()?.let { m[n] = it }
+        }
+        return NutrientSet.Amounts(m)
+    }
 }
+
+/**
+ * The further nutrients in the order the seed writes them, computed once.
+ *
+ * ⚠️ Sorted rather than taken as declared: `entries` follows declaration order, and the point of
+ * keying on the id is that reordering the enum must not silently re-map every column in a shipped
+ * asset. If the two ever disagree this is where it shows.
+ */
+private val SEED_EXTRAS: List<NutrientSet.Nutrient> =
+    NutrientSet.Nutrient.entries.sortedBy { it.id }
+
+/** The first further-nutrient column: 13 head/macro/serving fields plus the eight micronutrients. */
+private const val EXTRA_BASE = 21
