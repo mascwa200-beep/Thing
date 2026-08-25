@@ -642,6 +642,21 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     /** Newest first. App-private files, never the camera roll. */
     val photos: StateFlow<List<ProgressPhotoStore.Photo>> = c.progressPhotoStore.photos
 
+    /**
+     * How much disk the photographs are using.
+     *
+     * ⚠️ Derived from the list rather than polled, so it is recomputed exactly when a photograph is
+     * taken or deleted and not once a second for a screen nobody is looking at. Each recomputation
+     * stats every file, which is cheap for the handful this holds and is the reason it hangs off a
+     * change rather than a timer.
+     *
+     * Starts at zero, which is also the honest answer for an empty list — the panel only prints the
+     * figure when there is something to print, so "not measured yet" never renders as "0.0 MB".
+     */
+    val photoBytes: StateFlow<Long> = c.progressPhotoStore.photos
+        .map { c.progressPhotoStore.bytesOnDisk() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+
     fun photoUri(id: String): android.net.Uri? = c.progressPhotoStore.uriFor(id)
 
     /**

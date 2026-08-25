@@ -57,6 +57,7 @@ import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.createCameraImageUri
 import dev.mascwa.pulse.data.health.MealPhotoReader
 import dev.mascwa.pulse.data.health.BodyStore
@@ -1632,10 +1633,17 @@ private fun ProgressPhotos(vm: HealthViewModel) {
                     )
                 }
             }
+            // ⚠️ How much room they take, said rather than implied — which is what
+            // `ProgressPhotoStore.bytesOnDisk` was written for and nothing called. These are
+            // full-resolution photographs with no cap on how many are kept, so this is the one
+            // thing in the tab that grows on disk without bound, and the reader had no way to
+            // know by how much.
+            val bytes by vm.photoBytes.collectAsStateWithLifecycle()
             Text(
-                "Kept on this phone only — never in the camera roll and never sent anywhere. That " +
-                    "also means uninstalling takes them with it, and the spreadsheet export does " +
-                    "not include them.",
+                (if (bytes > 0L) "${photos.size} kept · ${Formatters.megabytes(bytes)}. " else "") +
+                    "Kept on this phone only — never in the camera roll and never sent anywhere. " +
+                    "That also means uninstalling takes them with it, and the spreadsheet export " +
+                    "does not include them.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
             )
         }

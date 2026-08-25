@@ -98,6 +98,23 @@ object Formatters {
      * That also means "this year" means this year *where the reader is*, which is the answer they
      * would give themselves.
      */
+    /**
+     * A size on disk, to one decimal, in the unit a phone's own storage screen means by "MB".
+     *
+     * ⚠️ **Mebibytes — 1,048,576 — not a million.** The two differ by about 5%, which is not a
+     * rounding difference but a different unit wearing the same name, and every file manager and
+     * settings screen the reader could compare this against uses the first.
+     *
+     * ⚠️ **Not integer division.** `bytes / (1024 * 1024)` renders 1.9 MB as "1 MB", so a download
+     * that has fetched most of a megabyte reads as having fetched none of it. One of the three
+     * hand-rolled copies this replaced did exactly that.
+     *
+     * A negative count is unknown rather than small, and says so. Zero is a real answer — nothing
+     * stored is nothing stored — so callers that mean "not fetched yet" test for it themselves.
+     */
+    fun megabytes(bytes: Long): String =
+        if (bytes < 0L) "?" else String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
+
     fun relativeTime(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
         if (epochMs <= 0) return ""
         val diff = nowMs - epochMs

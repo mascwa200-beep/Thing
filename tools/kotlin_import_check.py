@@ -22,6 +22,13 @@ satisfied check 1 completely, and that package does not contain JetBrainsMono �
 ui.theme. Fourteen unresolved references reached CI past a gate reporting "clean". A gate you can
 satisfy while being wrong is worse than no gate.
 
+⚠️ The same lesson landed a second time, in the opposite direction — a FALSE NEGATIVE. String
+literals used to be thrown away whole, which also threw away the code inside `${...}`, so a symbol
+used only in a template was invisible: `"${Formatters.megabytes(bytes)}"` with no import for
+Formatters passed this cleanly. Templates are now scanned as code and the literal text around them
+discarded, and that was negative-tested against exactly the file it had missed. Only `${...}` is
+read; a bare `"$name"` can only be a plain identifier, never a call.
+
 It is textual, so it cannot fail for an environmental reason — the same reasoning as
 WidgetLinkageTest. Only own-package imports are resolved; a third-party import cannot be checked
 from source and guessing would produce noise.
@@ -97,8 +104,31 @@ BUILTINS = set(
 )
 
 
+def interpolations(t: str, i: int, n: int, out: list) -> int:
+    """Emit the code inside a `${...}` template, and return the index just past it.
+
+    ⚠️ This is the whole reason string literals cannot simply be thrown away. `"${Foo.bar()}"` is a
+    CALL, and dropping it with the surrounding quotes made every symbol used only inside a template
+    invisible to this gate — which is how a genuinely missing import passed it and reached CI. The
+    braces are counted rather than matched on the first `}`, because a template can hold a lambda,
+    and a nested string is handed back to the caller's own scanner so `"${a("$b")}"` behaves.
+    """
+    depth, i = 1, i + 2
+    while i < n and depth:
+        c = t[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if not depth:
+                return i + 1
+        out.append(c)
+        i += 1
+    return i
+
+
 def strip(t: str) -> str:
-    """The source with comments and string literals removed."""
+    """The source with comments removed and string literals reduced to their `${}` code."""
     out, i, n = [], 0, len(t)
     while i < n:
         two = t[i:i + 2]
@@ -119,14 +149,26 @@ def strip(t: str) -> str:
         if t[i:i + 3] == '"""':
             i += 3
             while i < n and t[i:i + 3] != '"""':
-                i += 1
+                if t[i:i + 2] == "${":
+                    out.append(" ")
+                    i = interpolations(t, i, n, out)
+                else:
+                    i += 1
             i += 3
+            out.append(" ")
             continue
         if t[i] == '"':
             i += 1
             while i < n and t[i] != '"':
-                i += 2 if t[i] == "\\" else 1
+                if t[i] == "\\":
+                    i += 2
+                elif t[i:i + 2] == "${":
+                    out.append(" ")
+                    i = interpolations(t, i, n, out)
+                else:
+                    i += 1
             i += 1
+            out.append(" ")
             continue
         out.append(t[i])
         i += 1

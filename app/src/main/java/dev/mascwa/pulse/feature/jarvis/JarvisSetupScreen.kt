@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -921,5 +922,7 @@ private fun ProgressBar(pct: Int, downloadedBytes: Long, totalBytes: Long) {
     }
 }
 
+// ⚠️ Zero means "not fetched yet" HERE, which is why the guard stays at this call site rather
+// than in the shared formatter — for a size on disk, zero is a real answer.
 private fun formatMb(bytes: Long): String =
-    if (bytes <= 0L) "?" else String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
+    if (bytes <= 0L) "?" else Formatters.megabytes(bytes)
