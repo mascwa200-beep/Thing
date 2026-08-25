@@ -8687,3 +8687,148 @@ undone with their reasons**, both recorded above in the PR #459 section: `stepsB
 (it needs Health Connect's step-dedup semantics and a `partial`-reconciliation rule that cannot be
 established without a device, and unlike the write half there is **no false claim on screen**), and
 three unused store APIs (`noteAt`, `seedFood`, `loggedDayCount`) are recorded rather than churned.
+
+### EVERY MACRO THE FOOD CARRIES, AND A STANDALONE APP THAT IS ONLY THIS (this session, PR #464)
+
+Owner: *"make a version of just the health tab into an app that works on every type of phone that
+could exist… without any novelty to it and just the features. Also, ensure that within the intake
+sections, that there are options to add every macro that the food has to offer, that way it isn't
+just calories, fat, protein, carbs and grams."* Alongside it, a **hard budget constraint** that
+overrides plan mode's default to launch Explore/Plan agents and overrides the ultracode reminder:
+until models are free again (**2026-08-26T15:56Z**), **zero subagents and zero workflows**. Four
+binding AskUserQuestion decisions: bundle everything into the standalone APK; keep **every nutrient
+with real coverage**; a **separate copy** of the screens; scope = everything but the AI bits.
+
+**⚠️ `date -u` is the only clock.** A one-shot cron was set for the reset and is session-scoped, so
+it is a convenience and not the meter. Requested sleep duration proves nothing — a lesson this
+project already paid a full misdiagnosis for.
+
+#### The measurements that decided the design
+
+- **Open Food Facts publishes 123 per-100g nutrients** and the app stored sixteen, which really are
+  almost exactly the sixteen best covered. ⚠️ **My first coverage pass counted non-EMPTY cells and
+  was wrong.** Re-measured on **non-zero** values, four candidates collapse — `vitamin-k` 3,081
+  non-empty against **143** non-zero, `caffeine` 68, `choline` 10, `alcohol` 679. The keep list is
+  **29, not the ~40** the plan first said. Counting cells is not counting figures.
+- ⚠️ `salt` and `sodium` have identical non-null counts and, probed value by value, agree on all
+  35,084 products carrying both. One figure in two units; `salt` excluded.
+- ⚠️ `vitamin-k` and `phylloquinone` look like one vitamin in two spellings and are **not**: of the
+  fourteen products carrying both, 36% agree within 1% and their medians differ **thirtyfold**.
+- **The seed's own numbers are far better than the barcodes'.** Over both bundled USDA datasets,
+  non-zero: water 100%, phosphorus/magnesium/zinc/B1/B2/niacin 97%, mono/polyunsaturated 96%,
+  selenium 93%, folate 92%, beta-carotene 82%, K1 79%; the individual sugars 8–13% because only SR
+  Legacy publishes them and FNDDS publishes **none**. 234,349 figures across 13,186 foods — **61% of
+  the cells against roughly 2%** for the same nutrients on a barcode. Generic foods are analysed;
+  packets are typed in.
+- **Cost, measured not estimated:** the seed goes 1,966 kB → 3,061 kB on disk and **500 kB → 887 kB
+  compressed**, which is what the APK actually pays.
+
+#### What shipped
+
+`e17fc5c` the label picker · `94d5aa7` the seed carries 26 more · `c2bfe62` the standalone module
+and its workflow · `a77eff4` the builder's memory and its resource reporting.
+
+- **MORE FROM THE LABEL** under QUICK ADD. ⚠️ **The picker spans two enums deliberately.**
+  `Micronutrients.Micro`'s eight have a published reference intake — that comparison and its two
+  refusals are why that type exists — and `NutrientSet.Nutrient`'s twenty-nine have none. One enum
+  would mean inventing guidelines or discarding real ones. Collapsed by default: thirty-seven number
+  fields would bury the four that matter on the one card that never stops working.
+- ⚠️ **A blank field yields no key** (falls out of `toDoubleOrNull`, not enforced), **a typed 0 is
+  kept** — "0 g trans fat" is printed on labels. Everything typed is what was **eaten**;
+  `per100gMicrosFrom`/`per100gExtrasFrom` convert once in the view model against the same weight.
+  Both return **empty** rather than null without a weight, unlike `per100gFrom`, whose null is the
+  refusal that gates the save.
+- **The seed** gets all 29 columns appended (indices 21…49), **ordered by `NutrientSet.Nutrient.id`
+  rather than declaration order** — the ids were made permanent for exactly this, so alphabetising
+  the enum cannot silently re-map a shipped asset. All 29 rather than the 26 USDA publishes, so
+  "which subset, in what order" is not a second implicit contract; the three empty columns cost
+  ~40 kB. ⚠️ The USDA **number** table is imported from `build_food_db.py` rather than restated —
+  the odd dependency direction buys one definition and its import-time validation.
+- ⚠️ **Two selection conventions in one builder, and it is not an inconsistency:** the macros select
+  by nutrient **id** because `Energy` appears twice under one name; the extras select by **number**
+  because that is what the shared table speaks. Measured first: all **997,140** nutrient entries
+  across both datasets carry a number.
+- ⚠️ **Exactly one unit mismatch of the 26** — USDA publishes riboflavin in **mg** where this app
+  stores **µg**. Handled by converting through grams from the declared unit rather than a
+  per-nutrient exception, so the next mismatch is handled too. Confirmed on real data: avocado reads
+  **130 µg** where USDA states 0.13 mg. ⚠️ The microgram sign was **checked to be U+00B5** rather
+  than assumed — the wrong codepoint silently drops selenium, folate, B12, K1, beta-carotene and
+  vitamin A.
+- **`:nutrition`** — `dev.mascwa.nutrition`, plain Material3, no device gate. ⚠️ **What makes it run
+  on any phone is the absence of native code, not minSdk 26.** No `abiFilters`, no
+  `externalNativeBuild`, so ONE universal APK covers arm64/arm32/x86/x86_64, and CI fails the build
+  if a `lib/` directory ever appears. Its own rolling tag `nutrition-latest`, never the shared
+  `latest` — `action-gh-release` rewrites the release NAME and that is where each updater reads its
+  build number. Same committed debug key as `:app` (a per-run throwaway key makes every update "App
+  not installed"). R8 off: no reflection, no icon library, and the size is the database.
+
+#### Three defects found by reading, each of which would have shipped
+
+1. ⚠️ **A `LazyColumn` inside `LcarsDialog` throws on open.** That dialog measures with
+   `height(IntrinsicSize.Min)` — one of only two intrinsic-forcing sites in the app — and a lazy list
+   is a `SubcomposeLayout`, which refuses intrinsic queries outright ("Asking for intrinsic
+   measurements of SubcomposeLayout layouts is not supported", read out of the shipped compose-ui
+   bytecode). It compiles perfectly. **And the message's own suggested mitigation does not apply:** a
+   `heightIn(max =)` is not a FIXED height, so `SizeNode` still delegates and the query reaches the
+   lazy list anyway. Use a scrolling `Column`. No shipped `LcarsDialog` nests one — checked by
+   brace-matching all seven.
+2. ⚠️ **The nutrition workflow shared the LCARS cache key while declaring a different `path`.** A
+   cache archive records the paths it was saved FROM, so it would have reported a **HIT**, left
+   nothing at the declared path, skipped the build (gated on `cache-hit`) and shipped an APK with no
+   database — greenly. Both now cache the same path; the build is gated on **the file existing**,
+   not on the cache's opinion of itself; a copy step puts it where the module packages it.
+3. ⚠️ **The database build gave each of ~1.9M USDA rows a `dict`.** Measured at that scale with
+   fourteen figures per row: **no extras 560 MB · dict 2,535 MB · list of ints 1,963 MB ·
+   `array("i")` 968 MB.** Now a lazily allocated `array("i")` of interleaved id and value, which is
+   the right width by construction (ids 1..29, values bounded by `stored_ceiling` ≤ INT_MAX).
+
+#### ⚠️ AN UNEXPLAINED CI DEATH, and how to read this shape
+
+Run 1985 died in "Build the food database" after 45 minutes with **an empty log archive** and the
+step still `in_progress`. **The step has `continue-on-error: true`**, so a builder that crashed, was
+OOM-killed or filled the disk would have been swallowed and the job would have carried on to the
+APK. It did not — so the **runner itself went away**, which is what losing a system resource looks
+like. That is an inference and it is **not proven**: the log is gone.
+
+Both workflows now print free disk and free memory either side of the build and run the builder
+under `/usr/bin/time -v` for peak RSS, so the next occurrence says which. ⚠️ The timer is guarded on
+the binary existing — `time` here is a package, not the shell builtin, and a diagnostic that can
+break the build is worse than no diagnostic.
+
+#### Verification, all local and free
+
+Core suite **1725** green. **Seven load-bearing rules negative-tested** against a baseline asserted
+green first, each perturbation asserted to have matched the source and each failing exactly the test
+that names it. The picker's arithmetic was **run, not read** — the shipped declarations extracted
+into a probe compiled against the real core types (37 rows, blank dropped, typed 0 kept, 120 mg in
+50 g → 240 mg). `SeedColumnsTest` compiled and executed locally against the shipped seed, 4 green;
+⚠️ **its offset check does not trust the arithmetic** — it reads the water column and requires it to
+be physical, so an offset wrong by one puts beta-carotene there and fails. Every one of the 13,186
+lines is exactly 50 columns and **not one line's first 21 columns changed**.
+
+⚠️ **A harness false positive worth recognising:** a version-catalog reference checker reported
+`compileSdk.get`, `minSdkWide.get` and `targetSdk.get` unresolved — its `[A-Za-z0-9.]+` pattern had
+swallowed the `.get` call. Every real reference resolved. **The harness needs the same care as the
+thing it checks**, for the fourth time in this project.
+
+⚠️ **Measurement that corrected my own comment, in the same commit:** `lines ending with a tab: 0`.
+Water is the last column and USDA records it on every food, so the trailing-tab hazard the
+`getOrNull` guard was written for is currently unreachable. The guard stays for the food that one
+day has no water figure; the comment now says what is true.
+
+#### Still to do
+
+- **B3/B4, after the reset:** move `data/health/*` into a shared `:core:health` library both apps
+  depend on, then write the ~3,300 lines of plain Material3 Compose for MACROS/INTAKE/BODY/COACH/
+  RECIPES/HABITS. **No meal photography** — it needs a cloud key and cannot work standalone. The
+  module today opens on a self-check reporting what actually made it into the build.
+- **Recipes and saved meals do not yet carry the further nutrients.** Recorded rather than silently
+  skipped, with the arithmetic: a five-ingredient recipe has roughly an 11% chance of any one
+  nutrient appearing, from a single ingredient, so the honest presentation is not obvious.
+
+⚠️ **On-device-unverified throughout** — CI compiles a screen, it does not draw one, scan a barcode,
+or install two apps side by side. Owner-verify on the Pixel, in order of risk: type a food into
+QUICK ADD and press MORE FROM THE LABEL (does the dialog open, does the list scroll, does a blank
+row stay absent from MACROS); scan or search a **generic** food and check the new nutrients appear
+on ITEMS with no zeros where nothing was measured; then install the standalone app **alongside** the
+main one and confirm both coexist.
