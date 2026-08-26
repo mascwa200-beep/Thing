@@ -153,6 +153,20 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
          * flat week of a number that was refused would be seven wrong answers instead of one.
          */
         val week: WeeklyPlan.Week? = null,
+        /**
+         * Whether daily walking has moved enough that the measurement window spans two ways of
+         * living. Never null — the "not enough days to say" case is a value, not an absence, and
+         * collapsing the two would make a surface unable to tell them apart.
+         */
+        val stepShift: Expenditure.StepShift =
+            Expenditure.StepShift(0, 0, 0, 0, false, "No step counts yet."),
+        /**
+         * An activity band the measured walking supports and the current setting does not, or null.
+         *
+         * ⚠️ A suggestion the person confirms, never applied on its own. See
+         * [Expenditure.suggestedActivity] for why it only ever points upward.
+         */
+        val stepSuggestion: Expenditure.Activity? = null,
         val eatenToday: NutritionDay.Nutrients = NutritionDay.Nutrients(),
         /**
          * Today's vitamins and minerals, and how many of today's foods each was drawn from.
@@ -189,8 +203,8 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     private val recompute = MutableStateFlow(0)
 
     val state: StateFlow<State> =
-        combine(profile, weighins, _entries, recompute) { p, w, todayEntries, _ ->
-            build(p, w, todayEntries)
+        combine(profile, weighins, _entries, c.bodyStore.stepHistory, recompute) { p, w, todayEntries, walked, _ ->
+            build(p, w, todayEntries, walked)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, State())
 
     /**
@@ -225,7 +239,8 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         p: HealthSettings,
         w: List<BodyTrend.Weighin>,
         todayEntries: List<NutritionDay.Entry>,
-    ): State = composeHealthReading(p, w, todayEntries, c.foodLogStore, todayStartMs())
+        walked: List<Expenditure.StepDay> = emptyList(),
+    ): State = composeHealthReading(p, w, todayEntries, c.foodLogStore, todayStartMs(), walked)
 
 
 
@@ -1335,6 +1350,11 @@ suspend fun composeHealthReading(
     todayEntries: List<NutritionDay.Entry>,
     foodLog: dev.mascwa.pulse.data.health.FoodLogStore,
     todayStartMs: Long,
+    /**
+     * Finished days of walking, oldest first. Defaulted empty so the `health` tool and any other
+     * caller that has no pedometer reading gets exactly today's behaviour.
+     */
+    walked: List<Expenditure.StepDay> = emptyList(),
 ): HealthViewModel.State {
     val trend = BodyTrend.estimate(w)
     val latestKg = (trend as? BodyTrend.Trend.Estimated)?.latest?.trendKg
@@ -1378,9 +1398,21 @@ suspend fun composeHealthReading(
         .getOrDefault(Expenditure.Activity.LIGHT)
     val formula = bmr?.takeIf { it.isFinite() }?.let { Expenditure.fromFormula(it, activity) }
 
+    // ⚠️ **Steps reach the answer by widening the measured interval, and nowhere else.** A shift in
+    // daily walking means the older half of the window describes a different way of living from the
+    // recent half — so the measurement is less certain than its own arithmetic thinks. Widening says
+    // that honestly, and the inverse-variance blend below then hands weight to the formula on its
+    // own. Nothing is discarded and no threshold is crossed. See `Expenditure.widenForShift` for why
+    // shortening the window instead would have been worse.
+    val shift = Expenditure.stepShift(walked, now, windowDays = window)
+    val suggestion = walked
+        .takeIf { it.size >= Expenditure.MIN_STEP_DAYS_EACH_SIDE }
+        ?.let { days -> days.sumOf { it.steps.toLong() } / days.size }
+        ?.let { Expenditure.suggestedActivity(Expenditure.stepBand(it.toInt()), activity) }
+
     // ⚠️ The blend, not a switch. Inverse-variance weighting hands the answer over as the
     // measurement tightens, so there is no day on which the number jumps and no threshold to pick.
-    val known = measured as? Expenditure.Estimate.Known
+    val known = (measured as? Expenditure.Estimate.Known)?.let { Expenditure.widenForShift(it, shift) }
     val expenditure = when {
         formula != null && known != null -> Expenditure.blend(formula, known)
         known != null -> known
@@ -1424,11 +1456,16 @@ suspend fun composeHealthReading(
         person = person,
         trend = trend,
         formula = formula,
-        measured = measured,
+        // ⚠️ The WIDENED measurement, not the raw one, so the interval on screen is the same
+        // interval the blend weighted by. Showing a tighter figure than the arithmetic used would
+        // be two statements of one number that disagree — the defect class this app keeps finding.
+        measured = known ?: measured,
         expenditure = expenditure,
         measuredShare = share,
         plan = plan,
         week = week,
+        stepShift = shift,
+        stepSuggestion = suggestion,
         eatenToday = NutritionDay.total(todayEntries),
         microsToday = NutritionDay.microTotal(todayEntries),
         extrasToday = NutritionDay.extraTotal(todayEntries),

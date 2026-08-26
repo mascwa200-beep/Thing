@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -86,6 +87,26 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
             selected = runCatching { Expenditure.Activity.valueOf(p.activity) }
                 .getOrDefault(Expenditure.Activity.LIGHT),
         ) { vm.setActivity(it) }
+
+        // ⚠️ **Offered, not applied.** The value it would replace is one the person typed, and
+        // rewriting somebody's own answer from a proxy teaches them the setting does not mean
+        // anything. It only ever appears when the measured walking supports MORE than what is set —
+        // see `Expenditure.suggestedActivity` for why it never points the other way.
+        state.stepSuggestion?.let { suggested ->
+            Button(onClick = { vm.setActivity(suggested) }) {
+                Text("Your steps suggest ${suggested.name.lowercase()} — use it")
+            }
+        }
+
+        // The shift is worth saying even when there is nothing to change: it is why the measured
+        // figure is lagging, and a number that lags without explanation reads as a broken one.
+        if (state.stepShift.changed) {
+            Text(
+                state.stepShift.sentence,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 
     SectionCard("What the app has worked out") {

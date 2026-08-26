@@ -1321,6 +1321,21 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         )
                     }
                 }
+                // ⚠️ Offered, never applied. The value it would replace is one the person typed,
+                // and it only ever points upward — see `Expenditure.suggestedActivity`.
+                state.stepSuggestion?.let { suggested ->
+                    LcarsButton(
+                        "YOUR STEPS SUGGEST ${suggested.name.replace('_', ' ')}",
+                        onClick = { vm.setActivity(suggested) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (state.stepShift.changed) {
+                    Text(
+                        state.stepShift.sentence,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                    )
+                }
                 Text(
                     "Only used until the measurement takes over, and it is coarse by nature — which is " +
                         "the whole reason this app measures instead.",

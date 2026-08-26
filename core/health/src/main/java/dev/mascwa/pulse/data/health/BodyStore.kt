@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.Habits
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,12 +79,32 @@ class BodyStore(
         val partial: Boolean = false,
     )
 
+    /**
+     * A day that finished, and what it counted.
+     *
+     * ⚠️ Only ever a COMPLETED day. Today's figure is still climbing, so putting it in the history
+     * would make every mean over the history sag toward whatever time of day it happened to be read.
+     */
+    @Serializable
+    private data class StoredStepDay(val dayStartMs: Long, val steps: Long)
+
     @Serializable
     private data class Stored(
         val weighins: List<StoredWeighin> = emptyList(),
         val measurements: List<StoredMeasurement> = emptyList(),
         val steps: StoredSteps? = null,
+        /** Defaulted, so a save written before this existed still loads. */
+        val stepHistory: List<StoredStepDay> = emptyList(),
     )
+
+    /**
+     * How many finished days of walking to keep.
+     *
+     * ⚠️ Comfortably past the 28-day expenditure window, so a shift comparison never runs out of
+     * earlier days at the moment the window is full. Forty-five days of three numbers is a few
+     * hundred bytes.
+     */
+    private val stepHistoryDays = 45
 
     private val prefsKey = stringPreferencesKey("body_json")
     private val mutex = Mutex()
@@ -99,6 +120,18 @@ class BodyStore(
 
     /** Today's walking, or null until the pedometer has been read at least once. */
     val steps: StateFlow<Habits.Steps?> = _steps.asStateFlow()
+
+    private val _stepHistory = MutableStateFlow<List<Expenditure.StepDay>>(emptyList())
+
+    /**
+     * Finished days of walking, oldest first.
+     *
+     * ⚠️ Feeds [Expenditure.stepShift], which asks whether the older half of the measurement window
+     * describes a different way of living from the recent half. It is a proxy that INFORMS the
+     * measurement and never replaces it — see the note on [Expenditure.StepDay] about why a step
+     * count is admissible where a wearable's calorie figure is not.
+     */
+    val stepHistory: StateFlow<List<Expenditure.StepDay>> = _stepHistory.asStateFlow()
 
     private val _measurements = MutableStateFlow<List<Measurement>>(emptyList())
     val measurements: StateFlow<List<Measurement>> = _measurements.asStateFlow()
@@ -117,6 +150,8 @@ class BodyStore(
 
     private fun publish(s: Stored) {
         _steps.value = s.steps?.let { Habits.Steps(it.baseline, it.dayStartMs, it.today, it.partial) }
+        _stepHistory.value = s.stepHistory.sortedBy { it.dayStartMs }
+            .map { Expenditure.StepDay(it.dayStartMs, it.steps.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) }
         _weighins.value = s.weighins.sortedBy { it.atMs }.map { BodyTrend.Weighin(it.atMs, it.kg) }
         _measurements.value = s.measurements.sortedBy { it.atMs }.mapNotNull { m ->
             val kind = runCatching { MeasureKind.valueOf(m.kind) }.getOrNull() ?: return@mapNotNull null
@@ -141,12 +176,35 @@ class BodyStore(
         scope.launch {
             val changed = mutex.withLock {
                 val s = loadLocked()
-                val next = Habits.steps(_steps.value, raw, todayStartMs)
-                if (next == _steps.value) return@withLock false
+                val previous = _steps.value
+                val next = Habits.steps(previous, raw, todayStartMs)
+                if (next == previous) return@withLock false
+
+                // ⚠️ **A day is banked when the NEXT one starts, and only then.** The completed
+                // total is the value the outgoing day held at the moment it rolled over; reading
+                // today's figure would bank a number that was still climbing.
+                //
+                // ⚠️ A PARTIAL day is never banked. `partial` means the count was truncated — the
+                // phone restarted, so the baseline was lost and only part of the day was seen. That
+                // is not a measurement of that day, and averaging it in would drag every mean down
+                // and could read as a fall in activity that never happened.
+                val banked = if (previous != null && next.dayStartMs != previous.dayStartMs && !previous.partial) {
+                    (s.stepHistory + StoredStepDay(previous.dayStartMs, previous.today))
+                        .distinctBy { it.dayStartMs }
+                        .sortedBy { it.dayStartMs }
+                        .takeLast(stepHistoryDays)
+                } else {
+                    s.stepHistory
+                }
+
                 loaded = s.copy(
                     steps = StoredSteps(next.baseline, next.dayStartMs, next.today, next.partial),
+                    stepHistory = banked,
                 )
                 _steps.value = next
+                _stepHistory.value = banked.map {
+                    Expenditure.StepDay(it.dayStartMs, it.steps.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                }
                 true
             }
             if (changed) scheduleFlush()
