@@ -8851,3 +8851,43 @@ QUICK ADD and press MORE FROM THE LABEL (does the dialog open, does the list scr
 row stay absent from MACROS); scan or search a **generic** food and check the new nutrients appear
 on ITEMS with no zeros where nothing was measured; then install the standalone app **alongside** the
 main one and confirm both coexist.
+
+#### Both apps green on `0d0600b`, and the measured sizes
+
+`0d0600b` is the first commit on which **both** workflows went fully green, so it is where the numbers
+above get replaced by measured ones. Nutrition Build **#2** published to `nutrition-latest`; Android
+Build published to `latest` with all four packaging assertions and the R8 keep gate passing, each
+printing its own evidence.
+
+| | measured on `0d0600b` |
+|---|---|
+| food database | **424 MB** uncompressed (98.3 bytes/row) — was 312 MB before the further nutrients |
+| builder peak RSS | **1.41 GB** |
+| LCARS APK | **329 MB** (345,620,174 bytes) — was 285 MB |
+| nutrition APK | **176 MB** (183,783,509 bytes) |
+
+⚠️ **The LCARS APK has grown by 44 MB and the owner pays that on every automatic update**, because
+the updater pulls the whole artifact from the rolling `latest` release. The growth is the
+`food_extra` side table genuinely landing, not slack: the schema is already `WITHOUT ROWID` with a
+composite `PRIMARY KEY (barcode, nutrient)`, which is the compact shape, and 98.3 bytes/row is what
+that costs. I checked before reaching for an optimisation and found it already optimised.
+
+⚠️ **Run 1985's death is now definitively NOT memory**, which closes the open question recorded
+above. Peak RSS is 1.41 GB against a runner with roughly sixteen. Combined with the two ~8-minute
+builds either side of it, a stalled source download remains the only hypothesis that fits, and the
+`--max-time 1800` on the OFF fetch accounts for the shape exactly.
+
+⚠️ **The universal-APK claim is checked from the artifact, not asserted.** The nutrition arch check
+printed `libandroidx.graphics.path.so` present for **all four** ABIs — arm64-v8a, armeabi-v7a, x86,
+x86_64 — which is why the property holds despite the APK containing native code at all. That is the
+corrected rule; the first version of the check tested for the *absence* of `lib/`, which Compose UI
+makes impossible to satisfy.
+
+⚠️ **The food-database cache had missed on every run, and the cause is `actions/cache` declaring
+`post-if: success()`.** The `a77eff4` nutrition run *failed* on the architecture check so never
+saved, and the Android run beside it was cancelled by a push. Both workflows share one key
+deliberately, so the first fully-green job populates it for the other — which is exactly what
+happened here (`Cache saved with key: food-db-c143754d…`, and the Android job reported the benign
+`another job may be creating this cache`). **A red CI round therefore costs two 8-minute database
+rebuilds and 3.4 GB of downloads from two servers we do not control**, so it is worth keeping rounds
+green for that reason alone, not only for the signal.
