@@ -1101,6 +1101,11 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     per100g = food.per100g,
                     grams = grams,
                     micros = food.microsPer100g,
+                    // ⚠️ Carried, not dropped. Without this a dish built entirely out of foods that
+                    // record magnesium logs no magnesium — the figure is on the ingredient and would
+                    // be discarded at the component, which is the same defect the micronutrient path
+                    // had before it was fixed.
+                    extras = food.extrasPer100g,
                 ),
             )
         }
@@ -1155,6 +1160,10 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         // calcium figure for 200 g beside a calorie figure for two portions on one row.
         val micros = if (byServings) Recipes.eatenServingsMicros(recipe, amount)
         else Recipes.eatenGramsMicros(recipe, amount)
+        // ⚠️ The SAME branch again, for the reason above: a helping's magnesium must describe the
+        // same portion its calories do.
+        val extras = if (byServings) Recipes.eatenServingsExtras(recipe, amount)
+        else Recipes.eatenGramsExtras(recipe, amount)
         val grams = if (byServings) (Recipes.servingGrams(recipe) ?: return) * amount else amount
         val now = System.currentTimeMillis()
         viewModelScope.launch {
@@ -1167,6 +1176,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     grams = grams,
                     nutrients = eaten,
                     micros = micros ?: Micronutrients.Amounts(),
+                    extras = extras ?: NutrientSet.Amounts(),
                     meal = meal,
                     // ⚠️ **RECIPE, and this used to say CUSTOM with a comment arguing against the very
                     // enum value that exists for this case.** `Source` answers "where did this record
@@ -1219,6 +1229,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                         grams = p.grams,
                         nutrients = p.nutrients,
                         micros = p.micros,
+                        extras = p.extras,
                         meal = meal,
                         source = NutritionDay.Source.RECIPE,
                         foodId = p.foodId,

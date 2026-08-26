@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
 import kotlinx.coroutines.CoroutineScope
@@ -89,6 +90,16 @@ class RecipeStore(
          * make somebody's whole recipe book undecodable. An unknown key here is simply dropped.
          */
         val micros: Map<String, Double> = emptyMap(),
+        /**
+         * The ingredient's TWENTY-NINE further nutrients per 100 g, keyed by `NutrientSet.Nutrient`
+         * NAME.
+         *
+         * ⚠️ Same shape and same two reasons as [micros], one tier sparser. Defaulted so every
+         * recipe already on disk decodes unchanged, and keyed by String because an enum-keyed
+         * serializer throws on a name it does not know — renaming a nutrient would otherwise make
+         * somebody's whole recipe book undecodable.
+         */
+        val extras: Map<String, Double> = emptyMap(),
     )
 
     @Serializable
@@ -246,6 +257,11 @@ class RecipeStore(
                         runCatching { Micronutrients.Micro.valueOf(k) }.getOrNull()?.let { m -> m to v }
                     }.toMap(),
                 ),
+                extras = NutrientSet.Amounts(
+                    it.extras.mapNotNull { (k, v) ->
+                        runCatching { NutrientSet.Nutrient.valueOf(k) }.getOrNull()?.let { n -> n to v }
+                    }.toMap(),
+                ),
             )
         },
         cookedYieldG = cookedYieldG,
@@ -264,6 +280,7 @@ class RecipeStore(
                 c = it.per100g.carbG, fibre = it.per100g.fibreG, sugar = it.per100g.sugarG,
                 satFat = it.per100g.satFatG, sodium = it.per100g.sodiumMg,
                 micros = it.micros.values.entries.associate { (m, v) -> m.name to v },
+                extras = it.extras.values.entries.associate { (n, v) -> n.name to v },
             )
         },
         cookedYieldG = cookedYieldG,

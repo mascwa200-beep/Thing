@@ -29,6 +29,14 @@ project dependency, or the compile-scope closure of an external artifact.
 ⚠️ `implementation` on a project dependency deliberately does NOT propagate. That
 is the whole point — it is the rule the DataStore failure broke.
 
+⚠️ **WHAT IT CANNOT SEE, and this is a real limit rather than a bug.** It reads
+IMPORTS. A type reached only as the INFERRED result of a dependency's public API is
+invisible to it, because nothing imports the name. `ProcessCameraProvider.getInstance()`
+returns a Guava `ListenableFuture`; `:nutrition` never writes that name, this check
+reported the module clean, and CI produced seven errors. Compiling is the only thing
+that catches that class — so a green run here means "every package you named is
+declared", never "this module compiles".
+
 Usage:  tools/module_dep_check.py <module-dir> [more-module-dirs ...]
 """
 import os

@@ -252,6 +252,84 @@ class RecipesTest {
         cookedYieldG = yieldG, servings = servings,
     )
 
+    /**
+     * The same two ingredients again, for the twenty-nine further nutrients. Arithmetic, before the
+     * assertion:
+     *
+     *   magnesium   500 g at 22.0 mg/100 g = 110.0  +  400 g at 11.0 = 44.0  -> 154.0 mg
+     *   zinc        500 g at  4.2 mg/100 g =  21.0  +  (not recorded)        ->  21.0 mg
+     *   water       (not recorded)                  +  400 g at 94.5 = 378.0 -> 378.0 g
+     */
+    private val minceWithExtras = minceWithMicros.copy(
+        extras = NutrientSet.Amounts(
+            mapOf(
+                NutrientSet.Nutrient.MAGNESIUM to 22.0,
+                NutrientSet.Nutrient.ZINC to 4.2,
+            ),
+        ),
+    )
+    private val tomatoesWithExtras = tomatoesWithMicros.copy(
+        extras = NutrientSet.Amounts(
+            mapOf(
+                NutrientSet.Nutrient.MAGNESIUM to 11.0,
+                NutrientSet.Nutrient.WATER to 94.5,
+            ),
+        ),
+    )
+
+    private fun richerStew(yieldG: Double? = null, servings: Int = 4) = Recipes.Recipe(
+        "r2", "Stew", listOf(minceWithExtras, tomatoesWithExtras),
+        cookedYieldG = yieldG, servings = servings,
+    )
+
+    @Test
+    fun thePotSumsWhicheverFurtherNutrientsTheIngredientsRecorded() {
+        val t = Recipes.totalExtras(richerStew())
+        assertEquals(154.0, t[NutrientSet.Nutrient.MAGNESIUM]!!, 1e-9)
+        assertEquals(21.0, t[NutrientSet.Nutrient.ZINC]!!, 1e-9)
+        assertEquals(378.0, t[NutrientSet.Nutrient.WATER]!!, 1e-9)
+        // ⚠️ Absent stays absent, exactly as it does for the eight. A 0.0 would claim a measurement
+        // nobody took, on the tier where three records in four say nothing at all.
+        assertNull(t[NutrientSet.Nutrient.SELENIUM])
+    }
+
+    /**
+     * ⚠️ **The property that matters, and the one a defect would break silently.** A helping's
+     * magnesium must describe the same portion its calories do. Weighed and counted are two routes
+     * to one plateful and must agree, exactly as `RecipesTest` already pins for the macros and the
+     * micronutrients.
+     *
+     * 900 g raw, no weighed yield, 4 portions -> a portion is 225 g. So one portion by count and
+     * 225 g by weight are the same food, and 154 mg of magnesium over the pot is 38.5 mg of it.
+     */
+    @Test
+    fun aHelpingsFurtherNutrientsScaleWithItsCalories() {
+        val r = richerStew(servings = 4)
+        val byCount = Recipes.eatenServingsExtras(r, 1.0)!!
+        val byWeight = Recipes.eatenGramsExtras(r, 225.0)!!
+        assertEquals(38.5, byCount[NutrientSet.Nutrient.MAGNESIUM]!!, 1e-9)
+        assertEquals(
+            byCount[NutrientSet.Nutrient.MAGNESIUM]!!,
+            byWeight[NutrientSet.Nutrient.MAGNESIUM]!!,
+            1e-9,
+        )
+        // And the macros the same helping carries come from the same portion.
+        val kcalByCount = Recipes.eatenServings(r, 1.0)!!.kcal
+        val kcalByWeight = Recipes.eatenGrams(r, 225.0)!!.kcal
+        assertEquals(kcalByCount, kcalByWeight, 1e-9)
+    }
+
+    /** A meal's portions carry the further nutrients too, or logging it drops them. */
+    @Test
+    fun everyFoodInAMealKeepsItsOwnFurtherNutrients() {
+        val meal = richerStew().copy(kind = Recipes.Kind.MEAL)
+        val parts = Recipes.eatenComponents(meal)
+        assertEquals(110.0, parts[0].extras[NutrientSet.Nutrient.MAGNESIUM]!!, 1e-9)
+        assertNull(parts[0].extras[NutrientSet.Nutrient.WATER])
+        assertEquals(378.0, parts[1].extras[NutrientSet.Nutrient.WATER]!!, 1e-9)
+        assertEquals(154.0, parts.sumOf { it.extras[NutrientSet.Nutrient.MAGNESIUM] ?: 0.0 }, 1e-9)
+    }
+
     @Test
     fun thePotSumsWhicheverMicronutrientsTheIngredientsRecorded() {
         val t = Recipes.totalMicros(richStew())
