@@ -9161,3 +9161,114 @@ to ignore**, so it is worth a slice of its own.
 universal APK" — for several commits after the code and its comments said the opposite. In this tree
 an overstated claim is a defect wherever it lives, and the artifact a reviewer reads counts. **Re-read
 the PR body whenever a claim in the code changes.**
+
+### TWO APPLICATIONS, ONE HEAP CEILING — and the gate that could not see past a test name (this session, PR #464)
+
+Owner's standing instruction, restated: **be very plan-conscious, no unnecessary agents**, until models
+are free again at **2026-08-26T15:56Z**. That overrides the ultracode reminder as it has all session.
+**Zero subagents, zero workflows.** Every check below is local kotlinc, `javap` against a real published
+jar, a signed CI log blob, or CI itself. ⚠️ `date -u` is the only clock.
+
+**Both applications ran out of the same 2 GB heap within one hour, on different tasks.**
+
+| | task | 
+|---|---|
+| `:app` run 1999 | `mergeReleaseNativeDebugMetadata` → took `minifyReleaseWithR8`, `lintVitalAnalyzeRelease` and the whole daemon with it |
+| `:nutrition` | `compressReleaseAssets` |
+
+⚠️ **Neither was a compile error, and the diagnostic step said so.** "Run unit tests" passed in both
+runs and `----- compiler errors -----` printed nothing. That combination — tests green, no `e:` lines,
+a task dying in packaging — is the signal that says **stop reading the code**.
+
+**The driver is measured, not guessed: the food database grew 312 MB → 424 MB** when the further
+nutrients landed, and both applications package it. `CompressAssetsWorkAction` hands each asset to
+`com.android.zipflinger.BytesSource(Path, String, int)`, whose body is a bare **`Files.readAllBytes`**
+into a `NoCopyByteArrayOutputStream` — read out of the shipped zipflinger 8.7.3 jar, not assumed. So
+that one asset wants its own 424 MB plus its deflated output live at once, before anything else runs,
+and `org.gradle.parallel=true` means R8 and the packaging tasks share the same ceiling.
+
+`-Xmx5g`, against a 16 GB runner, sized so the database can roughly triple again. The Kotlin compile
+daemon reads `kotlin.daemon.jvmargs` and has its own heap, so raising this does not multiply, and
+`-Xmx` is a ceiling rather than a reservation so a smaller development machine is unaffected.
+
+⚠️ **Compression is worth keeping** — the database deflates to about 118 MB, so `noCompress` would add
+~300 MB to an APK the updater re-downloads in full on every build. That was checked before reaching
+for it.
+
+**Second, and deliberately framed as a saving rather than the fix:** `:app` was extracting the symbol
+table of `liblcarsnative.so` into `native-debug-symbols.zip`, whose only consumer is the Play Console.
+This APK is sideloaded and the workflow publishes `app-release.apk` and nothing else. It matters here
+and not in most projects because whisper.cpp, llama.cpp and quickjs-ng are all statically linked into
+one library. ⚠️ It changes nothing about what is packaged — `stripReleaseDebugSymbols` already strips
+the shipped `.so`.
+
+⚠️ **Evidence it was running at all is the task graph plus the AGP bytecode, never a recollection about
+defaults.** `ExtractNativeDebugMetadataTask` has exactly two creation actions in the shipped 8.7.3 jar,
+one pinned to `FULL` and one to `SYMBOL_TABLE`, so the task **name** in the log (`extractReleaseNativeSymbolTables`)
+says the effective level was SYMBOL_TABLE. `debugSymbolLevel` is a real
+settable `String` on `com.android.build.api.dsl.Ndk` and `NdkOptions$DebugSymbolLevel` accepts
+NONE / SYMBOL_TABLE / FULL through a case-insensitive converter. Both checked with `javap` first.
+
+**⚠️ `gradle.properties` WAS IN NEITHER PATH ALLOWLIST**, so the heap raise would not have rebuilt
+`:nutrition` — the fix for a failure shipping without ever re-running the thing it fixed. Same shape as
+the desktop filter that once did not name `data/live`: a hand-maintained list beside a set of real
+dependencies, where the drift is silent and shows up as a workflow that simply did not run. Swept
+rather than patched: **the complete set of root files that change what Gradle does is `build.gradle.kts`,
+`settings.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml` and `gradle/wrapper/**`**, and
+both allowlists now name all five. `gradlew`/`gradlew.bat` deliberately left out — the distribution URL
+is in the properties, so a change to the script alone changes nothing, and an entry that reads as
+load-bearing without being so is its own small defect.
+
+**⚠️ THE IMPORT GATE HAD THE CHARACTER-LITERAL BUG AGAIN, ONE LEXICAL FORM OVER.** In code position a
+backtick always opens an escaped identifier, and this repository writes every test name as an English
+sentence inside one. Measured: **2,893 escaped identifiers, 56 containing a double quote and 26 an
+apostrophe** — `NavScreen.kt` has one with both, `` `179°59'60.0"` `` — against 19 files for the
+char-literal shape. The visible half was `HealthDaysTest.kt` reporting `NOT`, a word from the middle of
+a test name. **The expensive half is a false NEGATIVE, proven in both directions** by a three-line probe
+(an escaped identifier carrying a double quote, then a genuinely unimported `Vanishes`):
+
+    without the branch:  (nothing — Vanishes is INVISIBLE)
+    with the branch:     Probe.kt: used but not imported: ['Vanishes']
+
+Bounded to the line as well as the closing backtick: the grammar forbids a newline inside an escaped
+identifier, so an unpaired one can only be a typo.
+
+⚠️ **The no-new-findings control was run over the provably-complete set rather than the whole tree**,
+which is both faster and better reasoning: the only packages whose report can change are those holding
+an escaped identifier with a quote, an apostrophe, or a capitalised token, since nothing else was ever
+visible to the old code. That is **125 packages**, and the result is `BEFORE: 4 · AFTER: 3`, with
+**zero lines only in AFTER** and exactly one removed — the `HealthDaysTest` false positive. The gate's
+three remaining standing reports (`SpotifyRepository`'s 16 DTOs, `FoodDatabase.JournalMode`,
+`TranscriptDatabase.Callback`) are the recorded nested-class and same-file shapes, false positives by
+construction since all three files compile green in CI.
+
+**⚠️ AN ORDERING MISTAKE THAT COST TEN MINUTES OF RUNNER TIME.** `tools/**` is in neither allowlist but
+android's filter is `paths-ignore`, so pushing an unrelated tool fix **restarted the 13-minute Android
+build** under `cancel-in-progress`. Same family as the recorded "push the docs commit first, or bundle
+it with the code" — sequence pushes so an expensive round is not superseded by something that does not
+touch it.
+
+**The outcome, measured across the two real logs rather than asserted:**
+
+| | run 1999 (before) | run 2002 (after) |
+|---|---|---|
+| `extractReleaseNativeSymbolTables` | present | **absent** |
+| `mergeReleaseNativeDebugMetadata` | present, died on heap | present, **`NO-SOURCE`** |
+| `Build release APK` | FAILED at 3m58s | **green in 7m42s** |
+| APK | — | **345,637,574 bytes (329 MB)** |
+
+⚠️ **The APK grew by 17,400 bytes against the last green build (345,620,174 on `0d0600b`), and all of
+that is the `:core:update` code** — which independently confirms the claim that turning the symbol
+level off changes nothing about the packaged artifact.
+
+Nutrition: **188,697,675 bytes (180 MB)**, with its universal-APK property evidenced — four native
+libraries (`libandroidx.graphics.path`, `libdatastore_shared_counter`, `libimage_processing_util_jni`,
+`libsurface_util_jni`), each present for arm64-v8a, armeabi-v7a, x86 **and** x86_64. The database line
+reads `food database packaged: 424 MB uncompressed`, which is the figure the heap note is sized against.
+
+**⚠️ A VERIFICATION MISTAKE OF MINE, AND IT IS THE RECORDED TRAP IN ITS PURE FORM.** I fetched run
+2002's log while the job was still uploading, got a **215-byte `BlobNotFound` XML page**, grepped it,
+read **0 occurrences**, and reported that as a clean before/after. An empty result is indistinguishable
+from a run that never happened. `/tmp/fetchlog.sh` now refuses any fetch that contains `<Error>` or is
+under 10 kB before anything is allowed to grep it. **A signed CI log blob does not exist until the job
+finishes uploading**, which is several seconds after the last step completes.

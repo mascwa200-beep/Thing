@@ -68,7 +68,15 @@ android {
             // seconds and `mergeReleaseNativeDebugMetadata` then died with `Java heap space`. And
             // `ExtractNativeDebugMetadataTask` has exactly two creation actions in the shipped 8.7.3
             // jar — one pinned to `FULL` and one to `SYMBOL_TABLE` — so the task *name* in that log
-            // says the effective level was SYMBOL_TABLE, and NONE registers neither of them.
+            // says the effective level was SYMBOL_TABLE.
+            //
+            // ⚠️ **The two tasks do NOT disappear together, and the first version of this comment said
+            // they did.** Measured across the two real logs: `extractReleaseNativeSymbolTables` goes
+            // from present to entirely absent, because it is the conditionally-registered one — but
+            // `mergeReleaseNativeDebugMetadata` is registered unconditionally and simply reports
+            // `NO-SOURCE`, having nothing to merge. The expensive half is gone; the cheap half is a
+            // no-op that still appears in the graph. Do not read its name in a log as this line having
+            // failed to take effect.
             //
             // ⚠️ **This is NOT the fix for that failure and should not be read as one.** The ceiling
             // was the 2 GB heap in `gradle.properties`, which `:nutrition` hit in the same hour on a
