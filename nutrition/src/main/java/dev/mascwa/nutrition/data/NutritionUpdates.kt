@@ -116,9 +116,15 @@ class NutritionUpdates(
             _state.value = State.Failed(explain(err))
             return null
         }
+        // ⚠️ **Hoisted to a local, and it has to be.** `UpdateCheck.available` is a `val` declared
+        // in `:core:update`, and Kotlin refuses to smart-cast a public property from another module
+        // — so `check.available != null -> check.available.also { ... }` leaves the receiver
+        // nullable and `State.Available`, which takes a non-null, will not accept it. A local val
+        // smart-casts normally. This repository has now paid for that rule four times.
+        val available = check.available
         val name = check.latestVersionName ?: "unknown"
         return when {
-            check.available != null -> check.available.also { _state.value = State.Available(it) }
+            available != null -> available.also { _state.value = State.Available(it) }
             check.pending -> { _state.value = State.Pending(name); null }
             else -> { _state.value = State.Current(name); null }
         }
