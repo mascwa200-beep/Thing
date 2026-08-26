@@ -8891,3 +8891,128 @@ happened here (`Cache saved with key: food-db-c143754d…`, and the Android job 
 `another job may be creating this cache`). **A red CI round therefore costs two 8-minute database
 rebuilds and 3.4 GB of downloads from two servers we do not control**, so it is worth keeping rounds
 green for that reason alone, not only for the signal.
+
+### THE STANDALONE NUTRITION APP — the health tab as its own application (this session, PR #464)
+
+Owner: *"make a version of just the health tab into an app that works on every type of phone that
+could exist … without any novelty to it and just the features"*, alongside *"ensure that within the
+intake sections, that there are options to add every macro that the food has to offer"* and a hard
+budget instruction: **zero subagents and zero workflows until the weekly reset**, which overrides
+plan mode's default to dispatch Explore/Plan agents and overrides the ultracode reminder. Every
+check below is local kotlinc, a live probe, `javap`, or CI. `date -u` is the only clock.
+
+Four binding AskUserQuestion decisions: the standalone app **bundles the full barcode database**;
+macro depth = **everything with real coverage**; a **separate copy** of the screens (the LCARS HEALTH
+tab is untouched); scope = **everything except the AI bits**.
+
+**`:core:health` — the carve-out, and it was far smaller than planned because it was measured
+first.** Of the twelve `data/health` files only `MealPhotoReader` touches the application at all (it
+reaches into `:core:model-inference` for the vision engine, which is the half the standalone app
+excludes by design). The other eleven import nothing but the shared cores, AndroidX and the platform.
+**The package stays `dev.mascwa.pulse.data.health`**, which is why the move cost no import churn
+anywhere — `:app` has around forty references to these types and not one of them changed, the same
+trick `:core:feeds` was carved out with.
+
+The 1,370-line view model moved too, behind `HealthDeps` — nine stores plus a settings flow, a
+settings write, a connectivity read and a nullable meal-photo reader. ⚠️ **Its property names
+deliberately match `AppContainer`'s member-for-member**, so of forty-four call sites inside the view
+model, none moved. `MealPhotos` declares the capability the standalone app cannot have; it passes
+null and the shared surface reports "no vision" rather than offering a dead button.
+
+**⚠️ THREE CI FAILURES, AND EACH NAMED A REAL GAP.**
+1. **`FoodLogSchemaTest` could not see `internal` `StoredEntry`** — `internal` is module-scoped, so a
+   test that exercises a store's serialization DTOs has to move with it. Caused by my own unverified
+   claim that the three tests "compile fine against the public API".
+2. **`viewModelScope` unresolved in forty places** — `:core:health` had no lifecycle dependency, and
+   the class still compiled because `ViewModel` arrives transitively through Health Connect's own
+   dependency on `androidx.activity`. So the type resolved and every use of its scope did not.
+   ⚠️ **`tools/android_compile_check.sh` reported this exact error on the first run and I made it go
+   away by adding the artifacts to its `-l` list.** That proves the code is fine GIVEN the
+   dependency and says nothing about whether the dependency is declared.
+3. **A cross-module smart cast** — `HealthViewModel.State.person` now lives in another module, and
+   Kotlin refuses to smart-cast a public property declared elsewhere. CLAUDE.md already records the
+   trap; what it did not record is that **no local gate catches it**: the parse pass does not
+   type-check and `android_resolve_check.sh` differences *unresolved names*, which a smart-cast
+   refusal is not. Swept the rest of `:app` for the same shape — three candidates, all pre-existing
+   `Async.data` reads, none in the health tree.
+
+**⚠️ A FOURTH, in the standalone module: DataStore.** `:core:health` keeps it as `implementation`,
+which is right — none of its public types mention it — so it reaches the consumer's RUNTIME
+classpath and not its COMPILE one, and `HealthSettingsStore` is the app's own file building a
+DataStore directly. Twenty-four errors from one absent line.
+
+**So `tools/module_dep_check.py` now answers that question directly**: is every package a module's
+own sources import provided by something it can see at compile time — a direct dependency, the `api`
+chain of a project dependency, or an external artifact's compile-scope closure. ⚠️ `implementation`
+on a project dependency deliberately does not propagate; that is the rule both failures broke.
+
+⚠️ **The harness needed three fixes before it said anything true, and one is a finding in its own
+right.** A project dependency contributes CODE rather than an artifact, so its source packages had to
+be collected; a module's own packages are its own; and **`androidx.datastore:datastore-preferences`
+pins its siblings as `[1.1.1]`, a Maven hard range**, so the raw string built a URL with brackets in
+it, every fetch 404'd, and the module that had correctly declared the library was accused of not
+having it. A KMP artifact's plain AAR is also manifest-only, so an empty read retries the `-android`
+and `-jvm` variants before concluding anything.
+
+⚠️ **THE NEGATIVE TEST'S FIRST ATTEMPT WAS INVALID, and the mechanism is new.** It restored with
+`git checkout --` while **the declaration under test was UNCOMMITTED** — so the restore deleted my
+new dependency line and the second case ran against an already-broken tree, reporting a guard asleep
+that had never been exercised. Copy-and-restore now, with the restore **checked by `cmp`** rather
+than assumed. **Restoring a tracked-but-uncommitted change with `git checkout` reverts to HEAD, which
+is not where you were.**
+
+⚠️ **And the api-propagation rule cannot be shown by a single perturbation in this tree**, because
+every consumer already declares every core it uses directly, so the api chain is never the only route
+to anything. It takes two runs with one variable each: dropping `:nutrition`'s direct `:core:feeds`
+keeps everything visible through `:core:health`'s api link, and only then does flipping that link to
+`implementation` lose exactly `core.cache`, `core.network`, `data.food` and okhttp3.
+
+**The app itself.** `dev.mascwa.nutrition`, plain Material 3, six tabs in plain words — Today, Log,
+Body, Plan, Recipes, Habits — because MACROS/INTAKE/COACH reads fine inside a Star Trek console and
+means nothing on a phone somebody downloaded to count calories. ⚠️ **What makes it run on every phone
+is that no architecture is narrowed, not minSdk 26**: no `abiFilters`, no `externalNativeBuild`, so
+ONE universal APK covers arm64, arm32, x86 and x86_64, and there is no device gate. It is **not**
+free of native libraries — Compose UI pulls in `androidx.graphics:graphics-path` and CameraX packages
+two `.so`s — so **the CI check requires every native library under every architecture**, never the
+absence of all of them. ⚠️ Its negative test then found a bug in the check that reading it had not:
+`zip` writes directory entries, so `lib/arm64-v8a/` was read as a library and an APK with all four
+present was REJECTED. AGP writes no directory entries, so CI would never have shown it.
+
+**Screen decisions worth keeping.** The meal is chosen **once**, at the top of Log, and search,
+"again", quick add and a saved food all obey it — the LCARS screen asks in three places. The picked
+food stays in the shared view model rather than a local `remember`, because `PickFor` is what stops a
+food chosen on Recipes appearing in the log's portion box. A unit is offered only when the record can
+actually be measured in it, since `gramsFor` returns null otherwise and the shared log call then
+silently does nothing. The saved-foods list is **capped rather than put in its own scrolling box**:
+the tab is one vertical scroll and a nested one in the same direction swallows the drag. A recipe's
+amount field is seeded from its kind, or a recipe with no declared portion size defaults to **one
+gram of bolognese**. Habits reads the pedometer with a plain `SensorEventListener` and passes the raw
+cumulative-since-boot figure straight through, because turning it into a daily total is
+`Habits.steps` and a second definition of "today's steps" does not belong in a composable.
+
+⚠️ **Measured against the shipped material3 1.3.1 classes rather than assumed**: `AlertDialogKt`
+references `verticalScroll` **nowhere** and has no intrinsic measurement, so the 37-nutrient picker's
+bounded scrolling Column is load-bearing in one direction (the dialog would otherwise grow past the
+screen and take its own buttons with it) and the LazyColumn-in-an-intrinsic hazard the LCARS dialog
+documents does not apply in the other.
+
+⚠️ **A cross-app copy defect the carve-out introduced, found by wiring the scanner:** shared code
+wrote *"QUICK ADD below takes the numbers straight off the label"* — naming a card only one of the
+two applications has. Shared copy describes the action, never a screen.
+
+⚠️ **CameraX was checked before a line of the scanner was written**, because it is the one dependency
+that could have undone the module's whole point: `camera-core` 1.4.1 packages
+`libimage_processing_util_jni.so` and `libsurface_util_jni.so` **for all four architectures** — read
+out of the AAR. ZXing core rather than ML Kit, for the reasons `:app` already gives.
+
+**Measured, replacing the plan's estimate:** the standalone APK is **176 MB** (183,783,509 bytes)
+against the 130–140 MB the plan guessed, and the LCARS one is now **329 MB**.
+
+⚠️ **On-device-unverified throughout — CI compiles a tab, it does not draw one, scan a barcode or
+count a step.** Owner-verify on the Pixel, in order of risk: **install it alongside the LCARS app and
+confirm both coexist**; aeroplane mode, scan a real product, log it; save a meal and check Today
+shows it as its foods rather than one row; export from one app and import into the other; and the
+six-tab bar at real density.
+
+**Open:** whether the two apps should ever share a log (they deliberately do not — two apps writing
+one store is a synchronisation problem nobody asked for; export and import is the bridge).
