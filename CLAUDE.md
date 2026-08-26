@@ -9008,6 +9008,14 @@ out of the AAR. ZXing core rather than ML Kit, for the reasons `:app` already gi
 **Measured, replacing the plan's estimate:** the standalone APK is **176 MB** (183,783,509 bytes)
 against the 130–140 MB the plan guessed, and the LCARS one is now **329 MB**.
 
+⚠️ **A FIFTH failure, and it named a hole in `tools/kotlin_import_check.py`:** `Arrangement.spacedBy(8.dp)`
+with no `import androidx.compose.ui.unit.dp`. The gate matches CAPITALISED symbols, and `dp` and `sp`
+are lowercase extension properties, so it reported the file clean twice. It now matches them too —
+those two names specifically, and only after a number (`8.dp`, `0.5f.dp`), because a bare lowercase
+identifier is almost always a local and reporting those would drown the real findings. Negative-tested
+against the exact file it missed, and swept repo-wide first: **217 real uses across `:app`,
+`:core`, `:nutrition` and `:desktop`, zero of them without an import**, so the rule adds no noise.
+
 ⚠️ **On-device-unverified throughout — CI compiles a tab, it does not draw one, scan a barcode or
 count a step.** Owner-verify on the Pixel, in order of risk: **install it alongside the LCARS app and
 confirm both coexist**; aeroplane mode, scan a real product, log it; save a meal and check Today

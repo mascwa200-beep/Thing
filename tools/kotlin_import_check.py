@@ -10,7 +10,9 @@ import in a new Compose file therefore reaches CI untouched by either.
 
 Three checks, and each later one exists because an earlier one was not enough:
 
-  1. every capitalised symbol used is imported, declared in the same package, or a builtin;
+  1. every capitalised symbol used — plus the lowercase `dp`/`sp` extension properties, which are
+     reachable only by import and appear in nearly every Compose file — is imported, declared in the
+     same package, or a builtin;
   2. every own-package import actually RESOLVES to a declaration at that path;
   3. no class declares two `companion object`s — a compile error no other local gate can see;
   4. no file declares two same-named functions that both take a lambda, which makes `it` at a
@@ -517,6 +519,17 @@ def main(pkgdir: pathlib.Path) -> int:
         # word at the start of a line follow the colon that ended the line before it, which turned
         # every `when` branch of an enum into a false alarm. Measured: 11 noisy packages became 23.
         used |= set(re.findall(r'(?::[ \t]*|\bis[ \t]+|\bas[ \t]+)([A-Z]\w*)', body))
+        # ⚠️ **The extension properties every Compose file lives on, and they are LOWERCASE**, so
+        # the capitalised-symbol patterns above cannot see one. `Arrangement.spacedBy(8.dp)` with no
+        # `import androidx.compose.ui.unit.dp` passed this gate cleanly and failed CI — twice on one
+        # screen. Two names, not a general lowercase rule: a bare lowercase identifier is almost
+        # always a local, and reporting those would drown the real findings. `dp` and `sp` are
+        # different because they are only ever reachable by import and appear in nearly every file.
+        #
+        # ⚠️ Matched only after a NUMBER (`8.dp`, `0.5f.dp`), which is what makes it unambiguous. A
+        # property named `dp` on somebody's own type would otherwise be reported for ever.
+        used |= {m for m in re.findall(r'\d(?:f|F)?\.(dp|sp)\b', body)}
+
         # A generic parameter is declared, not imported. `fun <T> load(): T` must not report T.
         # ⚠️ The optional NAME matters: `fun <T> load()` puts the list straight after the keyword,
         # `class Async<T>` puts the class name in between. A pattern that only handles the first
