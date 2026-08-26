@@ -9024,3 +9024,108 @@ six-tab bar at real density.
 
 **Open:** whether the two apps should ever share a log (they deliberately do not — two apps writing
 one store is a synchronisation problem nobody asked for; export and import is the bridge).
+
+#### The same PR, continued — the recipe, Guava, and the five gaps
+
+**A recipe threw away twenty-nine of its ingredients' nutrients (`fb12f8e`).** `Recipes.Component`
+carried the eight micronutrients and nothing else, so a dish built entirely from foods that record
+magnesium logged none: the figure was on the ingredient and was discarded at the component. Fixed by
+repeating the micronutrient block rather than writing a generic pass over both — `Micronutrients.Amounts`
+and `NutrientSet.Amounts` are separate types on purpose, so sharing an implementation would mean
+erasing them to a map of strings or inventing a supertype for two things that answer different
+questions. Both new fields are defaulted, which is not optional: the store persists these types and
+an old blob must still decode.
+
+**⚠️ `com.google.guava:listenablefuture:1.0` CANNOT fix a missing `ListenableFuture`, and trying it
+first cost a CI round (`1fce31b`).** The reasoning in the comment it replaced was confidently wrong
+and is worth not re-forming. Measured from the published **Gradle module metadata** rather than the
+POMs — Gradle prefers `.module`, where a dependency sits in an `api` or a `runtime` variant rather
+than carrying a Maven scope:
+
+- `camera-core` declares `listenablefuture:1.0` in its **api** variant, so it does reach a consumer's
+  compile classpath unaided.
+- `connect-client` (through `:core:health`) declares `guava:31.1-android` in its **runtime** variant
+  only, and full Guava's own POM declares `listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`.
+  That version sorts higher, wins the conflict, and **the artifact that wins is empty** — the
+  mechanism exists precisely to stop the class being packaged twice.
+- Guava carries `ListenableFuture` itself, so nothing is missing at runtime. It arrives runtime-only,
+  so the compile classpath is left holding the empty jar and no class: *"Cannot access class … check
+  your module classpath for missing or conflicting dependencies"*, seven times.
+
+So *"Guava supplies the class"* holds only when Guava is on the **compile** classpath. Declaring full
+Guava is the fix and it costs the artifact nothing — already packaged through Health Connect's
+runtime dependency, at the version that graph already resolves. This is also the shape `:app` has by
+accident: **`media3-common` declares `guava` in its api variant**, which is the whole reason the
+identical scanner code compiles there with no such line. ⚠️ **Do not answer a recurrence by forcing
+`listenablefuture` to 1.0** — with Guava in the graph that packages the class twice.
+
+⚠️ **`tools/module_dep_check.py` reported the module clean before the failure and clean again after
+declaring the artifact that could not work**, so its documented limit grew a second half: it resolves
+POMs, so it can neither see variant scoping nor model a version conflict across a configuration. A
+green run there means "every package you named is declared", never "this module compiles".
+
+**Thirty-seven nutrients could be typed in and none read back (`f4a3e94`).** The picker offers every
+nutrient a label carries; the app then showed four. Two panels on Today, deliberately not one: the
+eight with a published reference intake get the comparison, the bar and the source line (through
+`Micronutrients.readout`, so the two applications cannot phrase it differently); the twenty-nine with
+none get the number and nothing else. **Absent stays absent** — no row, never a zero — and for the
+twenty-nine an empty section is the ordinary day. `caveat` carries the denominator and is silent once
+a nutrient is well covered. Verified by running the shipped expressions against the real core types
+in a typed probe rather than reading them.
+
+**Five capabilities the shared view model had and the standalone app could not reach (`bc975e5`).**
+Found by listing every public `HealthViewModel` function and asking which no file under `nutrition/`
+calls — nineteen came back, of which meal photography is deliberate and four are used by neither app.
+- **Every action was silent.** `notice` is how the view model answers back and nothing was listening,
+  so every control worked and gave no sign. Hosted at the scaffold, not per screen, because the
+  notice outlives any one tab. ⚠️ **The obvious ordering is the broken one**: the effect is keyed on
+  the notice and `LaunchedEffect` cancels its coroutine when the key changes, so clearing before
+  showing cancels that very coroutine and the snackbar never appears. Show, then clear.
+- **`setProteinGPerKg` had no control**, so the split's own figure was the only one obtainable. Zero
+  is offered as a named choice ("The split's own") because zero means *follow the split*.
+- **`copyFrom` had no caller**, so a routine had to be retyped daily. Three offsets, not a date
+  picker, and through `dayPlus` — a local day is 23 hours one night a year and 25 another.
+- **Photographs and Health Connect were whole features with no surface.** `:core:health` ships an
+  intentionally empty manifest that already specified the fix in writing: permissions belong to
+  whichever application asks, and the FileProvider authority derives from the consumer's own package
+  at runtime. ⚠️ **The `<queries>` entry is not optional and its absence is invisible**: `getSdkStatus`
+  resolves the provider by package, so without it the call returns SDK_UNAVAILABLE on a phone that
+  has Health Connect — indistinguishable from one that does not, on the single call the whole
+  integration is gated behind. `file_paths.xml` is narrower than the LCARS copy, which also exposes a
+  self-updater and a meal-photo directory that do not exist here.
+
+⚠️ **A Kotlin string-template escape written into an XML file.** `${'$'}{applicationId}` is heredoc
+habit and produced a literal that would have matched no provider. Caught by grepping the result
+against `:app`'s own working declaration; the manifest now carries **exactly one placeholder, in the
+attribute**, and none inside a comment (`:app` has zero in comments, so a placeholder there would
+have been the first and an unproven one).
+
+**Measured from run #10's own log, not asserted:** the standalone APK is **188,472,742 bytes
+(180 MB)**, and the universal-APK claim is evidenced — four native libraries, each present for
+arm64-v8a, armeabi-v7a, x86 **and** x86_64. It publishes to `nutrition-latest` ("Nutrition — build
+#5"), so the three rolling tags do not clobber each other's release names.
+
+**Owner-verify on the Pixel, added to the list above:** the new vitamins and everything-else panels
+on Today (a nutrient with no figure must show **no row**, not a zero); that recording a weigh-in now
+says so; the protein chips on Plan; "repeat a day" on Log; taking a progress photograph and
+confirming it is **not** in the camera roll; and whether Health Connect is present on this GrapheneOS
+build at all — the panel will say.
+
+**One message for three situations, on the step counter.** `StepsCard` answered every silence with
+*"No step count — this phone's pedometer is not reporting"*, which is a claim about the hardware.
+It is false when the permission was refused, and false again in the ordinary first seconds before an
+on-change sensor has said anything. ⚠️ **The comment directly above that line already named two of
+the three causes**, so the code knew the distinction was real and simply did not carry it to the
+screen — and a refusal was a dead end, because the automatic ask fires once per composition and
+Android shows nothing for a second automatic request after two refusals. Three states now, each with
+its own sentence, and the refusal carries a button.
+
+⚠️ **The sensor is only queried after the permission is granted, which dodges a question this
+container cannot answer**: whether `getDefaultSensor` filters out a sensor whose permission the app
+lacks is runtime behaviour no build machine can settle. Asking only after the grant makes all three
+reported states certainties rather than inferences.
+
+⚠️ **My first version passed the launcher between two composables through a file-level `var`.** A
+top-level mutable holding an `ActivityResultLauncher` is shared by every instance of the screen and
+outlives the composition that made it, so it ends up pointing at a destroyed activity's registry — a
+leak that compiles and reads as wired. The remedy travels in the returned value instead.
