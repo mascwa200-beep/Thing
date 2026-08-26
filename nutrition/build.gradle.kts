@@ -157,6 +157,13 @@ dependencies {
     // graph that packages the class twice, which is the outcome the 9999.0 artifact prevents.
     implementation(libs.guava)
 
+    // ⚠️ Coil for the progress-photograph thumbnails, and it earns its place rather than being a
+    // habit: a 96dp thumbnail of a full-resolution camera capture is a bitmap decode that has to be
+    // downsampled and taken off the main thread, and hand-rolling `BitmapFactory` with an
+    // `inSampleSize` inside a composable is how a scrolling row of them drops frames. The LCARS
+    // application already uses this version, so there is one copy of it in the repository.
+    implementation(libs.coil.compose)
+
     // The bundled barcode database and the nutrient declarations behind it. Nothing of the LCARS
     // application is reachable from here; these two are shared because a second copy of either
     // would be a second chance to disagree about what a stored figure means.

@@ -32,6 +32,32 @@
     <!-- Same reasoning: a phone with no camera loses one button, not the app. -->
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
+    <!--
+      ⚠️ **Weight and steps, and nothing else.** A permission absent from here cannot be requested at
+      all, however the code asks — so these three ARE the reach of the Health Connect integration,
+      and the bridge derives the set it requests from the same record types so the two cannot drift
+      into a request that could never be granted. Nothing about food, sleep, exercise or heart rate
+      is asked for, and the panel says so before offering the button.
+
+      ⚠️ `:core:health` deliberately ships an EMPTY manifest and says why: the permissions belong to
+      whichever application chooses to ask for them. Declaring them there would have every consumer
+      inherit a request it never made.
+    -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+
+    <!--
+      ⚠️ **Without this the provider is invisible and Health Connect reports as absent on a phone
+      that has it.** `getSdkStatus` resolves the provider BY PACKAGE, and Android 11's package
+      visibility hides it from an app that has not declared the query — so the call returns
+      SDK_UNAVAILABLE, indistinguishable from a device that genuinely lacks it, on the one call the
+      whole integration is gated behind.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -52,5 +78,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          ⚠️ **Each application declares its own, and `:core:health` says why in its manifest.**
+          `ProgressPhotoStore.uriFor` builds the authority from the CONSUMER's package at runtime
+          — the package name followed by ".fileprovider" — so an authority inherited from the library
+          would not match the one asked for — the camera would be handed a Uri no provider owns and
+          every capture would fail with a permission error rather than anything that names the cause.
+          The applicationId placeholder below resolves to the same value the runtime reads, debug
+          suffix included.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

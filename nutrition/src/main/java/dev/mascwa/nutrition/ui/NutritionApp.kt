@@ -10,16 +10,21 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.screens.BodyScreen
 import dev.mascwa.nutrition.ui.screens.HabitsScreen
 import dev.mascwa.nutrition.ui.screens.LogScreen
@@ -55,8 +60,33 @@ enum class Tab(val label: String) {
 fun NutritionApp(vm: HealthViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
 
+    // ⚠️ **The shared view model answers back and nothing here was listening.** Every action that
+    // reports — a weigh-in recorded, a measurement removed, "Copied 3 entries", the count of foods
+    // logged from a meal — sets `notice`, and until this was wired the standalone app performed all
+    // of them in complete silence. A control that gives no sign it worked reads as a broken one, and
+    // the user's only recourse is to do it again, which for "record a weigh-in" writes a second
+    // reading.
+    //
+    // ⚠️ Hosted here rather than per-screen, because the notice belongs to the view model and the
+    // view model outlives any one tab: recording a weigh-in on Body and switching to Today before
+    // the message is read must not lose it.
+    val snackbars = remember { SnackbarHostState() }
+    val notice by vm.notice.collectAsStateWithLifecycle()
+    LaunchedEffect(notice) {
+        val message = notice ?: return@LaunchedEffect
+        // ⚠️ **Show first, clear afterwards, and the obvious order is the broken one.** This effect
+        // is keyed on the notice, and `LaunchedEffect` cancels its coroutine whenever the key
+        // changes — so clearing before showing sets the key to null, cancels this very coroutine,
+        // and `showSnackbar` never reaches the screen. It compiles, it looks wired, and no message
+        // is ever seen. `showSnackbar` suspends until the message is dismissed or times out, so
+        // clearing after it returns is what marks it read.
+        snackbars.showSnackbar(message)
+        vm.clearNotice()
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text(tab.label, fontWeight = FontWeight.SemiBold) }) },
+        snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { t ->

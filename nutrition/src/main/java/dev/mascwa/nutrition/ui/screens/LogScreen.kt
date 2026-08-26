@@ -49,6 +49,39 @@ fun LogScreen(vm: HealthViewModel) {
     Recents(vm, meal)
     QuickAddCard(vm, meal)
     MyFoods(vm)
+    RepeatADay(vm)
+}
+
+/**
+ * Put a previous day's whole log onto this one — how a routine gets entered in one tap.
+ *
+ * ⚠️ **`copyFrom` was on the shared view model with no caller here**, so somebody who eats the same
+ * breakfast every morning had to enter it every morning. It sits below the other paths deliberately:
+ * it is the fastest route once a routine exists and the least useful on a first run, where there is
+ * no earlier day to repeat.
+ *
+ * ⚠️ Not a date picker. The three offsets cover what people actually repeat — yesterday, the day
+ * before, the same weekday last week — and each is a plain question a person can answer without
+ * working out a date. The view model reports what it copied, including "nothing logged that day",
+ * so an empty source is answered rather than silently doing nothing.
+ */
+@Composable
+private fun RepeatADay(vm: HealthViewModel) {
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+    SectionCard(
+        "Or repeat a day",
+        subtitle = "Copies everything logged that day onto this one. Nothing is removed.",
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(1L to "Yesterday", 2L to "Two days back", 7L to "A week back").forEach { (back, label) ->
+                // ⚠️ Through `dayPlus`, never `day - back * 86_400_000`. A local day is 23 hours on
+                // one night of the year and 25 on another, and the arithmetic version silently
+                // copies the wrong day — the defect this feature has already had four times.
+                val source = vm.dayPlus(day, -back)
+                OutlinedButton(onClick = { vm.copyFrom(source) }) { Text(label) }
+            }
+        }
+    }
 }
 
 @Composable

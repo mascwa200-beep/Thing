@@ -28,6 +28,7 @@ import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.feature.health.HealthViewModel
+import kotlin.math.abs
 
 /**
  * Who you are and where you are going — the handful of facts every target is derived from.
@@ -91,6 +92,33 @@ fun PlanScreen(vm: HealthViewModel) {
         // figure from four days is not the same as the same figure from four weeks.
         StatRow("Measured", "${round(state.measuredShare * 100)}%")
         StatRow("Days logged", "${state.loggedDaysInWindow} of ${p.expenditureWindowDays}")
+    }
+
+    // ⚠️ **A wired capability with nowhere to reach it.** `setProteinGPerKg` is on the shared view
+    // model, `MacroTargets` reads the override on every recomputation, and this app had no control
+    // for it — so the split's own figure was the only one obtainable here.
+    SectionCard(
+        "Protein",
+        subtitle = "Grams per kilogram of a healthy weight for your height, not of what you weigh now.",
+    ) {
+        val chosen = p.proteinGPerKg
+        val fromMode = runCatching { MacroTargets.DietMode.valueOf(p.dietMode) }
+            .getOrDefault(MacroTargets.DietMode.BALANCED).proteinGPerKg
+        ChipRow(
+            // ⚠️ Zero is not "no protein", it is "follow the split", which is why it is offered as a
+            // named choice rather than left as an empty number field somebody would read as none.
+            options = listOf(0.0 to "The split's own") + listOf(1.6, 2.0, 2.4).map { it to round(it, 1) },
+            selected = listOf(0.0, 1.6, 2.0, 2.4).firstOrNull { abs(it - chosen) < 1e-6 } ?: 0.0,
+        ) { vm.setProteinGPerKg(it) }
+        Text(
+            if (chosen > 0.0) {
+                "Yours, whatever the split asks for. It would have asked for ${round(fromMode, 1)}."
+            } else {
+                "Following the split you picked, which asks for ${round(fromMode, 1)}."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     AboutCard()
