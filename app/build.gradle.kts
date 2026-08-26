@@ -54,7 +54,33 @@ android {
         // libraries (Vosk / JNA / MediaPipe / MapLibre / ExoPlayer) for arm64-v8a. Dropping the unused
         // armeabi-v7a / x86 / x86_64 variants removes the bulk of the APK's native footprint with zero
         // behaviour change on the target device.
-        ndk { abiFilters += "arm64-v8a" }
+        ndk {
+            abiFilters += "arm64-v8a"
+
+            // ⚠️ **Nothing in this project has ever read the symbol table this was producing.** AGP
+            // was extracting it from `liblcarsnative.so` and zipping it into `native-debug-symbols.zip`
+            // — an artifact whose only consumer is the Play Console's crash symbolication. This APK is
+            // sideloaded from a GitHub release and has never been near Play; the workflow publishes
+            // `app-release.apk` and nothing else.
+            //
+            // The evidence it was running at all is the task graph and the AGP bytecode rather than a
+            // recollection about defaults. In run 1999 `extractReleaseNativeSymbolTables` ran for nine
+            // seconds and `mergeReleaseNativeDebugMetadata` then died with `Java heap space`. And
+            // `ExtractNativeDebugMetadataTask` has exactly two creation actions in the shipped 8.7.3
+            // jar — one pinned to `FULL` and one to `SYMBOL_TABLE` — so the task *name* in that log
+            // says the effective level was SYMBOL_TABLE, and NONE registers neither of them.
+            //
+            // ⚠️ **This is NOT the fix for that failure and should not be read as one.** The ceiling
+            // was the 2 GB heap in `gradle.properties`, which `:nutrition` hit in the same hour on a
+            // completely different task; the note there has the measurement. What this removes is work
+            // nothing collects, which happens to be a large share of the pressure here because
+            // whisper.cpp, llama.cpp and quickjs-ng are all statically linked into one library, so that
+            // one symbol table is enormous.
+            //
+            // ⚠️ It does not change what is packaged either. `stripReleaseDebugSymbols` already strips
+            // the shipped `.so`, so the APK is byte-identical with or without this line.
+            debugSymbolLevel = "none"
+        }
 
         // ⚠️ **NAME THE ONE TARGET, because the AGP default is "build every executable and shared
         // library the CMake project defines" — and `EXCLUDE_FROM_ALL` on `add_subdirectory` does not
