@@ -109,6 +109,13 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
 
+    // ⚠️ Declared here as well as in `:core:health`, and it has to be. The shared library keeps
+    // DataStore as `implementation`, which is right — none of its public types mention it — so it
+    // reaches this module's RUNTIME classpath and not its COMPILE classpath, and `HealthSettingsStore`
+    // is this app's own file building a DataStore directly. The version is the one `:app` and
+    // `:core:health` already use, so there is still one copy of it in the APK.
+    implementation(libs.androidx.datastore.preferences)
+
     // The bundled barcode database and the nutrient declarations behind it. Nothing of the LCARS
     // application is reachable from here; these two are shared because a second copy of either
     // would be a second chance to disagree about what a stored figure means.

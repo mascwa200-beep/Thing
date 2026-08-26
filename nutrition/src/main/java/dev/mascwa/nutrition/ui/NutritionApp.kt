@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -16,14 +15,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.mascwa.nutrition.ui.screens.BodyScreen
+import dev.mascwa.nutrition.ui.screens.HabitsScreen
+import dev.mascwa.nutrition.ui.screens.LogScreen
 import dev.mascwa.nutrition.ui.screens.PlanScreen
+import dev.mascwa.nutrition.ui.screens.RecipesScreen
 import dev.mascwa.nutrition.ui.screens.TodayScreen
 import dev.mascwa.pulse.feature.health.HealthViewModel
 
@@ -78,38 +79,16 @@ fun NutritionApp(vm: HealthViewModel) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // ⚠️ Exhaustive with no `else`, deliberately: a seventh tab is then a compile error
+            // until it has something to draw, rather than an entry that renders a blank page.
             when (tab) {
                 Tab.TODAY -> TodayScreen(vm)
+                Tab.LOG -> LogScreen(vm)
                 Tab.BODY -> BodyScreen(vm)
                 Tab.PLAN -> PlanScreen(vm)
-                Tab.LOG, Tab.RECIPES, Tab.HABITS -> NotYet(tab)
+                Tab.RECIPES -> RecipesScreen(vm)
+                Tab.HABITS -> HabitsScreen(vm)
             }
         }
-    }
-}
-
-/**
- * ⚠️ A screen that has not been written yet, saying so.
- *
- * The alternative — leaving the tab out until it works — was considered and rejected: the shape of
- * the app is part of what the owner is being asked to look at, and a bar that grows by two items
- * between builds is harder to judge than one that is complete and honest about which pages are
- * filled in. This composable is deleted, not emptied, as each screen lands.
- */
-@Composable
-private fun NotYet(tab: Tab) {
-    SectionCard(tab.label, subtitle = "Not built yet.") {
-        Text(
-            when (tab) {
-                Tab.LOG -> "Searching the bundled food database, scanning a barcode and adding what " +
-                    "you ate. The data behind it is already on the phone — see Today."
-                Tab.RECIPES -> "Building a recipe once and logging a helping of it afterwards."
-                Tab.HABITS -> "How consistently you have been logging, and what that means for how " +
-                    "far the numbers on Plan can be trusted."
-                else -> ""
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

@@ -2,12 +2,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      ⚠️ No permissions at all in this first slice, and each one added later should have to justify
-      itself here. The LCARS application asks for the microphone, the camera, location, the calendar,
-      body sensors, device-admin and the right to draw over other apps — none of which a nutrition
-      tracker needs to open a database and add up what somebody ate. The camera arrives with the
-      barcode scanner and nothing before it.
+      ⚠️ **One permission, and each one added later should have to justify itself here.** The LCARS
+      application asks for the microphone, the camera, location, the calendar, body sensors,
+      device-admin and the right to draw over other apps — none of which a nutrition tracker needs to
+      open a database and add up what somebody ate. The camera arrives with the barcode scanner and
+      nothing before it.
+
+      ⚠️ ACTIVITY_RECOGNITION is what makes the step counter work at all: without it
+      `TYPE_STEP_COUNTER` delivers no events on API 29 and later, so the sensor reads as a phone with
+      no pedometer rather than as a refused permission. It is requested on the one screen that shows
+      steps, not at startup.
     -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!--
+      ⚠️ `required="false"`, or this app would be hidden on the store from every phone without a
+      pedometer — which is most of the cheap ones, and exactly the phones "works on every type of
+      phone" was asked about. Steps are one card; the rest of the app does not need the sensor.
+    -->
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
 
     <application
         android:allowBackup="true"
