@@ -1,5 +1,7 @@
 package dev.mascwa.nutrition
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,10 +12,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.NutritionApp
 import dev.mascwa.nutrition.ui.NutritionTheme
 import dev.mascwa.pulse.feature.health.HealthViewModel
+import kotlinx.coroutines.launch
 
 /**
  * The whole application: one activity, six tabs, no gate.
@@ -41,6 +45,55 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Keep the app current without anybody having to think about it.
+     *
+     * ⚠️ **The clear and the check share ONE coroutine, in that order.** As two launches the clear
+     * could land after a fresh download had set the marker, wiping the guard at the exact moment it
+     * was needed. The guard's whole job is to stop a build that will not install being fetched
+     * again on every launch for ever.
+     *
+     * ⚠️ **Unmetered only.** This APK carries the barcode database and is a very large download;
+     * pulling it over a mobile connection because somebody opened the app on a train is not a cost
+     * to impose silently. When the network cannot be classified the answer is "metered", which is
+     * the safe direction — it costs a delayed update, never an unexpected bill.
+     */
+    private fun maybeAutoUpdate() {
+        lifecycleScope.launch {
+            if (!container.updates.clearPendingIfLanded()) return@launch
+            if (container.updates.hasDownload) return@launch
+            if (!unmetered()) return@launch
+            val info = container.updates.check() ?: return@launch
+            container.updates.download(info)
+        }
+    }
+
+    private fun unmetered(): Boolean = runCatching {
+        val cm = getSystemService(ConnectivityManager::class.java)
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        caps != null &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }.getOrDefault(false)
+
+    /**
+     * ⚠️ **Installing happens on the way OUT, not on the way in, and that is correctness rather
+     * than politeness.** Android tears this process down while its own package is replaced, so
+     * committing while somebody is reading a page makes the app vanish mid-sentence — which reads
+     * as a crash, and is worse than the tap it saves.
+     */
+    override fun onStop() {
+        super.onStop()
+        if (container.updates.hasDownload) {
+            lifecycleScope.launch { container.updates.install() }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        maybeAutoUpdate()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -49,7 +102,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    NutritionApp(vm)
+                    NutritionApp(vm, container.updates)
                 }
             }
         }

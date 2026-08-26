@@ -19,6 +19,10 @@ on:
       - "core/feeds/**"
       - "core/health/**"
       - "core/database/**"
+      # ⚠️ Added when the self-update path moved here. A change to the green gate or the
+      # installer ladder that did not rebuild this app would leave the two disagreeing about
+      # when a build is safe to install, which is the exact thing sharing the module prevents.
+      - "core/update/**"
       - "tools/food/**"
       - "gradle/libs.versions.toml"
       - "settings.gradle.kts"

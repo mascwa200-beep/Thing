@@ -51,6 +51,15 @@ class NutritionContainer(context: Context) {
 
     val settings: HealthSettingsStore by lazy { HealthSettingsStore(appContext, json) }
 
+    /**
+     * This app keeping itself current.
+     *
+     * ⚠️ Lazy like everything else here, so a launch that never opens the update card never
+     * constructs it — but the activity DOES ask on every foreground, so in practice it is built
+     * early. That is deliberate: an updater nobody has to remember is the point.
+     */
+    val updates: NutritionUpdates by lazy { NutritionUpdates(appContext, http, settings) }
+
     private val http: HttpClient by lazy {
         HttpClient(
             OkHttpClient.Builder()
@@ -62,6 +71,19 @@ class NutritionContainer(context: Context) {
     }
 
     private val cache: DiskCache by lazy { DiskCache(appContext.cacheDir, json) }
+
+    /**
+     * Whether this phone has a usable network right now.
+     *
+     * ⚠️ Defensive to `false` rather than `true`. A thrown or unanswerable query means we do not
+     * know, and claiming a network we cannot confirm turns "you are offline" into a lookup that
+     * hangs and then fails with a less useful message.
+     */
+    private fun online(): Boolean = runCatching {
+        val cm = appContext.getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }.getOrDefault(false)
 
     /**
      * The bundled barcode database, or null.
@@ -98,12 +120,15 @@ class NutritionContainer(context: Context) {
      * things this application is built to do without. The shared view model reports it as "no
      * vision", which is an honest state rather than a button that quietly does nothing.
      *
-     * ⚠️ [HealthDeps.isOnline] answers **true** unconditionally, and the reason is worth stating.
-     * The LCARS application has a ConnectivityObserver watching a callback; adding one here would
-     * mean ACCESS_NETWORK_STATE, a permission this app has so far not needed. What the flag actually
-     * gates is whether a food search bothers reaching for the network — and a lookup that fails
-     * because there is no network reports that itself, in the same words, one round-trip later. The
-     * cost is a wasted request when offline; the alternative is a permission for a hint.
+     * ⚠️ [HealthDeps.isOnline] is a real reading now, and the note it replaces was written when it
+     * could not be: it said answering truthfully would cost ACCESS_NETWORK_STATE, "a permission this
+     * app has so far not needed". The updater needs that permission anyway — it refuses to pull a
+     * very large APK over a metered connection — so the honest answer became free, and a food search
+     * can skip a round-trip it already knows will fail.
+     *
+     * ⚠️ It is a **snapshot, not a subscription**: this asks the connectivity service each time
+     * rather than watching a callback. A stale answer here costs one wasted request, which is
+     * exactly what the previous unconditional `true` cost on every single lookup.
      */
     val healthDeps: HealthDeps by lazy {
         HealthDeps(
@@ -118,7 +143,7 @@ class NutritionContainer(context: Context) {
             healthImporter = importer,
             healthSettings = settings.settings,
             updateHealth = { block -> settings.update(block) },
-            isOnline = { true },
+            isOnline = { online() },
             mealPhotoReader = null,
         )
     }

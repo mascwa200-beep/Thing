@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.screens.BodyScreen
 import dev.mascwa.nutrition.ui.screens.HabitsScreen
 import dev.mascwa.nutrition.ui.screens.LogScreen
+import dev.mascwa.nutrition.data.NutritionUpdates
 import dev.mascwa.nutrition.ui.screens.PlanScreen
 import dev.mascwa.nutrition.ui.screens.RecipesScreen
 import dev.mascwa.nutrition.ui.screens.TodayScreen
@@ -57,7 +58,7 @@ enum class Tab(val label: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NutritionApp(vm: HealthViewModel) {
+fun NutritionApp(vm: HealthViewModel, updates: NutritionUpdates) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
 
     // ⚠️ **The shared view model answers back and nothing here was listening.** Every action that
@@ -115,7 +116,7 @@ fun NutritionApp(vm: HealthViewModel) {
                 Tab.TODAY -> TodayScreen(vm)
                 Tab.LOG -> LogScreen(vm)
                 Tab.BODY -> BodyScreen(vm)
-                Tab.PLAN -> PlanScreen(vm)
+                Tab.PLAN -> PlanScreen(vm, updates)
                 Tab.RECIPES -> RecipesScreen(vm)
                 Tab.HABITS -> HabitsScreen(vm)
             }
