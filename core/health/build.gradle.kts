@@ -42,6 +42,13 @@ dependencies {
     api(project(":core:feeds"))
     api(project(":core:database"))
 
+    // ⚠️ `api`, because HealthViewModel is public and extends ViewModel: an application that
+    // constructs it has to be able to name its supertype. `viewModelScope` is the specific member
+    // that made this necessary -- ViewModel itself arrives transitively through Health Connect's own
+    // dependency on androidx.activity, so the class compiled and forty of its coroutine launches did
+    // not, which is a confusing shape of failure and worth naming here.
+    api(libs.androidx.lifecycle.viewmodel.ktx)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
