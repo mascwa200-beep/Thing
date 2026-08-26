@@ -182,6 +182,26 @@ def strip(t: str) -> str:
             i += 1
             out.append(" ")
             continue
+        # ⚠️ **AN ESCAPED IDENTIFIER, and it is the char-literal bug over again on a much larger
+        # population.** In code position a backtick always opens one — `fun \`a name\`()`,
+        # ``obj.\`is\`()`` — and this repository writes every test name as an English sentence
+        # inside them. Measured across the tree: 2,893 escaped identifiers, of which **56 contain a
+        # double quote and 26 an apostrophe** (`NavScreen.kt` has one with both, `\`179°59'60.0"\``).
+        # Each of those desyncs the scan exactly as `trim('`', '"')` did, so every symbol used after
+        # it goes INVISIBLE to this gate — the miss it exists to catch. The visible half was cheaper
+        # to notice: `HealthDaysTest.kt` was reporting `NOT`, a word out of the middle of a test name.
+        #
+        # Bounded to the line as well as to the closing backtick. The grammar forbids a newline
+        # inside an escaped identifier, so an unpaired one can only be a typo, and stopping at the
+        # newline keeps the damage to that line instead of eating the rest of the file.
+        if t[i] == "`":
+            i += 1
+            while i < n and t[i] != "`" and t[i] != "\n":
+                i += 1
+            if i < n and t[i] == "`":
+                i += 1
+            out.append(" ")
+            continue
         if t[i] == '"':
             i += 1
             while i < n and t[i] != '"':
