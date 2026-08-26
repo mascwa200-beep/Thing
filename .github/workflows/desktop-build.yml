@@ -30,6 +30,11 @@ on:
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle/libs.versions.toml"
+      # ⚠️ The same omission the nutrition workflow had. `gradle.properties` carries the daemon's
+      # memory, parallelism and the build cache, and the wrapper decides which Gradle runs at all —
+      # both apply to this module as much as to the Android ones, and neither would have rebuilt it.
+      - "gradle.properties"
+      - "gradle/wrapper/**"
       - ".github/workflows/desktop-build.yml"
   workflow_dispatch:
 

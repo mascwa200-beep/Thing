@@ -27,6 +27,14 @@ on:
       - "gradle/libs.versions.toml"
       - "settings.gradle.kts"
       - "build.gradle.kts"
+      # ⚠️ Missed when this list was written, and it cost a verification: the heap ceiling that
+      # this module's `compressReleaseAssets` ran out of lives in `gradle.properties`, so raising
+      # it would not have rebuilt the app whose failure it was fixing. Everything in that file —
+      # the daemon's memory, parallelism, the build cache, AndroidX — applies to every module in
+      # the tree, and the wrapper decides which Gradle runs at all. Same shape as the desktop
+      # workflow's filter not naming a directory it genuinely reads.
+      - "gradle.properties"
+      - "gradle/wrapper/**"
       - ".github/workflows/nutrition-build.yml"
   workflow_dispatch:
 
