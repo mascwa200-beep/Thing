@@ -469,10 +469,15 @@ private fun MicroRow(
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
                 )
             }
+            // ⚠️ `c.muted`, matching the other `day.caveat` site in this same file — which was
+            // already right and had drifted from this one. Amber is the caution colour; a note
+            // saying how many of today's foods recorded a nutrient is not a caution, it is the
+            // denominator, and two statements of the same kind of fact should not arrive in two
+            // colours.
             day.caveat(m)?.let { caveat ->
                 Text(
                     caveat,
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
                 )
             }
         }
@@ -1871,7 +1876,8 @@ private fun StepsPanel(steps: Habits.Steps?, source: StepSource) {
                 Text(
                     "The phone restarted, so the steps before that are not recoverable — the counter " +
                         "begins again from zero and nothing recorded the old total.",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                    // ⚠️ A fact about the phone, not a caution and nothing the reader did.
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
                 )
             }
         }

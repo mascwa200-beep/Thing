@@ -161,7 +161,9 @@ private fun StepsCard(vm: HealthViewModel, source: StepSource) {
                 "The phone restarted, so the steps before that are gone — the counter begins again " +
                     "from zero and nothing recorded the old total.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                // ⚠️ A fact about the phone, not an error and nothing the reader did. On the screen
+                // that shows streaks, red is read as "you broke something".
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

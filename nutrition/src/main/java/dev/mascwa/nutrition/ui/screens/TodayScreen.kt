@@ -155,8 +155,16 @@ private fun Vitamins(day: Micronutrients.Day, sexName: String, birthYear: Int) {
                     )
                 }
             }
+            // ⚠️ Not the error colour. This says "only three of today's eight foods recorded
+            // calcium" — a statement about how complete the record is, which is the honesty this
+            // app is built on. Painting it red makes an honest limitation read as a fault, and on a
+            // food screen the reader will take the fault to be theirs.
             day.caveat(m)?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
