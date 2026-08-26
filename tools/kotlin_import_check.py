@@ -529,6 +529,16 @@ def main(pkgdir: pathlib.Path) -> int:
         # ⚠️ Matched only after a NUMBER (`8.dp`, `0.5f.dp`), which is what makes it unambiguous. A
         # property named `dp` on somebody's own type would otherwise be reported for ever.
         used |= {m for m in re.findall(r'\d(?:f|F)?\.(dp|sp)\b', body)}
+        # ⚠️ **A class literal or a callable reference, which the first pattern cannot see**: it
+        # requires the name be followed by `.`, `(` or `<`, and `SensorManager::class.java` is
+        # followed by a colon. That hole let a genuinely missing `import android.hardware.SensorManager`
+        # through a gate that reported the same file's `Sensor` correctly — so the run looked like a
+        # single finding rather than two, and fixing what it named would still have failed CI.
+        #
+        # ⚠️ `::` is unambiguous in a way a bare capitalised word is not: the left side of one is
+        # always a type or an expression, and a capitalised expression is a type or an object. There
+        # is no widening judgement to make here, unlike the type-position rule above.
+        used |= set(re.findall(r'(?<![\w.])([A-Z]\w*)::', body))
 
         # A generic parameter is declared, not imported. `fun <T> load(): T` must not report T.
         # ⚠️ The optional NAME matters: `fun <T> load()` puts the list straight after the keyword,

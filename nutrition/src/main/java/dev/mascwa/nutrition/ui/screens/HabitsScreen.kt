@@ -61,18 +61,7 @@ fun HabitsScreen(vm: HealthViewModel) {
  * comment above that line already named two of the three causes, so the code knew the distinction
  * was real and simply did not carry it to the screen.
  */
-private data class StepSource(val kind: Kind, val allow: () -> Unit) {
-    enum class Kind {
-        /** Granted, a counter exists, and it has not reported yet. It reports when you move. */
-        WAITING,
-
-        /** Refused. The one case with something to do about it, so the card offers the ask again. */
-        NO_PERMISSION,
-
-        /** Granted, and this phone has no pedometer. Nothing to be done, and the card says so. */
-        NO_SENSOR,
-    }
-}
+private data class StepSource(val kind: Habits.StepSilence, val allow: () -> Unit)
 
 /**
  * Register for the step counter while this tab is open, and report why it is silent when it is.
@@ -115,7 +104,7 @@ private fun rememberStepSource(vm: HealthViewModel): StepSource {
     // destroyed activity's registry — a leak that compiles and looks wired.
     val allow = { runCatching { ask.launch(Manifest.permission.ACTIVITY_RECOGNITION) }; Unit }
 
-    if (!granted) return StepSource(StepSource.Kind.NO_PERMISSION, allow)
+    if (!granted) return StepSource(Habits.StepSilence.NO_PERMISSION, allow)
 
     val vmRef = rememberUpdatedState(vm)
     val sensors = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -143,7 +132,7 @@ private fun rememberStepSource(vm: HealthViewModel): StepSource {
     }
 
     return StepSource(
-        if (counter == null) StepSource.Kind.NO_SENSOR else StepSource.Kind.WAITING,
+        if (counter == null) Habits.StepSilence.NO_SENSOR else Habits.StepSilence.WAITING,
         allow,
     )
 }
@@ -157,17 +146,14 @@ private fun StepsCard(vm: HealthViewModel, source: StepSource) {
         // because the permission was refused would be worse than saying the count is not available
         // — and saying the wrong reason is worse still, because it points them nowhere.
         Text(
-            Habits.describe(steps) ?: when {
-                steps != null -> "Nothing much yet today."
-                source.kind == StepSource.Kind.NO_PERMISSION ->
-                    "No step count — this app has not been allowed to read the pedometer."
-                source.kind == StepSource.Kind.NO_SENSOR ->
-                    "No step count — this phone has no pedometer. Everything else here works without one."
-                else -> "Waiting for the first reading — the counter reports when you move."
-            },
+            // ⚠️ A count that exists and is small is not a silence — `describe` withholds anything
+            // under `MIN_WORTH_SAYING` because it is somebody walking to the kettle. Only a genuine
+            // null asks the core WHY there is nothing.
+            Habits.describe(steps)
+                ?: if (steps != null) "Nothing much yet today." else Habits.explain(source.kind),
             style = MaterialTheme.typography.titleMedium,
         )
-        if (steps == null && source.kind == StepSource.Kind.NO_PERMISSION) {
+        if (steps == null && source.kind == Habits.StepSilence.NO_PERMISSION) {
             Button(onClick = source.allow) { Text("Allow it") }
         }
         if (steps?.partial == true) {

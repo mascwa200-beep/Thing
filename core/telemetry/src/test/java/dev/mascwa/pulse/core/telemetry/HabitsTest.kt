@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -247,5 +248,51 @@ class HabitsTest {
 
         // The constant-difference rule cannot even see yesterday, so it reports the streak broken.
         assertEquals(0, Habits.streak(days.toSet(), today, evenDays).current)
+    }
+
+    // ------------------------------------------------------------------ why there is no count
+
+    /**
+     * ⚠️ The property that matters is that the three are DIFFERENT, not what any one of them says.
+     * Both applications used to answer all three with one sentence about the pedometer, and a test
+     * that only checked each string was non-empty would have passed against exactly that.
+     */
+    @Test
+    fun everyReasonForNoStepCountSaysSomethingDifferent() {
+        val said = Habits.StepSilence.entries.map { Habits.explain(it) }
+        assertEquals(Habits.StepSilence.entries.size, said.toSet().size)
+        assertTrue(said.all { it.isNotBlank() })
+    }
+
+    /**
+     * ⚠️ Only the refusable one may mention permission, and only the hardware one may blame the
+     * phone. This is the actual defect being guarded: "the pedometer is not reporting" shown to
+     * somebody who tapped Deny is a claim about their phone that is not true.
+     */
+    @Test
+    fun aRefusalIsNotBlamedOnThePhoneAndWaitingIsNotBlamedOnEither() {
+        assertTrue(Habits.explain(Habits.StepSilence.NO_PERMISSION).contains("allowed"))
+        assertFalse(Habits.explain(Habits.StepSilence.NO_PERMISSION).contains("no pedometer"))
+        assertTrue(Habits.explain(Habits.StepSilence.NO_SENSOR).contains("no pedometer"))
+        val waiting = Habits.explain(Habits.StepSilence.WAITING)
+        assertFalse(waiting.contains("allowed"))
+        assertFalse(waiting.contains("no pedometer"))
+    }
+
+    /**
+     * ⚠️ `explain` must never stand in for `describe`. A count of zero — somebody who genuinely has
+     * not moved — is a different answer from no count at all, and folding the two together is what
+     * produced the one-sentence-for-three-situations defect in the first place.
+     */
+    @Test
+    fun aRealButSmallCountIsNotASilence() {
+        val barelyMoved = Habits.Steps(
+            baseline = 0, dayStartMs = 0, today = Habits.MIN_WORTH_SAYING - 1, partial = false,
+        )
+        assertNull(Habits.describe(barelyMoved))
+        val worthSaying = Habits.Steps(
+            baseline = 0, dayStartMs = 0, today = Habits.MIN_WORTH_SAYING, partial = false,
+        )
+        assertNotNull(Habits.describe(worthSaying))
     }
 }

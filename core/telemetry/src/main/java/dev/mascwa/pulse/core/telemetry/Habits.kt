@@ -183,4 +183,44 @@ object Habits {
 
     /** Below this the count is somebody walking to the kettle, and saying it is clutter. */
     const val MIN_WORTH_SAYING = 100L
+
+    /**
+     * Why there is no step count, when there is none.
+     *
+     * ⚠️ **Three situations, and both applications used to answer all of them with one sentence
+     * about the hardware.** "The pedometer is not reporting" is a claim about the phone: it is false
+     * when the permission was refused, and false again in the ordinary first seconds before an
+     * on-change sensor has said anything. They call for different actions — grant it, wait, or
+     * nothing at all — so telling somebody the wrong one points them nowhere.
+     *
+     * ⚠️ **The sentences live here rather than in either screen**, for the reason [describe] does:
+     * one vocabulary about steps, read by two applications with different chrome. Two copies of the
+     * same explanation drift, and the copy that drifts is always the one nobody is reading.
+     */
+    enum class StepSilence {
+        /** Allowed, a counter exists, and it has not reported yet. It reports when you move. */
+        WAITING,
+
+        /** Refused. The only one of the three with something to be done about it. */
+        NO_PERMISSION,
+
+        /** Allowed, and this phone has no pedometer at all. */
+        NO_SENSOR,
+    }
+
+    /**
+     * What to say when [describe] returns null and there is no count at all.
+     *
+     * ⚠️ Deliberately NOT a fallback inside [describe]. That function answers "what does this count
+     * say", and a count of zero — somebody who genuinely has not moved — is a different answer from
+     * no count at all. Folding them together is what produced the one-sentence-for-three-situations
+     * defect in the first place.
+     */
+    fun explain(silence: StepSilence): String = when (silence) {
+        StepSilence.WAITING -> "Waiting for the first reading — the counter reports when you move."
+        StepSilence.NO_PERMISSION ->
+            "No step count — this app has not been allowed to read the pedometer."
+        StepSilence.NO_SENSOR ->
+            "No step count — this phone has no pedometer. Everything else here works without one."
+    }
 }

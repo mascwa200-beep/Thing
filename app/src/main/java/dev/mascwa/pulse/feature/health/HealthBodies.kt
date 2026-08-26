@@ -2,6 +2,8 @@ package dev.mascwa.pulse.feature.health
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -1510,10 +1512,10 @@ fun HabitsBody(vm: HealthViewModel) {
     val habits by vm.habits.collectAsStateWithLifecycle()
     val steps by vm.steps.collectAsStateWithLifecycle()
 
-    StepSensor(vm)
+    val source = StepSensor(vm)
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        item { StepsPanel(steps) }
+        item { StepsPanel(steps, source) }
         items(Habits.Habit.entries.toList(), key = { it.name }) { h ->
             StreakRow(h, habits[h])
         }
@@ -1612,7 +1614,7 @@ private fun ExportPanel(vm: HealthViewModel) {
  * request has a visible reason.
  */
 @Composable
-private fun StepSensor(vm: HealthViewModel) {
+private fun StepSensor(vm: HealthViewModel): StepSource {
     val context = LocalContext.current
     val container = (context.applicationContext as PulseApplication).container
     val scope = rememberCoroutineScope()
@@ -1632,12 +1634,26 @@ private fun StepSensor(vm: HealthViewModel) {
             ask.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
+    // ⚠️ The remedy travels in the returned value. The automatic ask above fires once per entry
+    // into the composition and is not a route anybody controls, and Android shows nothing at all
+    // for a request made after two refusals — so without a control on the panel, one Deny was a
+    // dead end with no way back to a step count.
+    val allow = { runCatching { ask.launch(Manifest.permission.ACTIVITY_RECOGNITION) }; Unit }
+
     // ⚠️ Keyed on the grant, and it owns the controller. `newTelemetryController()` is a FACTORY —
     // it hands back a fresh listener that has to be started and, more importantly, stopped, or the
     // sensor stays registered after the tab is gone. DisposableEffect is the shape that guarantees
     // the second half; a LaunchedEffect would start it and never take it down.
-    if (!granted) return
+    if (!granted) return StepSource(Habits.StepSilence.NO_PERMISSION, allow)
     val vmRef = rememberUpdatedState(vm)
+
+    // ⚠️ Asked only after the grant, which dodges a question no build machine can settle: whether
+    // `getDefaultSensor` filters out a sensor whose permission the app lacks is runtime behaviour.
+    // Asking after the grant makes "this phone has no pedometer" a certainty when it is said.
+    val counter = remember(context) {
+        context.getSystemService(SensorManager::class.java)?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    }
+
     DisposableEffect(granted) {
         val controller = container.newTelemetryController()
         controller.start()
@@ -1649,10 +1665,17 @@ private fun StepSensor(vm: HealthViewModel) {
             controller.stop()
         }
     }
+    return StepSource(
+        if (counter == null) Habits.StepSilence.NO_SENSOR else Habits.StepSilence.WAITING,
+        allow,
+    )
 }
 
+/** Why the step count is silent, and what can be done about it. See [Habits.StepSilence]. */
+private data class StepSource(val kind: Habits.StepSilence, val allow: () -> Unit)
+
 @Composable
-private fun StepsPanel(steps: Habits.Steps?) {
+private fun StepsPanel(steps: Habits.Steps?, source: StepSource) {
     val c = Pulse.colors
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1661,13 +1684,18 @@ private fun StepsPanel(steps: Habits.Steps?) {
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
             )
             // ⚠️ Null is "cannot tell", not zero. Showing 0 to somebody who has walked all morning
-            // because the permission was refused is worse than saying the count is unavailable.
+            // because the permission was refused is worse than saying the count is unavailable —
+            // and this used to say "the pedometer is not reporting" for all three of the reasons
+            // there can be no count, which is a claim about the hardware and false for two of them.
+            // The sentences come from `Habits` so this panel and the standalone app's cannot drift.
             Text(
                 Habits.describe(steps)
-                    ?: if (steps == null) "No step count — the pedometer is not reporting."
-                    else "Nothing much yet today.",
+                    ?: if (steps != null) "Nothing much yet today." else Habits.explain(source.kind),
                 fontFamily = ChakraPetch, fontSize = 20.sp, color = c.ink,
             )
+            if (steps == null && source.kind == Habits.StepSilence.NO_PERMISSION) {
+                LcarsButton(text = "ALLOW IT", onClick = source.allow)
+            }
             if (steps?.partial == true) {
                 Text(
                     "The phone restarted, so the steps before that are not recoverable — the counter " +
