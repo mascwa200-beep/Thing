@@ -88,10 +88,13 @@ private fun DayBar(vm: HealthViewModel, day: Long) {
 @Composable
 private fun Targets(t: MacroTargets.Targets, eaten: NutritionDay.Nutrients) {
     SectionCard("Against your plan") {
-        ProgressRow("Calories", eaten.kcal, t.kcal, "kcal")
-        ProgressRow("Protein", eaten.proteinG, t.proteinG, "g")
-        ProgressRow("Fat", eaten.fatG, t.fatG, "g")
-        ProgressRow("Carbohydrate", eaten.carbG, t.carbG, "g")
+        // ⚠️ Each row says which way its own number binds. Calories and carbohydrate are budgets;
+        // protein and fat are floors the planner raises people UP to, so passing them is the point
+        // rather than a fault. See `MacroTargets.Bound`.
+        ProgressRow("Calories", eaten.kcal, t.kcal, "kcal", macro = MacroTargets.Macro.CALORIES)
+        ProgressRow("Protein", eaten.proteinG, t.proteinG, "g", macro = MacroTargets.Macro.PROTEIN)
+        ProgressRow("Fat", eaten.fatG, t.fatG, "g", macro = MacroTargets.Macro.FAT)
+        ProgressRow("Carbohydrate", eaten.carbG, t.carbG, "g", macro = MacroTargets.Macro.CARBS)
     }
 }
 

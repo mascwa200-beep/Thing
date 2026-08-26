@@ -16,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.mascwa.pulse.core.telemetry.MacroTargets
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * The few shapes every screen here is built from.
@@ -80,10 +82,41 @@ fun StatRow(label: String, value: String, emphasis: Boolean = false) {
  * 2,000 look identical to hitting it exactly, which is the one case somebody most needs to see.
  */
 @Composable
-fun ProgressRow(label: String, eaten: Double, target: Int, unit: String, tint: Color? = null) {
+fun ProgressRow(
+    label: String,
+    eaten: Double,
+    target: Int,
+    unit: String,
+    tint: Color? = null,
+    /**
+     * Which way this number binds. Defaulted to a floor, so a caller that has not thought about it
+     * gets the quiet treatment rather than an accidental warning.
+     */
+    macro: MacroTargets.Macro = MacroTargets.Macro.PROTEIN,
+) {
     val share = if (target > 0) (eaten / target).coerceIn(0.0, 1.0) else 0.0
+    // ⚠️ **The bar clamps at one, so six hundred calories over drew exactly the same full bar as
+    // landing on the target.** The figures beside it were right, but a bar is the thing read at a
+    // glance and it reported "done" for both.
+    //
+    // ⚠️ **Said in WORDS rather than in a colour, and that is this module's theme deciding it.**
+    // `NutritionTheme` takes the device's dynamic scheme on Android 12 and later, so every role
+    // above `primary` is whatever the user's wallpaper produced — `tertiary` could read as cheerful
+    // on one phone and as a warning on the next, which makes it useless for carrying a meaning. The
+    // one role Material does define for this is `error`, and over budget is not an error: this app
+    // measures expenditure from what you log, so a day rendered as a failure is a day somebody
+    // quietly stops logging, and that puts a hole in the twenty-eight-day window for four weeks.
+    // A plain "600 over" is a fact where a coloured bar is a verdict.
+    //
+    // Only for a BUDGET. Passing a FLOOR is the point of having one — see `MacroTargets.Bound` for
+    // why protein and fat are floors the planner raises people up to.
+    val over = if (target > 0) eaten.roundToInt() - target else 0
+    val note = if (over > 0 && macro.bound == MacroTargets.Bound.BUDGET) " — $over over" else ""
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        StatRow(label, if (target > 0) "${round(eaten)} / $target $unit" else "${round(eaten)} $unit")
+        StatRow(
+            label,
+            if (target > 0) "${round(eaten)} / $target $unit$note" else "${round(eaten)} $unit",
+        )
         LinearProgressIndicator(
             progress = { share.toFloat() },
             modifier = Modifier.fillMaxWidth(),

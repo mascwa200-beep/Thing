@@ -139,22 +139,27 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     Text(
                         if (left.overKcal) "${-left.kcal} OVER" else "${left.kcal} LEFT",
                         fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 34.sp,
-                        color = if (left.overKcal) c.negative else c.accent,
+                        // ⚠️ Amber rather than the delete colour. See `overColor` — over budget is
+                        // worth noticing and is not a malfunction, and a day rendered as a fault is
+                        // a day somebody stops logging.
+                        color = if (left.overKcal) c.amber else c.accent,
                     )
                     Text(
                         "of ${targets.kcal} calories — ${eaten.kcal.roundToInt()} logged",
                         fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
                     )
-                    MacroBar(eaten.kcal, targets.kcal.toDouble(), c.accent)
+                    // Calories are the one genuinely binding budget, so this is the one bar that
+                    // changes colour when it is passed — amber, matching the figure above it.
+                    MacroBar(eaten.kcal, targets.kcal.toDouble(), c.accent, c.amber)
                 }
             }
         }
 
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                MacroTile("PROTEIN", eaten.proteinG, targets.proteinG, c.positive, Modifier.weight(1f))
-                MacroTile("FAT", eaten.fatG, targets.fatG, c.amber, Modifier.weight(1f))
-                MacroTile("CARBS", eaten.carbG, targets.carbG, c.sky, Modifier.weight(1f))
+                MacroTile("PROTEIN", eaten.proteinG, targets.proteinG, c.positive, MacroTargets.Macro.PROTEIN, Modifier.weight(1f))
+                MacroTile("FAT", eaten.fatG, targets.fatG, c.amber, MacroTargets.Macro.FAT, Modifier.weight(1f))
+                MacroTile("CARBS", eaten.carbG, targets.carbG, c.sky, MacroTargets.Macro.CARBS, Modifier.weight(1f))
             }
         }
 
@@ -237,20 +242,56 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
 }
 
 @Composable
-private fun MacroTile(label: String, eaten: Double, target: Int, tint: Color, modifier: Modifier = Modifier) {
+private fun MacroTile(
+    label: String,
+    eaten: Double,
+    target: Int,
+    tint: Color,
+    macro: MacroTargets.Macro,
+    modifier: Modifier = Modifier,
+) {
     val c = Pulse.colors
-    val left = target - eaten.roundToInt()
     LcarsFrame(modifier, padding = PaddingValues(start = 11.dp, end = 11.dp, top = 9.dp, bottom = 9.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
             Text(
                 "${eaten.roundToInt()}",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 19.sp,
-                color = if (left < 0) c.negative else tint,
+                color = overColor(eaten, target.toDouble(), macro, tint),
             )
             Text("of $target g", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-            MacroBar(eaten, target.toDouble(), tint)
+            MacroBar(eaten, target.toDouble(), tint, overColor(eaten, target.toDouble(), macro, tint))
         }
+    }
+}
+
+/**
+ * What colour a figure takes once it is past its target.
+ *
+ * ⚠️ **Was `c.negative` for all four numbers, and that was wrong in two directions at once.**
+ * Exceeding a FLOOR is the point of having one — the planner raises protein and fat UP to a minimum,
+ * which is what `AdjustmentKind.PROTEIN_RAISED` and `FAT_RAISED` record — so painting it in the
+ * palette's `negative` said that eating enough protein was a fault. And `negative` is not a warning
+ * colour in this file at all: it is what REMOVE, ✕ and DELETE THIS ONE are drawn in, so it read as
+ * "this destroys something".
+ *
+ * ⚠️ A budget past its mark takes AMBER, the colour this app already uses for "worth a look" — the
+ * WORTH A LOOK panel, a stale figure's vintage, an intake shift. Noticing is not failing, and the
+ * difference is load-bearing: this app measures expenditure from what you log, so a day somebody
+ * eats over and then does not log is a hole in the window that degrades the estimate for four weeks.
+ */
+private fun overColor(
+    eaten: Double,
+    target: Double,
+    macro: MacroTargets.Macro,
+    tint: Color,
+): Color {
+    val c = Pulse.colors
+    val over = target > 0.0 && eaten.roundToInt() > target.roundToInt()
+    if (!over) return tint
+    return when (macro.bound) {
+        MacroTargets.Bound.FLOOR -> tint
+        MacroTargets.Bound.BUDGET -> c.amber
     }
 }
 
@@ -523,18 +564,32 @@ private fun SugarRow(sugarG: Double) {
 /**
  * How much of a target is spent.
  *
- * ⚠️ Overshoot is drawn as a full bar in the warning colour rather than a bar past its end. A
- * proportional overrun would need the bar to keep growing off the tile, and the number above it already
- * says exactly how far over — the bar's job is the glance, not the measurement.
+ * ⚠️ Overshoot is drawn as a full bar rather than a bar past its end. A proportional overrun would
+ * need the bar to keep growing off the tile, and the number above it already says exactly how far
+ * over — the bar's job is the glance, not the measurement.
+ *
+ * ⚠️ **[overTint] defaults to [tint], and that default is the fix rather than a convenience.** This
+ * used to paint every overshoot in the palette's `negative`, which is what REMOVE, ✕ and DELETE THIS
+ * ONE are drawn in — so a bar that had passed its mark read as "this destroys something" whatever
+ * the number beside it said. Two of the four call sites hand in a tint their own caller has already
+ * reasoned about: [NutrientRow] knows a fibre target from a sodium limit, so it is already green
+ * when a target is met and red when a limit is passed, and the bar overriding that put the bar and
+ * the number in different colours for one fact. Falling back to the caller's own colour keeps them
+ * agreeing. Only a caller with something different to say passes [overTint].
  */
 @Composable
-private fun MacroBar(eaten: Double, target: Double, tint: Color) {
+private fun MacroBar(
+    eaten: Double,
+    target: Double,
+    tint: Color,
+    overTint: Color = tint,
+) {
     val c = Pulse.colors
     val frac = if (target > 0.0) (eaten / target).coerceIn(0.0, 1.0).toFloat() else 0f
     val over = target > 0.0 && eaten > target
     LcarsFillRow(
         segments = listOf(
-            (if (over) 1f else frac) to (if (over) c.negative else tint),
+            (if (over) 1f else frac) to (if (over) overTint else tint),
             (if (over) 0f else 1f - frac) to c.raise,
         ),
         modifier = Modifier.fillMaxWidth().height(6.dp),
@@ -1457,7 +1512,13 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                 item {
                     LcarsDataRow(
                         label = "To ${fmt(goal * unit.perKg)} ${unit.label}",
-                        value = weeks?.let { "about ${it.roundToInt()} weeks" } ?: "not at this pace",
+                        // ⚠️ "if the plan holds" is not padding. BODY carries a second count-down,
+                        // built from the rate the scale is actually showing rather than the one the
+                        // plan asks for, and the two will differ — that gap is the useful part. A
+                        // reader shown both without being told which is which concludes the app is
+                        // broken. See `MacroTargets.weeksToGoal` against `GoalProjection.project`.
+                        value = weeks?.let { "about ${it.roundToInt()} weeks if the plan holds" }
+                            ?: "not at this pace",
                     )
                 }
             }
