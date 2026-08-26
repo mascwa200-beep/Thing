@@ -45,8 +45,7 @@ import dev.mascwa.pulse.feature.health.HealthViewModel
  */
 @Composable
 fun HabitsScreen(vm: HealthViewModel) {
-    StepSensor(vm)
-    StepsCard(vm)
+    StepsCard(vm, rememberStepSource(vm))
     StreaksCard(vm)
     RecordCard(vm)
 }
@@ -54,17 +53,45 @@ fun HabitsScreen(vm: HealthViewModel) {
 // ------------------------------------------------------------------------------------- the steps
 
 /**
- * ⚠️ **Only while this tab is open, and that costs nothing.** `TYPE_STEP_COUNTER` is maintained by
- * the hardware whether or not anybody is listening, so the total is already right the moment
- * somebody looks. A listener registered for the life of the process would hold the sensor open for
- * a number nobody is reading.
+ * Where a step count can come from, and which of the reasons it cannot.
  *
- * ⚠️ The permission is asked for here rather than at startup. Without ACTIVITY_RECOGNITION the
- * sensor delivers no events at all on API 29 and later, so this is both the honest place to ask and
- * the one screen where the request has a visible reason.
+ * ⚠️ **Three situations, three sentences.** The card used to answer all of them with "this phone's
+ * pedometer is not reporting", which is a claim about the hardware — false when the permission was
+ * refused, and false again in the ordinary first seconds before the counter has said anything. The
+ * comment above that line already named two of the three causes, so the code knew the distinction
+ * was real and simply did not carry it to the screen.
+ */
+private data class StepSource(val kind: Kind, val allow: () -> Unit) {
+    enum class Kind {
+        /** Granted, a counter exists, and it has not reported yet. It reports when you move. */
+        WAITING,
+
+        /** Refused. The one case with something to do about it, so the card offers the ask again. */
+        NO_PERMISSION,
+
+        /** Granted, and this phone has no pedometer. Nothing to be done, and the card says so. */
+        NO_SENSOR,
+    }
+}
+
+/**
+ * Register for the step counter while this tab is open, and report why it is silent when it is.
+ *
+ * ⚠️ **Only while this tab is open, and that costs nothing.** `TYPE_STEP_COUNTER` is maintained by
+ * the sensor hub whether or not anything is listening, so the total is complete whenever somebody
+ * looks. A listener registered for the life of the process would hold the sensor open for nothing.
+ *
+ * ⚠️ The permission is asked for here rather than at startup — the one screen where the request has
+ * a visible reason. Without ACTIVITY_RECOGNITION the sensor delivers no events at all on API 29 and
+ * later.
+ *
+ * ⚠️ **The sensor is only queried once the permission is granted, and that dodges a question this
+ * container cannot answer**: whether `getDefaultSensor` filters out a sensor whose permission the
+ * app lacks is runtime behaviour no build machine can settle. Asking only after the grant means
+ * every state reported here is a certainty rather than an inference.
  */
 @Composable
-private fun StepSensor(vm: HealthViewModel) {
+private fun rememberStepSource(vm: HealthViewModel): StepSource {
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(
@@ -82,9 +109,17 @@ private fun StepSensor(vm: HealthViewModel) {
             ask.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
+    // ⚠️ The remedy travels IN the returned value rather than through a file-level `var`, which is
+    // what the first version of this did. A top-level mutable holding a launcher is shared by every
+    // instance of the screen and outlives the composition that made it, so it ends up pointing at a
+    // destroyed activity's registry — a leak that compiles and looks wired.
+    val allow = { runCatching { ask.launch(Manifest.permission.ACTIVITY_RECOGNITION) }; Unit }
 
-    if (!granted) return
+    if (!granted) return StepSource(StepSource.Kind.NO_PERMISSION, allow)
+
     val vmRef = rememberUpdatedState(vm)
+    val sensors = remember(context) { context.getSystemService(SensorManager::class.java) }
+    val counter = remember(sensors) { sensors?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) }
 
     // ⚠️ `DisposableEffect`, because a registered `SensorEventListener` that is never unregistered
     // outlives the screen. A `LaunchedEffect` would register it and never take it down.
@@ -93,9 +128,7 @@ private fun StepSensor(vm: HealthViewModel) {
     // BOOT, and turning it into a daily total — including deciding that a lower reading means the
     // phone restarted — is `Habits.steps`, which is tested. Subtracting anything here would be a
     // second definition of "today's steps" living in a composable.
-    DisposableEffect(granted) {
-        val sensors = context.getSystemService(SensorManager::class.java)
-        val counter = sensors?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    DisposableEffect(counter) {
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 event.values.firstOrNull()?.let { vmRef.value.onSteps(it.toLong()) }
@@ -103,27 +136,40 @@ private fun StepSensor(vm: HealthViewModel) {
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
-        if (counter != null) {
+        if (counter != null && sensors != null) {
             sensors.registerListener(listener, counter, SensorManager.SENSOR_DELAY_NORMAL)
         }
-        onDispose { if (counter != null) sensors.unregisterListener(listener) }
+        onDispose { if (counter != null) sensors?.unregisterListener(listener) }
     }
+
+    return StepSource(
+        if (counter == null) StepSource.Kind.NO_SENSOR else StepSource.Kind.WAITING,
+        allow,
+    )
 }
 
 @Composable
-private fun StepsCard(vm: HealthViewModel) {
+private fun StepsCard(vm: HealthViewModel, source: StepSource) {
     val steps by vm.steps.collectAsStateWithLifecycle()
 
     SectionCard("On foot") {
         // ⚠️ Null is "cannot tell", not zero. Showing 0 to somebody who has walked all morning
-        // because the permission was refused, or because the phone has no pedometer, is worse than
-        // saying the count is not available.
+        // because the permission was refused would be worse than saying the count is not available
+        // — and saying the wrong reason is worse still, because it points them nowhere.
         Text(
-            Habits.describe(steps)
-                ?: if (steps == null) "No step count — this phone's pedometer is not reporting."
-                else "Nothing much yet today.",
+            Habits.describe(steps) ?: when {
+                steps != null -> "Nothing much yet today."
+                source.kind == StepSource.Kind.NO_PERMISSION ->
+                    "No step count — this app has not been allowed to read the pedometer."
+                source.kind == StepSource.Kind.NO_SENSOR ->
+                    "No step count — this phone has no pedometer. Everything else here works without one."
+                else -> "Waiting for the first reading — the counter reports when you move."
+            },
             style = MaterialTheme.typography.titleMedium,
         )
+        if (steps == null && source.kind == StepSource.Kind.NO_PERMISSION) {
+            Button(onClick = source.allow) { Text("Allow it") }
+        }
         if (steps?.partial == true) {
             Text(
                 "The phone restarted, so the steps before that are gone — the counter begins again " +
