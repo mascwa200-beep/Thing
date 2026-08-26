@@ -14,6 +14,7 @@ import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
+import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.data.health.HealthDeps
 import dev.mascwa.pulse.data.health.HealthSettings
 import dev.mascwa.pulse.data.health.MealPhotos
@@ -145,6 +146,13 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         /** How much of [expenditure] is measured rather than guessed, 0..1. Worth showing while it climbs. */
         val measuredShare: Double = 0.0,
         val plan: MacroTargets.Plan? = null,
+        /**
+         * The same plan spread across seven days.
+         *
+         * ⚠️ Null whenever [plan] is not a [MacroTargets.Plan.Set] — a refusal has no week, and a
+         * flat week of a number that was refused would be seven wrong answers instead of one.
+         */
+        val week: WeeklyPlan.Week? = null,
         val eatenToday: NutritionDay.Nutrients = NutritionDay.Nutrients(),
         /**
          * Today's vitamins and minerals, and how many of today's foods each was drawn from.
@@ -165,6 +173,11 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         val loggedDaysInWindow: Int = 0,
     ) {
         val targets: MacroTargets.Targets? get() = (plan as? MacroTargets.Plan.Set)?.targets
+
+        /** Which mode is in charge. Falls back rather than throwing on a value written by a newer build. */
+        val programMode: WeeklyPlan.Mode
+            get() = runCatching { WeeklyPlan.Mode.valueOf(profile.programMode) }
+                .getOrDefault(WeeklyPlan.Mode.COACHED)
         val remaining: NutritionDay.Remaining?
             get() = targets?.let { NutritionDay.remaining(eatenToday, it) }
         val latest: BodyTrend.Point? get() = (trend as? BodyTrend.Trend.Estimated)?.latest
@@ -1276,6 +1289,23 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     fun setGoalKg(v: Double) = edit { it.copy(goalKg = v.coerceIn(0.0, Body.MAX_KG)) }
     fun setRatePerWeekKg(v: Double) = edit { it.copy(ratePerWeekKg = v.coerceIn(-3.0, 3.0)) }
     fun setDietMode(v: MacroTargets.DietMode) = edit { it.copy(dietMode = v.name) }
+
+    /** Who is in charge of the calories. See [WeeklyPlan.Mode]. */
+    fun setProgramMode(v: WeeklyPlan.Mode) = edit { it.copy(programMode = v.name) }
+
+    /**
+     * Mark a day of the week heavy, or stop marking it.
+     *
+     * ⚠️ Stored sorted and de-duplicated. The set is what the core reads, so order does not change
+     * the plan — but it changes the JSON, and a settings blob that rewrites itself on every toggle
+     * makes every diff of it unreadable and every flush look like a real change.
+     */
+    fun toggleHeavyDay(index: Int) = edit { current ->
+        if (index !in 0 until WeeklyPlan.DAYS) return@edit current
+        val next = current.heavyDays.toMutableSet()
+        if (!next.add(index)) next.remove(index)
+        current.copy(heavyDays = next.sorted())
+    }
     fun setActivity(v: Expenditure.Activity) = edit { it.copy(activity = v.name) }
     fun setProteinGPerKg(v: Double) = edit { it.copy(proteinGPerKg = v.coerceIn(0.0, 5.0)) }
     fun setMassUnit(v: BodyTrend.MassUnit) = edit { it.copy(massUnit = v.name) }
@@ -1374,6 +1404,21 @@ suspend fun composeHealthReading(
         null
     }
 
+    // ⚠️ Built from the plan rather than beside it, so the week can never describe a different
+    // daily figure from the one the rest of the screen shows. The floor handed down is the HIGHER of
+    // the absolute one and this person's resting rate: MacroTargets already refuses to set a daily
+    // target below the resting rate, and a light day that dipped under it would quietly undo a
+    // decision taken one layer up.
+    val week = (plan as? MacroTargets.Plan.Set)?.let { set ->
+        WeeklyPlan.build(
+            base = set.targets,
+            mode = runCatching { WeeklyPlan.Mode.valueOf(p.programMode) }
+                .getOrDefault(WeeklyPlan.Mode.COACHED),
+            heavy = p.heavyDays.toSet(),
+            floorKcal = maxOf(MacroTargets.ABSOLUTE_FLOOR_KCAL, bmr ?: 0.0),
+        )
+    }
+
     return HealthViewModel.State(
         profile = p,
         person = person,
@@ -1383,6 +1428,7 @@ suspend fun composeHealthReading(
         expenditure = expenditure,
         measuredShare = share,
         plan = plan,
+        week = week,
         eatenToday = NutritionDay.total(todayEntries),
         microsToday = NutritionDay.microTotal(todayEntries),
         extrasToday = NutritionDay.extraTotal(todayEntries),

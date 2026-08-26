@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +63,7 @@ import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.createCameraImageUri
@@ -1298,6 +1300,10 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
         }
         item { ProteinPreference(vm, state) }
 
+        item { LcarsHeaderBar("YOUR WEEK") }
+        item { ProgramModeRow(vm, state) }
+        item { WeekShape(vm, state) }
+
         item { LcarsHeaderBar("HOW ACTIVE, ROUGHLY") }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1399,6 +1405,103 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
         }
     }
 }
+
+/**
+ * Who owns the calories: the app, the two of you, or you.
+ *
+ * ⚠️ The subtitle is [WeeklyPlan.Mode.ownsTheTotal] rather than a sentence written here, so the two
+ * applications cannot end up describing the same three modes differently. Three words on their own
+ * are a picker nobody moves off the default.
+ */
+@Composable
+private fun ProgramModeRow(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            WeeklyPlan.Mode.entries.forEach { m ->
+                LcarsChip(m.label, state.programMode == m, { vm.setProgramMode(m) })
+            }
+        }
+        Text(
+            state.programMode.ownsTheTotal,
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+    }
+}
+
+/**
+ * The week itself: which days are heavy, what each one asks for, and every limit that bit.
+ *
+ * ⚠️ The day toggles are drawn only under the collaborative mode. They do nothing under the other
+ * two — a coached week is flat because nothing has told it otherwise, a manual week because the
+ * person owns the number — and a control that is present and inert is worse than one that is absent.
+ *
+ * ⚠️ Every [WeeklyPlan.Limit] is printed. The per-day floor and the heavy-day cap are what stand
+ * between somebody and a plan that is arithmetically fine and not eatable, and a guard rail that
+ * works silently leaves the reader wondering why their swing is smaller than the one they asked for.
+ */
+@Composable
+private fun WeekShape(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val week = state.week
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (state.programMode == WeeklyPlan.Mode.COLLABORATIVE) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                WEEKDAY_LABELS.forEachIndexed { index, name ->
+                    val on = index in state.profile.heavyDays
+                    LcarsFrame(
+                        Modifier.weight(1f).clickable { vm.toggleHeavyDay(index) },
+                        accent = if (on) c.accent else c.line,
+                        padding = PaddingValues(vertical = 6.dp),
+                    ) {
+                        Text(
+                            name,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            color = if (on) c.accent else c.ink2,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+            Text(
+                "Tap the days you train. The same weekly total moves onto them.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+        }
+
+        if (week == null) {
+            Text(
+                "No plan to spread yet.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
+            return@Column
+        }
+
+        Text(
+            WeeklyPlan.sentence(week),
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 15.sp,
+        )
+        week.days.forEach { day ->
+            // ⚠️ `valueColor`, not an accent: `LcarsDataRow` has no accent parameter, which reading
+            // its declaration settled before this compiled anywhere.
+            LcarsDataRow(
+                WEEKDAY_LABELS[day.index],
+                "${day.kcal} kcal  ${day.targets.proteinG}p ${day.targets.fatG}f ${day.targets.carbG}c",
+                valueColor = if (day.kind == WeeklyPlan.DayKind.HEAVY) c.accent else c.ink,
+            )
+        }
+        week.limits.forEach {
+            Text(
+                it.sentence,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+        }
+    }
+}
+
+/** ⚠️ Index 0 is Monday, and it is this file that decides that — `WeeklyPlan` has no calendar in it. */
+private val WEEKDAY_LABELS = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
 /**
  * Where you are heading, and how long it takes at the pace you picked.

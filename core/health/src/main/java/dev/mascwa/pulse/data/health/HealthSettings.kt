@@ -86,6 +86,30 @@ data class HealthSettings(
      */
     val athlete: Boolean = false,
 
+    /**
+     * [dev.mascwa.pulse.core.telemetry.WeeklyPlan.Mode] name — who is in charge of the calories.
+     *
+     * COACHED is the default and the honest one to start on: until there is enough logged to measure
+     * anything, the app is the only party with a defensible opinion, and asking somebody to name
+     * their own number on day one is asking them to guess.
+     */
+    val programMode: String = "COACHED",
+
+    /**
+     * Which days of the week are the heavy ones, as indices 0..6, under the collaborative mode.
+     *
+     * ⚠️ Indices rather than weekday names, matching
+     * [dev.mascwa.pulse.core.telemetry.WeeklyPlan.Day.index]: which index is Monday is a calendar
+     * question and neither this type nor that core has a calendar in it. The surface that draws the
+     * week is the one place that knows.
+     *
+     * ⚠️ Ignored entirely outside the collaborative mode, and that is deliberate rather than tidy —
+     * a coached week is flat because nothing has told it otherwise, and a manual week is flat because
+     * the person owns the number. Redistributing under either would be the app taking back the thing
+     * that mode hands over.
+     */
+    val heavyDays: List<Int> = emptyList(),
+
     /** Whether the tab has ever been set up — decides between the welcome and the dashboard. */
     val configured: Boolean = false,
 )

@@ -28,6 +28,7 @@ import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.feature.health.HealthViewModel
 import kotlin.math.abs
 
@@ -73,6 +74,8 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
                 .getOrDefault(MacroTargets.DietMode.BALANCED),
         ) { vm.setDietMode(it) }
     }
+
+    ProgramCard(vm, state)
 
     SectionCard(
         "How active you are",
@@ -143,6 +146,82 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
  * the incoming value and fight whoever is typing — a defect the LCARS side of this feature already
  * hit and solved the same way.
  */
+/**
+ * Who is in charge of the calories, and what the week looks like as a result.
+ *
+ * ⚠️ **The three modes differ in who owns the TOTAL, and the card says so rather than listing three
+ * words and leaving it to be guessed.** Coached means the app decides; collaborative means the app
+ * keeps the weekly total and you decide its shape; manual means you own the number. A picker whose
+ * options mean nothing until you try them is a picker nobody moves off the default.
+ *
+ * ⚠️ The day toggles appear only under collaborative, because they do nothing under the other two —
+ * and a control that is present and inert is worse than one that is absent, since it teaches the
+ * reader that this screen's controls sometimes do not work.
+ */
+@Composable
+private fun ProgramCard(vm: HealthViewModel, state: HealthViewModel.State) {
+    val week = state.week
+    SectionCard("Your week", subtitle = state.programMode.ownsTheTotal) {
+        ChipRow(
+            options = WeeklyPlan.Mode.entries.map { it to it.label },
+            selected = state.programMode,
+        ) { vm.setProgramMode(it) }
+
+        if (state.programMode == WeeklyPlan.Mode.COLLABORATIVE) {
+            Text(
+                "Tap the days you train. The same weekly total moves onto them.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                // ⚠️ The names live here and not in the core: which index is Monday is a calendar
+                // question, and `WeeklyPlan` deliberately has no calendar in it.
+                DAY_NAMES.forEachIndexed { index, name ->
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = index in state.profile.heavyDays,
+                        onClick = { vm.toggleHeavyDay(index) },
+                        label = { Text(name) },
+                    )
+                }
+            }
+        }
+
+        if (week == null) {
+            Text(
+                "There is no plan to spread yet — fill in the section above and log a few days.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Text(WeeklyPlan.sentence(week), style = MaterialTheme.typography.bodyMedium)
+            week.days.forEach { day ->
+                StatRow(
+                    DAY_NAMES[day.index],
+                    "${day.kcal} kcal · ${day.targets.proteinG}p ${day.targets.fatG}f ${day.targets.carbG}c",
+                    emphasis = day.kind == WeeklyPlan.DayKind.HEAVY,
+                )
+            }
+            // ⚠️ A limit that bit is always stated. The floor and the heavy-day cap are the two things
+            // standing between somebody and a plan that looks arithmetically fine and is not eatable,
+            // and a guard rail that works silently teaches nobody why their swing is smaller than asked.
+            week.limits.forEach {
+                Text(
+                    it.sentence,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** ⚠️ Index 0 is Monday here, and it is this file that decides that — see [ProgramCard]. */
+private val DAY_NAMES = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
 @Composable
 private fun NumberField(label: String, value: Double?, onCommit: (Double) -> Unit) {
     var text by remember(value) { mutableStateOf(value?.let { round(it, 1).removeSuffix(".0") } ?: "") }
