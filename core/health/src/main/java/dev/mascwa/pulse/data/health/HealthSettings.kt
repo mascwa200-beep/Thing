@@ -59,6 +59,33 @@ data class HealthSettings(
     /** How far back the expenditure measurement looks. */
     val expenditureWindowDays: Int = 28,
 
+    /**
+     * Body fat as a percentage, or 0.0 for "not known".
+     *
+     * Knowing it selects a materially better resting-rate equation — one fitted on fat-free and fat
+     * mass separately rather than on total weight — which is what the app leans on hardest during the
+     * first weeks, before there are enough weigh-ins and logged days to measure anything.
+     *
+     * ⚠️ 0.0 is the unset sentinel and needs no separate "is it set" branch: it falls below
+     * [dev.mascwa.pulse.core.telemetry.BmrEquations.MIN_BODY_FAT_PCT], so the plausibility check
+     * already rejects it and the estimate falls back to the equation that does not need it. A typo
+     * is refused the same way rather than clamped into range.
+     */
+    val bodyFatPct: Double = 0.0,
+
+    /**
+     * Seven or more hours a week of intense training, self-reported.
+     *
+     * ⚠️ A self-report and not an inference from body fat. The athlete equation's exponent is close to
+     * linear because a lean, heavily-muscled population varies much less in tissue mix than the general
+     * one does; applied to an untrained body it over-estimates badly. Being lean is not the same as
+     * being trained, so this cannot be guessed from a body-fat figure.
+     *
+     * ⚠️ On its own it does nothing — that equation needs fat-free mass, so without [bodyFatPct] the
+     * estimate falls back rather than inventing the input it is missing.
+     */
+    val athlete: Boolean = false,
+
     /** Whether the tab has ever been set up — decides between the welcome and the dashboard. */
     val configured: Boolean = false,
 )

@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.health
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
@@ -1318,7 +1319,31 @@ suspend fun composeHealthReading(
     val intake = foodLog.intakeDays(from, now)
     val measured = Expenditure.measure(trend, intake, now, window)
 
-    val bmr = person?.let { Body.bmr(it) }
+    // ⚠️ The allometric equations, NOT [Body.bmr], and the two are deliberately not the same call.
+    // This number is an *estimate* — it is what the blend below leans on hardest in the first weeks,
+    // before enough weigh-ins and logged days exist to measure anything — so accuracy is what matters.
+    // [Body.bmr] stays where it is, under the calorie floor in MacroTargets, because a floor wants the
+    // conservative side rather than the accurate one: for an ordinary adult these equations land some
+    // tens of calories BELOW Mifflin–St Jeor, and lowering a safety floor as a side effect of improving
+    // an estimate is not a trade anybody asked for.
+    //
+    // ⚠️ Peak weight is the peak of the RECORDED weigh-ins, which is not the same as a lifetime peak —
+    // somebody who started tracking after already losing twenty kilograms has no record of theirs, and
+    // will not get the reduction. That is the safe direction: no discount means a higher resting rate,
+    // a higher floor, and a more conservative plan.
+    val peakKg = w.maxOfOrNull { it.kg }
+    val resting = person?.let {
+        BmrEquations.estimate(
+            p = it,
+            bodyFatPct = p.bodyFatPct,
+            athlete = p.athlete,
+            adaptation = BmrEquations.Adaptation(
+                inDeficit = p.ratePerWeekKg < 0.0,
+                belowPeak = peakKg != null && BmrEquations.isBelowPeak(it.kg, peakKg),
+            ),
+        )
+    }
+    val bmr = resting?.kcal
     val activity = runCatching { Expenditure.Activity.valueOf(p.activity) }
         .getOrDefault(Expenditure.Activity.LIGHT)
     val formula = bmr?.takeIf { it.isFinite() }?.let { Expenditure.fromFormula(it, activity) }
