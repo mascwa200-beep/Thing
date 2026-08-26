@@ -10,6 +10,7 @@ import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
@@ -167,6 +168,15 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
          * [Expenditure.suggestedActivity] for why it only ever points upward.
          */
         val stepSuggestion: Expenditure.Activity? = null,
+        /**
+         * Whether measured expenditure has moved since a genuinely independent earlier reading —
+         * which is how the app can say a deficit's suppression is lifting rather than promise it.
+         */
+        val recovery: Maintenance.Recovery =
+            Maintenance.Recovery.TooSoon(0.0, 0.0, "No expenditure readings yet."),
+        /** When the trend should be able to show whether the current rate is happening. */
+        val confirmation: Maintenance.Confirmation =
+            Maintenance.Confirmation.Never("Not enough weigh-ins yet."),
         val eatenToday: NutritionDay.Nutrients = NutritionDay.Nutrients(),
         /**
          * Today's vitamins and minerals, and how many of today's foods each was drawn from.
@@ -1420,6 +1430,24 @@ suspend fun composeHealthReading(
     }
     val share = if (formula != null && known != null) Expenditure.measuredShare(formula, known) else 0.0
 
+    // ⚠️ **The earlier reading is RECOMPUTED, not banked, and that is better in two ways.** The
+    // measurement is a pure function of the weigh-ins and the food log, both of which are stored in
+    // full — so asking what it would have said a window ago is exact, where a recorded reading would
+    // depend on whether the app happened to be opened that day.
+    //
+    // ⚠️ It does use today's smoothing for both endpoints, so it is not "what we told you a month
+    // ago". It is not meant to be: the question is what the data says expenditure was over two
+    // disjoint windows, and the best available smoothing is the right tool for both halves of it.
+    val earlierAt = now - window.toLong() * 86_400_000L
+    val earlierKnown = Expenditure.measure(trend, intake, earlierAt, window) as? Expenditure.Estimate.Known
+    val recovery = Maintenance.recovery(
+        listOfNotNull(
+            earlierKnown?.let { Maintenance.Reading(earlierAt, it.kcal, window.toDouble()) },
+            known?.let { Maintenance.Reading(now, it.kcal, window.toDouble()) },
+        ),
+        now,
+    )
+
     val plan = if (person != null && expenditure != null) {
         MacroTargets.plan(
             MacroTargets.Request(
@@ -1466,6 +1494,11 @@ suspend fun composeHealthReading(
         week = week,
         stepShift = shift,
         stepSuggestion = suggestion,
+        recovery = recovery,
+        confirmation = Maintenance.confirmIn(
+            p.ratePerWeekKg,
+            (trend as? BodyTrend.Trend.Estimated)?.latest?.trendSdKg ?: Double.NaN,
+        ),
         eatenToday = NutritionDay.total(todayEntries),
         microsToday = NutritionDay.microTotal(todayEntries),
         extrasToday = NutritionDay.extraTotal(todayEntries),

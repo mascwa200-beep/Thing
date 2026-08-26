@@ -29,6 +29,7 @@ import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.feature.health.HealthViewModel
 import kotlin.math.abs
@@ -117,6 +118,45 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
         // figure from four days is not the same as the same figure from four weeks.
         StatRow("Measured", "${round(state.measuredShare * 100)}%")
         StatRow("Days logged", "${state.loggedDaysInWindow} of ${p.expenditureWindowDays}")
+
+        // ⚠️ Both of these are sentences the core produced, printed verbatim. They exist precisely
+        // because the honest answer is often a refusal — "these two readings share their data", "at
+        // this pace the change is slower than the scale's own noise" — and a screen that rephrased
+        // them would eventually rephrase a refusal into a claim.
+        Text(
+            when (val r = state.recovery) {
+                is Maintenance.Recovery.Measured -> r.sentence
+                is Maintenance.Recovery.TooSoon -> r.sentence
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            when (val c = state.confirmation) {
+                is Maintenance.Confirmation.InDays -> c.sentence
+                is Maintenance.Confirmation.Never -> c.sentence
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // ⚠️ Offered only when it would raise the target. Ending a deficit is the case this is for,
+        // and showing "step DOWN to what was measured" as a button labelled about deficits would be
+        // the wrong action wearing the right words — `Maintenance.stepUp` says the other case in
+        // prose instead.
+        val measuredNow = state.expenditure?.kcal
+        val targetNow = state.targets?.kcal
+        if (measuredNow != null && targetNow != null && p.ratePerWeekKg < 0.0) {
+            val step = Maintenance.stepUp(targetNow, measuredNow)
+            if (step.deltaKcal > 0) {
+                Button(onClick = { vm.setRatePerWeekKg(0.0) }) { Text("Stop losing — eat at what was measured") }
+                Text(
+                    step.sentence,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 
     // ⚠️ **A wired capability with nowhere to reach it.** `setProteinGPerKg` is on the shared view

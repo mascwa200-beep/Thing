@@ -57,6 +57,7 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.MealPhoto
@@ -1300,6 +1301,9 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
         }
         item { ProteinPreference(vm, state) }
 
+        item { LcarsHeaderBar("WHAT THE SCALE CAN TELL YOU") }
+        item { MaintenanceRead(vm, state) }
+
         item { LcarsHeaderBar("YOUR WEEK") }
         item { ProgramModeRow(vm, state) }
         item { WeekShape(vm, state) }
@@ -1416,6 +1420,55 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         value = weeks?.let { "about ${it.roundToInt()} weeks" } ?: "not at this pace",
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Whether measured expenditure has moved, when a rate becomes visible, and the way off a deficit.
+ *
+ * ⚠️ **Every sentence here comes out of the core verbatim.** They exist mostly to REFUSE — two
+ * readings share their data, a change is slower than the scale's own noise, maintaining has no
+ * change to confirm — and a screen that rephrased them would eventually rephrase a refusal into a
+ * claim, which is the one thing this whole subsystem is built not to do.
+ */
+@Composable
+private fun MaintenanceRead(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            when (val r = state.recovery) {
+                is Maintenance.Recovery.Measured -> r.sentence
+                is Maintenance.Recovery.TooSoon -> r.sentence
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+        Text(
+            when (val f = state.confirmation) {
+                is Maintenance.Confirmation.InDays -> f.sentence
+                is Maintenance.Confirmation.Never -> f.sentence
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+
+        // ⚠️ Offered only when it would RAISE the target — ending a deficit is what this is for, and
+        // a button labelled about deficits that stepped somebody down would be the wrong action
+        // wearing the right words. The other case is said in prose by `Maintenance.stepUp`.
+        val measuredNow = state.expenditure?.kcal
+        val targetNow = state.targets?.kcal
+        if (measuredNow != null && targetNow != null && state.profile.ratePerWeekKg < 0.0) {
+            val step = Maintenance.stepUp(targetNow, measuredNow)
+            if (step.deltaKcal > 0) {
+                LcarsButton(
+                    "STOP LOSING — EAT AT WHAT WAS MEASURED",
+                    onClick = { vm.setRatePerWeekKg(0.0) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    step.sentence,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
             }
         }
     }
