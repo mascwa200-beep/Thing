@@ -88,7 +88,15 @@ android {
 
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        // ⚠️ **Off by default since AGP 8, and the updater is what needs it.** `BuildConfig.VERSION_CODE`
+        // is how this app knows which build it is running — the whole basis of "is there a newer one"
+        // and of the marker that stops a failed install being retried for ever. Without this the
+        // class is simply not generated, which reads as an unresolved reference rather than as a
+        // missing build feature.
+        buildConfig = true
+    }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
@@ -171,4 +179,9 @@ dependencies {
     implementation(project(":core:telemetry"))
     implementation(project(":core:feeds"))
     implementation(project(":core:health"))
+
+    // Keeping itself current: the GitHub release check with its green gate, and the PackageInstaller
+    // ladder. Shared with the LCARS application so the two cannot come to disagree about when a
+    // build is safe to install.
+    implementation(project(":core:update"))
 }
