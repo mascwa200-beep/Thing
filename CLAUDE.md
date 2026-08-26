@@ -9272,3 +9272,67 @@ read **0 occurrences**, and reported that as a clean before/after. An empty resu
 from a run that never happened. `/tmp/fetchlog.sh` now refuses any fetch that contains `<Error>` or is
 under 10 kB before anything is allowed to grep it. **A signed CI log blob does not exist until the job
 finishes uploading**, which is several seconds after the last step completes.
+
+### FOUR REASONS THERE WAS NO DOWNLOAD ARROW (this session, PR #464)
+
+Owner, twice: *"I didn't see an option like a button or anything where they're normally would be to
+download the nutrition app"*, then *"there is no downward facing arrow with a drawer to indicate
+download available for the nutrition workflow actions."* Standing budget constraint still in force —
+**zero subagents, zero workflows** until the reset, which overrides plan mode's own instruction to
+dispatch Explore/Plan agents. Every check below is local: a YAML parse, the shipped shell executed
+against fake artifacts, and `actions_list`.
+
+**The report was correct, and it had four independent causes — only one of which was a defect.**
+
+| fact | evidence |
+|---|---|
+| the artifact step landed **an hour before the report** | `31e060d`, 04:34Z — the tip commit |
+| so only **run #19** has an artifact; **#1–#18 have none** | 19 runs listed; artifact only on `32930744315` |
+| ⚠️ GitHub serves every artifact as a **ZIP** | not installable on a phone, and there is no option not to |
+| ⚠️ artifacts are on the run **summary** page, never the job log | which is where a tapped tick lands you |
+| ⚠️ the GitHub **mobile app lists no artifacts at all** | no workflow change can put an arrow there |
+| ⚠️ **the repo is PRIVATE, so every route needs auth** | artifact, release asset and API alike |
+| the release asset is the installable one | `nutrition-release.apk`, 188,697,675 B, `application/vnd.android.package-archive` |
+| **`download_count: 0`** | that route has never once been used |
+
+**So the fix is not another artifact step.** What a run page can carry that is genuinely installable
+is a `$GITHUB_STEP_SUMMARY` block — it renders at the **top** of the summary page, above the
+artifacts drawer, and links to the bare `.apk` on the rolling release. ⚠️ **Nothing in this
+repository wrote a step summary before**, so it is a new surface rather than a tweak to one. Both
+Android and nutrition workflows now write one, `always()` so it survives a failed publish (the
+previous build's release is then still the newest thing to install) but gated on the APK existing so
+a failed compile writes no misleading link.
+
+⚠️ **The release BODY carries the same link, and that is the half that reaches the GitHub mobile
+app** — which shows releases and their assets while showing no artifacts. Both asset names are stable
+(`nutrition-release.apk`, `app-release.apk`), so the URLs never change and always serve the newest
+build. `android-build.yml`'s body became a block scalar to fit it.
+
+**`retention-days: 7` on all three uploads.** None was set, so all sat at the repo default of **90
+days** — measured, `expires_at: 2026-11-24` — at **187 MB** (nutrition) + **290 MB** (`pulse-release-apk`)
++ the MSI *per run*, on a branch that pushes many times a day. Each rolling release is the durable
+copy and is always the newest build, so an artifact older than a few days has no consumer. The cost
+is stated rather than hidden: an OLD run's page stops offering a download after a week.
+
+⚠️ **The route that actually works on a phone is the in-app one**, and it is the only one that does
+not need a browser login: **Settings → System → GET THE NUTRITION APP · ~180 MB**, using the token in
+Computer Setup. It went in at `31e060d` after the same report — before that the control was
+`RoundCyberButton`, an **icon-only circle whose string is a `contentDescription`**, so there was
+literally no visible button, behind a three-tap Check → Download → Install flow, in a section no
+green build had ever carried. `getCompanion()` now downloads on success rather than waiting for a
+second tap on a control that was not visible until that moment.
+
+**Verification worth reusing:** the two summary scripts were **extracted from the shipped YAML,
+`${{ }}`-substituted, and executed** against fake APKs truncated to the real byte sizes — so the
+rendered markdown (`180M`, `330M`, both links) was read rather than reasoned about. The harness
+asserts no `${{` survived substitution, which is what would otherwise pass a syntactically valid
+script that emits a broken URL.
+
+⚠️ **A gap in my own parse check, caught by using it:** it read only the first job, so
+`desktop-build.yml`'s upload — which lives in `package-windows` — reported no `retention-days` when
+it had one. **Iterate every job, not `next(iter(jobs))`.**
+
+**Said plainly rather than worked around:** artifacts will never be one-tap installs (GitHub zips
+them); the mobile app will never list them; and nothing here is anonymously downloadable while the
+repository is private. Making the APK public would mean opening the repository or pushing it to an
+outside host, and neither is proposed.

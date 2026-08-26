@@ -770,12 +770,22 @@ jobs:
           # only mean the matcher is broken.
           SENTINEL: dev.mascwa.pulse.ThisClassDoesNotExist_R8GateSentinel
 
+      # ⚠️ An artifact is a **zip** — GitHub zips every one and offers no way not to — so it is not
+      # installable on a phone, and the GitHub mobile app does not list artifacts at all. The step
+      # summary below is the route that works from a phone. This upload is for a computer.
+      #
+      # ⚠️ `retention-days` because the `latest` release is the durable copy and is always the newest
+      # build, so an artifact older than a few days has no consumer — while each one is ~290 MB and
+      # this branch pushes many times a day. The cost is that an OLD run's page stops offering a
+      # download after a week; the newest build is always on the release, which is also what the
+      # in-app updater reads.
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: pulse-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 7
 
       - name: Publish APK to 'latest' release
         if: github.event_name == 'push'
@@ -784,7 +794,21 @@ jobs:
           tag_name: latest
           name: "Pulse — debug build #${{ github.run_number }}"
           prerelease: true
-          body: "Auto-built APK (build #${{ github.run_number }}) from commit ${{ github.sha }}. Non-debuggable, baseline-profile optimized (faster cold start). Sideload on a Pixel 10 Pro XL (allow 'install unknown apps'). Installs as an in-place UPDATE over a previous build — your settings and downloaded model are kept. (One-time: if you have an older differently-signed build, uninstall it once before installing this.)"
+          # ⚠️ The direct link is spelled out because the release page is the only thing the GitHub
+          # mobile app will show — it lists no artifacts. The asset name is stable, so the URL never
+          # changes and always serves the newest build.
+          body: |
+            Auto-built APK (build #${{ github.run_number }}) from commit ${{ github.sha }}.
+
+            **[▸ Download and install it](${{ github.server_url }}/${{ github.repository }}/releases/download/latest/app-release.apk)**
+
+            Non-debuggable, baseline-profile optimized (faster cold start). Sideload on a Pixel 10
+            Pro XL (allow "install unknown apps"). Installs as an in-place UPDATE over a previous
+            build — your settings and downloaded model are kept. (One-time: if you have an older
+            differently-signed build, uninstall it once before installing this.)
+
+            This repository is private, so following that link needs a signed-in GitHub session in
+            whatever browser opens it. The app updates itself without any of this.
           files: app/build/outputs/apk/release/app-release.apk
 
       - name: Remove stale debug asset from the rolling release
@@ -794,3 +818,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete-asset latest app-debug.apk -y || true
+
+      # ⚠️ Renders at the TOP of the run summary, above the artifacts drawer, and links to the bare
+      # `.apk` rather than to a zip. It matters less here than on the nutrition workflow — this app
+      # installs its own updates unattended — but the asymmetry is what made the other one look
+      # broken: this run page has always carried an artifact and that one had none at all.
+      #
+      # ⚠️ `always()` so it still appears when the publish failed; gated on the APK existing, so a
+      # failed compile writes no misleading link.
+      - name: Say where to get it
+        if: always() && hashFiles('app/build/outputs/apk/release/app-release.apk') != ''
+        run: |
+          size=$(numfmt --to=iec "$(stat -c%s app/build/outputs/apk/release/app-release.apk)")
+          base="${{ github.server_url }}/${{ github.repository }}"
+          {
+            echo "## LCARS — build #${{ github.run_number }}"
+            echo
+            echo "### [▸ Download and install it]($base/releases/download/latest/app-release.apk)"
+            echo
+            echo "$size · arm64 only · installs in place over a previous build, keeping your"
+            echo "settings and the downloaded model."
+            echo
+            echo "That link is a bare \`.apk\` the phone's installer opens directly. You must be"
+            echo "**signed in to GitHub in that browser** — this repository is private. Normally you"
+            echo "need none of this: the app fetches and installs its own updates unattended."
+            echo
+            echo "The artifact below is a **zip**, because GitHub zips every artifact; Android"
+            echo "cannot install one. It is there for a computer."
+            echo
+            echo "Looking for the standalone nutrition app? It has its own workflow and its own"
+            echo "release under \`nutrition-latest\`."
+          } >> "$GITHUB_STEP_SUMMARY"

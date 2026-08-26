@@ -244,12 +244,23 @@ jobs:
       # page showed a green tick and no artifact.
       #
       # `if-no-files-found: error` because a silent empty upload would restore the same dead end.
+      #
+      # ⚠️ **But an artifact is NOT the answer on a phone, and the step below is.** GitHub zips every
+      # artifact and offers no way not to, so this is a `.zip` Android cannot install; the GitHub
+      # mobile app lists no artifacts at all; and the drawer lives on the run SUMMARY page rather
+      # than the job log most people land on after tapping a tick. This upload is for a computer.
+      #
+      # ⚠️ `retention-days` because the release under `nutrition-latest` is the durable copy and is
+      # always the newest build, so an artifact older than a few days has no consumer — while each
+      # one is ~187 MB and this branch pushes many times a day. The honest cost is that an OLD run's
+      # page stops offering a download after a week; the newest build is always on the release.
       - name: Upload the APK to this run
         uses: actions/upload-artifact@v4
         with:
           name: nutrition-release-apk
           path: nutrition/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 7
 
       - name: Publish
         if: github.event_name == 'push'
@@ -262,10 +273,54 @@ jobs:
           tag_name: nutrition-latest
           name: "Nutrition — build #${{ github.run_number }}"
           prerelease: true
+          # ⚠️ **The direct link is spelled out because this is the half that reaches the GitHub
+          # mobile app**, which shows releases and their assets but no workflow artifacts at all.
+          # The asset name is stable (`nutrition-release.apk`, from the module name), so the URL
+          # never changes and always serves the newest build.
           body: |
             Standalone nutrition app, build #${{ github.run_number }}, from ${{ github.sha }}.
+
+            **[▸ Download and install it](${{ github.server_url }}/${{ github.repository }}/releases/download/nutrition-latest/nutrition-release.apk)**
 
             One APK for every architecture, Android 8.0 and later, no device gate. Installs
             alongside the LCARS app rather than over it — different package name — so both can be
             on one phone at once. Sideload it and allow "install unknown apps".
+
+            This repository is private, so following that link needs a signed-in GitHub session in
+            whatever browser opens it. Already have the LCARS app? **Settings → System → GET THE
+            NUTRITION APP** does the whole thing in one tap with the token already stored there.
           files: nutrition/build/outputs/apk/release/*.apk
+
+      # ⚠️ **This is what a run page can carry that is genuinely installable**, and it is the fix for
+      # "there is no download arrow": `$GITHUB_STEP_SUMMARY` renders at the TOP of the run summary,
+      # above the artifacts drawer, and it links to the bare `.apk` on the rolling release rather
+      # than to a zip. Nothing else in this repository writes a step summary, so this is a new
+      # surface rather than a tweak to one.
+      #
+      # ⚠️ `always()` so it still appears when the publish itself failed — the previous build's
+      # release is then still the newest thing there is to install, and a run that says nothing is
+      # exactly the dead end being removed. Gated on the APK existing, so a failed compile writes
+      # no misleading link.
+      - name: Say where to get it
+        if: always() && hashFiles('nutrition/build/outputs/apk/release/*.apk') != ''
+        run: |
+          apk=$(ls nutrition/build/outputs/apk/release/*.apk | head -1)
+          size=$(numfmt --to=iec "$(stat -c%s "$apk")")
+          base="${{ github.server_url }}/${{ github.repository }}"
+          {
+            echo "## Nutrition app — build #${{ github.run_number }}"
+            echo
+            echo "### [▸ Download and install it]($base/releases/download/nutrition-latest/nutrition-release.apk)"
+            echo
+            echo "$size · one APK for every architecture · Android 8.0 and later · installs"
+            echo "alongside the LCARS app, not over it."
+            echo
+            echo "That link is a bare \`.apk\` the phone's installer opens directly. You must be"
+            echo "**signed in to GitHub in that browser** — this repository is private."
+            echo
+            echo "The artifact below is a **zip**, because GitHub zips every artifact; Android"
+            echo "cannot install one. It is there for a computer."
+            echo
+            echo "Already have the LCARS app? **Settings → System → GET THE NUTRITION APP** does all"
+            echo "of this in one tap using the token stored in Computer Setup, with no browser."
+          } >> "$GITHUB_STEP_SUMMARY"
