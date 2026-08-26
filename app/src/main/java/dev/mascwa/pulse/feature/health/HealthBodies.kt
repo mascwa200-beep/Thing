@@ -95,7 +95,12 @@ import kotlin.math.roundToInt
 import java.time.LocalDate
 import java.time.ZoneId
 
-private val Pad = PaddingValues(13.dp)
+/**
+ * ⚠️ **Internal, and one definition for the whole tab.** It existed twice — here and in
+ * `RecipesBody` — and a third body was about to add a third copy. Every page in this tab has to
+ * inset by the same amount or the sub-tabs visibly jump as you move between them.
+ */
+internal val Pad = PaddingValues(13.dp)
 
 // =================================================================================== MACROS
 
@@ -979,7 +984,7 @@ private fun MoreFromTheLabel(
 }
 
 @Composable
-private fun NumberCell(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun NumberCell(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
@@ -1536,6 +1541,18 @@ private fun WeekShape(vm: HealthViewModel, state: HealthViewModel.State) {
                         )
                     }
                 }
+            }
+            // ⚠️ Offered, never applied on its own — the training log may disagree with a choice
+            // somebody made deliberately, and moving calories between days unasked is a decision
+            // rather than a suggestion. Silent when the two already agree, or a row that repeats
+            // what is already set teaches the reader to skip it.
+            val trained = vm.heavyDaysFromTraining()
+            if (trained.isNotEmpty() && trained != state.profile.heavyDays.toSet()) {
+                LcarsButton(
+                    "USE THE ${trained.size} DAYS YOU TRAINED",
+                    { vm.applyTrainingDays() },
+                    color = c.muted,
+                )
             }
             Text(
                 "Tap the days you train. The same weekly total moves onto them.",

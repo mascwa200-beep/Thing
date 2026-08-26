@@ -249,6 +249,10 @@ private fun ProgramCard(vm: HealthViewModel, state: HealthViewModel.State) {
                     )
                 }
             }
+            // ⚠️ Offered, never applied on its own — the training log may disagree with a choice
+            // somebody made deliberately, and moving calories between days unasked is not a
+            // suggestion, it is a decision. Silent when the two already agree.
+            HeavyDaySuggestion(vm)
         }
 
         if (week == null) {

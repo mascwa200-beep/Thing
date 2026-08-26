@@ -46,6 +46,8 @@ import dev.mascwa.pulse.feature.health.HealthViewModel
 @Composable
 fun HabitsScreen(vm: HealthViewModel) {
     StepsCard(vm, rememberStepSource(vm))
+    TrainingCard(vm)
+    WeekVolumeCard(vm)
     StreaksCard(vm)
     RecordCard(vm)
 }

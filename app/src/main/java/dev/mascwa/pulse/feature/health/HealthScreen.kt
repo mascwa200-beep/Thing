@@ -50,6 +50,7 @@ enum class HealthTab(val label: String) {
     BODY("BODY"),
     COACH("COACH"),
     RECIPES("RECIPES"),
+    TRAIN("TRAIN"),
     HABITS("HABITS"),
 }
 
@@ -82,6 +83,7 @@ fun HealthScreen(vm: HealthViewModel) {
                 HealthTab.BODY -> BodyBody(vm, state)
                 HealthTab.COACH -> CoachBody(vm, state)
                 HealthTab.RECIPES -> RecipesBody(vm)
+                HealthTab.TRAIN -> TrainingBody(vm)
                 HealthTab.HABITS -> HabitsBody(vm)
             }
         }

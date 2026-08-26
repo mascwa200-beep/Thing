@@ -3,7 +3,6 @@ package dev.mascwa.pulse.feature.health
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,7 +34,6 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.roundToInt
 
-private val Pad = PaddingValues(13.dp)
 
 /**
  * The dishes you make more than once, and the groups of foods you eat together.

@@ -1185,21 +1185,32 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
     }
 
-    /** Add a movement the catalogue does not have. */
+    /**
+     * Add a movement the catalogue does not have, and put it straight into the open session.
+     *
+     * ⚠️ **Both, in one call, and that is not a convenience.** Somebody types a name because they
+     * are about to log sets of it; a version that only filed it in the catalogue would look like it
+     * had done nothing, because the store write is asynchronous and the session would still be
+     * empty when they looked. The session gets the object directly rather than waiting for the
+     * flow to come back around.
+     */
     fun addExercise(name: String, pattern: Training.Pattern, loaded: Boolean = true) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
+        val exercise = Training.Exercise(
+            // ⚠️ Prefixed, so an added movement can never collide with a catalogue id and silently
+            // shadow it — the same rule custom foods follow with `own:`.
+            id = Training.OWN_PREFIX + UUID.randomUUID().toString(),
+            name = trimmed,
+            pattern = pattern,
+            loaded = loaded,
+        )
+        if (_session.value != null) {
+            addMovement(exercise)
+        }
         viewModelScope.launch {
-            c.trainingStore.addExercise(
-                Training.Exercise(
-                    // ⚠️ Prefixed, so an added movement can never collide with a catalogue id and
-                    // silently shadow it — the same rule custom foods follow with `own:`.
-                    id = "own:" + UUID.randomUUID().toString(),
-                    name = trimmed,
-                    pattern = pattern,
-                    loaded = loaded,
-                ),
-            )
+            c.trainingStore.addExercise(exercise)
+            if (_session.value != null) saveSession()
         }
     }
 

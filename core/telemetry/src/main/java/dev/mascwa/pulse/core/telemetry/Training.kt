@@ -334,6 +334,17 @@ object Training {
         Exercise("cond.sled", "Sled push", Pattern.CONDITIONING),
     )
 
+    /**
+     * What marks a movement somebody added rather than one the build ships.
+     *
+     * ⚠️ **In the core, beside the catalogue whose ids it must not collide with.** An added
+     * movement's id is written into every session that uses it, so the prefix is part of the saved
+     * format rather than a UI detail — and three places need to agree about it: the model that
+     * mints ids, the picker that decides which entries can be forgotten, and anything that later
+     * tells the two apart.
+     */
+    const val OWN_PREFIX: String = "own:"
+
     /** A movement by id, from the catalogue or from anything the person added themselves. */
     fun exercise(id: String, added: List<Exercise> = emptyList()): Exercise? =
         added.firstOrNull { it.id == id } ?: STARTER.firstOrNull { it.id == id }
