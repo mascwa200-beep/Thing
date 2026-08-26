@@ -8755,9 +8755,15 @@ and its workflow · `a77eff4` the builder's memory and its resource reporting.
   than assumed — the wrong codepoint silently drops selenium, folate, B12, K1, beta-carotene and
   vitamin A.
 - **`:nutrition`** — `dev.mascwa.nutrition`, plain Material3, no device gate. ⚠️ **What makes it run
-  on any phone is the absence of native code, not minSdk 26.** No `abiFilters`, no
-  `externalNativeBuild`, so ONE universal APK covers arm64/arm32/x86/x86_64, and CI fails the build
-  if a `lib/` directory ever appears. Its own rolling tag `nutrition-latest`, never the shared
+  on any phone is that no architecture is narrowed, not minSdk 26.** No `abiFilters`, no
+  `externalNativeBuild`, so ONE universal APK covers arm64/arm32/x86/x86_64. ⚠️ **It is not free of
+  native libraries and my first version of both the check and this sentence said it was** — measured
+  from the shipped artifact, Compose UI pulls in `androidx.graphics:graphics-path`, whose ~10 kB
+  `.so` is packaged for all four architectures, which is exactly why the property still holds. CI
+  requires **every** native library under **every** architecture, never the absence of all of them.
+  ⚠️ Its negative test then found a bug in the check itself that reading it had not: `zip` writes
+  directory entries, so `lib/arm64-v8a/` was read as a library and an APK with all four present was
+  REJECTED. AGP writes no directory entries, so CI would never have shown it. Its own rolling tag `nutrition-latest`, never the shared
   `latest` — `action-gh-release` rewrites the release NAME and that is where each updater reads its
   build number. Same committed debug key as `:app` (a per-run throwaway key makes every update "App
   not installed"). R8 off: no reflection, no icon library, and the size is the database.
@@ -8794,6 +8800,19 @@ Both workflows now print free disk and free memory either side of the build and 
 under `/usr/bin/time -v` for peak RSS, so the next occurrence says which. ⚠️ The timer is guarded on
 the binary existing — `time` here is a package, not the shell builtin, and a diagnostic that can
 break the build is worse than no diagnostic.
+
+⚠️ **UPDATE, and it corrects the hypothesis above.** The next round built the database successfully
+on BOTH runners — **7m43s** on the LCARS one and **8m13s** on the nutrition one. So eight minutes is
+the normal cost, run 1985 was already pathologically slow long before it died at forty-five, and
+memory is a poor explanation for a step that was taking five times too long from the start. A stalled
+source download fits better: the OFF fetch carries `--max-time 1800`, so a slow mirror alone accounts
+for thirty of those minutes. **The memory reduction stands on its own measurement and is not the fix
+for this**; the reporting is what will name it next time. Do not read the array change as having
+resolved run 1985.
+
+⚠️ **Measured, replacing the plan's estimate:** the standalone APK is **176 MB** (183,783,509 bytes),
+against the 130–140 MB the plan guessed. The plan said that estimate would be replaced by a measured
+number on the first CI run, and this is it.
 
 #### Verification, all local and free
 
