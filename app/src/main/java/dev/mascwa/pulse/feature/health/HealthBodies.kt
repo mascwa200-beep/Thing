@@ -1280,6 +1280,15 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
                         )
                     }
+                    // ⚠️ Here rather than in the walking panel, because this is the figure it
+                    // qualifies. A measured number that lags with no explanation reads as a broken
+                    // one, and this is the explanation.
+                    if (state.intakeShift.changed) {
+                        Text(
+                            state.intakeShift.sentence,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                        )
+                    }
                 }
             }
         }

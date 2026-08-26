@@ -119,6 +119,17 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
         StatRow("Measured", "${round(state.measuredShare * 100)}%")
         StatRow("Days logged", "${state.loggedDaysInWindow} of ${p.expenditureWindowDays}")
 
+        // ⚠️ Beside the figure it qualifies rather than in the steps card above, for the reason that
+        // card gives about the step shift: a measured number that lags with no explanation reads as a
+        // broken one.
+        if (state.intakeShift.changed) {
+            Text(
+                state.intakeShift.sentence,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         // ⚠️ Both of these are sentences the core produced, printed verbatim. They exist precisely
         // because the honest answer is often a refusal — "these two readings share their data", "at
         // this pace the change is slower than the scale's own noise" — and a screen that rephrased

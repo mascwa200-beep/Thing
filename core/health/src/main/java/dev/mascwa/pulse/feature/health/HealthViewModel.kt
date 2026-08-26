@@ -174,6 +174,13 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
          */
         val stepSuggestion: Expenditure.Activity? = null,
         /**
+         * Whether how much you eat has moved enough that the measurement window spans two ways of
+         * eating. Never null, for the reason [stepShift] gives: "not enough days to say" is a value
+         * rather than an absence, and collapsing the two leaves a surface unable to tell them apart.
+         */
+        val intakeShift: Expenditure.IntakeShift =
+            Expenditure.IntakeShift(0.0, 0.0, 0, 0, false, "Nothing logged yet."),
+        /**
          * Whether measured expenditure has moved since a genuinely independent earlier reading —
          * which is how the app can say a deficit's suppression is lifting rather than promise it.
          */
@@ -1764,6 +1771,12 @@ suspend fun composeHealthReading(
     // own. Nothing is discarded and no threshold is crossed. See `Expenditure.widenForShift` for why
     // shortening the window instead would have been worse.
     val shift = Expenditure.stepShift(walked, now, windowDays = window)
+    // ⚠️ The same treatment for the OTHER way a window stops describing one steady life. A change in
+    // how much you eat does not make the arithmetic wrong — an average over a window is an average
+    // whether or not intake was constant — but it does break the assumption a reader makes, that the
+    // answer describes them now. The trend responds to an intake change with a lag, and a body eating
+    // differently for a fortnight is probably spending differently too.
+    val intakeMove = Expenditure.intakeShift(intake, now, windowDays = window)
     val suggestion = walked
         .takeIf { it.size >= Expenditure.MIN_STEP_DAYS_EACH_SIDE }
         ?.let { days -> days.sumOf { it.steps.toLong() } / days.size }
@@ -1771,7 +1784,8 @@ suspend fun composeHealthReading(
 
     // ⚠️ The blend, not a switch. Inverse-variance weighting hands the answer over as the
     // measurement tightens, so there is no day on which the number jumps and no threshold to pick.
-    val known = (measured as? Expenditure.Estimate.Known)?.let { Expenditure.widenForShift(it, shift) }
+    val known = (measured as? Expenditure.Estimate.Known)
+        ?.let { Expenditure.widenForShifts(it, shift, intakeMove) }
     val expenditure = when {
         formula != null && known != null -> Expenditure.blend(formula, known)
         known != null -> known
@@ -1842,6 +1856,7 @@ suspend fun composeHealthReading(
         plan = plan,
         week = week,
         stepShift = shift,
+        intakeShift = intakeMove,
         stepSuggestion = suggestion,
         recovery = recovery,
         confirmation = Maintenance.confirmIn(

@@ -616,6 +616,155 @@ object Expenditure {
     private fun List<StepDay>.meanSteps(): Int =
         if (isEmpty()) 0 else (sumOf { it.steps.toLong() } / size).toInt()
 
+    // -------------------------------------------------------------------------- eating differently
+
+    /**
+     * Both sides of an intake comparison need this many logged days.
+     *
+     * ⚠️ Derived from the step figure rather than restated, because the reason is word for word the
+     * same one: a comparison against two days is a comparison against a weekend, and every week
+     * contains one. Two honest names, one number, and moving the step figure moves this with it.
+     */
+    const val MIN_INTAKE_DAYS_EACH_SIDE: Int = MIN_STEP_DAYS_EACH_SIDE
+
+    /** How recent "recently" is, when asking whether intake has moved. */
+    const val INTAKE_SHIFT_RECENT_DAYS: Int = STEP_SHIFT_RECENT_DAYS
+
+    /**
+     * A change smaller than this fraction of the earlier mean is day-to-day variation, not a change
+     * of plan.
+     *
+     * ⚠️ Tighter than the step fraction, and the reason is that the two quantities are not alike.
+     * Steps swing enormously between a quiet week and a busy one, so a quarter is the point at which
+     * one stops being the other. Intake is far steadier for somebody tracking it, and a deliberate
+     * change is typically three to five hundred calories — around fifteen per cent of an ordinary
+     * day. A quarter would miss most real ones.
+     */
+    const val INTAKE_SHIFT_FRACTION: Double = 0.15
+
+    /**
+     * ⚠️ And an absolute floor beside the fraction, for the same reason the step one has one: on an
+     * 1,100-calorie base fifteen per cent is 165 calories, which is a snack rather than a decision.
+     * Two hundred and fifty a day is roughly half a pound a week of weight change, which is not.
+     */
+    const val INTAKE_SHIFT_MIN_ABSOLUTE: Double = 250.0
+
+    /**
+     * How much a confirmed intake shift widens the measured interval.
+     *
+     * ⚠️ The same figure as the step one and derived from it, because it is the same statement: the
+     * window no longer describes one steady way of living.
+     *
+     * ⚠️ **But what widening BUYS here is weaker than it is for steps, and pretending otherwise would
+     * be the overstatement this file is careful about elsewhere.** A step shift hands weight to the
+     * formula, and the formula is itself informed by recent walking through [Activity] — so the
+     * answer genuinely improves. Nothing in the formula knows anything about intake, so here the
+     * blend leans on a number that is merely *uncontaminated* rather than better informed. What this
+     * is really for is the interval and the sentence: a reader decides how much to trust a figure
+     * from its give-or-take, and a stale window currently understates it while saying nothing at all
+     * about why.
+     */
+    const val INTAKE_SHIFT_SD_INFLATION: Double = STEP_SHIFT_SD_INFLATION
+
+    /**
+     * Whether daily intake has moved enough that the older half of the window describes a different
+     * way of eating.
+     *
+     * ⚠️ **This does NOT mean the arithmetic is wrong.** Energy balance over a window is an average,
+     * and an average is valid whether or not intake was constant across it. What a shift breaks is
+     * the assumption a reader makes about the answer — that it describes them *now*. It does not,
+     * because the weight trend responds to an intake change with a lag, and because a body that
+     * started eating differently a fortnight ago has probably started spending differently too.
+     */
+    data class IntakeShift(
+        val earlierMean: Double,
+        val recentMean: Double,
+        val earlierDays: Int,
+        val recentDays: Int,
+        val changed: Boolean,
+        val sentence: String,
+    ) {
+        /** Signed, so a caller can say which way without recomputing it. */
+        val delta: Double get() = recentMean - earlierMean
+    }
+
+    /**
+     * The identity for [widenForShifts] — nothing known about intake, so nothing to widen for.
+     *
+     * ⚠️ Exists so [widenForShift] can delegate instead of keeping a second copy of the widening.
+     */
+    val NO_INTAKE_SHIFT: IntakeShift =
+        IntakeShift(0.0, 0.0, 0, 0, false, "Intake not considered.")
+
+    /** Compare the last [recentDays] of logged intake against the rest of the window. */
+    fun intakeShift(
+        intake: List<IntakeDay>,
+        nowMs: Long,
+        recentDays: Int = INTAKE_SHIFT_RECENT_DAYS,
+        windowDays: Int = DEFAULT_WINDOW_DAYS,
+    ): IntakeShift {
+        val windowStart = nowMs - (windowDays * MS_PER_DAY).toLong()
+        val recentStart = nowMs - (recentDays * MS_PER_DAY).toLong()
+        // ⚠️ `counted`, so a marked fast is a real zero-calorie day and an unopened one is a gap. That
+        // predicate exists precisely so this distinction is made in one place — see [IntakeDay].
+        val usable = intake.filter { it.dayStartMs >= windowStart && it.counted }
+        val recent = usable.filter { it.dayStartMs >= recentStart }
+        val earlier = usable.filter { it.dayStartMs < recentStart }
+
+        if (recent.size < MIN_INTAKE_DAYS_EACH_SIDE || earlier.size < MIN_INTAKE_DAYS_EACH_SIDE) {
+            return IntakeShift(
+                earlierMean = earlier.meanKcal(),
+                recentMean = recent.meanKcal(),
+                earlierDays = earlier.size,
+                recentDays = recent.size,
+                changed = false,
+                sentence = "Not enough logged days on both sides to say whether how much you eat has changed.",
+            )
+        }
+
+        val e = earlier.meanKcal()
+        val r = recent.meanKcal()
+        val diff = abs(r - e)
+        val changed = diff >= INTAKE_SHIFT_MIN_ABSOLUTE && diff >= e * INTAKE_SHIFT_FRACTION
+        val sentence = when {
+            !changed -> "You are eating about what you were — around ${e.roundToInt()} calories a day."
+            r > e ->
+                "You are eating a good deal more than you were — about ${r.roundToInt()} calories a " +
+                    "day against ${e.roundToInt()}. The measurement averages over both, so it will " +
+                    "lag until the older days fall out of the window."
+            else ->
+                "You are eating a good deal less than you were — about ${r.roundToInt()} calories a " +
+                    "day against ${e.roundToInt()}. The measurement averages over both, so it will " +
+                    "lag until the older days fall out of the window."
+        }
+        return IntakeShift(e, r, earlier.size, recent.size, changed, sentence)
+    }
+
+    private fun List<IntakeDay>.meanKcal(): Double =
+        if (isEmpty()) 0.0 else sumOf { it.kcal } / size
+
+    /**
+     * Widen a measured estimate for every reason the window is not describing one steady way of
+     * living.
+     *
+     * ⚠️ **The largest inflation, NOT the product, and that is the load-bearing decision.** Both
+     * shifts assert the same thing — the older days no longer describe you — so multiplying them
+     * gives 2.25× from two facts neither of which supports more than 1.5 on its own. That would push
+     * a measured estimate almost entirely onto the formula on the strength of arithmetic rather than
+     * evidence. The window is inhomogeneous; the worst inhomogeneity governs.
+     */
+    fun widenForShifts(
+        measured: Estimate.Known,
+        steps: StepShift,
+        intake: IntakeShift,
+    ): Estimate.Known {
+        val inflation = maxOf(
+            if (steps.changed) STEP_SHIFT_SD_INFLATION else 1.0,
+            if (intake.changed) INTAKE_SHIFT_SD_INFLATION else 1.0,
+        )
+        return if (inflation <= 1.0) measured else measured.copy(sdKcal = measured.sdKcal * inflation)
+    }
+
     /**
      * Widen a measured estimate's interval because the window spans a change in how much you move.
      *
@@ -629,8 +778,11 @@ object Expenditure {
      * Returns the estimate unchanged when nothing shifted, so a caller can apply it unconditionally.
      */
     fun widenForShift(measured: Estimate.Known, shift: StepShift): Estimate.Known =
-        if (!shift.changed) measured
-        else measured.copy(sdKcal = measured.sdKcal * STEP_SHIFT_SD_INFLATION)
+        // ⚠️ Delegates rather than repeating the arithmetic. Two functions that both widen an
+        // interval are two places the rule can drift, and this file has a note elsewhere about
+        // exactly that happening to a sentence. `NO_INTAKE_SHIFT` is the identity for the plural
+        // form, so this is the one-shift case of one definition.
+        widenForShifts(measured, shift, NO_INTAKE_SHIFT)
 
     // ----------------------------------------------------------------------------------- wording
 
