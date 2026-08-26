@@ -52,6 +52,21 @@ for d in $PKGS; do
     fi
 done
 
+# ---- 1b. one top-level name declared twice in a package ------------------------------------------
+# ⚠️ Added after a CI round was spent on exactly this. Two file-private top-level declarations in
+# different files are legal, which is why it looks safe; a private one beside anything more visible
+# is a "Conflicting overloads" compile error. Neither the parse gate (no name resolution) nor the
+# resolve gate (differences UNRESOLVED names, and this name resolved at HEAD) can see it.
+echo
+echo "== duplicate top-level declarations =="
+DUP=$(python3 tools/kotlin_dup_decl_check.py $PKGS 2>&1)
+if echo "$DUP" | grep -q "^no colliding"; then
+    printf '   ok    none in the packages this change touches\n'
+else
+    echo "$DUP" | sed 's/^/   /'
+    FAIL=1
+fi
+
 # ---- 2. parse only: braces and syntax, in seconds ------------------------------------------------
 # ⚠️ Says NOTHING about whether a name resolves. Two CI failures have gone straight past it.
 echo

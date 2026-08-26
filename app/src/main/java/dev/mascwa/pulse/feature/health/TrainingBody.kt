@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Training
-import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.data.health.TrainingStore
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsDataRow
@@ -80,7 +79,7 @@ private fun SessionListPanel(vm: HealthViewModel, sessions: List<Training.Sessio
                 )
             } else {
                 for (s in sessions.take(RECENT)) {
-                    LcarsDataRow(relativeDay(s.atMs), Training.sentence(s))
+                    LcarsDataRow(relativeDay(s.atMs).uppercase(), Training.sentence(s))
                 }
                 if (sessions.size > RECENT) {
                     Text(
@@ -392,9 +391,3 @@ private fun trimKg(v: Double): String {
     }
 }
 
-/** ⚠️ Local calendar days, not elapsed milliseconds — see [HealthDays] for why that matters. */
-private fun relativeDay(atMs: Long): String = when (val days = HealthDays.daysAgo(atMs)) {
-    0 -> "TODAY"
-    1 -> "YESTERDAY"
-    else -> if (days < 0) "TODAY" else "$days DAYS AGO"
-}
