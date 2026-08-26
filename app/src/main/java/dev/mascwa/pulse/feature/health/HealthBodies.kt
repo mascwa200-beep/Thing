@@ -1381,8 +1381,12 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
 
             val goal = p.goalKg
-            if (goal > 0.0 && state.person != null) {
-                val weeks = MacroTargets.weeksToGoal(state.person.kg, goal, set.effectiveRatePerWeekKg)
+            // ⚠️ Hoisted to a local rather than smart-cast: `person` is a public property of a class
+            // in :core:health, and Kotlin refuses to smart-cast a public property declared in another
+            // module — nothing stops that module publishing a different value on the second read.
+            val person = state.person
+            if (goal > 0.0 && person != null) {
+                val weeks = MacroTargets.weeksToGoal(person.kg, goal, set.effectiveRatePerWeekKg)
                 item {
                     LcarsDataRow(
                         label = "To ${fmt(goal * unit.perKg)} ${unit.label}",
