@@ -306,6 +306,7 @@ dependencies {
     // a plain JVM module: not one of those files imported `android.*`.
     implementation(project(":core:feeds"))
     implementation(project(":core:health"))
+    implementation(project(":core:update"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

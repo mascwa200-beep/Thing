@@ -8,7 +8,7 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import dev.mascwa.pulse.security.DevicePolicyController
+import android.app.admin.DevicePolicyManager
 import java.io.File
 
 /**
@@ -62,7 +62,7 @@ object ApkInstaller {
      * ⚠️ Nothing here waits for the outcome. On a successful self-update this process is killed
      * during [PackageInstaller.Session.commit], so any code written after it may simply never run.
      */
-    fun install(context: Context, file: File): Boolean {
+    fun install(context: Context, file: File, expectPackage: String? = null): Boolean {
         if (!file.isFile || file.length() <= 0L) return false
         val installer = context.packageManager.packageInstaller
         var sessionId = -1
@@ -70,10 +70,14 @@ object ApkInstaller {
             val params = PackageInstaller.SessionParams(
                 PackageInstaller.SessionParams.MODE_FULL_INSTALL,
             ).apply {
-                setAppPackageName(context.packageName)
+                // ⚠️ The package the APK declares, which is NOT always ours: this same path
+                // installs the companion nutrition app. The platform verifies this against the
+                // APK's own manifest and rejects a mismatch outright, so it is stated when the
+                // caller knows it and omitted when it does not, rather than guessed.
+                setAppPackageName(expectPackage ?: context.packageName)
                 // Rung 1. A device owner's commit is not confirmed; on any other device this is
                 // recorded and otherwise ignored.
-                if (DevicePolicyController(context).isDeviceOwner()) {
+                if (isDeviceOwner(context)) {
                     runCatching { setInstallReason(PackageManager.INSTALL_REASON_POLICY) }
                 }
                 // Rung 2. Honoured only for the installer of record, so this arms itself one
@@ -104,6 +108,19 @@ object ApkInstaller {
             false
         }
     }
+
+    /**
+     * Whether this app is the device owner.
+     *
+     * ⚠️ Asked of the platform directly rather than routed through `:app`'s `DevicePolicyController`,
+     * which this module cannot see. That is not a second copy of a rule: there is no rule, only the
+     * platform's own answer, and `isDeviceOwnerApp` is the single call that gives it. A device
+     * without the management API at all answers false, which is the correct rung to fall to.
+     */
+    private fun isDeviceOwner(context: Context): Boolean = runCatching {
+        context.getSystemService(DevicePolicyManager::class.java)
+            ?.isDeviceOwnerApp(context.packageName) == true
+    }.getOrDefault(false)
 
     private fun resultSender(context: Context, sessionId: Int): android.content.IntentSender {
         val intent = Intent(ACTION_RESULT).setPackage(context.packageName)

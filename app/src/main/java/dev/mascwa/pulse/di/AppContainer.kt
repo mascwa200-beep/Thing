@@ -67,7 +67,37 @@ class AppContainer(private val appContext: Context) {
     val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
-        dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
+        dev.mascwa.pulse.data.update.UpdateRepository(
+            appContext,
+            http,
+            tag = dev.mascwa.pulse.data.update.UpdateRepository.LCARS_TAG,
+            workflow = dev.mascwa.pulse.data.update.UpdateRepository.LCARS_WORKFLOW,
+            currentVersionCode = dev.mascwa.pulse.BuildConfig.VERSION_CODE,
+            currentVersionName = dev.mascwa.pulse.BuildConfig.VERSION_NAME,
+            token = { settingsRepository.current().jarvis.githubToken },
+        )
+    }
+
+    /**
+     * The same checker pointed at the standalone nutrition app's own release, so this app can put
+     * the companion on the phone in the first place — there is otherwise no way to obtain it.
+     *
+     * ⚠️ **`currentVersionCode = 0` is a statement, not a placeholder**: this app cannot read the
+     * version of a package it does not own, so it treats every published build as newer than
+     * nothing and offers the newest. Installing over an equal or older build is harmless — the
+     * platform refuses a downgrade itself — whereas guessing a version here would mean silently
+     * refusing to offer an update the owner asked for.
+     */
+    val nutritionUpdateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
+        dev.mascwa.pulse.data.update.UpdateRepository(
+            appContext,
+            http,
+            tag = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_TAG,
+            workflow = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_WORKFLOW,
+            currentVersionCode = 0,
+            currentVersionName = "",
+            token = { settingsRepository.current().jarvis.githubToken },
+        )
     }
     /** GitHub write client + self-coding brain (opt-in): J.A.R.V.I.S. drafts a change and opens a PR. */
     val gitHubRepo: dev.mascwa.pulse.data.selfcode.GitHubRepo by lazy {

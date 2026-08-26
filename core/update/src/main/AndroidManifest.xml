@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      ⚠️ These three declarations live HERE rather than in each application, and that is the point
+      of the module. They were in `:app`'s manifest alone; a second copy in the standalone app would
+      be two statements of one fact, and the copy that drifts is always the one nobody is reading —
+      with the failure mode being an install path that silently falls back a rung, or a receiver
+      that never fires, neither of which any build can see.
+    -->
+
+    <!-- Self-update: install a newer APK the app downloaded. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+      Lets an update complete with no confirmation, but ONLY for the installer of record of the
+      package being updated. An app is not that until it has committed a session itself, so this
+      permission arms itself one update after the first install this library performs. It is the
+      fallback route; the primary is device-owner status, which needs nothing here.
+    -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
+    <application>
+        <!--
+          The install session's own result. Not exported: the PendingIntent that reaches it is
+          package-scoped, and an exported receiver here would let any app fake an install outcome.
+        -->
+        <receiver
+            android:name="dev.mascwa.pulse.data.update.ApkInstaller$ResultReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.mascwa.pulse.INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

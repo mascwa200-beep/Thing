@@ -1,10 +1,8 @@
 package dev.mascwa.pulse.data.update
 
 import android.content.Context
-import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.UpdatePolicy
-import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -34,15 +32,39 @@ data class UpdateCheck(
 )
 
 /**
- * Checks the project's rolling `latest` GitHub release (published by CI on every green build, versioned
- * by the run number) and downloads the APK. The repo is private, so the GitHub token from Settings is
- * sent on the API call and the asset download; public repos work token-free too. Installing is done from
- * the UI via the system installer (the user's authorization).
+ * Checks a rolling GitHub release (published by CI on every green build, versioned by the run number)
+ * and downloads the APK. The repo is private, so a GitHub token is sent on the API call and the asset
+ * download; public repos work token-free too. Installing is [ApkInstaller]'s job.
+ *
+ * ## Why this is parameterised rather than copied
+ *
+ * ⚠️ **Three applications now read releases from this one repository** — LCARS from `latest`, the
+ * standalone nutrition app from `nutrition-latest`, and LCARS again when it fetches the nutrition
+ * APK so the companion can be installed in the first place. What differs between them is four
+ * facts: which tag, which workflow's run numbers to trust, what build is already installed, and
+ * where the token lives. Everything else — the green gate, the newest-asset pick, the private-repo
+ * download dance — is identical, and a second copy of it would be a second chance to offer a build
+ * that is still compiling.
+ *
+ * @param tag the rolling release tag, e.g. `latest`.
+ * @param workflow the workflow file whose `run_number` equals the shipped `versionCode`. ⚠️ Scoped
+ *   deliberately: `run_number` is per-workflow, so asking about all runs would let a different
+ *   workflow carrying the same number answer, and give a confident wrong verdict.
+ * @param currentVersionCode the build already installed. ⚠️ **Zero means "nothing is installed"**,
+ *   which is exactly right for fetching a companion app: every published build is newer than
+ *   nothing, so the newest one is always offered.
+ * @param currentVersionName what to show for the installed build.
+ * @param token the GitHub token, read fresh on every call rather than captured — a token pasted
+ *   after this object was constructed has to work without restarting the app.
  */
 class UpdateRepository(
     context: Context,
     private val http: HttpClient,
-    private val settings: SettingsRepository,
+    private val tag: String,
+    private val workflow: String,
+    private val currentVersionCode: Int,
+    private val currentVersionName: String,
+    private val token: suspend () -> String?,
 ) {
 
     private val appContext = context.applicationContext
@@ -70,13 +92,12 @@ class UpdateRepository(
     @Serializable
     private data class WorkflowRun(val run_number: Int = 0, val status: String = "", val conclusion: String? = null)
 
-    val currentVersionCode: Int get() = BuildConfig.VERSION_CODE
-    val currentVersionName: String get() = BuildConfig.VERSION_NAME
-
     /** The configured GitHub token, or null when unset. Trimmed — pasted tokens often carry a trailing
-     *  space/newline, which would corrupt the `Bearer` header and 401 the request. */
+     *  space/newline, which would corrupt the `Bearer` header and 401 the request. A failure to read
+     *  it at all is the same answer as not having one: the check then runs unauthenticated and the
+     *  private repo answers 404, which the caller already has to handle. */
     suspend fun token(): String? =
-        runCatching { settings.current().jarvis.githubToken }.getOrNull()?.trim()?.ifBlank { null }
+        runCatching { token.invoke() }.getOrNull()?.trim()?.ifBlank { null }
 
     /**
      * Checks the `latest` release and reports the latest published version + an [UpdateInfo] when it's
@@ -92,10 +113,10 @@ class UpdateRepository(
             put("Cache-Control", "no-cache")
         }
         // The release is a prerelease, so /releases/latest won't return it — fetch it by its tag.
-        val rel = http.getJson("$API/releases/tags/$TAG", GhRelease.serializer(), headers)
+        val rel = http.getJson("$API/releases/tags/$tag", GhRelease.serializer(), headers)
         val code = UpdatePolicy.buildNumberOf(rel.name, rel.body) ?: return UpdateCheck(null, null)
         val latestName = UpdatePolicy.versionName(code)
-        if (code <= BuildConfig.VERSION_CODE) return UpdateCheck(latestName, null)
+        if (code <= currentVersionCode) return UpdateCheck(latestName, null)
         // A newer build exists. Only offer it once the CI run that produced it is GREEN — never while it's
         // still building (orange) or if it failed. The rolling `latest` release picks up the new APK + run
         // number mid-workflow, so without this gate we'd offer a build that isn't finished/verified.
@@ -128,7 +149,7 @@ class UpdateRepository(
         // Scope to the build workflow: `run_number` is per-workflow, so querying all runs would let a
         // future second workflow with the same number be matched first and give a wrong verdict.
         val runs = runCatching {
-            http.getJson("$API/actions/workflows/$WORKFLOW/runs?per_page=20", RunList.serializer(), headers)
+            http.getJson("$API/actions/workflows/$workflow/runs?per_page=20", RunList.serializer(), headers)
         }.getOrNull() ?: return null
         val run = runs.workflow_runs.firstOrNull { it.run_number == code } ?: return null
         return UpdatePolicy.runVerdict(run.status, run.conclusion)
@@ -138,7 +159,10 @@ class UpdateRepository(
      *  token + octet-stream Accept (GitHub redirects to the signed blob); public: the browser URL. */
     suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
         val dir = File(appContext.cacheDir, "apk").apply { mkdirs() }
-        val out = File(dir, "update.apk")
+        // ⚠️ Named after the tag, because LCARS now runs TWO of these — its own update and the
+        // companion app's. One shared `update.apk` would have the second download overwrite the
+        // first mid-install, and the failure would read as a corrupt APK rather than a collision.
+        val out = File(dir, "$tag.apk")
         val tok = token()
         val useApi = tok != null && info.apkAssetUrl.isNotBlank()
         val req = Request.Builder()
@@ -174,8 +198,23 @@ class UpdateRepository(
 
     companion object {
         const val API = "https://api.github.com/repos/mascwa200-beep/Thing"
-        const val TAG = "latest"
-        // The CI workflow whose run_number == the shipped versionCode (the green-gate looks it up by number).
-        private const val WORKFLOW = "android-build.yml"
+
+        /** The LCARS application's own rolling release and the workflow that publishes it. */
+        const val LCARS_TAG = "latest"
+        const val LCARS_WORKFLOW = "android-build.yml"
+
+        /**
+         * The standalone nutrition app's own rolling release.
+         *
+         * ⚠️ **Its own tag, never `latest`.** `softprops/action-gh-release` rewrites the release
+         * NAME, and the name is where every updater here reads its build number — three publishers
+         * sharing one tag would each clobber the others' version, and each app would then read
+         * somebody else's build number as its own.
+         */
+        const val NUTRITION_TAG = "nutrition-latest"
+        const val NUTRITION_WORKFLOW = "nutrition-build.yml"
+
+        /** The standalone app's applicationId, which the release build carries with no suffix. */
+        const val NUTRITION_PACKAGE = "dev.mascwa.nutrition"
     }
 }

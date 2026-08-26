@@ -9129,3 +9129,35 @@ reported states certainties rather than inferences.
 top-level mutable holding an `ActivityResultLauncher` is shared by every instance of the screen and
 outlives the composition that made it, so it ends up pointing at a destroyed activity's registry — a
 leak that compiles and reads as wired. The remedy travels in the returned value instead.
+
+**The same defect in the LCARS app, and the fix went where the vocabulary lives.** Its `StepsPanel`
+is handed the count and nothing about why there might not be one, so it could not have said anything
+else. `Habits.StepSilence` + `Habits.explain` now hold the three sentences, both screens read them,
+and both gained the button back from a refusal. ⚠️ **`explain` is deliberately NOT a fallback inside
+`describe`**: a count of zero from somebody who has not moved is a different answer from no count at
+all, and folding them together is what produced the one-sentence defect in the first place.
+
+⚠️ **`tools/kotlin_import_check.py` MISSED one of the two missing imports here, and the mechanism is
+worth knowing.** Its main pattern requires a name be followed by `.`, `(` or `<`, and
+`SensorManager::class.java` is followed by a colon — so it reported `Sensor` correctly and said
+nothing about `SensorManager`, making a run that named one finding look complete when fixing it would
+still have failed CI. Reproduced in isolation first (`Alpha::class.java` invisible, `Beta.VALUE`
+caught), then fixed, then **measured repo-wide: across 120 real `::` uses the rule adds zero new
+findings**, and the eight standing reports are byte-identical with it on and off. That control run is
+what makes "adds no noise" a measurement rather than a hope.
+
+⚠️ **Eight standing false positives remain in that gate**, and they are false positives *by
+construction*: every one of these files compiles in CI today, so a genuinely missing import among
+them would already be a red build. The list, so a follow-up has a target rather than a rediscovery —
+`BreakingNewsScreen` (LATEST/LIVE/SOURCES), `TheaterComponents` (CornerTag), `CiTool` (CI),
+`FoodDatabase` (JournalMode), `TranscriptDatabase` (Callback), `InferenceService` and
+`IsolatedInferenceEngine` (IInferenceService), `WindowFaults` (StackTraceElement). Three shapes:
+nested classes reached through their outer name, symbols declared in the same file, and one
+`java.lang` type missing from the builtins list. Recorded rather than fixed — unrelated to this
+change, none in a package this session touched — but **a gate with standing noise is one people learn
+to ignore**, so it is worth a slice of its own.
+
+⚠️ **The PR body carried a claim I had already corrected in the source** — "no native code, so one
+universal APK" — for several commits after the code and its comments said the opposite. In this tree
+an overstated claim is a defect wherever it lives, and the artifact a reviewer reads counts. **Re-read
+the PR body whenever a claim in the code changes.**

@@ -28,6 +28,11 @@ include(":core:telemetry")
 include(":core:feeds")
 include(":core:health")
 
+// The self-update path, shared by both Android applications: the GitHub release check with its
+// green gate, and the PackageInstaller ladder. Two copies of either would be two chances to
+// disagree about when a build is safe to install.
+include(":core:update")
+
 // The standalone nutrition app: the health half of :app with none of its novelty, its device gate
 // or its native code, so one universal APK runs on any phone. Shares :core:telemetry and
 // :core:database; deliberately reaches nothing else of the LCARS application.

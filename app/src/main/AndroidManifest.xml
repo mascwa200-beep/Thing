@@ -69,16 +69,8 @@
     <!-- Let J.A.R.V.I.S. set alarms/timers in the clock app (normal permission). -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
-    <!-- Self-update: install a newer APK the app downloaded (the user still confirms in the system
-         installer, and must grant "install unknown apps" once). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!--
-      Lets an update complete with no confirmation, but ONLY for the installer of record of the
-      package being updated. This app is not that yet — every install so far came through the system
-      installer UI — so the permission arms itself one update after the first session ApkInstaller
-      commits. It is the fallback route; the primary is device-owner status, which needs nothing here.
-    -->
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Self-update: REQUEST_INSTALL_PACKAGES and UPDATE_PACKAGES_WITHOUT_USER_ACTION are
+         declared by `:core:update` and merged in, so both applications carry the same pair. -->
 
     <!-- Active-Matrix: keep J.A.R.V.I.S. resident as a foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -236,17 +228,10 @@
 
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <!--
-          The install session's own result. Not exported: the PendingIntent that reaches it is
-          package-scoped, and an exported receiver here would let any app fake an install outcome.
+          ⚠️ The install-result receiver and the two install permissions are declared by
+          `:core:update`'s own manifest and merged in from there, so the standalone nutrition app
+          gets exactly the same ones from exactly one declaration.
         -->
-        <receiver
-            android:name=".data.update.ApkInstaller$ResultReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="dev.mascwa.pulse.INSTALL_RESULT" />
-            </intent-filter>
-        </receiver>
 
         <receiver
             android:name=".notifications.BootReceiver"
