@@ -31,6 +31,8 @@ class SettingsViewModel(
     private val diskCache: DiskCache,
     private val notifier: Notifier,
     private val updates: UpdateRepository,
+    /** The same checker pointed at the standalone nutrition app's own release. */
+    private val companionUpdates: UpdateRepository,
     private val selfCoder: SelfCoder,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
@@ -255,6 +257,78 @@ class SettingsViewModel(
         viewModelScope.launch {
             val file = runCatching { updates.download(info) { pct -> _update.value = UpdateUi.Downloading(pct) } }.getOrNull()
             _update.value = if (file != null) UpdateUi.ReadyToInstall(info, file) else UpdateUi.Error("Download failed — try again.")
+        }
+    }
+
+    // ------------------------------------------------------------------- the companion nutrition app
+
+    private val _companion = MutableStateFlow<UpdateUi>(UpdateUi.Idle)
+
+    /**
+     * The standalone nutrition app's own release, so it can be put on this phone at all.
+     *
+     * ⚠️ **This is how that app is obtained.** It has no store listing and its releases sit in a
+     * private repository, so without this the only route is a desktop, a browser signed in to
+     * GitHub and a cable. This app already holds the token that can read those releases, which is
+     * the whole reason the download belongs here rather than there.
+     *
+     * ⚠️ It reuses [UpdateUi] rather than growing a parallel vocabulary, so the same screen code
+     * renders both — and the states mean exactly what they mean above, including [UpdateUi.Pending]
+     * for a build still going through CI.
+     */
+    val companionState: StateFlow<UpdateUi> = _companion
+
+    /**
+     * Ask what the newest nutrition build is.
+     *
+     * ⚠️ **Never [UpdateUi.UpToDate].** That repository is pointed at with `currentVersionCode = 0`
+     * — this app cannot read the version of a package it does not own — so every published build is
+     * newer than nothing and the answer is always either "here it is" or "it is not built yet".
+     * Saying "up to date" would be a claim about a package this app has not looked at.
+     */
+    fun checkCompanion() {
+        if (_companion.value is UpdateUi.Checking || _companion.value is UpdateUi.Downloading) return
+        _companion.value = UpdateUi.Checking
+        viewModelScope.launch {
+            _companion.value = runCatching { companionUpdates.check() }.fold(
+                onSuccess = { result ->
+                    val info = result.available
+                    when {
+                        info != null -> UpdateUi.Available(info)
+                        else -> UpdateUi.Pending(result.latestVersionName)
+                    }
+                },
+                onFailure = { e ->
+                    val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
+                    UpdateUi.Error(
+                        when {
+                            companionUpdates.token() == null ->
+                                "The nutrition app's releases are in the same private repo — add a " +
+                                    "GitHub token (repo scope) in Computer Setup."
+                            code == 404 ->
+                                "No nutrition release yet (404), or the token cannot see this repo."
+                            code == 401 || code == 403 ->
+                                "GitHub refused the token ($code) — check it has repo scope."
+                            else -> "Couldn't reach GitHub${code?.let { " ($it)" } ?: ""}."
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    /** Fetch the nutrition APK; the screen installs the file this leaves in [companionState]. */
+    fun downloadCompanion() {
+        val info = (_companion.value as? UpdateUi.Available)?.info
+            ?: (_companion.value as? UpdateUi.ReadyToInstall)?.info ?: return
+        _companion.value = UpdateUi.Downloading(0)
+        viewModelScope.launch {
+            val file = runCatching {
+                companionUpdates.download(info) { pct -> _companion.value = UpdateUi.Downloading(pct) }
+            }.getOrNull()
+            _companion.value =
+                if (file != null) UpdateUi.ReadyToInstall(info, file)
+                else UpdateUi.Error("Download failed — try again.")
         }
     }
 

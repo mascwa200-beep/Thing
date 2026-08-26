@@ -209,6 +209,64 @@ fun SettingsScreen(
                 }
             }
 
+            // ----- The companion nutrition app -----
+            if (vis(SettingsCategory.SYSTEM, "nutrition companion app download install food macros")) item {
+                val n by vm.companionState.collectAsStateWithLifecycle()
+                PrefSection("Nutrition app") {
+                    val status = when (val st = n) {
+                        is UpdateUi.Checking -> "Asking GitHub for the newest build…"
+                        is UpdateUi.Available -> "Build #${st.info.versionCode} is ready to download."
+                        is UpdateUi.Downloading -> "Downloading ${st.pct}% — it is a large file."
+                        is UpdateUi.ReadyToInstall -> "Downloaded — tap install."
+                        is UpdateUi.Pending ->
+                            "The newest nutrition build is still going through CI. Nothing to install yet."
+                        is UpdateUi.Error -> st.message
+                        // ⚠️ Says what the thing IS, because nothing else in this app mentions it.
+                        // Somebody reading a settings screen has no way to know a second application
+                        // exists, and "check" with no explanation is a button that means nothing.
+                        else -> "A separate app with just the food and body log — plain, no gate, and " +
+                            "it runs on any phone. Same barcode database. Install it here; after that " +
+                            "it keeps itself current."
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        RoundCyberButton(LcarsIcons.Refresh, "Check for the nutrition app") {
+                            vm.checkCompanion()
+                        }
+                        when (val st = n) {
+                            is UpdateUi.Available ->
+                                RoundCyberButton(Icons.Filled.Download, "Download it") { vm.downloadCompanion() }
+                            is UpdateUi.ReadyToInstall ->
+                                RoundCyberButton(Icons.Filled.InstallMobile, "Install it") {
+                                    installApk(
+                                        context,
+                                        st.file,
+                                        dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_PACKAGE,
+                                    )
+                                }
+                            is UpdateUi.Error ->
+                                RoundCyberButton(Icons.Filled.Download, "Try again") { vm.checkCompanion() }
+                            else -> {}
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "NUTRITION",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                status,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
             // ----- Device, OS & special access -----
             if (vis(SettingsCategory.DEVICE, "hardware os graphene attestation sensors")) item {
                 val graphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context) }

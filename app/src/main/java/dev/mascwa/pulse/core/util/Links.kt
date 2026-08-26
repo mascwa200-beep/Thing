@@ -171,12 +171,16 @@ fun requestInstallPermission(context: Context) {
  * showing the old dialog where it does not. Both the automatic and the manual UPDATE control come
  * through here on purpose, so the two can never drift into behaving differently.
  *
+ * ⚠️ [expectPackage] names the package the APK declares when it is NOT this app's own — the
+ * companion nutrition app is installed through this same path. The platform checks it against the
+ * APK and refuses a mismatch, so it is stated when the caller knows it rather than guessed.
+ *
  * The permission is checked *after* an attempt rather than before it: a device owner does not need
  * `REQUEST_INSTALL_PACKAGES` to install through a session, and asking first would send such a device
  * to a settings screen it has no reason to visit.
  */
-fun installApk(context: Context, file: File): Boolean {
-    if (dev.mascwa.pulse.data.update.ApkInstaller.install(context, file)) return true
+fun installApk(context: Context, file: File, expectPackage: String? = null): Boolean {
+    if (dev.mascwa.pulse.data.update.ApkInstaller.install(context, file, expectPackage)) return true
     if (!canInstallApks(context)) requestInstallPermission(context)
     return false
 }

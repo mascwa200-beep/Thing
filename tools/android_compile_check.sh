@@ -96,6 +96,22 @@ if [ -n "${SERIALIZATION_PLUGIN:-}" ]; then
 fi
 [ $# -ge 1 ] || { echo "usage: $0 [-s] [-l group:artifact:version ...] [-m module/build/classes/kotlin/main ...] <file.kt> [more.kt ...]"; exit 64; }
 
+# ⚠️ **Forgetting -s on a file that uses @Serializable produces a page of convincing false findings,
+# and this says so rather than letting somebody chase them.** Without the plugin the compiler has no
+# generated `serializer()` and no generated members, so every property of every serializable class
+# reads as unresolved — which looks exactly like a real defect and cost several rounds once. It is a
+# notice, not a refusal: a caller may deliberately be checking something else in the same file.
+if [ -z "${SERIALIZATION_PLUGIN:-}" ]; then
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    if grep -q '@Serializable' "$f" 2>/dev/null; then
+      echo "note: $f uses @Serializable and -s was not passed — expect false 'unresolved reference'" >&2
+      echo "      reports on its generated members and on serializer(). Re-run with -s." >&2
+      break
+    fi
+  done
+fi
+
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "fetching the platform classes (~186 MB, once per cache) …" >&2
   url="https://repo1.maven.org/maven2/org/robolectric/android-all/$ANDROID_ALL_VERSION/android-all-$ANDROID_ALL_VERSION.jar"
@@ -140,8 +156,15 @@ SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.j
 # which reads like a real finding and buries whatever you were actually checking. Cost two rounds
 # once. Kept alongside the coroutines/serialization jars for exactly the same reason.
 JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
+# ⚠️ kotlinx-serialization-JSON as well as -core, and the distinction is not cosmetic. `@Serializable`
+# and `KSerializer` live in core; `Json` itself lives in json, and `DiskCache` — which almost every
+# repository in this project reaches through — names `Json` directly. Without this the whole feeds
+# module fails on an unresolved `Json`, every `serializer()` after it cascades, and the report reads
+# as dozens of real findings in the file you were actually checking. Verified by control run: the
+# same file at HEAD, which CI compiles green, produced the identical errors until this line existed.
+SERJ=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-json-jvm-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra$module_cp"
+TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$SERJ:$JSOUP$extra$module_cp"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
       -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)
