@@ -343,6 +343,35 @@ class TrainingTest {
         assertTrue(heavy.all { it in 0 until WeeklyPlan.DAYS })
     }
 
+    // --------------------------------------------------------------------------------- catalogue
+
+    @Test
+    fun `catalogue ids are unique, because they are written into saved sessions`() {
+        val ids = Training.STARTER.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(Training.STARTER.all { it.id.isNotBlank() && it.name.isNotBlank() })
+    }
+
+    @Test
+    fun `every pattern the volume breakdown reports can be filled from the catalogue`() {
+        // ⚠️ Otherwise a beginner finds a heading on that screen with no way to put anything under
+        // it. OTHER is the exception and is deliberately absent: it is where a movement lands when
+        // somebody has not said what it is, not something to offer.
+        val covered = Training.STARTER.map { it.pattern }.toSet()
+        for (p in Training.Pattern.entries) {
+            if (p == Training.Pattern.OTHER) continue
+            assertTrue("$p has no starter movement", p in covered)
+        }
+    }
+
+    @Test
+    fun `a movement somebody added wins over the catalogue, and an unknown id is null`() {
+        val mine = Training.Exercise("squat.back", "My squat", Training.Pattern.SQUAT)
+        assertEquals("My squat", Training.exercise("squat.back", listOf(mine))!!.name)
+        assertEquals("Back squat", Training.exercise("squat.back")!!.name)
+        assertNull(Training.exercise("nothing.here"))
+    }
+
     // ---------------------------------------------------------------------------------- sentences
 
     @Test

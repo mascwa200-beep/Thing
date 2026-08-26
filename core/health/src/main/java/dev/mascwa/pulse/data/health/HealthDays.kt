@@ -77,6 +77,18 @@ object HealthDays {
         }
     }
 
+    /**
+     * Which day of the week an instant falls on, **Monday = 0**.
+     *
+     * ⚠️ The convention is not arbitrary and not free to change: it is what the week's heavy-day
+     * toggles are indexed by and what `WeeklyPlan.Day.index` means, and the labels beside them read
+     * MON…SUN. `java.time` numbers Monday as 1, so the subtraction is the whole of the conversion —
+     * and doing it here rather than at a call site is the point, since a second copy that forgot it
+     * would move somebody's calories onto the wrong day and look perfectly plausible.
+     */
+    fun weekdayIndex(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): Int =
+        dateOf(epochMs, zone).dayOfWeek.value - 1
+
     private fun dateOf(epochMs: Long, zone: ZoneId): LocalDate =
         Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
 }

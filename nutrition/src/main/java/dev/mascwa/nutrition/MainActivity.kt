@@ -91,9 +91,16 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         Breadcrumbs.drop("app", "backgrounded")
-        if (container.updates.hasDownload) {
-            Breadcrumbs.drop("update", "installing on the way out")
-            lifecycleScope.launch { container.updates.install() }
+        // ⚠️ The flush and the install are ONE coroutine, in this order, and that is the whole
+        // point. Every store debounces its write by a couple of seconds, so committing an install
+        // first hands the process to Android while somebody's last few entries are still in memory.
+        // As two launches there would be nothing sequencing them.
+        lifecycleScope.launch {
+            container.flushAll()
+            if (container.updates.hasDownload) {
+                Breadcrumbs.drop("update", "installing on the way out")
+                container.updates.install()
+            }
         }
     }
 

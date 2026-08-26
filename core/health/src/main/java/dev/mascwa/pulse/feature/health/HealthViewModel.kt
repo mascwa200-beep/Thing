@@ -15,7 +15,9 @@ import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
+import dev.mascwa.pulse.core.telemetry.Training
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
+import dev.mascwa.pulse.data.health.TrainingStore
 import dev.mascwa.pulse.data.health.HealthDeps
 import dev.mascwa.pulse.data.health.HealthSettings
 import dev.mascwa.pulse.data.health.MealPhotos
@@ -1059,6 +1061,204 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 _exporting.value = false
             }
         }
+    }
+
+    // -------------------------------------------------------------------------------- training
+
+    /** Every retained session, most recent first. */
+    val sessions: StateFlow<List<Training.Session>> = c.trainingStore.sessions
+
+    /** The catalogue plus anything added, additions first. */
+    val exercises: StateFlow<List<Training.Exercise>> = c.trainingStore.exercises
+
+    /** Personal bests, heaviest first. These outlive the sessions they were set in. */
+    val bests: StateFlow<List<TrainingStore.Best>> = c.trainingStore.bests
+
+    /**
+     * The session being logged, or null when nothing is open.
+     *
+     * ⚠️ Held here rather than in the composable, for the reason the recipe draft above states: a
+     * session is an hour of work across a dozen movements, and `remember` dies the moment somebody
+     * navigates away to log a drink.
+     */
+    private val _session = MutableStateFlow<Training.Session?>(null)
+    val session: StateFlow<Training.Session?> = _session.asStateFlow()
+
+    /** Open a session for the given instant, or reopen one already saved at it. */
+    fun startSession(atMs: Long = System.currentTimeMillis()) {
+        _session.value = sessions.value.firstOrNull { it.atMs == atMs }
+            ?: Training.Session(atMs = atMs, movements = emptyList())
+    }
+
+    /**
+     * Reopen a session already saved.
+     *
+     * ⚠️ Named apart from the private lambda-taking `editSession` deliberately. Kotlin permits two
+     * overloads of one name where the second takes a function, and then cannot infer which receiver
+     * a trailing lambda belongs to — a shape this repository has already paid a CI round for.
+     */
+    fun openSession(session: Training.Session) {
+        _session.value = session
+    }
+
+    fun closeSession() {
+        _session.value = null
+    }
+
+    private fun editSession(block: (Training.Session) -> Training.Session) {
+        _session.value = _session.value?.let(block)
+    }
+
+    fun addMovement(exercise: Training.Exercise) = editSession { s ->
+        if (s.movements.any { it.exercise.id == exercise.id }) s
+        else s.copy(movements = s.movements + Training.Movement(exercise, emptyList()))
+    }
+
+    fun removeMovement(index: Int) = editSession { s ->
+        if (index !in s.movements.indices) s
+        else s.copy(movements = s.movements.filterIndexed { i, _ -> i != index })
+    }
+
+    /**
+     * Add a set to a movement.
+     *
+     * ⚠️ Defaults are taken from the LAST set on that movement rather than left blank, because a
+     * working set is nearly always the same weight and reps as the one before it — and retyping
+     * three numbers per set is how somebody stops logging halfway through a session.
+     */
+    fun addSet(movementIndex: Int, reps: Int? = null, loadKg: Double? = null, rpe: Double? = null) =
+        editSession { s ->
+            val m = s.movements.getOrNull(movementIndex) ?: return@editSession s
+            val previous = m.sets.lastOrNull()
+            val set = Training.SetEntry(
+                reps = reps ?: previous?.reps ?: 5,
+                loadKg = loadKg ?: previous?.loadKg,
+                rpe = rpe,
+            )
+            s.copy(
+                movements = s.movements.mapIndexed { i, mv ->
+                    if (i == movementIndex) mv.copy(sets = mv.sets + set) else mv
+                },
+            )
+        }
+
+    fun updateSet(movementIndex: Int, setIndex: Int, set: Training.SetEntry) = editSession { s ->
+        val m = s.movements.getOrNull(movementIndex) ?: return@editSession s
+        if (setIndex !in m.sets.indices) return@editSession s
+        s.copy(
+            movements = s.movements.mapIndexed { i, mv ->
+                if (i != movementIndex) mv
+                else mv.copy(sets = mv.sets.mapIndexed { j, old -> if (j == setIndex) set else old })
+            },
+        )
+    }
+
+    fun removeSet(movementIndex: Int, setIndex: Int) = editSession { s ->
+        val m = s.movements.getOrNull(movementIndex) ?: return@editSession s
+        if (setIndex !in m.sets.indices) return@editSession s
+        s.copy(
+            movements = s.movements.mapIndexed { i, mv ->
+                if (i != movementIndex) mv
+                else mv.copy(sets = mv.sets.filterIndexed { j, _ -> j != setIndex })
+            },
+        )
+    }
+
+    fun setSessionNote(note: String) = editSession { it.copy(note = note) }
+
+    /**
+     * Save the open session.
+     *
+     * ⚠️ Called after every change rather than only at the end, and the store upserts on the
+     * session's instant so that leaves one record rather than twenty. A phone killed mid-workout
+     * should cost the last set, not the whole hour.
+     */
+    fun saveSession() {
+        val s = _session.value ?: return
+        viewModelScope.launch { c.trainingStore.save(s) }
+    }
+
+    fun deleteSession(atMs: Long) {
+        viewModelScope.launch {
+            c.trainingStore.remove(atMs)
+            if (_session.value?.atMs == atMs) closeSession()
+        }
+    }
+
+    /** Add a movement the catalogue does not have. */
+    fun addExercise(name: String, pattern: Training.Pattern, loaded: Boolean = true) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            c.trainingStore.addExercise(
+                Training.Exercise(
+                    // ⚠️ Prefixed, so an added movement can never collide with a catalogue id and
+                    // silently shadow it — the same rule custom foods follow with `own:`.
+                    id = "own:" + UUID.randomUUID().toString(),
+                    name = trimmed,
+                    pattern = pattern,
+                    loaded = loaded,
+                ),
+            )
+        }
+    }
+
+    fun removeExercise(id: String) {
+        viewModelScope.launch { c.trainingStore.removeExercise(id) }
+    }
+
+    /**
+     * What to load next time on a movement, from the last session that actually recorded an effort.
+     *
+     * ⚠️ Searches back through sessions rather than reading only the most recent one. Somebody who
+     * squats on Monday and benches on Tuesday would otherwise get "nothing to judge" on the squat
+     * every Tuesday, which is the answer being useless exactly where it should be useful.
+     */
+    fun nextLoad(exerciseId: String, targetRpe: Double = 8.0): Training.Advice {
+        for (s in sessions.value) {
+            val m = s.movements.firstOrNull { it.exercise.id == exerciseId } ?: continue
+            // ⚠️ An Unknown from an UNLOADED movement is final — searching further back would keep
+            // asking a question a press-up has no answer to. An Unknown from a session that simply
+            // recorded no effort is worth looking past, which is why the two are not treated alike.
+            if (!m.exercise.loaded) return Training.nextLoad(m, targetRpe)
+            val advice = Training.nextLoad(m, targetRpe)
+            if (advice is Training.Advice.Load) return advice
+        }
+        return Training.Advice.Unknown(
+            "Nothing logged on this movement yet, so there is no last set to judge the next one against.",
+        )
+    }
+
+    /**
+     * Hard sets by pattern over the last seven days, for somebody asking whether a week was balanced.
+     */
+    fun weekVolume(nowMs: Long = System.currentTimeMillis()): Map<Training.Pattern, Int> {
+        val since = nowMs - 7L * 86_400_000L
+        return Training.setsByPattern(sessions.value.filter { it.atMs >= since })
+    }
+
+    /**
+     * Which days of this week the training log says were heavy.
+     *
+     * ⚠️ **A suggestion, never applied on its own** — the same rule the step-count activity
+     * suggestion follows. `heavyDays` is a setting somebody may have chosen deliberately, and a
+     * training log quietly overwriting it would move calories between days without being asked.
+     * [applyTrainingDays] is the confirmation.
+     */
+    fun heavyDaysFromTraining(nowMs: Long = System.currentTimeMillis()): Set<Int> {
+        val since = nowMs - 7L * 86_400_000L
+        val recent = sessions.value.filter { it.atMs >= since }
+        // ⚠️ A CALENDAR weekday, Monday = 0 — the convention `WeeklyPlan.Day.index` carries and the
+        // MON…SUN toggles are indexed by. An earlier version of this used days-back-from-today,
+        // which is a different number every day and would have moved the heavy days one place every
+        // twenty-four hours without ever looking wrong.
+        return Training.heavyDays(recent) { HealthDays.weekdayIndex(it) }
+    }
+
+    /** Take the training log's answer as the week's heavy days. */
+    fun applyTrainingDays(nowMs: Long = System.currentTimeMillis()) {
+        val days = heavyDaysFromTraining(nowMs).sorted()
+        edit { it.copy(heavyDays = days) }
     }
 
     // --------------------------------------------------------------------------------- recipes

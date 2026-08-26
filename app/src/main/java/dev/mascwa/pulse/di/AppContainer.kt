@@ -413,6 +413,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.RecipeStore(appContext, json)
     }
 
+    /** What was lifted, and the personal bests that outlive the sessions they were set in. */
+    val trainingStore: dev.mascwa.pulse.data.health.TrainingStore by lazy {
+        dev.mascwa.pulse.data.health.TrainingStore(appContext, json)
+    }
+
     /** Packaged food by barcode or name, from the keyless Open Food Facts community database. */
     val openFoodFacts: dev.mascwa.pulse.data.food.OpenFoodFactsRepository by lazy {
         dev.mascwa.pulse.data.food.OpenFoodFactsRepository(http, diskCache)
@@ -478,6 +483,7 @@ class AppContainer(private val appContext: Context) {
             healthConnect = healthConnect,
             customFoodStore = customFoodStore,
             recipeStore = recipeStore,
+            trainingStore = trainingStore,
             foodRepository = foodRepository,
             healthExporter = healthExporter,
             healthImporter = healthImporter,

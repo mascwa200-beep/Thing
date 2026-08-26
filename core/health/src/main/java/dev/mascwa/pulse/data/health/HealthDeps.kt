@@ -26,6 +26,7 @@ class HealthDeps(
     val healthConnect: HealthConnectBridge,
     val customFoodStore: CustomFoodStore,
     val recipeStore: RecipeStore,
+    val trainingStore: TrainingStore,
     val foodRepository: FoodRepository,
     val healthExporter: HealthExporter,
     val healthImporter: HealthImporter,

@@ -288,6 +288,56 @@ object Training {
             .filter { it in 0 until WeeklyPlan.DAYS }
             .toSet()
 
+    // ------------------------------------------------------------------------------- the catalogue
+
+    /**
+     * Movements offered before anybody has typed one.
+     *
+     * ⚠️ **In the core rather than in either app**, so a session logged on the phone and read on the
+     * desktop is talking about the same exercise. The ids are permanent for the same reason
+     * `NutrientSet`'s are: they are written into saved sessions, and renaming one would detach
+     * somebody's history from the movement it belongs to.
+     *
+     * ⚠️ Deliberately short. This is a starting point, not an attempt at every lift that exists —
+     * anything missing is one text field away, and a list nobody can read past is worse than a list
+     * somebody adds to. Every pattern the volume breakdown can report appears at least once, or a
+     * beginner would find a category on that screen they had no way to fill.
+     */
+    val STARTER: List<Exercise> = listOf(
+        Exercise("squat.back", "Back squat", Pattern.SQUAT),
+        Exercise("squat.front", "Front squat", Pattern.SQUAT),
+        Exercise("squat.goblet", "Goblet squat", Pattern.SQUAT),
+        Exercise("squat.split", "Bulgarian split squat", Pattern.SQUAT),
+        Exercise("squat.legpress", "Leg press", Pattern.SQUAT),
+        Exercise("hinge.deadlift", "Deadlift", Pattern.HINGE),
+        Exercise("hinge.romanian", "Romanian deadlift", Pattern.HINGE),
+        Exercise("hinge.hipthrust", "Hip thrust", Pattern.HINGE),
+        Exercise("hinge.goodmorning", "Good morning", Pattern.HINGE),
+        Exercise("push.bench", "Bench press", Pattern.PUSH),
+        Exercise("push.incline", "Incline bench press", Pattern.PUSH),
+        Exercise("push.overhead", "Overhead press", Pattern.PUSH),
+        Exercise("push.dip", "Dip", Pattern.PUSH, loaded = false),
+        Exercise("push.pressup", "Press-up", Pattern.PUSH, loaded = false),
+        Exercise("pull.row", "Barbell row", Pattern.PULL),
+        Exercise("pull.pulldown", "Lat pulldown", Pattern.PULL),
+        Exercise("pull.chinup", "Chin-up", Pattern.PULL, loaded = false),
+        Exercise("pull.facepull", "Face pull", Pattern.PULL),
+        Exercise("pull.curl", "Biceps curl", Pattern.PULL),
+        Exercise("carry.farmer", "Farmer's carry", Pattern.CARRY),
+        Exercise("carry.suitcase", "Suitcase carry", Pattern.CARRY),
+        Exercise("core.plank", "Plank", Pattern.CORE, loaded = false),
+        Exercise("core.hanging", "Hanging leg raise", Pattern.CORE, loaded = false),
+        Exercise("core.rollout", "Ab rollout", Pattern.CORE, loaded = false),
+        Exercise("cond.row", "Rowing machine", Pattern.CONDITIONING, loaded = false),
+        Exercise("cond.bike", "Stationary bike", Pattern.CONDITIONING, loaded = false),
+        Exercise("cond.run", "Run", Pattern.CONDITIONING, loaded = false),
+        Exercise("cond.sled", "Sled push", Pattern.CONDITIONING),
+    )
+
+    /** A movement by id, from the catalogue or from anything the person added themselves. */
+    fun exercise(id: String, added: List<Exercise> = emptyList()): Exercise? =
+        added.firstOrNull { it.id == id } ?: STARTER.firstOrNull { it.id == id }
+
     // ---------------------------------------------------------------------------------- sentences
 
     /** One line describing a session, for a list that has room for a sentence and not a table. */

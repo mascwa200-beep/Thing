@@ -19,6 +19,7 @@ import dev.mascwa.pulse.data.health.HealthImporter
 import dev.mascwa.pulse.data.health.OfflineFoodStore
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.health.RecipeStore
+import dev.mascwa.pulse.data.health.TrainingStore
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -148,11 +149,37 @@ class NutritionContainer(context: Context) {
         db?.let { OfflineFoodStore(it) }
     }
 
-    val bodyStore: BodyStore by lazy { BodyStore(appContext, json) }
-    val foodLogStore: FoodLogStore by lazy { FoodLogStore(appContext, json) }
-    val customFoodStore: CustomFoodStore by lazy { CustomFoodStore(appContext, json) }
-    val recipeStore: RecipeStore by lazy { RecipeStore(appContext, json) }
+    private val lazyBody = lazy { BodyStore(appContext, json) }
+    val bodyStore: BodyStore by lazyBody
+    private val lazyFoodLog = lazy { FoodLogStore(appContext, json) }
+    val foodLogStore: FoodLogStore by lazyFoodLog
+    private val lazyCustomFood = lazy { CustomFoodStore(appContext, json) }
+    val customFoodStore: CustomFoodStore by lazyCustomFood
+    private val lazyRecipe = lazy { RecipeStore(appContext, json) }
+    val recipeStore: RecipeStore by lazyRecipe
+    private val lazyTraining = lazy { TrainingStore(appContext, json) }
+    val trainingStore: TrainingStore by lazyTraining
     val progressPhotoStore: ProgressPhotoStore by lazy { ProgressPhotoStore(appContext, json) }
+
+    /**
+     * Write every pending edit to disk, now.
+     *
+     * ⚠️ Every store here debounces its write by a couple of seconds so a builder session that
+     * touches ten ingredients writes once — which means an app swiped away, or a process torn down
+     * to install an update, can be holding somebody's last few entries in memory only. This is
+     * called from `onStop` BEFORE the installer is handed anything, for exactly that reason.
+     *
+     * ⚠️ `lazy` matters here: reading a store to flush it would CREATE it, so a launch that never
+     * opened a screen would build every DataStore on the way out. Only the ones already
+     * initialised are asked, which is why this checks rather than simply calling.
+     */
+    suspend fun flushAll() {
+        if (lazyBody.isInitialized()) runCatching { bodyStore.flushNow() }
+        if (lazyFoodLog.isInitialized()) runCatching { foodLogStore.flushNow() }
+        if (lazyCustomFood.isInitialized()) runCatching { customFoodStore.flushNow() }
+        if (lazyRecipe.isInitialized()) runCatching { recipeStore.flushNow() }
+        if (lazyTraining.isInitialized()) runCatching { trainingStore.flushNow() }
+    }
     val healthConnect: HealthConnectBridge by lazy { HealthConnectBridge(appContext) }
 
     private val openFoodFacts: OpenFoodFactsRepository by lazy { OpenFoodFactsRepository(http, cache) }
@@ -190,6 +217,7 @@ class NutritionContainer(context: Context) {
             healthConnect = healthConnect,
             customFoodStore = customFoodStore,
             recipeStore = recipeStore,
+            trainingStore = trainingStore,
             foodRepository = foodRepository,
             healthExporter = exporter,
             healthImporter = importer,
