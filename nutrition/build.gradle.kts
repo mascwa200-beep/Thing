@@ -130,18 +130,32 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.zxing.core)
-    // ⚠️ **`ProcessCameraProvider.getInstance()` returns a Guava `ListenableFuture`, and that class
-    // does not reach this module's COMPILE classpath on its own.** `androidx.concurrent:concurrent-futures`
-    // declares it at compile scope and CameraX depends on that — checked in the POMs — but the
-    // published Gradle module metadata keeps it out of the consumer's compile variant, so `:app`
-    // only gets away with silence because media3 puts full Guava in its graph. Seven errors, all
-    // from one absent line.
+    // ⚠️ **`ProcessCameraProvider.getInstance()` returns a Guava `ListenableFuture`, and full Guava
+    // is what has to be declared here — the 3 kB `com.google.guava:listenablefuture` artifact cannot
+    // work, and trying it first cost a CI round.** Measured from the published metadata rather than
+    // reasoned about:
     //
-    // ⚠️ The 3 kB `1.0` artifact rather than the 3 MB library, and the version conflict is handled
-    // by design rather than by luck: full Guava depends on `listenablefuture:9999.0-empty-to-avoid-
-    // conflict-with-guava`, so if anything ever pulls Guava in, Gradle resolves to the higher version
-    // — which is empty — and Guava supplies the class. There is no duplicate-class outcome.
-    implementation(libs.listenablefuture)
+    //   - `camera-core` declares `listenablefuture:1.0` in its **api** variant, so it does reach a
+    //     consumer's compile classpath on its own.
+    //   - `connect-client` (via `:core:health`) declares `guava:31.1-android` in its **runtime**
+    //     variant, and full Guava's own POM declares `listenablefuture:9999.0-empty-to-avoid-
+    //     conflict-with-guava`. That version sorts higher, so it wins the conflict and the artifact
+    //     that wins is **empty** — the mechanism exists precisely to stop two copies of the class
+    //     being packaged.
+    //   - Guava carries `ListenableFuture` itself, so on the runtime side nothing is missing. But it
+    //     arrives runtime-only, so the compile classpath ends up with the empty jar and no class:
+    //     "Cannot access class ... check your module classpath for missing or conflicting
+    //     dependencies", seven times.
+    //
+    // ⚠️ **This costs the APK nothing.** Guava is already packaged here through Health Connect's
+    // runtime dependency; declaring it only makes an already-present class visible at compile time.
+    // The version is the one that graph already resolves, so nothing moves. And this is exactly the
+    // shape `:app` has by accident — `media3-common` declares `guava` in its **api** variant, which
+    // is the whole reason the identical scanner code compiles there with no line like this one.
+    //
+    // ⚠️ Do **not** "fix" a future recurrence by forcing `listenablefuture` to 1.0. With Guava in the
+    // graph that packages the class twice, which is the outcome the 9999.0 artifact prevents.
+    implementation(libs.guava)
 
     // The bundled barcode database and the nutrient declarations behind it. Nothing of the LCARS
     // application is reachable from here; these two are shared because a second copy of either

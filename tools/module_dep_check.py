@@ -37,6 +37,14 @@ reported the module clean, and CI produced seven errors. Compiling is the only t
 that catches that class — so a green run here means "every package you named is
 declared", never "this module compiles".
 
+⚠️ **And declaring the missing artifact is not always enough, which cost a second CI
+round.** This check resolves POMs, where a dependency is compile- or runtime-scoped;
+Gradle prefers the `.module` metadata beside them, where the same dependency sits in an
+`api` or a `runtime` variant, and version conflicts are resolved across the whole
+configuration. `com.google.guava:listenablefuture:1.0` declared directly still lost to
+`9999.0-empty-to-avoid-conflict-with-guava`, pulled in by a Guava that reaches only the
+runtime side. Reading `.module` is what settles that; this file does not.
+
 Usage:  tools/module_dep_check.py <module-dir> [more-module-dirs ...]
 """
 import os
