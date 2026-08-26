@@ -20,7 +20,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.nutrition.data.NutritionUpdates
+import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
@@ -39,7 +39,7 @@ import kotlin.math.abs
  * would make the measurement pointless, which is the whole idea this app is built around.
  */
 @Composable
-fun PlanScreen(vm: HealthViewModel, updates: NutritionUpdates) {
+fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
     val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
 
@@ -122,9 +122,11 @@ fun PlanScreen(vm: HealthViewModel, updates: NutritionUpdates) {
         )
     }
 
-    UpdateCard(updates)
+    UpdateCard(container.updates)
 
     AboutCard()
+
+    DiagnosticsCard(container)
 
     SectionCard("Units") {
         ChipRow(

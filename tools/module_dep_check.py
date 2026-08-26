@@ -62,6 +62,12 @@ REPOS = [
 ]
 # Packages every module gets from the language and the platform itself.
 FREE_PREFIXES = ("kotlin", "java", "javax", "android.", "dalvik.")
+
+# ⚠️ Bundled in `android.jar` since API 1, so an ANDROID module gets it with no dependency
+# — and a plain Kotlin/JVM module does not. That is why it is not in FREE_PREFIXES above:
+# adding it there would let `:core:telemetry` import `org.json` and pass this check while
+# failing to compile. Applied per module, in `main`, only where an Android plugin is on.
+ANDROID_FREE_PREFIXES = ("org.json", "org.xmlpull", "org.w3c.dom", "org.xml.sax", "org.apache.http")
 MAX_DEPTH = 3
 MAX_ARTIFACTS = 260
 
@@ -359,7 +365,61 @@ def source_packages(module):
     return out
 
 
-def own_imports(module):
+def is_android_module(module):
+    """
+    Whether this module applies an Android plugin, and so compiles against `android.jar`.
+
+    ⚠️ **Comments are stripped first, and that is not fastidiousness — it was a real
+    misclassification.** `:core:telemetry` is a plain Kotlin/JVM module whose build file
+    explains at length why it is NOT `android.library`, and a plain substring search read
+    that sentence as the plugin being applied. Worse, it made the negative test written to
+    prove this rule pass for the wrong reason: `org.json` was skipped as free, so the check
+    reported clean on a module that genuinely could not compile it.
+    """
+    for name in ("build.gradle.kts", "build.gradle"):
+        path = os.path.join(ROOT, module, name)
+        if not os.path.exists(path):
+            continue
+        lines = []
+        for line in open(path):
+            line = re.sub(r'//.*$', "", line)
+            lines.append(line)
+        text = re.sub(r'/\*.*?\*/', "", "".join(lines), flags=re.S)
+        return bool(re.search(r'(alias\(\s*libs\.plugins\.android\.(application|library)|id\(\s*"com\.android\.(application|library)")', text))
+    return False
+
+
+def package_readings(fq):
+    """
+    Every defensible reading of which PACKAGE an import belongs to.
+
+    ⚠️ Three readings, not one, because an import names a package followed by an unknown
+    number of nested things. `okhttp3.Request` is two segments; `okhttp3.MediaType.Companion
+    .toMediaType` is FOUR, and taking the parent — which is all this used to do — lands on
+    `okhttp3.MediaType`, so a companion-extension import of a perfectly well declared library
+    was reported missing. The convention that settles it is capitalisation: a package segment
+    is lower case and a class is not, so the leading run of lower-case segments IS the package.
+    The two older readings are kept beside it because a genuinely lower-case class name (rare,
+    and this repository has none) would otherwise be read as one segment too deep.
+
+    Being permissive here can only remove false positives: an import from an undeclared
+    package fails under every reading, since the leading segment is missing whichever way it
+    is cut.
+    """
+    parts = fq.split(".")
+    readings = {fq.rsplit(".", 1)[0]}
+    readings.add(fq.rsplit(".", 1)[0].rsplit(".", 1)[0])
+    lower = []
+    for part in parts:
+        if part[:1].isupper():
+            break
+        lower.append(part)
+    if lower:
+        readings.add(".".join(lower))
+    return {r for r in readings if r}
+
+
+def own_imports(module, free_prefixes=FREE_PREFIXES):
     """Every non-free package imported by the module's own Kotlin sources."""
     out = {}
     for dp, _, fs in os.walk(os.path.join(ROOT, module, "src/main")):
@@ -372,12 +432,9 @@ def own_imports(module):
                 if not m:
                     continue
                 fq = m.group(1)
-                if fq.startswith(FREE_PREFIXES):
+                if fq.startswith(free_prefixes):
                     continue
-                pkg = fq.rsplit(".", 1)[0]
-                # A member import (`Foo.Bar.baz`) sits one level deeper than its
-                # package, so accept either reading rather than guessing.
-                out.setdefault(pkg, set()).add(os.path.relpath(full, ROOT))
+                out.setdefault(fq, set()).add(os.path.relpath(full, ROOT))
     return out
 
 
@@ -392,12 +449,17 @@ def main(modules):
             print("  ⚠️  resolved no packages at all — treat this run as inconclusive")
             bad += 1
             continue
+        free = FREE_PREFIXES
+        if is_android_module(module):
+            free = FREE_PREFIXES + ANDROID_FREE_PREFIXES
         missing = {}
-        for pkg, files in own_imports(module).items():
-            parent = pkg.rsplit(".", 1)[0]
-            if pkg in have or parent in have:
+        for fq, files in own_imports(module, free).items():
+            readings = package_readings(fq)
+            if readings & have:
                 continue
-            missing[pkg] = files
+            # Report the most likely package rather than the whole import, so the line names
+            # something you could put in a build file.
+            missing[min(readings, key=len)] = files
         if missing:
             bad += 1
             for pkg in sorted(missing):

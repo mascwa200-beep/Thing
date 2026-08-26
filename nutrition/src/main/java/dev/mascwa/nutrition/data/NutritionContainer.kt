@@ -1,7 +1,10 @@
 package dev.mascwa.nutrition.data
 
 import android.content.Context
+import dev.mascwa.nutrition.BuildConfig
 import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.crash.CrashReporter
+import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.food.OpenFoodFactsRepository
 import dev.mascwa.pulse.data.food.db.FoodDatabase
@@ -52,6 +55,43 @@ class NutritionContainer(context: Context) {
     val settings: HealthSettingsStore by lazy { HealthSettingsStore(appContext, json) }
 
     /**
+     * Faults recorded on this phone.
+     *
+     * ⚠️ The build identity is passed in rather than read inside: the reporter is shared with the
+     * LCARS application, so each names its own `BuildConfig`. Which build a fault came from is the
+     * most load-bearing line in a report — a fixed bug and a live one look identical without it —
+     * so there is no default to fall through to.
+     */
+    val crashReporter: CrashReporter by lazy {
+        CrashReporter(
+            appContext,
+            appLabel = "Nutrition",
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+        )
+    }
+
+    /**
+     * Faults leaving this phone, so a failure here can be read off the repository.
+     *
+     * ⚠️ **The only credential this application holds is the update token**, so that is the whole of
+     * what the scrubber is given to match by exact value — on top of the shape patterns it applies
+     * regardless. If a second secret is ever added, it belongs in that list on the same commit.
+     */
+    val crashUploader: CrashUploader by lazy {
+        CrashUploader(
+            appContext,
+            reporter = crashReporter,
+            stream = "nutrition",
+            appLabel = "Nutrition",
+            buildLabel = "${BuildConfig.VERSION_NAME} (#${BuildConfig.VERSION_CODE})",
+            token = { settings.currentUpdateToken() },
+            autoSendEnabled = { settings.currentAutoSendReports() },
+            secrets = { listOfNotNull(settings.currentUpdateToken()) },
+        )
+    }
+
+    /**
      * This app keeping itself current.
      *
      * ⚠️ Lazy like everything else here, so a launch that never opens the update card never
@@ -93,7 +133,19 @@ class NutritionContainer(context: Context) {
      * without a network. [FoodRepository] takes it as nullable for exactly that reason.
      */
     private val offline: OfflineFoodStore? by lazy {
-        FoodDatabase.open(appContext)?.let { OfflineFoodStore(it) }
+        val db = FoodDatabase.open(appContext)
+        if (db == null) {
+            // ⚠️ **The single most valuable non-fatal report this app can file.** A database that
+            // will not open makes every barcode miss and every offline search return nothing, and
+            // there is no screen anywhere that could tell you that is what happened — a scan that
+            // finds no product and a scan that could not look identical. Nothing crashes, so
+            // without this the app is simply "not working" with no evidence at all.
+            crashReporter.reportNonFatal(
+                "food.db.open",
+                note = "The bundled barcode database did not open — every scan falls back to the network.",
+            )
+        }
+        db?.let { OfflineFoodStore(it) }
     }
 
     val bodyStore: BodyStore by lazy { BodyStore(appContext, json) }

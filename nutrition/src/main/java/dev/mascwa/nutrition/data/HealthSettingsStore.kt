@@ -3,6 +3,7 @@ package dev.mascwa.nutrition.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -42,6 +43,7 @@ class HealthSettingsStore(
     private val key = stringPreferencesKey("health")
     private val tokenKey = stringPreferencesKey("update_token")
     private val pendingKey = intPreferencesKey("pending_install")
+    private val autoSendKey = booleanPreferencesKey("auto_send_reports")
     private val lock = Mutex()
 
     val settings: Flow<HealthSettings> =
@@ -105,6 +107,29 @@ class HealthSettingsStore(
         context.settingsStore.edit { prefs ->
             if (code <= 0) prefs.remove(pendingKey) else prefs[pendingKey] = code
         }
+    }
+
+    // ------------------------------------------------------------------------- sending fault reports
+
+    /**
+     * Whether recorded faults are sent on by themselves.
+     *
+     * ⚠️ **Its own key rather than a field on [HealthSettings], for the same reason as the token.**
+     * The profile is health data and one day gets carried between devices; whether this phone
+     * reports its own crashes is a property of this phone.
+     *
+     * ⚠️ **Default ON, and visible on the diagnostics card.** It is the one thing in this app that
+     * leaves the device, so it is switchable and it is stated; a report that nobody knew was going
+     * anywhere would be the wrong trade even though it is the more useful one.
+     */
+    val autoSendReports: Flow<Boolean> =
+        context.settingsStore.data.map { prefs -> prefs[autoSendKey] ?: true }
+
+    suspend fun currentAutoSendReports(): Boolean =
+        runCatching { context.settingsStore.data.first() }.getOrNull()?.get(autoSendKey) ?: true
+
+    suspend fun setAutoSendReports(value: Boolean) {
+        context.settingsStore.edit { prefs -> prefs[autoSendKey] = value }
     }
 
     private fun decode(raw: String?): HealthSettings =

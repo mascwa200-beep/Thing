@@ -28,7 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.screens.BodyScreen
 import dev.mascwa.nutrition.ui.screens.HabitsScreen
 import dev.mascwa.nutrition.ui.screens.LogScreen
-import dev.mascwa.nutrition.data.NutritionUpdates
+import dev.mascwa.nutrition.data.NutritionContainer
+import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.nutrition.ui.screens.PlanScreen
 import dev.mascwa.nutrition.ui.screens.RecipesScreen
 import dev.mascwa.nutrition.ui.screens.TodayScreen
@@ -58,7 +59,7 @@ enum class Tab(val label: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NutritionApp(vm: HealthViewModel, updates: NutritionUpdates) {
+fun NutritionApp(vm: HealthViewModel, container: NutritionContainer) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
 
     // ⚠️ **The shared view model answers back and nothing here was listening.** Every action that
@@ -93,7 +94,13 @@ fun NutritionApp(vm: HealthViewModel, updates: NutritionUpdates) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t,
-                        onClick = { tab = t },
+                        onClick = {
+                            // ⚠️ A route name, which is exactly what the content rule permits: it
+                            // says where somebody was when something went wrong and nothing about
+                            // what they had eaten.
+                            Breadcrumbs.drop("nav", t.name)
+                            tab = t
+                        },
                         icon = {},
                         label = { Text(t.label) },
                         alwaysShowLabel = true,
@@ -116,7 +123,7 @@ fun NutritionApp(vm: HealthViewModel, updates: NutritionUpdates) {
                 Tab.TODAY -> TodayScreen(vm)
                 Tab.LOG -> LogScreen(vm)
                 Tab.BODY -> BodyScreen(vm)
-                Tab.PLAN -> PlanScreen(vm, updates)
+                Tab.PLAN -> PlanScreen(vm, container)
                 Tab.RECIPES -> RecipesScreen(vm)
                 Tab.HABITS -> HabitsScreen(vm)
             }

@@ -13,9 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.NutritionApp
 import dev.mascwa.nutrition.ui.NutritionTheme
+import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.pulse.feature.health.HealthViewModel
 import kotlinx.coroutines.launch
 
@@ -30,7 +30,13 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : ComponentActivity() {
 
-    private val container by lazy { NutritionContainer(this) }
+    /**
+     * ⚠️ **The application's container, not one of its own.** Two containers in one process means two
+     * of every store, and several of those hold a DataStore over a fixed file — which throws on a
+     * second instance rather than quietly working. This activity used to build its own, which was
+     * safe only while nothing else did.
+     */
+    private val container by lazy { (application as NutritionApplication).container }
 
     /**
      * ⚠️ `by viewModels` rather than constructing it in `setContent`, so it survives a rotation.
@@ -84,13 +90,16 @@ class MainActivity : ComponentActivity() {
      */
     override fun onStop() {
         super.onStop()
+        Breadcrumbs.drop("app", "backgrounded")
         if (container.updates.hasDownload) {
+            Breadcrumbs.drop("update", "installing on the way out")
             lifecycleScope.launch { container.updates.install() }
         }
     }
 
     override fun onStart() {
         super.onStart()
+        Breadcrumbs.drop("app", "foregrounded")
         maybeAutoUpdate()
     }
 
@@ -102,7 +111,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    NutritionApp(vm, container.updates)
+                    NutritionApp(vm, container)
                 }
             }
         }

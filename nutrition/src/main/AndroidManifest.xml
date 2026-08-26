@@ -75,7 +75,15 @@
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
+    <!--
+      ⚠️ **`android:name` was absent, and its absence meant no fault before the first frame could
+      ever be recorded.** Without an application class the earliest code this app ran was
+      `MainActivity.onCreate`, so a store whose file was corrupt or a dependency that threw while
+      being constructed killed the app with nothing written and nothing to read afterwards — which
+      is precisely the class of failure that makes an app look broken from launch.
+    -->
     <application
+        android:name=".NutritionApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"

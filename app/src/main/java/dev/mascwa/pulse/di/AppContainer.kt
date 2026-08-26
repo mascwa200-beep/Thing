@@ -723,9 +723,21 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer(appContext)
     }
 
-    /** App-wide crash reporter backing the global handler + the SYS crash console. */
+    /**
+     * App-wide crash reporter backing the global handler + the SYS crash console.
+     *
+     * ⚠️ The build identity is passed in rather than read inside: the reporter is shared with the
+     * standalone nutrition application now, and each one has to name its own `BuildConfig`. Which
+     * build a fault came from is the most load-bearing line in a report, so there is no default to
+     * fall through to.
+     */
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
-        dev.mascwa.pulse.crash.CrashReporter(appContext)
+        dev.mascwa.pulse.crash.CrashReporter(
+            appContext,
+            appLabel = "LCARS",
+            versionName = dev.mascwa.pulse.BuildConfig.VERSION_NAME,
+            versionCode = dev.mascwa.pulse.BuildConfig.VERSION_CODE,
+        )
     }
     /** Uploads scrubbed crash/debug reports to the repo's `debug-reports` branch (opt-in) for remote
      *  reading. Reuses the repo-scoped GitHub token; never touches main/dev or opens a PR. */
