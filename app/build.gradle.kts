@@ -305,6 +305,7 @@ dependencies {
     // desktop companion. Moved out of this module in the same pass that made `:core:telemetry`
     // a plain JVM module: not one of those files imported `android.*`.
     implementation(project(":core:feeds"))
+    implementation(project(":core:health"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

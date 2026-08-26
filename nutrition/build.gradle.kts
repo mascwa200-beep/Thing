@@ -110,4 +110,6 @@ dependencies {
     // would be a second chance to disagree about what a stored figure means.
     implementation(project(":core:database"))
     implementation(project(":core:telemetry"))
+    implementation(project(":core:feeds"))
+    implementation(project(":core:health"))
 }

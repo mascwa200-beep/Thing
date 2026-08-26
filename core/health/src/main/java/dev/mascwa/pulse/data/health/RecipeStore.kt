@@ -49,7 +49,7 @@ private val Context.recipeDataStore: DataStore<Preferences> by preferencesDataSt
  * holds thousands that change at every meal. The sharding over there exists for a reason that does
  * not apply here.
  *
- * Mirrors the [dev.mascwa.pulse.data.profile.ProfileStore] template — in-memory state is
+ * Mirrors the app's ProfileStore template — in-memory state is
  * authoritative, a [Mutex] serialises every read-modify-write, and the disk write is debounced so a
  * builder session that touches ten ingredients writes once. [flushNow] is called from
  * `MainActivity.onStop`, so a half-built recipe survives the app being swiped away.

@@ -16,6 +16,8 @@ on:
     paths:
       - "nutrition/**"
       - "core/telemetry/**"
+      - "core/feeds/**"
+      - "core/health/**"
       - "core/database/**"
       - "tools/food/**"
       - "gradle/libs.versions.toml"

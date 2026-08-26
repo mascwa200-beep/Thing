@@ -28,7 +28,7 @@ private val Context.bodyDataStore: DataStore<Preferences> by preferencesDataStor
 /**
  * Every weigh-in and body measurement, on this device only.
  *
- * In-memory state (authoritative) + a debounced flush, exactly as [dev.mascwa.pulse.data.profile.ProfileStore]
+ * In-memory state (authoritative) + a debounced flush, exactly as the app's ProfileStore
  * does. The store keeps raw readings and nothing derived: the trend, the rate and their uncertainty all
  * come from [BodyTrend], which is pure and tested, so there is nothing here that can disagree with what
  * the screen shows.

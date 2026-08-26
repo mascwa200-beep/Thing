@@ -26,6 +26,7 @@ include(":core:database")
 include(":core:model-inference")
 include(":core:telemetry")
 include(":core:feeds")
+include(":core:health")
 
 // The standalone nutrition app: the health half of :app with none of its novelty, its device gate
 // or its native code, so one universal APK runs on any phone. Shares :core:telemetry and
