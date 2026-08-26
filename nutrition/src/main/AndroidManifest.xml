@@ -16,11 +16,21 @@
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!--
+      ⚠️ The camera is for the barcode scanner and nothing else. No frame is stored, uploaded or kept:
+      each one is decoded in memory and dropped, and only the digits on the packet leave the screen.
+      Requested on the scanner itself rather than at startup, so the reason is visible when it is asked.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
       ⚠️ `required="false"`, or this app would be hidden on the store from every phone without a
       pedometer — which is most of the cheap ones, and exactly the phones "works on every type of
       phone" was asked about. Steps are one card; the rest of the app does not need the sensor.
     -->
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
+
+    <!-- Same reasoning: a phone with no camera loses one button, not the app. -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:allowBackup="true"

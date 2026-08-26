@@ -116,6 +116,21 @@ dependencies {
     // `:core:health` already use, so there is still one copy of it in the APK.
     implementation(libs.androidx.datastore.preferences)
 
+    // The barcode scanner. ⚠️ **CameraX is the one dependency here that could have undone the
+    // module's whole point, and it was checked before a line was written**: `camera-core` packages
+    // `libimage_processing_util_jni.so` and `libsurface_util_jni.so`, and it packages both for
+    // arm64-v8a, armeabi-v7a, x86 AND x86_64 — read out of the 1.4.1 AAR, not assumed. So one
+    // universal APK still covers every architecture, which is exactly what the CI check asserts.
+    //
+    // ⚠️ ZXing core, NOT ML Kit, for the same two reasons `:app` gives: the unbundled ML Kit variant
+    // needs Play Services, and the bundled one adds two or three megabytes to an APK that is already
+    // mostly database. This is pure JVM.
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.zxing.core)
+
     // The bundled barcode database and the nutrient declarations behind it. Nothing of the LCARS
     // application is reachable from here; these two are shared because a second copy of either
     // would be a second chance to disagree about what a stored figure means.

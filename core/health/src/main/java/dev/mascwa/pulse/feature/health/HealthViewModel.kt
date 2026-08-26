@@ -532,15 +532,20 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     _search.value = Search()
                     _picked.value = r.food
                 }
+                // ⚠️ **Neither of these names a card, and that is a rule now rather than a
+                // wording choice.** This copy is written in a shared module and rendered by two
+                // applications whose screens are called different things — the LCARS one has QUICK
+                // ADD and the standalone one has "Type it in" — so naming either sends half the
+                // readers looking for something that is not on their screen. Describe the action.
                 is FoodLookup.NoNutrition -> _search.value = Search(
                     query = code,
                     note = "${r.food.display} is in the database, but nobody has filled in its " +
-                        "nutrition. QUICK ADD below takes the numbers straight off the label.",
+                        "nutrition. Typing the numbers off the label works.",
                 )
                 is FoodLookup.NotInDatabase -> _search.value = Search(
                     query = code,
-                    note = "Barcode $code is not in the packaged-food database. QUICK ADD below " +
-                        "takes the numbers straight off the label.",
+                    note = "Barcode $code is not in the packaged-food database. Typing the numbers " +
+                        "off the label works.",
                 )
                 is FoodLookup.Unreachable -> _search.value = Search(
                     query = code,

@@ -82,6 +82,25 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
     val picked by vm.picked.collectAsStateWithLifecycle()
     val pickFor by vm.pickFor.collectAsStateWithLifecycle()
 
+    // ⚠️ Held here rather than in the view model, unlike the picked food, because a viewfinder is
+    // not state anything else needs to agree about — and one that survived leaving the tab would be
+    // a camera left open behind a screen nobody is looking at.
+    var scanning by remember { mutableStateOf(false) }
+    if (scanning) {
+        BarcodeScanner(
+            onCode = { code ->
+                scanning = false
+                vm.searchFor(HealthViewModel.PickFor.LOG)
+                // ⚠️ The digits go to `lookUpBarcode`, not into the search box. A barcode is an
+                // exact key — the bundled database is indexed on it — and running it through the
+                // name search would turn a certain answer into a ranked guess.
+                vm.lookUpBarcode(code)
+            },
+            onCancel = { scanning = false },
+        )
+        return
+    }
+
     SectionCard("Find a food") {
         OutlinedTextField(
             value = search.query,
@@ -90,6 +109,10 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        OutlinedButton(onClick = { scanning = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("Scan a barcode")
+        }
 
         if (search.busy) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
