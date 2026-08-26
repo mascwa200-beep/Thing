@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,10 +18,14 @@ import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.feature.health.HealthViewModel
 import java.text.DateFormat
+import java.util.Calendar
 import java.util.Date
 
 /**
@@ -56,6 +61,8 @@ fun TodayScreen(vm: HealthViewModel) {
     }
 
     Eaten(state.eatenToday)
+    Vitamins(state.microsToday, state.profile.sex, state.profile.birthYear)
+    Everything(state.extrasToday)
     Entries(vm, entries)
 }
 
@@ -95,6 +102,89 @@ private fun Eaten(eaten: NutritionDay.Nutrients) {
         StatRow("Sugars", "${round(eaten.sugarG)} g")
         StatRow("Saturated fat", "${round(eaten.satFatG)} g")
         StatRow("Sodium", "${round(eaten.sodiumMg)} mg")
+    }
+}
+
+/**
+ * The vitamins and minerals today's food actually reported, against published guidance.
+ *
+ * ⚠️ **Present, never complete.** Only about a quarter of product records carry calcium, so a total
+ * drawn from one food in six is not the day's calcium — and a figure shown without that denominator
+ * says it is. [Micronutrients.Day.caveat] supplies the denominator and is silent once a nutrient is
+ * well covered, which is right: a line under every row is a line nobody reads.
+ *
+ * ⚠️ A nutrient nothing reported gets **no row at all**, never a zero. A dash-filled table of eight
+ * would read as "you ate none of these today", which is a claim the data cannot make.
+ */
+@Composable
+private fun Vitamins(day: Micronutrients.Day, sexName: String, birthYear: Int) {
+    val present = Micronutrients.Micro.entries.filter { day[it] != null }
+    if (present.isEmpty()) return
+
+    val year = Calendar.getInstance().get(Calendar.YEAR)
+    val age = if (birthYear > 0) year - birthYear else 0
+    val sex = runCatching { Body.Sex.valueOf(sexName) }.getOrDefault(Body.Sex.UNSPECIFIED)
+
+    SectionCard("Vitamins and minerals") {
+        present.forEach { m ->
+            val tally = day[m] ?: return@forEach
+            val reference = Micronutrients.reference(m, sex, age)
+            val guide = (reference as? Micronutrients.Reference.Amount)?.guide
+            if (guide != null) {
+                // The core writes the readout — "12 mg · 86% of 14 mg" — so this screen and the
+                // LCARS one cannot phrase the same comparison two ways.
+                StatRow(m.label, Micronutrients.readout(m, tally.total, guide))
+                LinearProgressIndicator(
+                    progress = { guide.fractionOf(tally.total).coerceIn(0.0, 1.0).toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "${guide.basis} \u00b7 ${guide.source}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                // ⚠️ No bar where there is no figure to fill it against: an empty track beside a
+                // number reads as "none of your allowance left", the opposite of the truth.
+                StatRow(m.label, "${round(tally.total, 1)} ${m.unit}")
+                (reference as? Micronutrients.Reference.None)?.let {
+                    Text(
+                        it.why,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            day.caveat(m)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+/**
+ * Everything else the day's records happened to carry.
+ *
+ * ⚠️ **No percentage of anything**, unlike [Vitamins] above. Twenty-nine further nutrients are
+ * declared and there is no reference intake this app can honestly state for most of them; inventing
+ * one to fill the same shape would be the exact dishonesty the sparse layer exists to avoid. The
+ * figure and where it came from is all there is to say.
+ *
+ * ⚠️ On an ordinary day this section is **absent entirely**, which is correct — the densest of the
+ * twenty-nine is recorded on 5.7% of products and most are near 2%.
+ */
+@Composable
+private fun Everything(day: NutrientSet.Day) {
+    val present = NutrientSet.Nutrient.entries.filter { day[it] != null }
+    if (present.isEmpty()) return
+    SectionCard("Everything else recorded") {
+        present.forEach { n ->
+            val tally = day[n] ?: return@forEach
+            StatRow(n.label, "${round(tally.total, 2)} ${n.unit.symbol}")
+            day.caveat(n)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
