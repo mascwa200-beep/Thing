@@ -1,5 +1,16 @@
 name: Nutrition Build
 
+# ⚠️ **The run TITLE carries the instruction, because it is the one surface no client hides.**
+# A step summary is written by this workflow and by `setup-gradle`, and a phone screenshot showed
+# NEITHER of them rendering — the run page went jobs-graph → Annotations → Artifacts with no summary
+# anywhere. Two independent summaries missing is the tell that the client does not display them at
+# all, so nothing written into one can be relied on to arrive. The run name shows on the run page, in
+# the runs list and in the mobile app.
+#
+# ⚠️ `run-name` may only reference `github`, `inputs` and `vars` — not secrets, not job outputs — so
+# this is a static string plus the run number, which is all it needs to be.
+run-name: "Nutrition #${{ github.run_number }} — install from Releases ▸ nutrition-latest"
+
 # The standalone nutrition app: the health half of the LCARS application with none of its novelty,
 # its device gate or its native code.
 #
@@ -324,3 +335,14 @@ jobs:
             echo "Already have the LCARS app? **Settings → System → GET THE NUTRITION APP** does all"
             echo "of this in one tap using the token stored in Computer Setup, with no browser."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # ⚠️ **The same link as an ANNOTATION, because a phone screenshot proved this block renders
+          # where the summary above does not** — and renders URLs as tappable links, which is how the
+          # Node-20 deprecation notice appears there in blue.
+          #
+          # ⚠️ Deliberately `notice` and NOT `warning`. A warning would be guaranteed to render on
+          # every client, and it would also be a lie about severity — the block beside this one is
+          # where genuine build warnings live, and dressing a download up as one teaches a reader to
+          # skim past all of them. If a client turns out to show only warnings and errors, the run
+          # NAME above is the half that still arrives.
+          echo "::notice title=Download the nutrition app ($size)::$base/releases/download/nutrition-latest/nutrition-release.apk"

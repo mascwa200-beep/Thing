@@ -9336,3 +9336,40 @@ it had one. **Iterate every job, not `next(iter(jobs))`.**
 them); the mobile app will never list them; and nothing here is anonymously downloadable while the
 repository is private. Making the APK public would mean opening the repository or pushing it to an
 outside host, and neither is proposed.
+
+#### ⚠️ CORRECTION, one round later: THE STEP SUMMARY RENDERS NOWHERE ON THE OWNER'S PHONE
+
+The section above says a `$GITHUB_STEP_SUMMARY` block "renders at the **top** of the summary page,
+above the artifacts drawer." **That is wrong for the client the owner reads**, and an owner
+screenshot settled it: the page goes jobs-graph → Annotations → Artifacts with no summary anywhere.
+
+**The step is not broken** — its own log shows it ran and wrote (`##[group]Run apk=$(ls …)` at
+07:25:33, then the `echo`s, then `} >> "$GITHUB_STEP_SUMMARY"`). ⚠️ **The decisive tell is a SECOND
+summary that is also missing:** `gradle/actions/setup-gradle` writes one on the same run ("Generating
+Job Summary", 07:25:33.918) and it is absent from that view too. Two independent summaries, neither
+rendered → **the client does not display job summaries at all**, so nothing written into one can be
+relied on to arrive. ⚠️ Note also that a job log shows `##[group]Run <first line of script>`, **not
+the step name** — grepping the log for a step's `name:` finds nothing and proves nothing.
+
+The same screenshot showed the artifact row carrying **no download control** (a digest copy button
+and nothing else), on a 178 MB **ZIP** Android cannot install regardless.
+
+**What it proved DOES work: the Annotations block renders, and renders URLs as tappable links** (the
+Node-20 deprecation link is blue and live in that very screenshot). So:
+- **`run-name:`** — a top-level workflow key setting the run's TITLE, shown on the run page, in the
+  runs list and in the mobile app. **No client hides it**, which makes it the load-bearing half.
+  ⚠️ It may reference only `github`, `inputs` and `vars` — not secrets, not job outputs.
+- **A `::notice::` annotation** carrying the release URL, appended to the existing summary step.
+  ⚠️ **Deliberately `notice`, not `warning`.** A warning would render on every client and would also
+  be a lie about severity; the block beside it is where genuine build warnings live, and dressing a
+  download up as one teaches the reader to skim past all of them. Whether a given client renders
+  notices as well as warnings is **not verifiable from here** — hence `run-name` as the fallback.
+
+**The routes that actually work today, neither needing any code:** the repo's **Releases** page →
+`nutrition-latest` → tap `nutrition-release.apk` (the mobile app shows releases and their assets even
+though it shows no artifacts), and **LCARS → Settings → System → GET THE NUTRITION APP**, which uses
+the stored token and involves no browser at all.
+
+⚠️ **The general lesson, and it is the third time this session:** a green tick plus a step reporting
+`success` proves the step RAN, never that its output REACHED anybody. Rendering is a property of the
+client, and the only instrument for it is the owner's screenshot.

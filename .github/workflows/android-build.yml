@@ -1,5 +1,11 @@
 name: Android Build
 
+# ⚠️ The run TITLE, because it is the one surface no client hides — a phone screenshot showed this
+# repository's step summaries (ours AND `setup-gradle`'s) rendering nowhere at all. See the longer
+# note in nutrition-build.yml; the same reasoning applies here. This app installs its own updates, so
+# it matters less, but the two workflows should not disagree about where a build can be got.
+run-name: "LCARS #${{ github.run_number }} — install from Releases ▸ latest"
+
 on:
   push:
     # Build on every code branch, but skip the telemetry-only `debug-reports` branch the in-app
@@ -849,3 +855,8 @@ jobs:
             echo "Looking for the standalone nutrition app? It has its own workflow and its own"
             echo "release under \`nutrition-latest\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # ⚠️ The same link as an annotation — the block a phone screenshot proved renders, and
+          # renders URLs as tappable links, where the summary above renders nowhere. `notice` rather
+          # than `warning` deliberately: see the longer note in nutrition-build.yml.
+          echo "::notice title=Download LCARS ($size)::$base/releases/download/latest/app-release.apk"
