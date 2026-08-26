@@ -128,7 +128,28 @@ class FoodLogStore(
     )
 
     @Serializable
-    private data class Index(val days: List<DayRow> = emptyList())
+    private data class Index(
+        val days: List<DayRow> = emptyList(),
+        /**
+         * Day-starts the user explicitly marked as a fast.
+         *
+         * ⚠️ Deliberately NOT a field on [DayRow]. A fasted day has no entries, and
+         * [reindexLocked] removes a day from the index the moment its entry list is empty — so a
+         * flag living on the row would be deleted by the very code that keeps the row honest. A
+         * fast is orthogonal to entries, so it is stored orthogonally.
+         *
+         * Defaulted, so every blob written before this existed still decodes.
+         */
+        val fasted: List<Long> = emptyList(),
+    )
+
+    /**
+     * How many fast marks are kept. Two years, oldest dropped first.
+     *
+     * A fast older than the longest expenditure window cannot change any answer, and this is the
+     * only day-keyed structure here that is not already bounded by shard pruning.
+     */
+    private val MAX_FASTED_DAYS = 730
 
     private val indexKey = stringPreferencesKey("food_index")
     private fun shardKey(month: String) = stringPreferencesKey("food_$month")
@@ -139,6 +160,15 @@ class FoodLogStore(
     private var flushJob: Job? = null
     private val dirtyShards = mutableSetOf<String>()
     private var indexDirty = false
+
+    /**
+     * Days explicitly marked as a fast. Loaded with the index and written with it.
+     *
+     * ⚠️ Capped, because it is the one structure here that only ever grows — every other day-keyed
+     * thing is bounded by the shards being pruned. [MAX_FASTED_DAYS] is a couple of years, and the
+     * oldest go first; a fast older than the longest expenditure window cannot affect any answer.
+     */
+    private var fastedDays: MutableSet<Long>? = null
 
     private val _days = MutableStateFlow<Map<Long, NutritionDay.Nutrients>>(emptyMap())
 
@@ -200,8 +230,17 @@ class FoodLogStore(
             ?.days.orEmpty()
         val map = loaded.associateBy { it.day }.toMutableMap()
         index = map
+        fastedDays = raw
+            ?.let { runCatching { json.decodeFromString(Index.serializer(), it) }.getOrNull() }
+            ?.fasted.orEmpty().toMutableSet()
         publishLocked(map)
         map
+    }
+
+    /** The fasted set, loading the index first if it has not been read yet. */
+    private suspend fun fastedLocked(): MutableSet<Long> {
+        indexLocked()
+        return fastedDays ?: mutableSetOf<Long>().also { fastedDays = it }
     }
 
     private suspend fun shardLocked(month: String): Shard = shards[month] ?: run {
@@ -238,6 +277,11 @@ class FoodLogStore(
     suspend fun add(entry: NutritionDay.Entry) {
         mutex.withLock {
             val map = indexLocked()
+            // ⚠️ Eating clears the fast, and it has to be here rather than left to the user. The two
+            // are contradictory claims about the same day, and a stale mark would send the day to
+            // the expenditure measurement as zero calories while the index also carried what was
+            // eaten — the same day counted twice, once wrongly.
+            fastedLocked().remove(entry.dayStartMs)
             val month = monthOf(entry.dayStartMs)
             val shard = shardLocked(month)
             val next = shard.copy(entries = shard.entries.filterNot { it.id == entry.id } + entry.stored())
@@ -387,15 +431,47 @@ class FoodLogStore(
      * weekend. Absent is what an unlogged day is, and the completeness gate is what prices it.
      */
     suspend fun intakeDays(fromMs: Long, toMs: Long): List<Expenditure.IntakeDay> = mutex.withLock {
-        indexLocked().values
+        val eaten = indexLocked().values
             .filter { it.day in fromMs..toMs && it.kcal > 0.0 }
-            .sortedBy { it.day }
             .map { Expenditure.IntakeDay(it.day, it.kcal) }
+        // ⚠️ A deliberate fast is a RECORD of what was eaten, not a gap, and passing it through is
+        // what stops the expenditure measurement treating a disciplined faster like somebody who
+        // forgot. It reaches the core as a real day worth zero calories.
+        val fasts = fastedLocked()
+            .filter { it in fromMs..toMs && !indexLocked().containsKey(it) }
+            .map { Expenditure.IntakeDay(it, 0.0, fasted = true) }
+        (eaten + fasts).sortedBy { it.dayStartMs }
+    }
+
+    /**
+     * Mark or unmark a day as a deliberate fast.
+     *
+     * ⚠️ Refused on a day that already has entries, and the refusal is the honest answer rather than
+     * an inconvenience: marking a fast on a day with food logged asserts two contradictory things
+     * about it. Delete the entries first if the day really was a fast. Returns whether it took.
+     */
+    suspend fun setFasted(dayStartMs: Long, fasted: Boolean): Boolean = mutex.withLock {
+        val set = fastedLocked()
+        if (fasted && indexLocked().containsKey(dayStartMs)) return@withLock false
+        val changed = if (fasted) set.add(dayStartMs) else set.remove(dayStartMs)
+        if (changed) {
+            indexDirty = true
+            scheduleFlush()
+        }
+        true
+    }
+
+    /** Whether [dayStartMs] is marked as a deliberate fast. */
+    suspend fun isFasted(dayStartMs: Long): Boolean = mutex.withLock {
+        fastedLocked().contains(dayStartMs)
     }
 
     /** How many of the last [days] days have anything logged — the streak-ish number the coach shows. */
     suspend fun loggedDayCount(fromMs: Long, toMs: Long): Int = mutex.withLock {
-        indexLocked().values.count { it.day in fromMs..toMs && it.kcal > 0.0 }
+        val eaten = indexLocked().values.count { it.day in fromMs..toMs && it.kcal > 0.0 }
+        // Same reasoning as intakeDays: a day somebody told us about is a day they logged.
+        val fasts = fastedLocked().count { it in fromMs..toMs && !indexLocked().containsKey(it) }
+        eaten + fasts
     }
 
     /**
@@ -443,6 +519,7 @@ class FoodLogStore(
             shards.clear()
             dirtyShards.clear()
             indexDirty = false
+            fastedDays = mutableSetOf()
             publishLocked(emptyMap())
             known
         }
@@ -469,7 +546,15 @@ class FoodLogStore(
 
     private suspend fun flush() {
         val (idxJson, shardJson) = mutex.withLock {
-            val idx = if (indexDirty) index?.let { m -> json.encodeToString(Index.serializer(), Index(m.values.sortedBy { it.day })) } else null
+            val idx = if (indexDirty) index?.let { m ->
+                json.encodeToString(
+                    Index.serializer(),
+                    Index(
+                        days = m.values.sortedBy { it.day },
+                        fasted = fastedDays.orEmpty().sorted().takeLast(MAX_FASTED_DAYS),
+                    ),
+                )
+            } else null
             val out = dirtyShards.mapNotNull { m ->
                 shards[m]?.let { m to json.encodeToString(Shard.serializer(), it) }
             }

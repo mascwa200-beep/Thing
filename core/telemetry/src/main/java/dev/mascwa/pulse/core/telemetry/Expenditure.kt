@@ -169,7 +169,38 @@ object Expenditure {
      * [dayStartMs] is the start of that day **in the person's own zone**, decided by the caller — this
      * core has no timezone, and a day boundary taken in UTC is a day out for most of the world.
      */
-    data class IntakeDay(val dayStartMs: Long, val kcal: Double)
+    /**
+     * One day's intake.
+     *
+     * ⚠️ [fasted] exists because zero calories and no record are different facts and were being
+     * treated as one. The predicate here used to be `kcal > 0`, so a day somebody deliberately fasted
+     * was dropped from the window AND counted against [completeness] — the same treatment as a day
+     * they forgot. That is backwards twice over: the deliberate faster told us exactly what they ate,
+     * and a long enough run of them could push a scrupulously tracked person to [Estimate.NotYet] for
+     * tracking too well.
+     *
+     * A fasted day therefore contributes 0 kcal to the mean, which is true, and counts toward
+     * completeness, which is also true. Nothing downstream needed changing: the variance, the
+     * finite-population correction and the unlogged-day bias all already do the right thing once the
+     * day is inside the window.
+     *
+     * ⚠️ Only an EXPLICIT mark counts. An absent day stays absent — inferring a fast from a missing
+     * record would invent zeros for every day somebody simply did not open the app, which is the
+     * larger of the two errors by a wide margin.
+     */
+    data class IntakeDay(
+        val dayStartMs: Long,
+        val kcal: Double,
+        val fasted: Boolean = false,
+    ) {
+        /**
+         * Whether this day is a record of what was eaten, as opposed to a gap.
+         *
+         * The single definition of "logged". It was written out twice before, which is how a
+         * predicate drifts.
+         */
+        val counted: Boolean get() = kcal.isFinite() && (kcal > 0.0 || fasted)
+    }
 
     /** The five multipliers that turn a resting rate into a daily one. Standard, and coarse. */
     enum class Activity(val multiplier: Double, val label: String) {
@@ -254,7 +285,7 @@ object Expenditure {
         if (trend !is BodyTrend.Trend.Estimated) {
             return Estimate.NotYet(
                 spanDays = 0.0,
-                loggedDays = intake.count { it.kcal.isFinite() && it.kcal > 0.0 },
+                loggedDays = intake.count { it.counted },
                 neededSpanDays = MIN_SPAN_DAYS,
                 neededLoggedDays = MIN_LOGGED_DAYS,
                 why = "No weigh-ins yet. Expenditure is measured from what the scale does, so it needs some.",
@@ -265,7 +296,7 @@ object Expenditure {
         val inWindow = trend.points.filter { it.atMs >= windowStart }
         val first = inWindow.firstOrNull()
         val last = inWindow.lastOrNull()
-        val logged = intake.filter { it.kcal.isFinite() && it.kcal > 0.0 }
+        val logged = intake.filter { it.counted }
 
         if (first == null || last == null || first === last) {
             return notYet(0.0, logged.size, "two weigh-ins inside the last $windowDays days")

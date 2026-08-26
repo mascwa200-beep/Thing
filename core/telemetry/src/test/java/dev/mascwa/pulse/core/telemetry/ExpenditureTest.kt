@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.sqrt
@@ -38,6 +39,77 @@ class ExpenditureTest {
     ): Expenditure.Estimate {
         val last = w.maxOf { it.atMs }
         return Expenditure.measure(BodyTrend.estimate(w), i, last + nowOffsetDays * day, window)
+    }
+
+    // ------------------------------------------------------------------------------------ fasting
+
+    /**
+     * ⚠️ THE DEFECT THIS FIXES. The predicate used to be `kcal > 0`, so a day somebody deliberately
+     * fasted was dropped from the window and counted against completeness — identical treatment to a
+     * day they forgot to log. Both halves are wrong, and the second is the worse one: a long enough
+     * run of fasts could push a scrupulous tracker to NotYet for tracking too well.
+     */
+    @Test
+    fun `a marked fast is a record and an absent day is not`() {
+        assertTrue(Expenditure.IntakeDay(t0, 0.0, fasted = true).counted)
+        assertFalse(Expenditure.IntakeDay(t0, 0.0, fasted = false).counted)
+        assertTrue(Expenditure.IntakeDay(t0, 2000.0).counted)
+        // NaN is never a record however it is marked
+        assertFalse(Expenditure.IntakeDay(t0, Double.NaN, fasted = true).counted)
+    }
+
+    /**
+     * The behavioural half: two identical 28-day records, one where five zero-calorie days are marked
+     * as fasts and one where the same five days are simply missing. The marked run must be measurable;
+     * the unmarked one is a less complete window and must report fewer logged days.
+     */
+    @Test
+    fun `marking a fast keeps the day in the window instead of dropping it`() {
+        val (w, full) = record(28, 80.0, -0.05, 2200.0)
+        val fastDays = setOf(3, 7, 11, 15, 19)
+
+        val marked = full.mapIndexed { i, d ->
+            if (i in fastDays) Expenditure.IntakeDay(d.dayStartMs, 0.0, fasted = true) else d
+        }
+        val absent = full.filterIndexed { i, _ -> i !in fastDays }
+
+        val withFasts = measure(w, marked)
+        val withGaps = measure(w, absent)
+
+        assertTrue("a marked run should still measure, got $withFasts", withFasts is Expenditure.Estimate.Known)
+        val known = withFasts as Expenditure.Estimate.Known
+
+        // The five fasts are inside the window and counted.
+        val loggedWithGaps = when (withGaps) {
+            is Expenditure.Estimate.Known -> withGaps.loggedDays
+            is Expenditure.Estimate.Doubtful -> withGaps.loggedDays
+            is Expenditure.Estimate.NotYet -> withGaps.loggedDays
+        }
+        assertTrue(
+            "marked run logged ${known.loggedDays}, gapped run logged $loggedWithGaps",
+            known.loggedDays > loggedWithGaps,
+        )
+        assertTrue("completeness ${known.completeness}", known.completeness > 0.9)
+    }
+
+    /**
+     * ⚠️ And the fast is worth zero, not skipped. Five zero days inside a 2200 kcal run must pull the
+     * measured expenditure DOWN — if a fast were merely counted for completeness while its calories
+     * were ignored, the mean would be unchanged and this would fail.
+     */
+    @Test
+    fun `a fast contributes zero calories to the mean rather than being skipped`() {
+        val (w, full) = record(28, 80.0, -0.05, 2200.0)
+        val fastDays = setOf(3, 7, 11, 15, 19)
+        val marked = full.mapIndexed { i, d ->
+            if (i in fastDays) Expenditure.IntakeDay(d.dayStartMs, 0.0, fasted = true) else d
+        }
+        val plain = measure(w, full) as Expenditure.Estimate.Known
+        val fasted = measure(w, marked) as Expenditure.Estimate.Known
+        assertTrue(
+            "plain ${plain.kcal}, with fasts ${fasted.kcal}",
+            fasted.kcal < plain.kcal - 200.0,
+        )
     }
 
     // -------------------------------------------------------------------------- it refuses, and says why
