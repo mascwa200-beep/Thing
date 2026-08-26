@@ -430,6 +430,36 @@ class AppContainer(private val appContext: Context) {
      * Foods somebody typed in themselves. Searched ahead of both databases, because a short list you
      * named yourself is more likely to be what you meant than one of thirteen thousand generic rows.
      */
+    /**
+     * The health view model's whole world, assembled from the members above.
+     *
+     * ⚠️ **This is the seam that lets one view model serve two applications.** Everything it names
+     * lives in `:core:health` except the last three, which are exactly the things the two
+     * applications do differently: this one keeps its health preferences as one section of a much
+     * larger settings blob, watches connectivity through its own observer, and has a vision model to
+     * read a photograph with. The standalone nutrition app has its own answers to the first two and
+     * passes null for the third.
+     */
+    val healthDeps: dev.mascwa.pulse.data.health.HealthDeps by lazy {
+        dev.mascwa.pulse.data.health.HealthDeps(
+            foodLogStore = foodLogStore,
+            bodyStore = bodyStore,
+            progressPhotoStore = progressPhotoStore,
+            healthConnect = healthConnect,
+            customFoodStore = customFoodStore,
+            recipeStore = recipeStore,
+            foodRepository = foodRepository,
+            healthExporter = healthExporter,
+            healthImporter = healthImporter,
+            healthSettings = settingsRepository.settings.map { it.health },
+            // ⚠️ A read-modify-write, not a setter: `health` is one field of forty on AppSettings and
+            // the other thirty-nine have to survive the write.
+            updateHealth = { block -> settingsRepository.update { it.copy(health = block(it.health)) } },
+            isOnline = { connectivityObserver.isOnline.value },
+            mealPhotoReader = mealPhotoReader,
+        )
+    }
+
     val customFoodStore: dev.mascwa.pulse.data.health.CustomFoodStore by lazy {
         dev.mascwa.pulse.data.health.CustomFoodStore(appContext, json)
     }

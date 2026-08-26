@@ -15,6 +15,12 @@ import java.io.File
  * which is the half that survives a hand edit, a bad merge, or an editor that strips the trailing
  * tabs a row of unrecorded nutrients ends in.
  *
+ * ⚠️ **This one test stays in `:app` while the rest of the health tests live beside their code in
+ * `:core:health`.** It reads the seed by a path relative to the module directory, and the seed is
+ * an asset of the application rather than of the library -- moving the test would leave it
+ * looking for a file that is not there, which would fail in a way that looks like a corpus
+ * problem rather than a path problem.
+ *
  * ⚠️ The offsets below are restated from `FoodRepository`, which is the authority, because they are
  * private to that file. That restatement is exactly what [waterLandsInTheWaterColumn] exists to
  * catch: it does not trust the arithmetic, it reads a physical quantity and checks it is physical.

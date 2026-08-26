@@ -13,16 +13,15 @@ import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.Recipes
-import dev.mascwa.pulse.core.util.VisionImage
-import dev.mascwa.pulse.data.health.MealPhotoReader
+import dev.mascwa.pulse.data.health.HealthDeps
+import dev.mascwa.pulse.data.health.HealthSettings
+import dev.mascwa.pulse.data.health.MealPhotos
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
-import dev.mascwa.pulse.data.settings.HealthSettings
-import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +47,7 @@ import java.util.UUID
  * The cores are cheap — a Kalman pass over a few hundred weigh-ins is microseconds — so there is nothing
  * to buy by caching them and a whole class of disagreement to avoid.
  */
-class HealthViewModel(private val c: AppContainer) : ViewModel() {
+class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     /** Which sub-tab is showing. Hoisted here so it survives navigating away and back. */
     val tabIndex = MutableStateFlow(0)
@@ -96,8 +95,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     // -------------------------------------------------------------------------------- the record
 
-    val profile: StateFlow<HealthSettings> = c.settingsRepository.settings
-        .map { it.health }
+    val profile: StateFlow<HealthSettings> = c.healthSettings
         .stateIn(viewModelScope, SharingStarted.Eagerly, HealthSettings())
 
     val weighins: StateFlow<List<BodyTrend.Weighin>> = c.bodyStore.weighins
@@ -453,7 +451,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         searchJob = viewModelScope.launch {
             delay(DEBOUNCE_MS)
             _search.value = _search.value.copy(busy = true)
-            val online = c.connectivityObserver.isOnline.value
+            val online = c.isOnline()
             val r = c.foodRepository.search(query, online)
             // ⚠️ Guard against a stale answer landing on a query that has moved on. The cancel above
             // handles the common case; this handles the one where the request had already returned.
@@ -733,7 +731,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
         data object Idle : MealShot
         data object Reading : MealShot
         data class Plate(
-            val proposals: List<MealPhotoReader.Proposal>,
+            val proposals: List<MealPhotos.Proposal>,
             val summary: String,
         ) : MealShot
 
@@ -758,17 +756,19 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
     fun readMealPhoto(context: android.content.Context, uri: android.net.Uri) {
         mealShotJob?.cancel()
         _mealShot.value = MealShot.Reading
+        val reader = c.mealPhotoReader
+        if (reader == null) {
+            // ⚠️ Not a failure. This application simply has no vision model, and the surface says so
+            // rather than showing a button that quietly does nothing.
+            _mealShot.value = MealShot.NoVision
+            return
+        }
         mealShotJob = viewModelScope.launch {
-            val encoded = VisionImage.encode(context, uri)
-            if (encoded == null) {
-                _mealShot.value = MealShot.Failed("That photograph could not be read.")
-                return@launch
-            }
-            _mealShot.value = when (val r = c.mealPhotoReader.read(encoded)) {
-                is MealPhotoReader.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
-                is MealPhotoReader.Result.NotFood -> MealShot.NotFood
-                is MealPhotoReader.Result.NoVision -> MealShot.NoVision
-                is MealPhotoReader.Result.Failed -> MealShot.Failed(r.reason)
+            _mealShot.value = when (val r = reader.read(context, uri)) {
+                is MealPhotos.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
+                is MealPhotos.Result.NotFood -> MealShot.NotFood
+                is MealPhotos.Result.NoVision -> MealShot.NoVision
+                is MealPhotos.Result.Failed -> MealShot.Failed(r.reason)
             }
         }
     }
@@ -1248,7 +1248,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun edit(block: (HealthSettings) -> HealthSettings) {
         viewModelScope.launch {
-            c.settingsRepository.update { it.copy(health = block(it.health)) }
+            c.updateHealth(block)
             recompute.value++
         }
     }
@@ -1282,7 +1282,7 @@ class HealthViewModel(private val c: AppContainer) : ViewModel() {
  * so the only way the Computer and the HEALTH screen can disagree about a calorie target is if there
  * are two copies of this arithmetic. There is one.
  */
-internal suspend fun composeHealthReading(
+suspend fun composeHealthReading(
     p: HealthSettings,
     w: List<BodyTrend.Weighin>,
     todayEntries: List<NutritionDay.Entry>,

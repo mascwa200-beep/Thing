@@ -1,8 +1,10 @@
 package dev.mascwa.pulse.data.health
 
+import android.content.Context
+import android.net.Uri
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MealPhoto
-import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.util.VisionImage
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.jarvis.inference.VisionEngine
 import kotlinx.coroutines.flow.toList
@@ -12,9 +14,10 @@ import kotlinx.coroutines.flow.toList
  *
  * ⚠️ **The model names the foods; the numbers come from food records.** That split is the whole
  * point and it is enforced here rather than trusted: [MealPhoto.PROMPT] never asks for nutrition
- * (a test guards that), and every figure a [Proposal] carries was looked up in the bundled corpus
- * by name. A model that answered "320 kcal" would have weighed nothing and read no label, and that
- * number would sit in the log beside laboratory analyses looking exactly like one of them.
+ * (a test guards that), and every figure a [MealPhotos.Proposal] carries was looked up in the
+ * bundled corpus by name. A model that answered "320 kcal" would have weighed nothing and read no
+ * label, and that number would sit in the log beside laboratory analyses looking exactly like one
+ * of them.
  *
  * ⚠️ **Nothing here logs anything.** These are proposals for somebody to correct and confirm. A
  * photograph is the least certain input this app takes — the portion especially — and the surface
@@ -23,56 +26,40 @@ import kotlinx.coroutines.flow.toList
 class MealPhotoReader(
     private val vision: VisionEngine,
     private val foods: FoodRepository,
-) {
+) : MealPhotos {
 
     /**
-     * One food the model saw, paired with the record that will supply its numbers.
-     *
-     * ⚠️ [match] is nullable and the null case is real, not defensive: the corpus has no entry for
-     * "grandma's casserole". Such an item is offered with its name and weight and **no nutrition**,
-     * so a person can rename it into something findable or drop it — which is far better than
-     * quietly attaching whatever the ranker liked third best.
+     * ⚠️ Encoding happens here rather than at the call site so that the shared view model never has
+     * to name [VisionImage], which is an application concern. It is off the main thread by virtue of
+     * being suspend: a JPEG off a modern phone camera is several megapixels, and both the decode and
+     * the base64 pass are long enough to drop frames.
      */
-    data class Proposal(
-        val item: MealPhoto.Item,
-        val match: Food?,
-    ) {
-        /** What this portion contributes, or null when nothing was matched to it. */
-        val eaten: NutritionDay.Nutrients?
-            get() = match?.let { FoodPortion.eaten(it.per100g, item.grams) }
-
-        val loggable: Boolean get() = (eaten?.kcal ?: 0.0) > 0.0
-    }
-
-    sealed interface Result {
-        data class Plate(val proposals: List<Proposal>, val summary: String) : Result
-        data object NotFood : Result
-
-        /** ⚠️ Not a failure — the one honest "this feature needs a network and a key" state. */
-        data object NoVision : Result
-        data class Failed(val reason: String) : Result
+    override suspend fun read(context: Context, uri: Uri): MealPhotos.Result {
+        val encoded = VisionImage.encode(context, uri)
+            ?: return MealPhotos.Result.Failed("That photograph could not be read.")
+        return read(encoded)
     }
 
     /**
      * Read [imageDataUrl] — a `data:image/jpeg;base64,...` string, the same shape the console's
      * image path already produces.
      */
-    suspend fun read(imageDataUrl: String): Result {
-        if (!runCatching { vision.supportsVision() }.getOrDefault(false)) return Result.NoVision
+    suspend fun read(imageDataUrl: String): MealPhotos.Result {
+        if (!runCatching { vision.supportsVision() }.getOrDefault(false)) return MealPhotos.Result.NoVision
 
         val answer = runCatching {
             vision.generateWithImages(MealPhoto.PROMPT, listOf(imageDataUrl)).toList().joinToString("")
-        }.getOrElse { return Result.Failed(it.message ?: "the model could not be reached") }
+        }.getOrElse { return MealPhotos.Result.Failed(it.message ?: "the model could not be reached") }
 
         return when (val outcome = MealPhoto.parse(answer)) {
-            is MealPhoto.Outcome.NotFood -> Result.NotFood
-            is MealPhoto.Outcome.Unreadable -> Result.Failed(
+            is MealPhoto.Outcome.NotFood -> MealPhotos.Result.NotFood
+            is MealPhoto.Outcome.Unreadable -> MealPhotos.Result.Failed(
                 "The model answered, but not with a list of foods."
             )
-            is MealPhoto.Outcome.NoVision -> Result.NoVision
-            is MealPhoto.Outcome.Unreachable -> Result.Failed(outcome.reason)
-            is MealPhoto.Outcome.Read -> Result.Plate(
-                proposals = outcome.items.map { Proposal(it, bestMatch(it.name)) },
+            is MealPhoto.Outcome.NoVision -> MealPhotos.Result.NoVision
+            is MealPhoto.Outcome.Unreachable -> MealPhotos.Result.Failed(outcome.reason)
+            is MealPhoto.Outcome.Read -> MealPhotos.Result.Plate(
+                proposals = outcome.items.map { MealPhotos.Proposal(it, bestMatch(it.name)) },
                 summary = MealPhoto.summary(outcome.items),
             )
         }

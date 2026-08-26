@@ -50,4 +50,10 @@ dependencies {
     // Optional at runtime and gated behind its own capability check — see HealthConnectBridge,
     // which never assumes the provider is installed.
     implementation(libs.androidx.health.connect)
+
+    // ⚠️ FoodLogSchemaTest exercises the store's `internal` serialization DTOs, which is why it lives
+    // here rather than in `:app` -- `internal` is module-scoped, so the same test one module over
+    // cannot see them. That is not a detail: those DTOs ARE the on-disk contract, and a test that
+    // could only reach the public API would not be testing the thing that breaks when it changes.
+    testImplementation(libs.junit)
 }

@@ -63,7 +63,7 @@ import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.createCameraImageUri
-import dev.mascwa.pulse.data.health.MealPhotoReader
+import dev.mascwa.pulse.data.health.MealPhotos
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.data.health.HealthDays
@@ -2158,7 +2158,7 @@ private fun PlateReview(
  */
 @Composable
 private fun PlateRow(
-    proposal: MealPhotoReader.Proposal,
+    proposal: MealPhotos.Proposal,
     onGrams: (Double) -> Unit,
     onDrop: () -> Unit,
 ) {
