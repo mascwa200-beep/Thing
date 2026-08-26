@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.reader.ReaderRepository
 import dev.mascwa.pulse.data.food.OpenFoodFactsRepository
 import dev.mascwa.pulse.data.food.db.FoodDatabase
 import dev.mascwa.pulse.data.health.BodyStore
@@ -221,6 +222,7 @@ class NutritionContainer(context: Context) {
             foodRepository = foodRepository,
             healthExporter = exporter,
             healthImporter = importer,
+            readerRepository = ReaderRepository(http),
             healthSettings = settings.settings,
             updateHealth = { block -> settings.update(block) },
             isOnline = { online() },

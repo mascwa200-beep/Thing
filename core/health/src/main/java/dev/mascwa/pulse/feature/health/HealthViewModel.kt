@@ -14,6 +14,8 @@ import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.RecipeImport
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Training
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
@@ -1302,6 +1304,9 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         _draft.value = null
         _picked.value = null
         _search.value = Search()
+        // An import belongs to the draft it opened. Leaving the lines behind would offer them against
+        // whatever draft is opened next, which is somebody else's recipe.
+        _recipeImport.value = RecipeImportState()
         searchFor(PickFor.LOG)
     }
 
@@ -1361,6 +1366,10 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
         _picked.value = null
         _search.value = Search()
+        // If this add answered an imported line, that line is dealt with. Read AFTER the add rather
+        // than before it, because `gramsFor` above can refuse and return early — retiring the line
+        // first would lose it on exactly the portion the app could not convert.
+        _recipeImport.value.matching?.let { dropImported(it) }
     }
 
     /**
@@ -1508,6 +1517,114 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     fun clearNotice() {
         _notice.value = null
+    }
+
+    // ------------------------------------------------------------------ a recipe off a web page
+
+    /**
+     * What an import has produced so far.
+     *
+     * ⚠️ **One flow rather than four, shaped like [Search] above.** The screens read it whole, and a
+     * busy flag that can disagree with the line list it belongs to is how a spinner ends up spinning
+     * over results that already arrived.
+     */
+    data class RecipeImportState(
+        val busy: Boolean = false,
+        /** Why nothing came back, when nothing did. Empty otherwise. */
+        val note: String = "",
+        /** [RecipeImport.sentence] — what the page yielded, said before anything is saved. */
+        val summary: String = "",
+        /** The lines still waiting to be matched to a food record. */
+        val lines: List<RecipeImport.Ingredient> = emptyList(),
+        /** Which of [lines] the search box is currently working on, if any. */
+        val matching: Int? = null,
+    ) {
+        val current: RecipeImport.Ingredient? get() = matching?.let { lines.getOrNull(it) }
+    }
+
+    private val _recipeImport = MutableStateFlow(RecipeImportState())
+    val recipeImport: StateFlow<RecipeImportState> = _recipeImport.asStateFlow()
+
+    /**
+     * Read a recipe page and open a draft from it.
+     *
+     * ⚠️ **The page's own ingredient list is what matters, NOT whether the decimator called it an
+     * article.** A recipe page is exactly the shape [Readability.Outcome.THIN] describes — a bulleted
+     * list and a numbered method with barely a paragraph between them — so gating on `isArticle`
+     * would reject the very pages this exists for. The outcome is read only to EXPLAIN a failure.
+     *
+     * ⚠️ And it always starts a NEW draft. An import carries a name and a portion count, so folding
+     * one into an open builder would overwrite both — which is why the control that calls this is
+     * offered on the recipe list and not inside the builder.
+     */
+    fun importRecipe(url: String) {
+        val trimmed = url.trim()
+        if (trimmed.isEmpty()) return
+        // Somebody pasting an address off a phone often loses the scheme; assuming https rather than
+        // refusing costs nothing, and http would be refused by the cleartext guard anyway.
+        val address = if (trimmed.startsWith("http", ignoreCase = true)) trimmed else "https://$trimmed"
+        _recipeImport.value = RecipeImportState(busy = true)
+        viewModelScope.launch {
+            val page = c.readerRepository.read(address)
+            val found = RecipeImport.fromBlocks(
+                blocks = page.blocks,
+                title = page.meta.title?.takeIf { it.isNotBlank() } ?: "Imported recipe",
+                sourceUrl = address,
+            )
+            if (found == null) {
+                _recipeImport.value = RecipeImportState(
+                    // The reader's own sentence when it has one — it knows about paywalls, dead links
+                    // and things that are not pages at all, and none of that is guessable from here.
+                    note = page.note
+                        ?: "That page opened, but there is no ingredient list on it this can read.",
+                )
+                return@launch
+            }
+            newRecipe()
+            draftName(found.title)
+            found.servings?.let { draftServings(it) }
+            _recipeImport.value = RecipeImportState(
+                summary = RecipeImport.sentence(found),
+                lines = found.ingredients,
+            )
+        }
+    }
+
+    /**
+     * Start matching one imported line against the food database.
+     *
+     * ⚠️ Searches the parsed NAME, never the raw line. "200 g plain flour, sifted" finds nothing;
+     * "plain flour" finds flour. That split is the whole reason [RecipeImport.Ingredient] keeps the
+     * quantity, the measure and the note apart from the name rather than handing back one string.
+     */
+    fun matchImported(index: Int) {
+        val line = _recipeImport.value.lines.getOrNull(index) ?: return
+        _recipeImport.value = _recipeImport.value.copy(matching = index)
+        searchFor(PickFor.RECIPE)
+        onSearchQuery(line.name)
+    }
+
+    /** Stop matching the current line without dropping it — the list is unchanged. */
+    fun cancelImportedMatch() {
+        _recipeImport.value = _recipeImport.value.copy(matching = null)
+        _picked.value = null
+        _search.value = Search()
+    }
+
+    /**
+     * Put an imported line aside.
+     *
+     * ⚠️ Called both when somebody skips a line deliberately and when [draftAdd] has just answered
+     * one. Nothing about the draft changes here: an ingredient the app has no record for is still in
+     * the pot, and the honest thing is to leave the recipe short and say so rather than invent it.
+     */
+    fun dropImported(index: Int) {
+        val s = _recipeImport.value
+        if (index !in s.lines.indices) return
+        _recipeImport.value = s.copy(
+            lines = s.lines.filterIndexed { i, _ -> i != index },
+            matching = null,
+        )
     }
 
     // ----------------------------------------------------------------------------------- the plan

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.health
 
+import dev.mascwa.pulse.data.reader.ReaderRepository
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -30,6 +31,16 @@ class HealthDeps(
     val foodRepository: FoodRepository,
     val healthExporter: HealthExporter,
     val healthImporter: HealthImporter,
+
+    /**
+     * Reading a recipe off a web page.
+     *
+     * ⚠️ **Not nullable, unlike [mealPhotoReader], and the difference is worth stating.** A vision
+     * model is a capability one application has and the other does not; a web page is neither, and
+     * both applications already build an `HttpClient`, so there is no honest state in which this is
+     * absent. Making it optional would invite a surface that silently does nothing.
+     */
+    val readerRepository: ReaderRepository,
 
     /** The health section of whatever this application calls its settings. */
     val healthSettings: Flow<HealthSettings>,

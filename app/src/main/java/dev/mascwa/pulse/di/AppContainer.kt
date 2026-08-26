@@ -487,6 +487,7 @@ class AppContainer(private val appContext: Context) {
             foodRepository = foodRepository,
             healthExporter = healthExporter,
             healthImporter = healthImporter,
+            readerRepository = readerRepository,
             healthSettings = settingsRepository.settings.map { it.health },
             // ⚠️ A read-modify-write, not a setter: `health` is one field of forty on AppSettings and
             // the other thirty-nine have to survive the write.
