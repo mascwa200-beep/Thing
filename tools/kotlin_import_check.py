@@ -81,6 +81,13 @@ SRC_ROOTS = sorted(
     if d.is_dir() and d.name in ("java", "kotlin")
 )
 
+# ⚠️ Discovered, not listed — the same reasoning as SRC_ROOTS, which was wrong once for exactly this
+# kind of hardcoding. `build` is excluded because AGP copies generated sources back under it, and a
+# stale copy there would keep declaring a name after its `.aidl` was deleted.
+# Measured at 0.05s over this whole repository, so it is not worth scoping to the source-root
+# patterns — and an unscoped walk keeps working wherever AGP is pointed.
+AIDL_FILES = [p for p in pathlib.Path(".").rglob("*.aidl") if "build" not in p.parts]
+
 # ⚠️ Written by the build, never present in source. Reporting them is the documented false positive
 # `android_resolve_check.sh` also carries; naming them here is cheaper than re-diagnosing it.
 GENERATED = {"R", "BuildConfig"}
@@ -102,7 +109,8 @@ BUILTINS = set(
     Class Integer Character ProcessBuilder ProcessHandle Object Void Boolean
     System Math Locale UUID Runtime Thread Error Runnable LinkageError
     UnsatisfiedLinkError NoClassDefFoundError StackOverflowError OutOfMemoryError
-    AssertionError CloneNotSupportedException InterruptedException""".split()
+    AssertionError CloneNotSupportedException InterruptedException
+    StackTraceElement StringBuffer ThreadLocal Iterable""".split()
 )
 
 
@@ -159,6 +167,21 @@ def strip(t: str) -> str:
             i += 3
             out.append(" ")
             continue
+        # ⚠️ **A CHARACTER LITERAL, and leaving this out silently inverted whole files.** Kotlin's
+        # `'` has no other use in code position, so a bare one always opens a char literal — and one
+        # containing a double quote, `'\"'`, is ordinary (`trim('`', '\"')` appears in this
+        # repository). Without this branch that `\"` opened a STRING, which then ran to the opening
+        # quote of some later real string, and from there the file was read inside-out: prose inside
+        # string literals became "code" and real code became "string". That is not one stray false
+        # positive — every symbol used after such a literal became INVISIBLE to this gate, which is
+        # precisely the miss it exists to catch. Found in `CiTool.kt`; 19 files carry the shape.
+        if t[i] == "'":
+            i += 1
+            while i < n and t[i] != "'":
+                i += 2 if t[i] == "\\" else 1
+            i += 1
+            out.append(" ")
+            continue
         if t[i] == '"':
             i += 1
             while i < n and t[i] != '"':
@@ -187,10 +210,21 @@ def declarations(text: str) -> set:
         r'^\s*(?:internal |private |public |abstract |open |sealed |expect |actual |suspend |'
         r'inline |operator |infix |tailrec |external |override |final |value )*'
         r'(?:fun|val|var|const val|class|object|enum class|interface|data class|'
-        r'annotation class|typealias) (?:<[^>]*> )?([A-Za-z_]\w*)', body, re.M))
+        # ⚠️ The optional dotted group is the EXTENSION RECEIVER, and without it this captured the
+        # receiver as the declared name: `fun BoxScope.CornerTag(` declared `BoxScope`, never
+        # `CornerTag`. It rarely showed, because extension function names are usually lowercase and
+        # this gate only judges capitalised symbols — but a private composable extension is exactly
+        # the case that is both capitalised and same-file, so it reported as unimported.
+        r'annotation class|typealias) (?:<[^>]*> )?(?:[A-Za-z_][\w.]*\.)?([A-Za-z_]\w*)', body, re.M))
     # ⚠️ `[(,;]` alone misses the LAST entry of an enum, which carries no trailing comma — and
     # Kotlin 2.0 resolves unqualified entries in a `when`, so those reads look unimported.
     names |= set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\s*(?:[(,;}]|$)', body, re.M))
+    # ⚠️ The line-anchored pattern above sees only the FIRST constant on a line, so a compact
+    # `A("a"), B("b"), C("c")` declared every entry but `A` as a call to something unimported.
+    # The enum bodies are already parsed properly for the constant checker, so read them from there
+    # rather than teaching the regex to count commas.
+    for members in enum_constants(text).values():
+        names |= set(members)
     return names
 
 
@@ -220,8 +254,33 @@ def _package_symbols(directory: pathlib.Path) -> set:
         extensions |= set(re.findall(
             r'^\s*(?:internal |private |public )*(?:val|var)\b[^=\n]*?\.([A-Za-z_]\w*)\s*(?::|\bget\b)',
             body, re.M))
+    names |= _aidl_interfaces(directory)
     _PKG_CACHE[key] = names | extensions
     return _PKG_CACHE[key]
+
+
+def _aidl_interfaces(directory: pathlib.Path) -> set:
+    """Interfaces declared by `.aidl` files whose package matches this directory's."""
+    pkg = _package_of(directory)
+    if not pkg:
+        return set()
+    out = set()
+    for aidl in AIDL_FILES:
+        text = aidl.read_text(errors="ignore")
+        declared = re.search(r'^\s*package\s+([\w.]+)\s*;', text, re.M)
+        if declared and declared.group(1) == pkg:
+            out |= set(re.findall(r'^\s*(?:oneway\s+)?interface\s+(\w+)', text, re.M))
+            out |= set(re.findall(r'^\s*parcelable\s+(\w+)', text, re.M))
+    return out
+
+
+def _package_of(directory: pathlib.Path) -> str:
+    """The Kotlin package a source directory holds, read from a file rather than from its path."""
+    for kt in directory.glob("*.kt"):
+        m = re.search(r'^package\s+([\w.]+)', kt.read_text(errors="ignore"), re.M)
+        if m:
+            return m.group(1)
+    return ""
 
 
 def declares(directory: pathlib.Path, symbol: str) -> bool:
@@ -446,6 +505,16 @@ def main(pkgdir: pathlib.Path) -> int:
     same_pkg = set()
     for text in texts.values():
         same_pkg |= declarations(text)
+
+    # ⚠️ **An AIDL interface is a same-package declaration with no Kotlin source, and it IS
+    # textually knowable — the `.aidl` file is right there.** `IInferenceService` is generated into
+    # `dev.mascwa.pulse.jarvis.inference` at build time, so both files using it read as an
+    # unimported symbol for as long as this gate has existed. Matched by the PACKAGE the aidl
+    # declares rather than by directory shape, because AGP keeps aidl under
+    # `src/main/aidl/<package path>` while Kotlin sits under `src/main/java` or `src/main/kotlin` —
+    # and hardcoding that relationship is exactly the assumption this file was already wrong about
+    # once, when a listed set of source roots made `:core:feeds` invisible.
+    same_pkg |= _aidl_interfaces(pkgdir)
 
     # ⚠️ A package can span modules. `dev.mascwa.pulse.data.settings` exists in BOTH :app and
     # :core:feeds — deliberately, so the shared repositories kept their import paths when they moved —
