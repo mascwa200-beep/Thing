@@ -62,8 +62,14 @@ class UpdateRepository(
     private val http: HttpClient,
     private val tag: String,
     private val workflow: String,
-    private val currentVersionCode: Int,
-    private val currentVersionName: String,
+    // ⚠️ **PUBLIC, and they have to be.** These two are what a screen shows as "you are on
+    // build N" — `SettingsViewModel.installedVersion` reads one of them directly. Writing them
+    // `private val` when this constructor was parameterised compiled fine here and broke `:app`,
+    // because promoting a public property to a constructor parameter silently changes its
+    // visibility if the modifier comes along for the ride. Checking that a member survived a move
+    // is not the same as checking it is still reachable.
+    val currentVersionCode: Int,
+    val currentVersionName: String,
     private val token: suspend () -> String?,
 ) {
 
