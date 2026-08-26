@@ -47,6 +47,26 @@ import java.util.Date
  * `BodyTrend` runs a filter over every weigh-in because day-to-day weight is mostly water, and both
  * this app and the LCARS one read the same estimate for the same reason.
  */
+/**
+ * How long the goal is, at the rate you are actually moving.
+ *
+ * ⚠️ **Absent entirely when no goal is set, rather than saying so.** Somebody maintaining has not
+ * asked the question, and "no goal weight set" printed under every weigh-in is the kind of line that
+ * teaches people to stop reading the card. Once a goal IS set every answer is shown, including the
+ * refusals — a missing date with no explanation reads as a fault rather than as the honest reply.
+ */
+@Composable
+private fun GoalCountdown(state: HealthViewModel.State) {
+    if (state.profile.goalKg <= 0.0) return
+    val unit = massUnitOf(state.profile.massUnit)
+    StatRow("Goal", "${round(state.profile.goalKg * unit.perKg, 1)} ${unit.label}")
+    Text(
+        state.goalProjection.sentence,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 fun BodyScreen(vm: HealthViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -61,6 +81,7 @@ fun BodyScreen(vm: HealthViewModel) {
                 // ⚠️ `hasRate` gates this, and the sentence carries a give-or-take of its own. A
                 // rate quoted from too few readings would state a direction the data cannot support.
                 StatRow("Change", BodyTrend.rateSentence(t.latest, unit, t.hasRate))
+                GoalCountdown(state)
             }
             is BodyTrend.Trend.TooLittle -> Text(
                 t.sentence,

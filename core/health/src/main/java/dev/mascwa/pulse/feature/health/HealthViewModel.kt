@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
+import dev.mascwa.pulse.core.telemetry.GoalProjection
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
@@ -212,6 +213,26 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         val unit: BodyTrend.MassUnit
             get() = runCatching { BodyTrend.MassUnit.valueOf(profile.massUnit) }
                 .getOrDefault(BodyTrend.MassUnit.KG)
+
+        /**
+         * When the goal weight arrives, if the last few weeks carry on.
+         *
+         * ⚠️ **A getter over this state's own fields rather than a stored one computed in [build],
+         * and that is the point rather than an economy.** It reads [trend] and [profile] off the same
+         * instance, so it is structurally incapable of quoting a projection from one moment beside a
+         * rate from another — which is the exact hazard this class's own opening note exists to
+         * prevent. Storing it would mean a second place the unit is resolved and a second chance for
+         * the two to drift. The arithmetic is a handful of divisions, unlike [week], which is stored
+         * because building one is real work.
+         */
+        val goalProjection: GoalProjection.Projection
+            get() {
+                val est = trend as? BodyTrend.Trend.Estimated
+                    ?: return GoalProjection.Projection.NotYet(
+                        "No weigh-ins yet — the count-down starts with the trend.",
+                    )
+                return GoalProjection.project(est.latest, est.hasRate, profile.goalKg, unit)
+            }
     }
 
     private val recompute = MutableStateFlow(0)

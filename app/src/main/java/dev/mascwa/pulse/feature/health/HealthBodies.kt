@@ -1135,6 +1135,27 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        // ⚠️ Only when a goal is actually set. Somebody maintaining has not asked how long anything
+        // will take, and "no goal weight set" under every weigh-in is the kind of line that teaches
+        // people to stop reading the panel. Once a goal IS set, every answer is shown — including the
+        // refusals, because a missing date with no explanation reads as a fault rather than a reply.
+        if (state.profile.goalKg > 0.0) {
+            item {
+                LcarsFrame(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        LcarsHeaderBar(
+                            "GOAL",
+                            trailing = fmt(state.profile.goalKg * unit.perKg) + " " + unit.label,
+                        )
+                        Text(
+                            state.goalProjection.sentence,
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 16.sp,
+                        )
+                    }
+                }
+            }
+        }
+
         // ⚠️ Off the TREND, and off the person the cores were given — not off the last thing the scale
         // said. A BMI that moves half a point because of yesterday's salt is the same lie the trend
         // exists to remove, and it is worse here because a band boundary makes it look categorical.
