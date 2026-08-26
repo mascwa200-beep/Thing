@@ -236,6 +236,21 @@ jobs:
             echo "::warning::no food database in this APK — barcodes will not be recognised offline"
           fi
 
+      # ⚠️ **Without this there is nothing to download on the run's own page, and that is exactly
+      # how somebody looking for the app fails to find it.** The release under `nutrition-latest` is
+      # a different page entirely — you have to know it exists and go to Releases — whereas the
+      # workflow run is where anyone naturally looks after watching a build go green. The LCARS
+      # workflow has carried this step since it was written; this one was missing it, so its run
+      # page showed a green tick and no artifact.
+      #
+      # `if-no-files-found: error` because a silent empty upload would restore the same dead end.
+      - name: Upload the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: nutrition-release-apk
+          path: nutrition/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
       - name: Publish
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2

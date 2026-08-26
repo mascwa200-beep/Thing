@@ -279,18 +279,30 @@ class SettingsViewModel(
     val companionState: StateFlow<UpdateUi> = _companion
 
     /**
-     * Ask what the newest nutrition build is.
+     * Fetch the nutrition app: ask GitHub what the newest build is and, if there is one, start
+     * downloading it. One action.
+     *
+     * ⚠️ **This used to be a bare "check", and that is precisely why somebody hunting for a way to
+     * get the app did not find one.** A person looking for a download expects a button that says
+     * download; a button that says *check* reads as diagnostics, and the actual Download control
+     * only appeared after that first tap succeeded. Three taps, the first two looking like
+     * different things. The check still happens — it has to, because the release URL is only known
+     * afterwards — it simply is not a separate decision any more.
      *
      * ⚠️ **Never [UpdateUi.UpToDate].** That repository is pointed at with `currentVersionCode = 0`
      * — this app cannot read the version of a package it does not own — so every published build is
      * newer than nothing and the answer is always either "here it is" or "it is not built yet".
      * Saying "up to date" would be a claim about a package this app has not looked at.
+     *
+     * ⚠️ It starts a download of roughly 180 MB without asking a second time, which is deliberate
+     * and is why the button has to name the size. The alternative — a confirmation between the
+     * check and the fetch — is the very step that made this unfindable.
      */
-    fun checkCompanion() {
+    fun getCompanion() {
         if (_companion.value is UpdateUi.Checking || _companion.value is UpdateUi.Downloading) return
         _companion.value = UpdateUi.Checking
         viewModelScope.launch {
-            _companion.value = runCatching { companionUpdates.check() }.fold(
+            val resolved = runCatching { companionUpdates.check() }.fold(
                 onSuccess = { result ->
                     val info = result.available
                     when {
@@ -314,6 +326,10 @@ class SettingsViewModel(
                     )
                 },
             )
+            _companion.value = resolved
+            // The whole point: having found a build, go and get it rather than waiting for a
+            // second tap on a control that was not visible until this moment.
+            if (resolved is UpdateUi.Available) downloadCompanion()
         }
     }
 

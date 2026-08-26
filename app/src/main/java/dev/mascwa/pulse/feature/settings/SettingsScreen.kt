@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
@@ -228,39 +229,54 @@ fun SettingsScreen(
                             "it runs on any phone. Same barcode database. Install it here; after that " +
                             "it keeps itself current."
                     }
-                    Row(
+                    // ⚠️ **A LABELLED button, not the round icon the rest of this screen uses, and
+                    // that is the whole fix.** `RoundCyberButton` is a 44dp circle holding a 20dp
+                    // icon; its string is a `contentDescription`, so it is read by a screen reader
+                    // and by nobody else. Every other control here is something you already know
+                    // you want — but this one is the *only* route by which the second application
+                    // can get onto the phone at all, and somebody hunting for a download has no
+                    // reason to read a small circular glyph as one. Reported as exactly that: no
+                    // button anywhere.
+                    Column(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        RoundCyberButton(LcarsIcons.Refresh, "Check for the nutrition app") {
-                            vm.checkCompanion()
-                        }
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         when (val st = n) {
-                            is UpdateUi.Available ->
-                                RoundCyberButton(Icons.Filled.Download, "Download it") { vm.downloadCompanion() }
-                            is UpdateUi.ReadyToInstall ->
-                                RoundCyberButton(Icons.Filled.InstallMobile, "Install it") {
+                            // Installing is the one step Android will not let an ordinary app do
+                            // for you, so it stays a separate, differently-worded action.
+                            is UpdateUi.ReadyToInstall -> LcarsButton(
+                                "INSTALL THE NUTRITION APP",
+                                {
                                     installApk(
                                         context,
                                         st.file,
                                         dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_PACKAGE,
                                     )
-                                }
-                            is UpdateUi.Error ->
-                                RoundCyberButton(Icons.Filled.Download, "Try again") { vm.checkCompanion() }
-                            else -> {}
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "NUTRITION",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                },
+                                Modifier.fillMaxWidth(),
                             )
-                            Text(
-                                status,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            // ⚠️ Disabled rather than hidden while it works. A control that vanishes
+                            // mid-operation leaves the screen looking as though the tap did nothing,
+                            // which is the same class of confusion this section is being fixed for.
+                            is UpdateUi.Checking, is UpdateUi.Downloading -> LcarsButton(
+                                "WORKING…",
+                                {},
+                                Modifier.fillMaxWidth(),
+                                enabled = false,
+                            )
+                            // ⚠️ The size is named because one tap now starts a ~180 MB download
+                            // with no second confirmation — see `getCompanion`. An unnamed number
+                            // that large is a nasty surprise on a metered connection.
+                            else -> LcarsButton(
+                                if (st is UpdateUi.Error) "TRY AGAIN — GET THE NUTRITION APP"
+                                else "GET THE NUTRITION APP  ·  ~180 MB",
+                                { vm.getCompanion() },
+                                Modifier.fillMaxWidth(),
                             )
                         }
                     }
