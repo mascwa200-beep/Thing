@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.feature.health.HealthViewModel
@@ -60,7 +61,14 @@ fun TodayScreen(vm: HealthViewModel) {
         }
     }
 
-    Eaten(state.eatenToday)
+    // ⚠️ Null, never a stand-in, when the plan has not been made. Two of the three guides below are
+    // a share of this number, and substituting 2,000 would produce a fibre reference that looks
+    // measured — `NutrientGuides.fibre` refuses for exactly that reason and this must not undo it.
+    AlsoToday(
+        eaten = state.eatenToday,
+        targetKcal = (plan as? MacroTargets.Plan.Set)?.targets?.kcal,
+        birthYear = state.profile.birthYear,
+    )
     Vitamins(state.microsToday, state.profile.sex, state.profile.birthYear)
     Everything(state.extrasToday)
     Entries(vm, entries)
@@ -98,13 +106,87 @@ private fun Targets(t: MacroTargets.Targets, eaten: NutritionDay.Nutrients) {
     }
 }
 
+/**
+ * Fibre, saturated fat, sodium and sugar — each against what it can honestly be measured against.
+ *
+ * ⚠️ **These were four bare totals, and a bare total is a number with no meaning.** "Sodium 3,400 mg"
+ * tells a reader nothing they can act on; "3,400 of 2,000 mg · past the usual ceiling" does. Every
+ * judgement here was already written and CI-tested in [NutrientGuides] — that fibre scales at 14 g
+ * per 1,000 kcal, that saturated fat is a tenth of energy, that sodium's figure is an adult one, and
+ * that total sugars cannot honestly be put against the added-sugars guideline — and this screen was
+ * reading none of it. Same shape as the economic figure with no vintage and the market with no
+ * session: the app held the meaning and showed only the number.
+ *
+ * ⚠️ **Nothing is ever lost when a guide cannot be stated.** [NutrientGuides.forDay] returns between
+ * zero and three servings depending on facts about the reader, so rendering only what it returns
+ * would make fibre disappear entirely for anyone whose plan has not been made — a total the app has
+ * and does not show. Every nutrient keeps its row; the ones without a guide carry
+ * [NutrientGuides.whyAbsent] in place of the comparison, which is a fact the reader can act on
+ * rather than a silence.
+ *
+ * ⚠️ **The bar clamps at one and the words carry the overshoot**, which is the same remedy as the
+ * macro rows above: `readout` says "3400 of 2000 mg" and `sentence` says "past the usual ceiling",
+ * so past a LIMIT is stated twice in text. A colour would carry it on the LCARS side and cannot
+ * here — this module takes the device's dynamic scheme, so no role above `primary` means anything
+ * fixed. See `MacroTargets.Bound`.
+ */
 @Composable
-private fun Eaten(eaten: NutritionDay.Nutrients) {
+private fun AlsoToday(eaten: NutritionDay.Nutrients, targetKcal: Int?, birthYear: Int) {
+    // ⚠️ Nothing logged means these totals are zero because the day is empty, not because the food
+    // had none of them — so the whole section is absent rather than showing four zeros and three
+    // explanations on a day nobody has eaten on yet. The same gate is on the LCARS copy.
+    if (eaten.kcal <= 0.0) return
+    val year = Calendar.getInstance().get(Calendar.YEAR)
+    // ⚠️ Indexed by the nutrient the CORE stamped, never by the display label. A label is prose and
+    // a reworded one would silently leave a nutrient rendered twice or not at all.
+    val stated = NutrientGuides.forDay(eaten, targetKcal, birthYear, year)
+        .mapNotNull { s -> s.guide.nutrient?.let { it to s } }
+        .toMap()
+
     SectionCard("Also today") {
-        StatRow("Fibre", "${round(eaten.fibreG)} g")
+        NutrientGuides.Nutrient.entries.forEach { n ->
+            val serving = stated[n]
+            if (serving == null) {
+                StatRow(n.label, "${round(n.eatenIn(eaten))} ${n.unit}")
+                NutrientGuides.whyAbsent(n, targetKcal, birthYear, year)?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                val g = serving.guide
+                StatRow(n.label, g.readout(serving.eaten))
+                LinearProgressIndicator(
+                    progress = { g.fractionOf(serving.eaten).coerceIn(0.0, 1.0).toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    NutrientGuides.sentence(g, serving.eaten),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // The basis, because two of the three move with the calorie target and one does not
+                // — and a figure that moves for a reason the screen has not given reads as a bug.
+                Text(
+                    "${g.basis} · ${g.source}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        // ⚠️ Sugar last and with no bar, which is the core's own refusal rather than an omission
+        // here: both food sources publish TOTAL sugars and the guideline everybody quotes is about
+        // ADDED sugars, which the data cannot separate. A bar would tell somebody eating fruit they
+        // had breached a limit they had not gone near.
         StatRow("Sugars", "${round(eaten.sugarG)} g")
-        StatRow("Saturated fat", "${round(eaten.satFatG)} g")
-        StatRow("Sodium", "${round(eaten.sodiumMg)} mg")
+        Text(
+            NutrientGuides.sugarNote,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

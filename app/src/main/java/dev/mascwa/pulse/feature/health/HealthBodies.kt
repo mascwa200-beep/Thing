@@ -168,17 +168,41 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         // caller. Which of them can be shown is NutrientGuides' judgement, not this screen's — two of
         // the three need a calorie target and one needs an adult birth year, and inventing either
         // would produce a bar that looks measured.
+        val thisYear = LocalDate.now(ZoneId.systemDefault()).year
         val guides = NutrientGuides.forDay(
             eaten = eaten,
             targetKcal = targets.kcal,
             birthYear = state.profile.birthYear,
-            thisYear = LocalDate.now(ZoneId.systemDefault()).year,
-        )
-        if (guides.isNotEmpty() || eaten.sugarG > 0.0) {
-            item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
-        }
-        items(guides) { serving -> NutrientRow(serving.guide, serving.eaten) }
-        if (eaten.sugarG > 0.0) {
+            thisYear = thisYear,
+        ).mapNotNull { s -> s.guide.nutrient?.let { it to s } }.toMap()
+        // ⚠️ Nothing logged means these totals are zero because the day is empty, not because the
+        // food had none of them — so the section is absent rather than showing four zeros and three
+        // explanations on a day nobody has eaten on yet.
+        val anythingLogged = eaten.kcal > 0.0
+        if (anythingLogged) item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
+        // ⚠️ **Every nutrient keeps its row whether or not a guide can be stated for it.** This used
+        // to render only what `forDay` returned, so with no birth year the sodium TOTAL — a real
+        // measured figure the app is holding — was not on the screen at all. That is this repo's
+        // recurring defect class, parsed-and-never-shown, and it hid exactly the two facts a reader
+        // could have fixed. An unguided row now carries `whyAbsent` where the comparison would be.
+        if (anythingLogged) {
+            items(NutrientGuides.Nutrient.entries) { n ->
+                val serving = guides[n]
+                if (serving != null) {
+                    NutrientRow(serving.guide, serving.eaten)
+                } else {
+                    NutrientTotalRow(
+                        label = n.label,
+                        value = "${n.eatenIn(eaten).roundToInt()} ${n.unit}",
+                        why = NutrientGuides.whyAbsent(
+                            n,
+                            targets.kcal,
+                            state.profile.birthYear,
+                            thisYear,
+                        ),
+                    )
+                }
+            }
             item { SugarRow(eaten.sugarG) }
         }
 
@@ -525,6 +549,39 @@ private fun MicroRow(
                     caveat,
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A total the app can measure and cannot yet compare, with the reason in place of the comparison.
+ *
+ * ⚠️ Shaped like [SugarRow] rather than [NutrientRow], and that is the point: no bar, because there
+ * is nothing to fill one against. A bar drawn at zero beside a real figure reads as "none of your
+ * allowance used", which is the opposite of "we cannot say".
+ *
+ * ⚠️ [why] comes from `NutrientGuides.whyAbsent` and is nullable because that function returns null
+ * when a guide DOES exist — a state this composable is never called in, but taking the value as it
+ * comes beats a `!!` at the call site.
+ */
+@Composable
+private fun NutrientTotalRow(label: String, value: String, why: String?) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    value,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink2,
+                )
+            }
+            why?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp)
             }
         }
     }
