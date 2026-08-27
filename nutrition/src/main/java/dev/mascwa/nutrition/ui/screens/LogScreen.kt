@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.round
+import dev.mascwa.pulse.core.telemetry.FoodPhrase
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MealDraft
 import dev.mascwa.pulse.core.telemetry.NutritionDay
@@ -47,6 +48,7 @@ fun LogScreen(vm: HealthViewModel) {
 
     MealPicker(meal) { meal = it }
     PlateCard(vm)
+    DescribeCard(vm, meal)
     FindAFood(vm, meal)
     Recents(vm, meal)
     QuickAddCard(vm, meal)
@@ -178,6 +180,128 @@ private fun MealPicker(meal: NutritionDay.Meal, onPick: (NutritionDay.Meal) -> U
                 )
             }
         }
+    }
+}
+
+// ------------------------------------------------------------------------------ describing a meal
+
+/**
+ * A whole meal in one line of ordinary English.
+ *
+ * ⚠️ **Nothing is logged until the list has been read.** The parser is deterministic and good at the
+ * shapes people write, and it is still reading somebody's words — so what it understood is shown
+ * first, item by item, with the record each one matched. That readback is the feature. A field that
+ * silently turned a sentence into six log entries would put figures nobody checked into the record
+ * that every target in this app is measured from.
+ *
+ * ⚠️ **An unmatched line stays on screen with its name and a way to search for it.** Dropping it
+ * quietly would leave the day looking complete and short by whatever it was.
+ */
+@Composable
+private fun DescribeCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val state by vm.describe.collectAsStateWithLifecycle()
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    var text by remember { mutableStateOf("") }
+
+    SectionCard(
+        "Describe it",
+        subtitle = "Type the meal the way you would say it, and it comes apart into things to log.",
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("What did you eat") },
+            placeholder = { Text("two eggs, a slice of toast and 200g of chicken") },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { vm.describeMeal(text) },
+                enabled = text.isNotBlank() && !state.busy,
+            ) { Text("Read it") }
+            if (state.items.isNotEmpty()) {
+                TextButton(onClick = { text = ""; vm.clearDescribed() }) { Text("Start again") }
+            }
+        }
+
+        if (state.busy) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(Modifier.padding(2.dp))
+                Text("Looking each one up…", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        state.items.forEachIndexed { i, row -> DescribedRow(vm, i, row) }
+
+        if (state.note.isNotBlank()) {
+            Text(
+                state.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (state.ready > 0) {
+            Button(
+                onClick = { vm.logDescribed(meal, toPlate = building) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (building) "Add ${state.ready} to the plate"
+                    else "Log ${state.ready} to ${meal.label.lowercase()}",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DescribedRow(vm: HealthViewModel, index: Int, row: HealthViewModel.Described) {
+    // ⚠️ Hoisted to locals before the null test. `Described` is declared in another module, and
+    // Kotlin will not smart-cast a public property across a module boundary — the trap this repo has
+    // paid for three times, and one the local gates cannot see.
+    val food = row.food
+    val grams = row.grams
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            // What was UNDERSTOOD, in the core's own words — "a serving" rather than "1 serving"
+            // where nothing was stated, because those are different claims.
+            Text(FoodPhrase.describe(row.item), style = MaterialTheme.typography.bodyMedium)
+            when {
+                food != null && grams != null -> Text(
+                    "${food.display} · ${round(grams)} g · " +
+                        "${round(FoodPortion.eaten(food.per100g, grams).kcal)} kcal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // Matched, but the record never said what one of them weighs, so nothing here can.
+                food != null -> Text(
+                    "${food.display} — but it does not say what one comes to. Say it in grams.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                else -> Text(
+                    "Nothing matched “${row.item.name}”.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (!row.ready) {
+            TextButton(onClick = { vm.searchDescribed(index) }) { Text("Find") }
+        }
+        TextButton(onClick = { vm.dropDescribed(index) }) { Text("Drop") }
     }
 }
 

@@ -12,6 +12,7 @@ import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.GoalProjection
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
+import dev.mascwa.pulse.core.telemetry.FoodPhrase
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.PeriodCompare
@@ -666,12 +667,48 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     }
 
     /**
-     * Log a portion of a found food.
+     * The entry a portion of [food] would become, or null when the amount cannot be worked out.
      *
-     * ⚠️ The conversion to what was actually eaten happens **here and nowhere else**, through
-     * [FoodPortion.eaten]. Every source publishes per 100 grams; an entry stores what is on the plate.
-     * Carrying a per-100-gram figure any further is how a 30-gram biscuit gets logged as a packet.
+     * ⚠️ **The conversion to what was actually eaten happens here and nowhere else**, through
+     * [FoodPortion.eaten]. Every source publishes per 100 grams; an entry stores what is on the
+     * plate. Carrying a per-100-gram figure any further is how a 30-gram biscuit gets logged as a
+     * packet.
+     *
+     * ⚠️ And it is ONE construction of [NutritionDay.Entry] for every path that logs a found food —
+     * the portion box, the plate, and a described meal. Two constructions meant to agree is exactly
+     * how one of them quietly gains a field the other does not, and the loss is invisible because
+     * the entry still looks complete.
+     *
+     * ⚠️ Null when [FoodPortion.gramsFor] cannot say what the portion weighs — a serving of a record
+     * that never declared one. The caller has to say so rather than invent a weight.
      */
+    private fun entryFor(
+        food: Food,
+        amount: Double,
+        unit: FoodPortion.Unit,
+        meal: NutritionDay.Meal,
+    ): NutritionDay.Entry? {
+        val grams = FoodPortion.gramsFor(FoodPortion.Portion(amount, unit), food.sizes) ?: return null
+        val eaten = FoodPortion.eaten(food.per100g, grams)
+        return NutritionDay.Entry(
+            id = UUID.randomUUID().toString(),
+            dayStartMs = _today.value,
+            atMs = System.currentTimeMillis(),
+            name = food.display,
+            grams = grams,
+            nutrients = eaten,
+            meal = meal,
+            brand = food.brand,
+            servingLabel = food.servingLabel,
+            source = food.source,
+            foodId = food.id,
+            // Through the same scaling rule as the macros above — see FoodPortion.
+            micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
+            extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
+        )
+    }
+
+    /** Log a portion of a found food. The arithmetic is [entryFor]'s. */
     fun logPortion(
         food: Food,
         amount: Double,
@@ -689,27 +726,8 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
          */
         toPlate: Boolean = false,
     ) {
-        val portion = FoodPortion.Portion(amount, unit)
-        val grams = FoodPortion.gramsFor(portion, food.sizes) ?: return
-        val eaten = FoodPortion.eaten(food.per100g, grams)
-        val now = System.currentTimeMillis()
+        val entry = entryFor(food, amount, unit, meal) ?: return
         viewModelScope.launch {
-            val entry = NutritionDay.Entry(
-                id = UUID.randomUUID().toString(),
-                dayStartMs = _today.value,
-                atMs = now,
-                name = food.display,
-                grams = grams,
-                nutrients = eaten,
-                meal = meal,
-                brand = food.brand,
-                servingLabel = food.servingLabel,
-                source = food.source,
-                foodId = food.id,
-                // Through the same scaling rule as the macros above — see FoodPortion.
-                micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
-                extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
-            )
             if (toPlate) c.plateStore.stage(entry) else c.foodLogStore.add(entry)
             _picked.value = null
             _search.value = Search()
@@ -822,6 +840,152 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             if (!toPlate) {
                 reloadEntries()
                 recompute.value++
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ a meal described in words
+
+    /**
+     * One thing somebody named, and the record it was matched to.
+     *
+     * ⚠️ [food] null means **unmatched, and it is reported rather than dropped**. A described meal
+     * that quietly logged four of its five things would be worse than one that logged nothing: the
+     * day would look complete and be short by a meal's worth of calories, with nothing on screen to
+     * say which one went missing.
+     */
+    data class Described(
+        val item: FoodPhrase.Item,
+        val food: Food? = null,
+        /** What the stated portion weighs, or null when the record cannot say. */
+        val grams: Double? = null,
+    ) {
+        /** Enough to log: a record, and a weight the record could actually give. */
+        val ready: Boolean get() = food != null && grams != null
+    }
+
+    /**
+     * What a description came to, before anything is logged.
+     *
+     * ⚠️ One flow rather than several, shaped like [Search] and [RecipeImportState] above, for the
+     * same reason: a busy flag that can disagree with the list it belongs to is how a spinner ends
+     * up spinning over rows that already arrived.
+     */
+    data class DescribeState(
+        val busy: Boolean = false,
+        val items: List<Described> = emptyList(),
+        /** Why a row is short, when one is. Empty otherwise. */
+        val note: String = "",
+    ) {
+        /** How many could be logged as they stand — the number the button offers. */
+        val ready: Int get() = items.count { it.ready }
+    }
+
+    private val _describe = MutableStateFlow(DescribeState())
+    val describe: StateFlow<DescribeState> = _describe.asStateFlow()
+
+    private var describeJob: Job? = null
+
+    /**
+     * Read a described meal and match each thing in it to a record.
+     *
+     * ⚠️ **THE INVARIANT, which is [FoodPhrase]'s and the photograph path's: the words name foods,
+     * and every NUMBER comes from a real record.** Nothing here knows what an egg contains. The name
+     * goes to the food search, the amount goes to [FoodPortion], and a name that matches nothing is
+     * reported unmatched.
+     *
+     * ⚠️ **Searched LOCALLY — the network is deliberately not consulted, one item at a time.** A
+     * described meal names generic foods ("two eggs, a slice of toast"), which is exactly what the
+     * bundled seed holds; a packaged good is named by scanning it or searching for it, where the
+     * result can be seen before it is committed. The alternative is up to [FoodPhrase.MAX_ITEMS]
+     * sequential requests to a community server behind one spinner, or a concurrent burst at it, and
+     * neither is worth it for the half of the corpus this path is least likely to need. An unmatched
+     * row keeps its name and hands it to the ordinary search box, so nothing is lost — it is routed
+     * to the path that can find it.
+     */
+    fun describeMeal(text: String) {
+        describeJob?.cancel()
+        val parsed = FoodPhrase.parse(text)
+        if (parsed.isEmpty()) {
+            _describe.value = DescribeState()
+            return
+        }
+        _describe.value = DescribeState(busy = true)
+        describeJob = viewModelScope.launch {
+            val rows = parsed.map { item ->
+                val portion = item.portion ?: return@map Described(item)
+                val food = c.foodRepository.search(item.name, online = false).foods.firstOrNull()
+                Described(
+                    item = item,
+                    food = food,
+                    grams = food?.let { FoodPortion.gramsFor(portion, it.sizes) },
+                )
+            }
+            _describe.value = DescribeState(
+                items = rows,
+                note = when {
+                    rows.none { it.ready } ->
+                        "Nothing here matched a record. Search for them one at a time below — a " +
+                            "packaged food is found by name or by its barcode, not by describing it."
+                    rows.any { it.food != null && it.grams == null } ->
+                        "A row saying it cannot work the amount out has a record that never " +
+                            "declared what one of them weighs. Say that one in grams instead."
+                    else -> ""
+                },
+            )
+        }
+    }
+
+    /** Put one described row aside. Nothing else about the description changes. */
+    fun dropDescribed(index: Int) {
+        val s = _describe.value
+        if (index !in s.items.indices) return
+        _describe.value = s.copy(items = s.items.filterIndexed { i, _ -> i != index })
+    }
+
+    /** Hand an unmatched name to the ordinary search box, which can reach the network. */
+    fun searchDescribed(index: Int) {
+        val row = _describe.value.items.getOrNull(index) ?: return
+        searchFor(PickFor.LOG)
+        onSearchQuery(row.item.name)
+    }
+
+    fun clearDescribed() {
+        describeJob?.cancel()
+        _describe.value = DescribeState()
+    }
+
+    /**
+     * Log everything that matched, in one go.
+     *
+     * ⚠️ **The rows that did NOT match are left standing**, and the notice says how many. Clearing
+     * the whole description would take the only record of what was missed off the screen at the
+     * moment it becomes actionable.
+     *
+     * ⚠️ One store write and one recompute for the lot, rather than [logPortion] per row: a
+     * described meal is several things, and reloading the day and moving the plan six times over is
+     * six chances for a target to visibly jump while somebody is still reading the list.
+     */
+    fun logDescribed(meal: NutritionDay.Meal, toPlate: Boolean = false) {
+        val rows = _describe.value.items
+        val entries = rows.mapNotNull { r ->
+            val food = r.food ?: return@mapNotNull null
+            val p = r.item.portion ?: return@mapNotNull null
+            entryFor(food, p.amount, p.unit, meal)
+        }
+        if (entries.isEmpty()) return
+        val left = rows.filterNot { it.ready }
+        viewModelScope.launch {
+            entries.forEach { if (toPlate) c.plateStore.stage(it) else c.foodLogStore.add(it) }
+            _describe.value = DescribeState(items = left)
+            if (!toPlate) {
+                reloadEntries()
+                recompute.value++
+            }
+            val where = if (toPlate) "the plate" else meal.label.lowercase()
+            _notice.value = when {
+                left.isEmpty() -> "${entries.size} logged to $where."
+                else -> "${entries.size} logged to $where · ${left.size} still to find."
             }
         }
     }

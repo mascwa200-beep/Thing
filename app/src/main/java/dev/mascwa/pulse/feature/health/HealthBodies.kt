@@ -57,6 +57,7 @@ import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.FoodPhrase
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
@@ -833,6 +834,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
         item { Notice(vm) }
         item { DayStepper(vm) }
         item { PlatePanel(vm) }
+        item { DescribeAMeal(vm, meal) }
         item { FindAFood(vm, meal) }
         item { PhotoOfAMeal(vm, meal) }
         item { EatenBefore(vm, meal) }
@@ -3072,6 +3074,127 @@ private fun PlateRow(
 }
 
 private val GRAMS_W = 78.dp
+
+// --------------------------------------------------------------------------- describing a meal
+
+/**
+ * A whole meal in one line of ordinary English.
+ *
+ * ⚠️ **Nothing is logged until the list has been read.** The parser is deterministic and good at the
+ * shapes people write, and it is still reading somebody's words — so what it understood is shown
+ * first, item by item, with the record each one matched. That readback is the feature. A field that
+ * silently turned a sentence into six entries would put figures nobody checked into the record every
+ * target in this tab is measured from.
+ *
+ * ⚠️ **An unmatched line stays on screen with its name and a way to search for it.** Dropping it
+ * quietly would leave the day looking complete and short by whatever it was.
+ */
+@Composable
+private fun DescribeAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val c = Pulse.colors
+    val state by vm.describe.collectAsStateWithLifecycle()
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    var text by remember { mutableStateOf("") }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "DESCRIBE A MEAL",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                "Say it the way you would say it. It comes apart into things to log, and nothing " +
+                    "goes in until you have read the list.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+            )
+            LcarsField(
+                text,
+                { text = it },
+                placeholder = "two eggs, a slice of toast and 200g of chicken",
+                singleLine = false,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                LcarsButton(
+                    text = "▸ READ IT",
+                    enabled = text.isNotBlank() && !state.busy,
+                    onClick = { vm.describeMeal(text) },
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.items.isNotEmpty()) {
+                    LcarsButton(
+                        text = "START AGAIN",
+                        onClick = { text = ""; vm.clearDescribed() },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            if (state.busy) {
+                Text("Looking each one up…", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            state.items.forEachIndexed { i, row -> DescribedRow(vm, i, row) }
+            if (state.note.isNotBlank()) {
+                Text(
+                    state.note,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+            if (state.ready > 0) {
+                LcarsButton(
+                    text = if (building) "▸ ADD ${state.ready} TO THE PLATE"
+                    else "▸ LOG ${state.ready} TO ${meal.label.uppercase()}",
+                    onClick = { vm.logDescribed(meal, toPlate = building) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One thing that was read, and the record it found.
+ *
+ * ⚠️ [HealthViewModel.Described.food] and `grams` are hoisted to locals before the null test. The
+ * type is declared in `:core:health`, and Kotlin will not smart-cast a public property across a
+ * module boundary — the trap this repository has paid for three times, and one none of the local
+ * gates can see.
+ */
+@Composable
+private fun DescribedRow(vm: HealthViewModel, index: Int, row: HealthViewModel.Described) {
+    val c = Pulse.colors
+    val food = row.food
+    val grams = row.grams
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            // The core's own words for what was understood — "a serving" where nothing was stated,
+            // rather than "1 serving", because those are different claims.
+            Text(
+                FoodPhrase.describe(row.item),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            Text(
+                when {
+                    food != null && grams != null ->
+                        "${food.display} · ${fmt(grams)} g · " +
+                            "${fmt(FoodPortion.eaten(food.per100g, grams).kcal)} kcal"
+                    // Matched, but the record never said what one of them weighs, so nothing can.
+                    food != null -> "${food.display} — no serving weight on record. Say it in grams."
+                    else -> "Nothing matched “${row.item.name}”."
+                },
+                fontFamily = JetBrainsMono, fontSize = 9.sp,
+                color = if (row.ready) c.muted else c.amber,
+                lineHeight = 13.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!row.ready) {
+            LcarsButton(text = "FIND", onClick = { vm.searchDescribed(index) })
+        }
+        LcarsButton(text = "DROP", onClick = { vm.dropDescribed(index) })
+    }
+}
 
 // ------------------------------------------------------------------------------- finding a food
 
