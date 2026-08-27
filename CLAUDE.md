@@ -9556,3 +9556,141 @@ The everyday one is checkable now: a weigh-in or measurement recorded **yesterda
 read "Yesterday" this morning, not "Today". Then, if you want fault reports reaching me, the token
 needs write access to contents — the diagnostics card says so now, and a refusal names the cause
 rather than printing a status code.
+
+### THE 63-FINDING AUDIT BACKLOG, WORKED — and the gate that was believed impossible (this session, PR #464)
+
+Owner, three parts in one message: *"optimize everything across the app make sure that a potato could
+run this thing, and I am talking about the nutrition app yes. also look at any and every debug log
+sent in wherever it's going to be ready I think you have like debug logs from two different phones
+also do a massive bug fix pass just full pass on everything"*. Alongside it, the standing constraint
+that has governed every arc since: **be 100% conscious of the usage plan as to not use any of it** —
+which overrides the ultracode directive AND plan mode's own instruction to dispatch Explore/Plan
+agents. **Zero subagent and zero workflow spend for the whole session.** Every check was local
+kotlinc + JUnit, live endpoint probes, `javap` against real jars, the four local gates, and CI.
+
+Three adversarial audit workflows had finished earlier and returned **63 adversarially-confirmed
+findings** at a cost of ~47M subagent tokens (they hit the session limit doing it). That spend was
+already sunk; the work below is entirely local. ⚠️ **Those workflows analysed a MOVING HEAD, so
+several findings were already fixed by the time they landed** — each was re-checked before being
+acted on, and about six were already closed.
+
+**The debug logs are read, and the reports themselves were the finding.** Three on the
+`debug-reports` branch, from **two phones** exactly as the owner said — a Pixel 10 Pro XL (builds #36
+and #46) and a **Samsung SM-A166U1**, a Galaxy A16, which is the genuine budget device. ⚠️ **Nothing
+crashed on either**; all three are manual context reports with no fault recorded. But measured over
+all three: **254 logcat lines and not one from our own code** — `VRI[MainActivity]` 78, `ImeTracker`
+36, `InsetsController` 35, the rest loader and font chatter. One report spanned **five different
+pids** under a heading claiming "this process only". `LogcatFilter` now keeps warnings and errors from
+**every** launch in the buffer (a previous launch's crash is the only record of it when the fault
+handler did not survive), attaches a stack trace's continuation lines to their record (they carry no
+pid prefix and are the most valuable thing in the dump), and sets the chatter aside **counted**.
+
+**Shipped, in order:** `c76b098` BundleCheck's two full scans over 4.5M rows → the `meta` values the
+builder already writes · `0fe1d05` the barcode scanner never released the camera · `666cd7d` the
+as-you-type search read all 4.4M rows every keystroke · `1cff0e9` six health flows off `Eagerly` ·
+`86a2977` **neither app could read a number typed on a comma keyboard** (`Decimals`, 60 sites, 14
+sanitisers) · `9f72e8b` a food found by name lost 29 nutrients a barcode kept · `feab86b` the food
+log's sharding saved decoding and nothing else · `ed5968a` the importer read a picker-chosen file
+whole · `b5c2f2c` **MEMORY crashed before it drew** · `4534897` the standalone app could not find a
+generic food · `9cbdbcf` a fractional plate load could not be typed · `b4c0bc5` the fault report ·
+`67b2b81` three stores · `73146ec` the feeds · `1e1baaf` the CI fix + potato pass · `e9e0d43` six
+small lies + the gate.
+
+**The four worth carrying forward as patterns:**
+
+- ⚠️ **`MEMORY` crashed before drawing, and it was a whole class.** One `LazyColumn` holding **eight**
+  keyed lists, three of them dense `Long` sequences from 0 or 1 (`AgentNoteEntity.id` autoGenerate,
+  `Memory.id` max+1, `AuditEntry.seq = entries.size`). Compose passes the item key straight to
+  `subcompose` as the slot id and throws `Key "1" was already used`. With one note and one memory
+  everything is co-visible in the first frame, and both stores persist — so it died **every time**, on
+  the only surface for reviewing what the assistant has learned about you. A sweep found **13 screens**
+  with 2+ keyed lists in one lazy scope. Fixed with a per-list literal prefix everywhere, and
+  **`LazyKeyTest`** is the permanent gate, negative-tested against both real collisions.
+- ⚠️ **The standalone app could not find a generic food, and the absence was swallowed.**
+  `FoodRepository.SEED_ASSET` is committed at `app/src/main/assets/food/seed.tsv` (3,134,481 bytes,
+  13,186 USDA records — the ones carrying real micronutrients) and `nutrition-build.yml` copied only
+  `food.db`. So searching "chicken breast" found nothing generic, describe-a-meal matched nothing, and
+  photo proposals matched nothing — all rendering as "no such food". Fixed in **Gradle, not the
+  workflow**, so a local build gets it too and nothing can drift, plus a CI assertion that the APK
+  really contains it.
+- ⚠️ **Three stores lied about what they wrote.** 25 DataStore edits each wrapped in `runCatching{}`
+  with the Result discarded, so `MainActivity.flush(name){}` — whose own KDoc calls a swallowed write
+  there "the worst place in the app for a swallowed failure" — was **structurally unreachable**. Every
+  store now keeps its last write in a `@Volatile Result<*>?` that `flushNow()` rethrows. And the audit
+  ledger reported **"Intact" while corrupt**: an undecodable blob set `corrupt = true`, installed a
+  fresh empty chain, and `flush()` then returned at its first line **for the life of the install** —
+  so `verify()` walked the empty chain and said intact while every prior entry was gone and every
+  future one unwritten.
+- ⚠️ **`SafetyRepository` shared one non-thread-safe `SimpleDateFormat` across four concurrent
+  loaders.** It keeps a mutable `Calendar`, so concurrent `parse` can return a time assembled from two
+  different strings rather than merely throwing — which presents an **expired weather warning as
+  current**. Moved to `java.time` (API 26, and 26 such imports already existed in shared modules).
+  Verified by running the old and new parsers over **143 live timestamps**.
+
+**⚠️ THE GATE, AND THE BELIEF THAT COST A CI ROUND.** `Result.failure(...)` assigned to a `Result<*>?`
+cannot infer `T` — a star projection gives the compiler nothing to infer from. It parses, every name
+resolves, and it fails `:core:health:compileDebugKotlin`. Two workflows failed together, because both
+applications compile that module. No local gate could see it, and the standing note said the module
+"cannot be built in this container".
+
+**That note was WRONG.** The belief came from reaching for the plain KMP DataStore AAR, which is
+manifest-only — every store then reported hundreds of unresolved names and the conclusion drawn was
+that the module was out of reach. With the `-android`/`-jvm` variant coordinates **the WHOLE module
+compiles against the real platform classes in about twenty seconds**, stores, Health Connect bridge
+and the 1,370-line view model included. The recipe is in `tools/android_compile_check.sh`'s header;
+`tools/check_changed.sh` now runs it automatically whenever a `core/health` file changes. Both
+branches proven, and restoring the defect reproduces CI's exact two errors.
+
+Two details in that stage are load-bearing: the shared cores go on as **compiled classes, never
+sources** (folding them makes it one module and a cross-module smart-cast error vanishes, so the gate
+would pass on code CI rejects), and it **requires the `compiles clean` line** rather than treating
+quiet as success — this script has reported clean having compiled nothing once already.
+
+**The last six, in `e9e0d43`:** "yesterday" decided by elapsed time rather than a calendar (a story
+filed Monday afternoon was still called yesterday on Wednesday; also the 25-hour-day case, pinned in a
+zone that observes it); two cache keys and one identity key spelled in the device's language;
+`importEntries` leaving a day claiming to be a fast while carrying food; `DebugUploader` sending the
+five **newest** reports while `CrashReporter.trim` deletes the oldest, so a crash-looping phone
+discarded the report explaining the loop; a cancelled photograph orphaning its file for ever; and
+`*.pyc` un-ignored since `bafeba2` because a wrapped comment was split to insert the Python block.
+
+**Deliberately NOT done, and it needs the owner's go-ahead:** R8 and resource shrinking on
+`:nutrition`. It is the biggest single APK win — 42.5 MB of third-party archives ship whole out of a
+180 MB download — and it is exactly the class of change that compiles green and breaks on the device,
+which cost this project a whole session once already (the `JsRuntime` keep rule). Also not done: a
+full `LazyColumn` restructure of all six nutrition screens (measured — the lists are capped almost
+everywhere and the realistic worst case is a few hundred nodes, so the win is moderate and the change
+is render-blind across 12 files), and trimming the shared cores down to what the nutrition app reaches,
+which R8 would largely subsume.
+
+**Recorded rather than built, for the owner to decide:** a broken food bundle is indistinguishable
+from an empty one. `OfflineFoodStore.guard()` correctly catches a read failure — its KDoc names the
+out-of-disk case, which is the budget-phone risk — but "no bundle", "bundle unreadable" and "nothing
+matched" all return the same empty `Scan`, and on the barcode path a broken bundle falls through to
+the network, so with no signal the user is told "could not reach Open Food Facts": honest about the
+network and wrong about the cause. `FoodLookup` already has the vocabulary (Found / NoNutrition /
+NotInDatabase / Unreachable); whether a broken bundle earns its own state or a screen-level banner
+touches shared UI in both apps.
+
+**⚠️ A FIFTH WAY A NEGATIVE TEST PROVES NOTHING, added to the four already recorded.** The four are:
+the perturbation never matched the source; it only *touched* the code without removing the property;
+the fixture never reached the branch; the assertion was too weak to see the damage. The new one:
+**the perturbation restored a DIFFERENT wrong thing than the defect being guarded against.** Swapping
+one calendar comparison for another reported the guard ASLEEP; restoring the real elapsed-days source
+failed exactly the two tests written for it. Derive the perturbation from the code that actually
+shipped before the fix, not from a plausible-looking alternative.
+
+**⚠️ Operational notes from this session.** `list_workflow_runs` blows the tool's token limit even at
+`per_page: 1` — save the result and parse it with python, and note the payload's shape varies (one
+call returned runs carrying `conclusion`, another did not). `list_workflow_jobs` with a run id is
+small and gives per-step status, which is what to poll. **"Run unit tests" is the compile gate at
+~3m30s; a full Android round is ~13 minutes and the APK step alone is ~7-9.** And ⚠️ **eight queued
+`check_run.completed` failure notifications all named commits already superseded** by a fix pushed
+before they were read — the pairs of failures are the tell that both applications compile
+`:core:health`. A wake on a failure already fixed needs no comment.
+
+⚠️ **Owner-verify on the Pixel — end-to-end proof CI cannot give.** Open **MEMORY** (it should draw
+rather than crash). In the nutrition app search **"chicken breast"** — generic foods should appear.
+Type **1.25** into a training load. A weigh-in recorded **yesterday evening** should read "Yesterday"
+this morning. And send a fault report: the logcat section should carry warnings and errors rather than
+keyboard chatter.
