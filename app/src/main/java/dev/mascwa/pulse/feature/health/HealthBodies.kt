@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.Body
+import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
@@ -1359,6 +1360,56 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
 /** The plan: where you are going, how fast, and what the app has actually measured about you. */
 
+/**
+ * The check-in: when the targets were last handed down, what moved, and when the next one is due.
+ *
+ * ⚠️ **This is the surface that makes a held target legible rather than mysterious.** The numbers on
+ * MACROS no longer move on their own — see `CheckIn` for why they used to and why that was wrong —
+ * and a plan that stopped changing with no explanation would read as the app having got stuck.
+ *
+ * ⚠️ The report is the STORED one, in the words the check-in used at the time. Recomputing it here
+ * against today's figures would answer a different question and would change every time somebody
+ * logged a meal, which is the drift this whole feature removes, reintroduced in the caption.
+ */
+@Composable
+private fun CheckInPanel(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val v = state.checkIn ?: return
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                "YOUR CHECK-IN",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+            )
+            Text(
+                when (v) {
+                    is CheckIn.Verdict.Hold -> when (v.daysUntilDue) {
+                        0 -> "New targets are due today."
+                        1 -> "These targets stand until tomorrow."
+                        else -> "These targets stand for another ${v.daysUntilDue} days."
+                    }
+                    // ⚠️ Present tense rather than "will be": by the time this draws, the collector
+                    // in the view model has already published, and a caption promising something
+                    // that has happened reads as a stuck screen.
+                    is CheckIn.Verdict.Publish -> v.why.sentence
+                },
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
+            )
+            state.checkInReport.forEach {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2, lineHeight = 16.sp)
+            }
+            Text(
+                "Your expenditure is measured every day; the targets are handed down once a week, so " +
+                    "you have a number you can shop and cook against.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+            if (state.livePlan is MacroTargets.Plan.Set) {
+                LcarsButton(text = "WORK THEM OUT NOW", onClick = { vm.recalculateNow() })
+            }
+        }
+    }
+}
+
 @Composable
 fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val c = Pulse.colors
@@ -1367,6 +1418,7 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
+        item { CheckInPanel(vm, state) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {

@@ -27,6 +27,7 @@ import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Maintenance
@@ -41,10 +42,57 @@ import kotlin.math.abs
  * plus what the log has measured, and shown on Today. Letting somebody type a calorie goal directly
  * would make the measurement pointless, which is the whole idea this app is built around.
  */
+
+/**
+ * The check-in, so a target that has stopped moving reads as a decision rather than a fault.
+ *
+ * ⚠️ **The numbers on Today no longer change on their own.** They used to move with every weigh-in
+ * and every logged meal, because the planner ran on every state build — see `CheckIn` for why that is
+ * the opposite of a plan. Having fixed it, the app has to say so: a figure that quietly stopped
+ * responding would look broken to anybody who had noticed it responding before.
+ *
+ * ⚠️ The sentences are the STORED report, in the words the check-in used at the time. Recomputing
+ * them here against today's figures would answer a different question and would change with every
+ * meal logged — the drift this feature removes, put back in the caption.
+ */
+@Composable
+private fun CheckInCard(vm: HealthViewModel, state: HealthViewModel.State) {
+    val v = state.checkIn ?: return
+    SectionCard("Your check-in") {
+        Text(
+            when (v) {
+                is CheckIn.Verdict.Hold -> when (v.daysUntilDue) {
+                    0 -> "New targets are due today."
+                    1 -> "These targets stand until tomorrow."
+                    else -> "These targets stand for another ${v.daysUntilDue} days."
+                }
+                // ⚠️ Present tense: by the time this draws, the view model's collector has already
+                // published, and a line promising something that has happened reads as a stuck screen.
+                is CheckIn.Verdict.Publish -> v.why.sentence
+            },
+            style = MaterialTheme.typography.titleMedium,
+        )
+        state.checkInReport.forEach {
+            Text(it, style = MaterialTheme.typography.bodyMedium)
+        }
+        Text(
+            "Your expenditure is measured every day; the targets are handed down once a week, so you " +
+                "have a number you can shop and cook against.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (state.livePlan is MacroTargets.Plan.Set) {
+            Button(onClick = { vm.recalculateNow() }) { Text("Work them out now") }
+        }
+    }
+}
+
 @Composable
 fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
     val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
+
+    CheckInCard(vm, state)
 
     SectionCard("About you") {
         NumberField("Height in cm", p.heightCm.takeIf { it > 0 }) { vm.setHeightCm(it) }

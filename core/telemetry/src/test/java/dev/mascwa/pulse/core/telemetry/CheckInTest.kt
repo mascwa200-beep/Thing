@@ -35,7 +35,7 @@ class CheckInTest {
         s: CheckIn.Stated = stated(),
         expenditure: Double = 2900.0,
         kg: Double = 84.0,
-    ) = CheckIn.Published(atMs, t, s, expenditure, kg)
+    ) = CheckIn.Published(atMs, t, s.fingerprint(), expenditure, kg)
 
     // -------------------------------------------------------------------------------- the cadence
 
@@ -94,7 +94,7 @@ class CheckInTest {
         // drifting target this file exists to stop.
         val before = published(atMs = now - 1 * day, kg = 84.0)
         val after = before.copy(weightKg = 82.5)
-        assertEquals(before.stated, after.stated)
+        assertEquals(before.statedFingerprint, after.statedFingerprint)
         assertEquals(CheckIn.Verdict.Hold(6), CheckIn.verdict(after, stated(), now))
     }
 
@@ -218,5 +218,50 @@ class CheckInTest {
         // 84.03 - 84.0 = 0.03 kg, under the tenth a weekly trend can resolve.
         val held = CheckIn.weightMoved(published(kg = 84.0), 84.03, BodyTrend.MassUnit.KG)!!
         assertTrue(held, held.contains("held steady"))
+    }
+
+    // ---------------------------------------------------------------------------- the fingerprint
+
+    /**
+     * ⚠️ The fingerprint is what makes the published snapshot one persisted field instead of ten, so
+     * its whole job is to change when ANY stated value does. This drives every field through a real
+     * change and requires a different string each time — a field left out of `fingerprint()` is
+     * invisible in every other way, and the symptom would be an instruction the app silently ignores
+     * for up to a week.
+     */
+    @Test
+    fun `every stated field moves the fingerprint`() {
+        val base = CheckIn.Stated()
+        val changed = listOf(
+            "heightCm" to base.copy(heightCm = 178.0),
+            "birthYear" to base.copy(birthYear = 1990),
+            "sex" to base.copy(sex = "MALE"),
+            "goalKg" to base.copy(goalKg = 78.0),
+            "ratePerWeekKg" to base.copy(ratePerWeekKg = -0.5),
+            "dietMode" to base.copy(dietMode = "KETO"),
+            "proteinGPerKg" to base.copy(proteinGPerKg = 2.0),
+            "bodyFatPct" to base.copy(bodyFatPct = 18.0),
+            "athlete" to base.copy(athlete = true),
+            "programMode" to base.copy(programMode = "MANUAL"),
+        )
+        // Every declared field is covered — a field added without a case here fails this, rather
+        // than quietly becoming one the fingerprint ignores.
+        val declared = CheckIn.Stated::class.java.declaredFields
+            .map { it.name }
+            .filter { !it.contains("$") }
+        assertEquals(declared.sorted(), changed.map { it.first }.sorted())
+
+        val seen = mutableSetOf(base.fingerprint())
+        for ((name, s) in changed) {
+            assertTrue("$name did not move the fingerprint", seen.add(s.fingerprint()))
+        }
+    }
+
+    @Test
+    fun `the same values give the same fingerprint`() {
+        // ⚠️ Stability matters as much as sensitivity: a fingerprint that varied between two equal
+        // values would republish the targets on every launch and undo the whole cadence.
+        assertEquals(stated().fingerprint(), stated().fingerprint())
+        assertEquals(stated(rate = -0.5).fingerprint(), stated(rate = -0.5).fingerprint())
     }
 }

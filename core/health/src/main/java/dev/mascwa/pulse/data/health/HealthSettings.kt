@@ -112,4 +112,57 @@ data class HealthSettings(
 
     /** Whether the tab has ever been set up — decides between the welcome and the dashboard. */
     val configured: Boolean = false,
+
+    // ------------------------------------------------------------------- the last check-in
+    //
+    // ⚠️ **The targets a person is actually eating to, held between check-ins.** Everything under
+    // here is one snapshot: what was handed down, the situation it rested on, and the report that
+    // went with it. It is flat rather than a nested object because this blob is the persisted
+    // shape and a nested type here would need its own serializer for no gain.
+    //
+    // ⚠️ Every field is defaulted, so a settings blob written before this existed still decodes —
+    // and `publishedAtMs == 0L` is what "nothing has been published" means, which is exactly the
+    // state `CheckIn.verdict` treats as due.
+    //
+    // ⚠️ These are WRITTEN BY the check-in and read by nothing else. A screen that edited one
+    // would be forging a plan the planner never made, so nothing outside `publishCheckIn` should
+    // ever set them.
+
+    /** When the last set of targets was handed down; zero means never. */
+    val publishedAtMs: Long = 0L,
+
+    val publishedKcal: Int = 0,
+    val publishedProteinG: Int = 0,
+    val publishedFatG: Int = 0,
+    val publishedCarbG: Int = 0,
+
+    /** What the published calories were computed to do, per week, at the time. */
+    val publishedEffectiveRatePerWeekKg: Double = 0.0,
+
+    /** The measured expenditure the published set rested on, so the next check-in can name the move. */
+    val publishedExpenditureKcal: Double = 0.0,
+
+    /** The trend weight at the time, for the same reason. Never a single morning's reading. */
+    val publishedWeightKg: Double = 0.0,
+
+    /**
+     * The limits that bit, as `KIND\u001Fsentence`.
+     *
+     * ⚠️ Encoded rather than stored as a pair because this is a settings blob, and the unit
+     * separator is used because it cannot occur in a sentence the app writes. A malformed entry is
+     * dropped on read rather than crashing — see `PublishedPlan`.
+     */
+    val publishedAdjustments: List<String> = emptyList(),
+
+    /** `CheckIn.Stated.fingerprint()` as it stood at the last check-in. */
+    val publishedFingerprint: String = "",
+
+    /**
+     * What the last check-in said, computed once when it happened.
+     *
+     * ⚠️ Stored rather than recomputed, because the set it was compared against is gone the moment
+     * this one replaces it. Keeping a second published snapshot purely to regenerate a sentence
+     * would be storing the whole history to render one card.
+     */
+    val publishedReport: List<String> = emptyList(),
 )

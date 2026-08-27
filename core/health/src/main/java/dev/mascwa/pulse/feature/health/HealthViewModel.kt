@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.GoalProjection
 import dev.mascwa.pulse.core.telemetry.Habits
@@ -151,7 +152,35 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         val expenditure: Expenditure.Estimate.Known? = null,
         /** How much of [expenditure] is measured rather than guessed, 0..1. Worth showing while it climbs. */
         val measuredShare: Double = 0.0,
+        /**
+         * The targets to eat to — **the PUBLISHED set between check-ins, not the planner's live
+         * answer**.
+         *
+         * ⚠️ This used to be recomputed on every state build, so it moved with every weigh-in and
+         * every logged meal. See [CheckIn] for why that is the opposite of a plan. It is still a
+         * [MacroTargets.Plan] and still a `Set` when there is one, deliberately: a held plan renders
+         * exactly as a fresh one and no surface has to learn what a check-in is.
+         */
         val plan: MacroTargets.Plan? = null,
+        /**
+         * What the planner says TODAY, whether or not it has been published.
+         *
+         * ⚠️ Kept beside [plan] rather than replacing it because the two answer different questions,
+         * and the check-in surface is the one place that needs both: [plan] is what to eat, this is
+         * what the next check-in will hand down. Everywhere else should read [plan].
+         */
+        val livePlan: MacroTargets.Plan? = null,
+        /** Whether a new set is due right now, and why — or how long the current one stands. */
+        val checkIn: CheckIn.Verdict? = null,
+        /** What was last handed down, or null before the first check-in. */
+        val published: CheckIn.Published? = null,
+        /**
+         * What the last check-in said, in the words it said them.
+         *
+         * ⚠️ Read from the stored report rather than recomputed, because the set it was compared
+         * against is gone the moment the new one replaces it.
+         */
+        val checkInReport: List<String> = emptyList(),
         /**
          * The same plan spread across seven days.
          *
@@ -1692,8 +1721,108 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     fun setMassUnit(v: BodyTrend.MassUnit) = edit { it.copy(massUnit = v.name) }
     fun setConfigured(v: Boolean) = edit { it.copy(configured = v) }
 
+    // ------------------------------------------------------------------------------- the check-in
+
+    /**
+     * True while a publish is in flight, so two emissions cannot both write one.
+     *
+     * ⚠️ Plain and not atomic on purpose: every read and write of it happens on the main dispatcher,
+     * inside the state collector or the coroutine it starts. Making it atomic would imply a
+     * concurrency that is not there and hide that this depends on the dispatcher.
+     */
+    private var publishing = false
+
+    /**
+     * Set when a publish threw, and it suppresses only the AUTOMATIC path.
+     *
+     * ⚠️ Without it a failing write spins: the verdict still says due on the next emission, so the
+     * collector tries again, forever, on every state change. Suppressing the manual button too would
+     * be worse in the other direction — a transient failure would leave somebody permanently unable
+     * to get new targets, with a button that does nothing and says nothing.
+     */
+    private var autoPublishFailed = false
+
+    /**
+     * Hand down the targets the planner currently says, and record what changed.
+     *
+     * ⚠️ **Only ever called when [CheckIn.verdict] says so**, and never from a screen's own logic.
+     * A surface that could publish would let somebody refresh their way to a new number whenever
+     * they did not like the one they had, which is exactly the behaviour the cadence removes.
+     * [recalculateNow] is the deliberate exception and it says so.
+     *
+     * ⚠️ It reads [State.livePlan], not [State.plan]. Between check-ins those differ — that IS the
+     * feature — and publishing the held plan would republish last week's numbers forever.
+     */
+    private fun publish(s: State, why: CheckIn.Reason) {
+        val fresh = s.livePlan as? MacroTargets.Plan.Set ?: return
+        if (publishing) return
+        publishing = true
+        viewModelScope.launch {
+            try {
+                val nowMs = System.currentTimeMillis()
+                val trendKg = (s.trend as? BodyTrend.Trend.Estimated)?.latest?.trendKg ?: 0.0
+                val unit = runCatching { BodyTrend.MassUnit.valueOf(s.profile.massUnit) }
+                    .getOrDefault(BodyTrend.MassUnit.KG)
+                val before = s.published
+                // The report is composed HERE, once, because the set it compares against is gone the
+                // moment this one replaces it.
+                val report = buildList {
+                    add(why.sentence)
+                    if (before != null) {
+                        addAll(CheckIn.changes(before.targets, fresh.targets))
+                        CheckIn.whyCaloriesMoved(before, fresh.expenditureKcal)?.let { add(it) }
+                        CheckIn.weightMoved(before, trendKg, unit)?.let { add(it) }
+                    }
+                }
+                c.updateHealth { p ->
+                    dev.mascwa.pulse.data.health.PublishedPlan.store(
+                        p = p,
+                        atMs = nowMs,
+                        plan = fresh,
+                        stated = dev.mascwa.pulse.data.health.PublishedPlan.statedOf(p),
+                        weightKg = trendKg,
+                        report = report,
+                    )
+                }
+                recompute.value++
+                autoPublishFailed = false
+            } catch (t: Throwable) {
+                // ⚠️ Recorded rather than rethrown, and the flag is what stops the retry loop. A
+                // throw here would take the view model's scope with it, which turns a settings
+                // write that failed into a tab that stops updating at all.
+                autoPublishFailed = true
+            } finally {
+                publishing = false
+            }
+        }
+    }
+
+    /**
+     * Take the planner's current answer now, without waiting for the week.
+     *
+     * ⚠️ The one deliberate way past the cadence, and it is a button rather than something the app
+     * does on its own. Somebody who has just come back from a fortnight away, or who has changed
+     * something the fingerprint cannot see, should not have to wait — but the app choosing this for
+     * them would be the drifting target again with an extra step.
+     */
+    fun recalculateNow() {
+        val s = state.value
+        if (s.livePlan !is MacroTargets.Plan.Set) return
+        autoPublishFailed = false
+        publish(s, CheckIn.Reason.DUE)
+    }
+
     init {
         refresh()
+        // ⚠️ The publish happens HERE and not inside `composeHealthReading`, because that function is
+        // a read path shared with the `health` assistant tool — a write there would hand down a new
+        // set of targets every time the Computer was asked a question.
+        viewModelScope.launch {
+            state.collect { s ->
+                val v = s.checkIn
+                if (v is CheckIn.Verdict.Publish && !autoPublishFailed) publish(s, v.why)
+            }
+        }
     }
 
     private companion object {
@@ -1827,12 +1956,35 @@ suspend fun composeHealthReading(
         null
     }
 
+    // ------------------------------------------------------------------------------- the check-in
+    //
+    // ⚠️ **The plan the screens read is the PUBLISHED one, not the one just computed.** `plan` above
+    // is a pure function of the live expenditure, which moves with every weigh-in and every meal, so
+    // reading it directly is what made the target drift underneath people. See `CheckIn`.
+    //
+    // ⚠️ This is in `composeHealthReading` rather than in the view model because the `health`
+    // assistant tool composes through here too. Holding the targets in one place and not the other
+    // would have the Computer and the screen quoting different numbers for the same day, which is
+    // the exact defect this function's own KDoc exists to prevent.
+    //
+    // ⚠️ Nothing is WRITTEN here. This is a read path, and a read path that persists would publish a
+    // check-in every time the assistant was asked a question. The verdict is carried out in `State`
+    // and the view model acts on it.
+    val stated = dev.mascwa.pulse.data.health.PublishedPlan.statedOf(p)
+    val published = dev.mascwa.pulse.data.health.PublishedPlan.from(p)
+    val verdict = CheckIn.verdict(published, stated, now)
+    val effectivePlan = if (verdict is CheckIn.Verdict.Hold && published != null) {
+        dev.mascwa.pulse.data.health.PublishedPlan.asPlan(published)
+    } else {
+        plan
+    }
+
     // ⚠️ Built from the plan rather than beside it, so the week can never describe a different
     // daily figure from the one the rest of the screen shows. The floor handed down is the HIGHER of
     // the absolute one and this person's resting rate: MacroTargets already refuses to set a daily
     // target below the resting rate, and a light day that dipped under it would quietly undo a
     // decision taken one layer up.
-    val week = (plan as? MacroTargets.Plan.Set)?.let { set ->
+    val week = (effectivePlan as? MacroTargets.Plan.Set)?.let { set ->
         WeeklyPlan.build(
             base = set.targets,
             mode = runCatching { WeeklyPlan.Mode.valueOf(p.programMode) }
@@ -1853,7 +2005,11 @@ suspend fun composeHealthReading(
         measured = known ?: measured,
         expenditure = expenditure,
         measuredShare = share,
-        plan = plan,
+        plan = effectivePlan,
+        livePlan = plan,
+        checkIn = verdict,
+        published = published,
+        checkInReport = p.publishedReport,
         week = week,
         stepShift = shift,
         intakeShift = intakeMove,

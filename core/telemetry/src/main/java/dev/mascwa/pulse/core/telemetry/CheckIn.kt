@@ -73,7 +73,37 @@ object CheckIn {
         val bodyFatPct: Double = 0.0,
         val athlete: Boolean = false,
         val programMode: String = "",
-    )
+    ) {
+        /**
+         * A stable string that changes if and only if one of these values does.
+         *
+         * ⚠️ **Exists so the published snapshot costs ONE persisted field instead of ten.** The
+         * comparison [verdict] makes is "is what you chose still what you chose", and storing a
+         * whole second copy of the settings to answer it is ten more fields to keep in step with
+         * this type — the kind of parallel list that drifts silently.
+         *
+         * ⚠️ Every part is written with Kotlin's own number formatting, which is locale-independent,
+         * so a phone set to a comma decimal produces the same string as one set to a point. A
+         * locale-sensitive format here would republish the targets on a language change.
+         *
+         * ⚠️ **Adding a field to [Stated] changes every fingerprint already on disk**, so everybody
+         * gets one extra check-in the first time they open the new build. That is the correct
+         * behaviour — the app is now considering an input it was not — and it is worth knowing
+         * rather than discovering.
+         */
+        fun fingerprint(): String = listOf(
+            heightCm.toString(),
+            birthYear.toString(),
+            sex,
+            goalKg.toString(),
+            ratePerWeekKg.toString(),
+            dietMode,
+            proteinGPerKg.toString(),
+            bodyFatPct.toString(),
+            athlete.toString(),
+            programMode,
+        ).joinToString("\u001F")
+    }
 
     /**
      * A set of targets that was handed down, and the situation it rested on.
@@ -85,9 +115,27 @@ object CheckIn {
     data class Published(
         val atMs: Long,
         val targets: MacroTargets.Targets,
-        val stated: Stated,
+        /** [Stated.fingerprint] as it stood when this was handed down. */
+        val statedFingerprint: String,
         val expenditureKcal: Double,
         val weightKg: Double,
+        /**
+         * What the published calories will actually do, as the planner computed it at the time.
+         *
+         * ⚠️ Held rather than recomputed against today's expenditure, because it describes THESE
+         * numbers. A rate worked out from held targets and a moved expenditure is a different
+         * statement, and putting it beside targets from last week would be two figures from two
+         * moments rendered as one plan.
+         */
+        val effectiveRatePerWeekKg: Double = 0.0,
+        /**
+         * The limits that bit when these targets were made — "your calories were raised to the
+         * floor" and the like.
+         *
+         * ⚠️ Held for the same reason: they explain the numbers ON SCREEN. Showing today's freshly
+         * computed adjustments beside held targets would describe a set of numbers nobody can see.
+         */
+        val adjustments: List<MacroTargets.Adjustment> = emptyList(),
     )
 
     /** What to do right now. */
@@ -124,7 +172,7 @@ object CheckIn {
      */
     fun verdict(published: Published?, stated: Stated, nowMs: Long): Verdict {
         if (published == null) return Verdict.Publish(Reason.FIRST)
-        if (published.stated != stated) return Verdict.Publish(Reason.CHANGED)
+        if (published.statedFingerprint != stated.fingerprint()) return Verdict.Publish(Reason.CHANGED)
         val elapsed = nowMs - published.atMs
         // ⚠️ A published time in the future — a clock moved back, a restored backup — is treated as
         // due rather than as a very long hold. The alternative is targets frozen until the clock
