@@ -22,8 +22,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -35,13 +37,41 @@ private val Context.foodDataStore: DataStore<Preferences> by preferencesDataStor
  * ## Why this one is sharded when nothing else in the app is
  *
  * Every other store here is a single blob because every other store holds tens or hundreds of small
- * things. This holds five or so entries a day forever: five years of ordinary logging is around nine
- * thousand entries and a couple of megabytes, written back several times a day. One blob would mean
- * re-encoding the whole history on every meal and holding all of it in memory to show today.
+ * things. This holds five or so entries a day forever. Measured by encoding a real [StoredEntry]
+ * through the shipped serializer rather than estimating it:
  *
- * So entries live in **monthly shards**, loaded only when that month is actually being read, and a small
- * resident **index** carries each day's totals. The index is what the daily rings, the charts and
- * [Expenditure] read, so the hot path never opens a shard at all.
+ *     one entry, as this writes them today  1,029 bytes   (286 bare; the micronutrients and the
+ *                                                          29 further nutrients are most of it)
+ *     five a day, one year                   1.88 MB
+ *     five a day, five years                 9.39 MB
+ *     the INDEX for one year                   27 kB      <- about 1.4% of the log
+ *
+ * So entries live in **monthly shards**, and a small resident **index** carries each day's totals. The
+ * index is what the daily rings, the charts and [Expenditure] read, so the hot path never opens a
+ * shard at all.
+ *
+ * ## ⚠️ Why the shards are plain files and not more preference keys
+ *
+ * They were preference keys, and **that made the sharding buy almost nothing.** DataStore Preferences
+ * keeps every key of a store in ONE file, so `data.first()[shardKey(month)]` read and protobuf-parsed
+ * the *whole* file — every month's JSON string — to pick one out, and `edit {}` rewrote all of it. The
+ * consequences, none of which the old note here admitted:
+ *
+ *  - **Launch** read and parsed the entire log to get the 27 kB index.
+ *  - **Every month's JSON stayed resident** for the process lifetime, because DataStore caches the
+ *    `Preferences` object it read.
+ *  - **Every meal logged rewrote the whole history** — 1.88 MB after a year, 9.4 MB after five.
+ *
+ * Sharding did save the JSON *decoding*, which is real. It saved nothing at all on IO or on the bytes
+ * held in memory, which is what the old text claimed.
+ *
+ * A shard is now `filesDir/food_log/<month>.json`, read on demand and written by the same temp-file
+ * -then-rename that DataStore itself uses. Logging a meal writes one month plus the index; opening
+ * the app reads the index alone.
+ *
+ * ⚠️ **All of that file IO goes through [Dispatchers.IO] explicitly.** The preference read did its own
+ * IO on DataStore's internal scope, so the old code could be called from the main thread and get away
+ * with it; a bare `File.readText` in the same place would not.
  *
  * ⚠️ **The index is derived, and is always recomputed from the shard that changed — never patched.**
  * A cache that is incrementally updated alongside its source drifts the first time an edge case is
@@ -152,12 +182,49 @@ class FoodLogStore(
     private val MAX_FASTED_DAYS = 730
 
     private val indexKey = stringPreferencesKey("food_index")
-    private fun shardKey(month: String) = stringPreferencesKey("food_$month")
+    /** Legacy only — the months live in files now. Kept so [clear] and the migration can name them. */
+    private fun shardKey(month: String) =
+        stringPreferencesKey(FoodLogFiling.SHARD_PREFIX + month)
 
     private val mutex = Mutex()
     private var index: MutableMap<Long, DayRow>? = null
-    private val shards = mutableMapOf<String, Shard>()
+
+    /**
+     * Decoded shards held in memory, most-recently-used last, **bounded**.
+     *
+     * ⚠️ This was an unbounded `mutableMapOf`, which is the more expensive half of the same defect
+     * the class note describes: scrolling back through five years left sixty decoded month graphs
+     * resident forever, and a decoded entry is several times its JSON — roughly 2 kB once its two
+     * nutrient maps are objects, so ~300 kB a month, ~18 MB for five years.
+     *
+     * [FoodLogFiling.MAX_RESIDENT_SHARDS] of 4 covers every read path with headroom ([recentFoods] opens two,
+     * [entriesFor] one) at about 1.2 MB.
+     *
+     * ⚠️ **A dirty shard is never evicted**, so an import that touches sixty months holds sixty until
+     * they are flushed. That is not a leak — those entries exist nowhere else yet.
+     */
+    private val shards: LinkedHashMap<String, Shard> = LinkedHashMap(16, 0.75f, true)
+
+    /**
+     * Legacy shards that could not be moved out of the preference store, kept for this session.
+     *
+     * Normally null. See [migrateLegacyShardsLocked]: a month is only removed from the old store once
+     * its file is on disk, so anything left here is a month whose file write failed and which must
+     * still be readable until the next launch retries.
+     */
+    private var legacyShards: MutableMap<String, String>? = null
     private var flushJob: Job? = null
+
+    /**
+     * Bumped by [clear]. A [flush] that took its snapshot before the clear must not write it back.
+     *
+     * ⚠️ [Job.cancel] is not enough on its own: it stops a flush still waiting on its delay, and does
+     * nothing about one already past the snapshot and part-way through writing files. That window is
+     * a few milliseconds, but what it leaves behind is a month of somebody's food log on disk after
+     * they asked for all of it to be gone — unreachable, because the index went with it, and still
+     * there. A generation check costs one comparison and closes it.
+     */
+    private var clearGeneration = 0
     private val dirtyShards = mutableSetOf<String>()
     private var indexDirty = false
 
@@ -224,15 +291,16 @@ class FoodLogStore(
     // ------------------------------------------------------------------------------------ loading
 
     private suspend fun indexLocked(): MutableMap<Long, DayRow> = index ?: run {
-        val raw = context.foodDataStore.data.first()[indexKey]
-        val loaded = raw
+        val prefs = context.foodDataStore.data.first()
+        // ⚠️ Decoded ONCE. This used to parse the same JSON twice — once for `days`, once for
+        // `fasted` — which on a five-year index is two passes over 135 kB on the launch path.
+        val parsed = prefs[indexKey]
             ?.let { runCatching { json.decodeFromString(Index.serializer(), it) }.getOrNull() }
-            ?.days.orEmpty()
-        val map = loaded.associateBy { it.day }.toMutableMap()
+        val map = parsed?.days.orEmpty().associateBy { it.day }.toMutableMap()
         index = map
-        fastedDays = raw
-            ?.let { runCatching { json.decodeFromString(Index.serializer(), it) }.getOrNull() }
-            ?.fasted.orEmpty().toMutableSet()
+        fastedDays = parsed?.fasted.orEmpty().toMutableSet()
+        // Driven off the snapshot already in hand, so migrating costs no extra read.
+        migrateLegacyShardsLocked(prefs)
         publishLocked(map)
         map
     }
@@ -244,12 +312,98 @@ class FoodLogStore(
     }
 
     private suspend fun shardLocked(month: String): Shard = shards[month] ?: run {
-        val raw = context.foodDataStore.data.first()[shardKey(month)]
+        val raw = readShardFile(month) ?: legacyShards?.get(month)
         val s = raw
             ?.let { runCatching { json.decodeFromString(Shard.serializer(), it) }.getOrNull() }
             ?: Shard()
         shards[month] = s
+        evictCleanShardsLocked()
         s
+    }
+
+    /**
+     * Drop the least-recently-used **clean** shards until the cache is back within its bound.
+     *
+     * ⚠️ Clean only. A dirty shard holds entries that exist nowhere else until [flush] writes them,
+     * so evicting one would lose a logged meal — silently, because the next read would find the file
+     * without it and report a plausible smaller day.
+     */
+    private fun evictCleanShardsLocked() {
+        // ⚠️ `shards` is access-ordered, so `keys` really is least-recently-used first — which is the
+        // ordering [FoodLogFiling.evictable] is documented to expect and cannot check for itself.
+        FoodLogFiling
+            .evictable(shards.keys.toList(), dirtyShards, FoodLogFiling.MAX_RESIDENT_SHARDS)
+            .forEach { shards.remove(it) }
+    }
+
+    // -------------------------------------------------------------------------------- shard files
+
+    private fun shardDir(): File = File(context.filesDir, FoodLogFiling.SHARD_DIR)
+
+    /**
+     * ⚠️ [month] is always `%04d-%02d` from [monthOf], so it can hold no path separator and no `..`.
+     * Nothing outside this class supplies one; every caller derives it from a day-start Long.
+     */
+    private fun shardFile(month: String): File = File(shardDir(), "$month.json")
+
+    private suspend fun readShardFile(month: String): String? = withContext(Dispatchers.IO) {
+        runCatching { shardFile(month).takeIf { it.isFile }?.readText() }.getOrNull()
+    }
+
+    /**
+     * Write one month, atomically. Returns whether it landed.
+     *
+     * ⚠️ Temp file then rename, which is the same shape `SingleProcessDataStore` uses for its own
+     * writes: on Linux `rename(2)` replaces the target atomically, so a reader either sees the whole
+     * previous month or the whole new one and never a half-written file. A `writeText` straight over
+     * the target would leave a truncated month behind if the process died mid-write.
+     */
+    private suspend fun writeShardFile(month: String, text: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val dir = shardDir()
+            dir.mkdirs()
+            val tmp = File(dir, "$month.json.tmp")
+            tmp.writeText(text)
+            if (tmp.renameTo(shardFile(month))) true else { tmp.delete(); false }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Move any month still living as a preference key out into its own file, once.
+     *
+     * ⚠️ **Ordering is the whole safety argument: the file is written, and its rename reports success,
+     * BEFORE the key is removed.** If the process dies between the two, the key is still there and this runs again next
+     * launch over identical content — so the migration is idempotent and cannot lose a month. A month
+     * whose file could not be written keeps its key AND is served from [legacyShards] for the rest of
+     * this session, so nothing disappears while the write is failing either.
+     *
+     * ⚠️ **The index key starts with the same prefix** (`food_index` against `food_2026-08`), so the
+     * scan matches the month SHAPE rather than the prefix. Matching the prefix would have written the
+     * index JSON out as a month called "index" and then deleted the real index — every day's totals
+     * gone, and the log itself intact behind them, which is about the worst shape a bug here could
+     * take.
+     */
+    private suspend fun migrateLegacyShardsLocked(prefs: Preferences) {
+        val legacy = prefs.asMap().mapNotNull { (k, v) ->
+            val month = FoodLogFiling.legacyMonth(k.name)
+            if (month != null && v is String) month to v else null
+        }
+        if (legacy.isEmpty()) return
+
+        val moved = mutableListOf<String>()
+        val stuck = mutableMapOf<String, String>()
+        for ((month, text) in legacy) {
+            // An existing file is by construction the same content or newer, so it wins and the key
+            // is safe to drop.
+            val onDisk = withContext(Dispatchers.IO) { shardFile(month).isFile }
+            if (onDisk || writeShardFile(month, text)) moved += month else stuck[month] = text
+        }
+        legacyShards = stuck.takeIf { it.isNotEmpty() }
+        if (moved.isNotEmpty()) {
+            runCatching {
+                context.foodDataStore.edit { p -> moved.forEach { p.remove(shardKey(it)) } }
+            }
+        }
     }
 
     private fun publishLocked(map: Map<Long, DayRow>) {
@@ -515,10 +669,12 @@ class FoodLogStore(
             // comes back the next time one of those days is opened, after the user asked for it to be
             // gone.
             val known = shards.keys.toSet() + indexLocked().keys.map { monthOf(it) }
+            clearGeneration++
             index = mutableMapOf()
             shards.clear()
             dirtyShards.clear()
             indexDirty = false
+            legacyShards = null
             fastedDays = mutableSetOf()
             publishLocked(emptyMap())
             known
@@ -526,8 +682,15 @@ class FoodLogStore(
         runCatching {
             context.foodDataStore.edit { prefs ->
                 prefs.remove(indexKey)
+                // Any month that never got migrated out of the old store.
                 months.forEach { prefs.remove(shardKey(it)) }
             }
+        }
+        // ⚠️ The whole directory, not the index-derived month list. The list exists because a
+        // preference key could only be named, never enumerated; a directory can be, so a month the
+        // index somehow did not know about goes too. A clear the user asked for has to be complete.
+        withContext(Dispatchers.IO) {
+            runCatching { shardDir().listFiles()?.forEach { it.delete() } }
         }
     }
 
@@ -545,7 +708,7 @@ class FoodLogStore(
     }
 
     private suspend fun flush() {
-        val (idxJson, shardJson) = mutex.withLock {
+        val (generation, idxJson, shardJson) = mutex.withLock {
             val idx = if (indexDirty) index?.let { m ->
                 json.encodeToString(
                     Index.serializer(),
@@ -563,16 +726,28 @@ class FoodLogStore(
             // silently. Anything arriving during the write marks itself dirty again.
             indexDirty = false
             dirtyShards.clear()
-            idx to out
+            Triple(clearGeneration, idx, out)
         }
         if (idxJson == null && shardJson.isEmpty()) return
-        runCatching {
-            context.foodDataStore.edit { prefs ->
-                idxJson?.let { prefs[indexKey] = it }
-                shardJson.forEach { (m, s) -> prefs[shardKey(m)] = s }
-            }
+
+        // ⚠️ A month whose file would not write is marked dirty AGAIN, so the next change retries it.
+        // The comment above has always said a failed write is retried by the next change; with the
+        // whole flush inside one swallowed `runCatching` that was not actually true — the dirty flags
+        // were already cleared, so the failure was silent and permanent until that month was touched.
+        val failed = shardJson.mapNotNull { (m, text) ->
+            if (stale(generation)) return else m.takeIf { !writeShardFile(m, text) }
+        }
+        if (failed.isNotEmpty()) mutex.withLock { dirtyShards += failed }
+
+        if (stale(generation)) return
+        idxJson?.let { text ->
+            runCatching { context.foodDataStore.edit { prefs -> prefs[indexKey] = text } }
         }
     }
+
+    /** Whether a [clear] has landed since this flush took its snapshot. */
+    private suspend fun stale(generation: Int): Boolean =
+        mutex.withLock { clearGeneration != generation }
 
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
