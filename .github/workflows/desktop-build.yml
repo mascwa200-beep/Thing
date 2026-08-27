@@ -67,7 +67,18 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build :desktop
-        run: ./gradlew :desktop:build --stacktrace --no-daemon
+        # ⚠️ `--configure-on-demand`, and it is not an optimisation. Gradle configures EVERY project
+        # by default, so building this plain Kotlin/JVM module was configuring `:app` — which
+        # declares `ndkVersion` and an `externalNativeBuild`, so AGP downloaded the whole ~1 GB NDK
+        # before compiling a line of desktop code. That is a gigabyte of network on every run for a
+        # module that has no native code in it, and on run 236 the download failed and took the
+        # build with it: `InstallFailedException: Failed to install ndk;27.0.12077973`.
+        #
+        # `:desktop` depends only on `:core:telemetry` and `:core:feeds`, both plain Kotlin/JVM, so
+        # `:app` never needs to be configured at all. Measured rather than assumed: this exact
+        # command succeeds in a container with **no Android SDK installed whatsoever**, which it
+        # could not do if `:app` were being configured.
+        run: ./gradlew :desktop:build --configure-on-demand --stacktrace --no-daemon
 
   package-windows:
     # The actual deliverable: an installable Windows app. Only worth spending a Windows runner on once the
@@ -95,7 +106,7 @@ jobs:
         # The build number is this workflow's own run_number, NOT the Android build's — they are separate
         # counters, and the in-app updater looks the run up by number in THIS workflow to decide whether
         # the build finished. Passing the wrong one would have it check an unrelated run.
-        run: .\gradlew.bat :desktop:packageMsi -PdesktopBuild=${{ github.run_number }} --stacktrace --no-daemon
+        run: .\gradlew.bat :desktop:packageMsi -PdesktopBuild=${{ github.run_number }} --configure-on-demand --stacktrace --no-daemon
 
       - name: Upload installer
         uses: actions/upload-artifact@v4

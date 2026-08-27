@@ -19,6 +19,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.TypedNumber
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -171,6 +175,27 @@ fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit
  */
 fun round(v: Double, places: Int = 0): String =
     String.format(Locale.getDefault(), "%.${places}f", v)
+
+/**
+ * A number field's own copy of what is being typed.
+ *
+ * ⚠️ **Without this a fully controlled numeric field records a number a hundred times too large** —
+ * typing `1.25` recorded 125. The rule, the measurements behind it and the three conditions live on
+ * [TypedNumber], shared with the LCARS application so the two cannot answer differently; what is
+ * here is the two lines of `remember` around it.
+ *
+ * ⚠️ Both assignments are unconditional, which is [TypedNumber.textFor]'s stated contract: letting
+ * `lastSeen` go stale makes the second rule fire on a value the field itself produced, and in the
+ * servings case that means the box can be cleared once and then never again.
+ */
+@Composable
+fun rememberTypedNumber(value: String): MutableState<String> {
+    val text = remember { mutableStateOf(value) }
+    val lastSeen = remember { mutableStateOf(value) }
+    text.value = TypedNumber.textFor(text.value, lastSeen.value, value)
+    lastSeen.value = value
+    return text
+}
 
 /**
  * Two lines over the same days: what you ate, and what you burned.

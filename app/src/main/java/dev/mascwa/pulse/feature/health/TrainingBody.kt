@@ -23,6 +23,7 @@ import dev.mascwa.pulse.data.health.TrainingStore
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsDataRow
 import dev.mascwa.pulse.feature.common.LcarsField
+import dev.mascwa.pulse.feature.common.rememberTypedNumber
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -221,24 +222,46 @@ private fun SetLine(
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
             modifier = Modifier.width(14.dp),
         )
+        // ⚠️ **Each box keeps its own copy of what is being typed, and without that this row
+        // recorded a number a hundred times too large.** `NumberCell` is fully controlled, so a
+        // half-typed number had to survive a round trip through a `Double`: `Decimals.parse("1.")`
+        // is 1.0 and `trimKg(1.0)` is `"1"`, so the decimal point was destroyed on the next frame
+        // and the following digit appended to the whole number. Typing 1.25 recorded **125**, 2.5
+        // recorded 25. Plates go in 1.25 kg steps and this figure feeds the progression advice.
+        //
+        // ⚠️ The buffer belongs HERE rather than inside `NumberCell`: twelve of that composable's
+        // fifteen callers already hold raw text of their own and hand it straight back. Only these
+        // three derive their value from the model. See `rememberTypedNumber`.
+        val reps = rememberTypedNumber(set.reps.takeIf { it > 0 }?.toString().orEmpty())
         NumberCell(
             "REPS",
-            set.reps.takeIf { it > 0 }?.toString().orEmpty(),
-            { onChange(set.copy(reps = it.toIntOrNull() ?: 0)) },
+            reps.value,
+            {
+                reps.value = it
+                onChange(set.copy(reps = it.toIntOrNull() ?: 0))
+            },
             Modifier.weight(1f),
         )
         if (movement.exercise.loaded) {
+            val load = rememberTypedNumber(set.loadKg?.let { trimKg(it) }.orEmpty())
             NumberCell(
                 "KG",
-                set.loadKg?.let { trimKg(it) }.orEmpty(),
-                { onChange(set.copy(loadKg = Decimals.parse(it))) },
+                load.value,
+                {
+                    load.value = it
+                    onChange(set.copy(loadKg = Decimals.parse(it)))
+                },
                 Modifier.weight(1.2f),
             )
         }
+        val rpe = rememberTypedNumber(set.rpe?.let { trimKg(it) }.orEmpty())
         NumberCell(
             "RPE",
-            set.rpe?.let { trimKg(it) }.orEmpty(),
-            { onChange(set.copy(rpe = Decimals.parse(it))) },
+            rpe.value,
+            {
+                rpe.value = it
+                onChange(set.copy(rpe = Decimals.parse(it)))
+            },
             Modifier.weight(1f),
         )
     }

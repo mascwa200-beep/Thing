@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
+import dev.mascwa.nutrition.ui.rememberTypedNumber
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.Training
@@ -212,6 +213,14 @@ private fun SetRow(
  * would clobber a half-typed number; nothing recomputes a set, so the simpler behaviour is also the
  * correct one here — and a set that only saved when you happened to tap elsewhere would be lost by
  * the person who types the last number and puts the phone down.
+ *
+ * ⚠️ **But it keeps its own copy of the text, and the reason is a defect that recorded a number a
+ * hundred times too large.** This field used to be fully controlled: its `value` came straight back
+ * from the model, so `1.25` was recorded as `125` and `2.5` as `25` — the decimal point destroyed on
+ * the next frame and the following digit appended to the whole number. `trim` renders two places
+ * because plates go in 1.25 kg steps; the display could hold a fraction and the input path could not
+ * produce one. The rule, the measurements and the two re-seed conditions live on
+ * [rememberTypedNumber], which all three number fields in this app now share.
  */
 @Composable
 private fun NumberBox(
@@ -220,8 +229,9 @@ private fun NumberBox(
     modifier: Modifier = Modifier,
     onChange: (Double?) -> Unit,
 ) {
+    val text = rememberTypedNumber(value)
     OutlinedTextField(
-        value = value,
+        value = text.value,
         // ⚠️ **The pre-filter here used to be `isDigit() || it == '.'`, and it was the one input in
         // either application that turned a fractional number into a wrong one rather than into
         // nothing.** Deleting a comma closes the gap, so on a keyboard whose decimal key is a comma
@@ -230,7 +240,10 @@ private fun NumberBox(
         // progression advice from then on. Nothing is stripped now; `Decimals.parse` decides what is
         // a number, and anything that is not one is null, which is the same refusal every other
         // field in both apps gives.
-        onValueChange = { text -> onChange(Decimals.parse(text)) },
+        onValueChange = { typed ->
+            text.value = typed
+            onChange(Decimals.parse(typed))
+        },
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

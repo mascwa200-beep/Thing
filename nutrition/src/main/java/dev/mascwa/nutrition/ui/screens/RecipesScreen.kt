@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
+import dev.mascwa.nutrition.ui.rememberTypedNumber
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPortion
@@ -319,19 +320,33 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
             // goes UP. The yield moves the density and never the totals — dividing the totals by the
             // raw weight would under-report every cooked recipe silently. A yield LARGER than the raw
             // weight is legitimate: rice absorbs water.
+            // ⚠️ Its own text buffer, like every number field here — see `rememberTypedNumber`.
+            // Fully controlled, "250.5" became "2505": `round` renders whole grams, so the point was
+            // destroyed on the next frame and the 5 appended to the hundreds.
+            val yieldText = rememberTypedNumber(r.cookedYieldG?.let { round(it) } ?: "")
             OutlinedTextField(
-                value = r.cookedYieldG?.let { round(it) } ?: "",
+                value = yieldText.value,
                 onValueChange = { s ->
                     val v = Decimals.keep(s, 6)
+                    yieldText.value = v
                     vm.draftYield(Decimals.parse(v))
                 },
                 label = { Text("Weight after cooking (g), if you weighed it") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            // ⚠️ **This field could not be cleared at all.** `s.toIntOrNull()?.let { … }` does
+            // nothing for a blank string, and `servings` is a non-null `Int`, so pressing backspace
+            // left the model saying 4 and the field re-rendered "4" on the next frame — the only way
+            // to change it was to append digits, giving 46 or 64. The buffer is what lets the empty
+            // intermediate exist; the model is still only told about a real number.
+            val servingsText = rememberTypedNumber(r.servings.toString())
             OutlinedTextField(
-                value = r.servings.toString(),
-                onValueChange = { s -> s.toIntOrNull()?.let { vm.draftServings(it) } },
+                value = servingsText.value,
+                onValueChange = { s ->
+                    servingsText.value = s
+                    s.toIntOrNull()?.let { vm.draftServings(it) }
+                },
                 label = { Text("How many portions it makes") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),

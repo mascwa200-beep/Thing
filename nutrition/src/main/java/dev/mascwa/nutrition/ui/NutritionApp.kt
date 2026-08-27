@@ -17,6 +17,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -109,11 +110,22 @@ fun NutritionApp(vm: HealthViewModel, container: NutritionContainer) {
             }
         },
     ) { inner ->
+        // ⚠️ **One scroll position per tab, and a single `rememberScrollState()` here is not that.**
+        // Read from the shipped source rather than recalled: `rememberScrollState` is
+        // `rememberSaveable(saver = ScrollState.Saver) { ScrollState(initial) }` — no key inputs — so
+        // one call at this site, which sits OUTSIDE the `when` below, gives all six tabs the same
+        // `ScrollState`. Scroll to the bottom of a long Log, tap Today, and Today opens at that same
+        // offset (clamped to its own height): a page that starts halfway down for no visible reason.
+        //
+        // `Tab.entries` is ordinal-ordered by definition, so indexing by `ordinal` cannot drift; the
+        // `key` makes each remember slot explicitly the tab's rather than the loop position's.
+        val scrolls = Tab.entries.map { t -> key(t) { rememberScrollState() } }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrolls[tab.ordinal])
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

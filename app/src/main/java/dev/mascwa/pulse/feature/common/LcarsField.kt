@@ -16,7 +16,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.TypedNumber
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
@@ -119,4 +122,35 @@ fun LcarsField(
             }
         },
     )
+}
+
+/**
+ * A number field's own copy of what is being typed.
+ *
+ * ⚠️ **Without this a fully controlled numeric field records a number a hundred times too large.**
+ * The training set row's load box was one: its `value` came straight back from the model, so a
+ * half-typed number had to survive a round trip through a `Double` — and `parse("1.")` is 1.0, which
+ * renders as `"1"`. Measured over real keystrokes, typing `1.25` recorded **125**, and `2.5`
+ * recorded 25. Plates go in 1.25 kg steps and the figure feeds the progression advice, so the
+ * display could hold a fraction the input path could not produce.
+ *
+ * The rule, the measurements and the three conditions live on [TypedNumber], shared with the
+ * standalone nutrition application so the two cannot answer differently; what is here is the two
+ * lines of `remember` around it.
+ *
+ * ⚠️ Both assignments are unconditional, which is [TypedNumber.textFor]'s stated contract: letting
+ * `lastSeen` go stale makes the "the model moved" rule fire on a value the field itself produced.
+ *
+ * ⚠️ **This belongs at the CALL SITE, not inside [NumberCell].** Twelve of that composable's fifteen
+ * callers already hold raw text in their own `remember` and hand it straight back — those are
+ * correct as they are, and wrapping them again would add an indirection for nothing. Only the three
+ * in `TrainingBody` derive their value from the model.
+ */
+@Composable
+fun rememberTypedNumber(value: String): MutableState<String> {
+    val text = remember { mutableStateOf(value) }
+    val lastSeen = remember { mutableStateOf(value) }
+    text.value = TypedNumber.textFor(text.value, lastSeen.value, value)
+    lastSeen.value = value
+    return text
 }
