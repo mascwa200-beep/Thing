@@ -3,6 +3,7 @@ package dev.mascwa.nutrition.data
 import android.content.Context
 import dev.mascwa.nutrition.BuildConfig
 import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
@@ -264,6 +265,7 @@ class NutritionContainer(context: Context) {
             updateHealth = { block -> settings.update(block) },
             isOnline = { online() },
             mealPhotoReader = null,
+            crumb = Breadcrumbs::drop,
         )
     }
 }

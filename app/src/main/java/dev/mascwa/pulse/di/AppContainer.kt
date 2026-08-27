@@ -500,6 +500,7 @@ class AppContainer(private val appContext: Context) {
             updateHealth = { block -> settingsRepository.update { it.copy(health = block(it.health)) } },
             isOnline = { connectivityObserver.isOnline.value },
             mealPhotoReader = mealPhotoReader,
+            crumb = dev.mascwa.pulse.crash.Breadcrumbs::drop,
         )
     }
 

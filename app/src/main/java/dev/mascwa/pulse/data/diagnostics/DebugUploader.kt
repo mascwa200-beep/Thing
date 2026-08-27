@@ -6,6 +6,7 @@ import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.core.device.DeviceGate
 import dev.mascwa.pulse.core.device.GrapheneOs
 import dev.mascwa.pulse.core.util.SecretScrub
+import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.data.selfcode.GitHubRepo
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -103,6 +104,15 @@ class DebugUploader(
             if (crashText != null) {
                 append("## Latest fault\n\n```\n").append(crashText.take(20_000)).append("\n```\n\n")
             }
+            // ⚠️ **This section did not exist, and the trail it renders was reaching nobody.**
+            // `Breadcrumbs` is shared with the standalone application and this bundle never read it,
+            // so a LCARS report arrived with the fault and no account of what led to it. The two
+            // sections below are not the same thing: the activity log is durable, aggregated and
+            // written to disk on its own schedule; this is the last couple of hundred moments held
+            // in memory, which is the resolution that matters for the seconds before a crash — and
+            // the only one that survives to be copied into the report as the process dies.
+            append("## What was happening just now\n\n```\n")
+                .append(Breadcrumbs.render(now)).append("```\n\n")
             append("## Recent activity (last ").append(activity.size).append(")\n\n```\n")
             activity.forEach {
                 append(TS.format(Date(it.epochMs))).append("  ").append(it.category).append("  ").append(it.label).append('\n')

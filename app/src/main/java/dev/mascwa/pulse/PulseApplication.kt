@@ -40,6 +40,7 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         // Install the app-wide crash guard early so any uncaught throwable is logged to the
         // on-device crash console before the OS terminates the process.
         container.crashReporter.install()
+        dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "process started")
         NotificationChannels.ensure(this)
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }

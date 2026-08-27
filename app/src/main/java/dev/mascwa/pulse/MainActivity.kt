@@ -364,6 +364,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         app.container.appForeground.value = true
+        dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "foregrounded")
         // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Reaching the foreground is both the evidence the update guard waits for and the moment to
@@ -411,6 +412,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         app.container.appForeground.value = false
+        dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "backgrounded")
         runCatching { hud?.stop() }
         hud = null
         // Best-effort: persist any buffered on-device learning before the process may be reclaimed.

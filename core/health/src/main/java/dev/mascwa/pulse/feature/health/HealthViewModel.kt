@@ -443,6 +443,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * entries if the day really was a fast.
      */
     fun setFasted(fasted: Boolean) {
+        c.crumb("log", "fasted")
         val day = _today.value
         viewModelScope.launch {
             val took = c.foodLogStore.setFasted(day, fasted)
@@ -458,6 +459,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     }
 
     fun recordWeighin(kg: Double) {
+        c.crumb("body", "weighin")
         if (!kg.isFinite() || kg <= 0.0) return
         val now = System.currentTimeMillis()
         val day = dayStartOf(now)
@@ -511,6 +513,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     }
 
     fun recordMeasurement(kind: BodyStore.MeasureKind, cm: Double) {
+        c.crumb("body", "measure")
         c.bodyStore.recordMeasurement(System.currentTimeMillis(), kind, cm)
         _notice.value = "${kind.label} recorded."
     }
@@ -690,6 +693,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     private var scanJob: Job? = null
 
     fun searchEveryProduct() {
+        c.crumb("search", "everyproduct")
         val query = _search.value.query.trim()
         if (query.length < MIN_QUERY) return
         scanJob?.cancel()
@@ -723,6 +727,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * tell somebody standing in a supermarket: one means try again, the other means type it in.
      */
     fun lookUpBarcode(code: String) {
+        c.crumb("search", "barcode")
         searchJob?.cancel()
         _search.value = Search(query = code, busy = true)
         searchJob = viewModelScope.launch {
@@ -818,6 +823,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
          */
         toPlate: Boolean = false,
     ) {
+        c.crumb("log", "portion")
         val entry = entryFor(food, amount, unit, meal) ?: return
         viewModelScope.launch {
             if (toPlate) c.plateStore.stage(entry) else c.foodLogStore.add(entry)
@@ -871,6 +877,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         /** Put it on the plate instead of straight into the record — see [logPortion]. */
         toPlate: Boolean = false,
     ) {
+        c.crumb("log", "quickadd")
         val label = name.trim().ifBlank { "Quick add" }
         if (!kcal.isFinite() || kcal < 0.0) return
         val now = System.currentTimeMillis()
@@ -1137,6 +1144,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * committed today would land somewhere nobody is looking with nothing to say it had.
      */
     fun commitPlate() {
+        c.crumb("log", "plate")
         viewModelScope.launch {
             val taken = c.plateStore.drain()
             if (taken.isEmpty()) return@launch
@@ -1393,6 +1401,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * double a morning's weight in the trend.
      */
     fun importFromHealthConnect() {
+        c.crumb("healthconnect", "import")
         viewModelScope.launch {
             val hc = c.healthConnect
             if (hc.availability() !is HealthConnectBridge.Availability.Ready) {
@@ -1419,6 +1428,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     }
 
     fun removeEntry(id: String) {
+        c.crumb("log", "remove")
         viewModelScope.launch {
             c.foodLogStore.remove(id, _today.value)
             reloadEntries()
@@ -1670,6 +1680,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * files twice for no reason.
      */
     fun exportRecord(uri: android.net.Uri) {
+        c.crumb("record", "export")
         if (_exporting.value) return
         _exporting.value = true
         _exportStatus.value = ""
@@ -1691,6 +1702,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * flags would let somebody export and import at once, over the same shards, for no gain.
      */
     fun importRecord(uri: android.net.Uri) {
+        c.crumb("record", "import")
         if (_exporting.value) return
         _exporting.value = true
         _exportStatus.value = ""
@@ -2025,6 +2037,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     }
 
     fun saveDraft() {
+        c.crumb("recipe", "save")
         val d = _draft.value ?: return
         viewModelScope.launch {
             c.recipeStore.save(d)
@@ -2053,6 +2066,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         byServings: Boolean,
         meal: NutritionDay.Meal,
     ) {
+        c.crumb("log", "recipe")
         val eaten = if (byServings) Recipes.eatenServings(recipe, amount)
         else Recipes.eatenGrams(recipe, amount)
         if (eaten == null) return
@@ -2116,6 +2130,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * "this much of that food", and the two would eventually disagree.
      */
     fun logMeal(recipe: Recipes.Recipe, scale: Double, meal: NutritionDay.Meal) {
+        c.crumb("log", "meal")
         val parts = Recipes.eatenComponents(recipe, scale)
         if (parts.isEmpty()) return
         val now = System.currentTimeMillis()

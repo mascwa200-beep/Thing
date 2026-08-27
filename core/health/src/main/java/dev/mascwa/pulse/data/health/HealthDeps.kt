@@ -72,4 +72,22 @@ class HealthDeps(
      * offer a button that silently does nothing.
      */
     val mealPhotoReader: MealPhotos?,
+
+    /**
+     * Leave a mark on the trail a fault report carries in front of it.
+     *
+     * ⚠️ **A lambda rather than a dependency on `Breadcrumbs`, for the reason the four above it are
+     * lambdas.** The ring lives in `:core:update` beside the crash reporter, and this module has no
+     * business depending on the updater to say what was being done a moment ago. Each application
+     * passes its own `Breadcrumbs::drop`.
+     *
+     * ⚠️ **Defaulted to nothing, so a caller that does not care is not forced to care** — and so
+     * that adding the parameter changed no existing construction. A no-op trail costs one call.
+     *
+     * ⚠️ **The content rule travels with it: a category and an action, never a subject.**
+     * `crumb("log", "portion")` says what happened; `crumb("log", "cheese sandwich")` puts a food
+     * diary into the one thing these applications send off the phone, one entry at a time. Nothing
+     * typed, no food name, no weight, no note.
+     */
+    val crumb: (String, String) -> Unit = { _, _ -> },
 )
