@@ -6,7 +6,6 @@ import dev.mascwa.pulse.core.telemetry.HealthImport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
-import java.util.zip.ZipInputStream
 
 /**
  * Reads back a zip — or a single CSV — that [HealthExporter] wrote.
@@ -40,8 +39,13 @@ class HealthImporter(
             runCatching {
                 val dayStartFor: (Long) -> Long = { ms -> HealthDays.startOf(ms, zone) }
 
-                val sheets = readSheets(uri)
-                    ?: return@runCatching Outcome(false, "Could not open that file.")
+                val sheets = when (val read = readSheets(uri)) {
+                    is HealthArchive.Read.Ok -> read.sheets
+                    HealthArchive.Read.Unopenable ->
+                        return@runCatching Outcome(false, "Could not open that file.")
+                    is HealthArchive.Read.TooBig ->
+                        return@runCatching Outcome(false, HealthArchive.tooBig(read.what))
+                }
                 if (sheets.isEmpty()) {
                     return@runCatching Outcome(false, "There was nothing readable in that file.")
                 }
@@ -84,31 +88,22 @@ class HealthImporter(
     // ------------------------------------------------------------------------------- internals
 
     /**
-     * Every CSV in the file, or null if it could not be opened at all.
+     * Every CSV in the file.
      *
-     * Tries the zip first because that is what the exporter writes; a file that is not a zip reads as
-     * one sheet of text. ⚠️ A zip is recognised by whether any entry actually appears, not by the file
-     * name — a `.zip` renamed to `.csv` by a mail client still opens.
+     * ⚠️ The reading and the caps live in [HealthArchive], which carries no Android import, so the
+     * bomb defence is held by a test that actually runs rather than by somebody reading it. This
+     * opens the stream and nothing else.
      */
-    private fun readSheets(uri: Uri): List<String>? {
+    private fun readSheets(uri: Uri): HealthArchive.Read {
         val bytes = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull() ?: return null
-        if (bytes.isEmpty()) return emptyList()
-
-        val fromZip = runCatching {
-            val out = mutableListOf<String>()
-            ZipInputStream(bytes.inputStream()).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    if (!entry.isDirectory) out += zip.readBytes().toString(Charsets.UTF_8)
-                    zip.closeEntry()
-                }
-            }
-            out
-        }.getOrDefault(emptyList())
-
-        return if (fromZip.isNotEmpty()) fromZip else listOf(bytes.toString(Charsets.UTF_8))
+            context.contentResolver.openInputStream(uri)
+                ?.use { HealthArchive.readBounded(it, HealthArchive.MAX_FILE_BYTES) }
+        }
+        // ⚠️ Three outcomes, not two: the open failed, the open worked and the file is too big, and
+        // the ordinary case. `getOrNull` on its own would flatten the first two into "could not open
+        // that file", which is a claim about the file that is not true.
+        val opened = bytes.getOrNull() ?: return HealthArchive.Read.Unopenable
+        return HealthArchive.sheetsFrom(opened)
     }
 
     /**
@@ -158,4 +153,5 @@ class HealthImporter(
         val why = if (r.reasons.isEmpty()) "" else " " + r.reasons.joinToString(" ")
         return (head + skipped + why).trim()
     }
+
 }
