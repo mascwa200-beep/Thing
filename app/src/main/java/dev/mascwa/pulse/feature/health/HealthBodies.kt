@@ -67,6 +67,7 @@ import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.PeriodCompare
+import dev.mascwa.pulse.core.telemetry.MealDraft
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.core.util.Formatters
@@ -664,6 +665,100 @@ private fun MacroBar(
 // =================================================================================== INTAKE
 
 /**
+ * A meal being assembled, and what committing it would do to the day.
+ *
+ * ⚠️ **One control, not two.** When nothing is being built this is a single button; once a plate is
+ * standing it becomes the plate. Offering "log" and "add to plate" side by side everywhere would
+ * make the choice ambiguous on every single food, and the mode meaningless.
+ *
+ * ⚠️ Nothing here refuses a commit or paints a meal red. The lines state arithmetic — see [MealDraft],
+ * and [MacroTargets.Bound] for why a surface that renders an honest over-budget meal as a failure
+ * is working against the measurement this whole app is built on.
+ */
+@Composable
+private fun PlatePanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    val staged by vm.plate.collectAsStateWithLifecycle()
+    val effect by vm.plateEffect.collectAsStateWithLifecycle()
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+
+    if (!building) {
+        LcarsButton(
+            text = "BUILD A PLATE",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { vm.setBuildingPlate(true) },
+        )
+        return
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(
+                "THE PLATE",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                MealDraft.summary(effect),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 15.sp,
+            )
+            if (staged.isEmpty()) {
+                Text(
+                    "Search for a food below, or type one in, and it goes here instead of straight " +
+                        "into the record.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+            staged.forEach { e ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            e.name,
+                            fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink, lineHeight = 15.sp,
+                        )
+                        Text(
+                            "${e.nutrients.kcal.roundToInt()} kcal · ${e.meal.label}" +
+                                // ⚠️ The day is named only when it is not the one on screen. Printing
+                                // it on every row would be noise; leaving it off the one row where it
+                                // differs is how a meal lands somewhere nobody is looking.
+                                if (e.dayStartMs != day) " · ${relativeDay(e.dayStartMs)}" else "",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                    LcarsButton(text = "OFF", onClick = { vm.unstage(e.id) })
+                }
+            }
+            effect.lines.forEach { l ->
+                Text(
+                    l.sentence,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 14.sp,
+                    // ⚠️ Amber marks a BUDGET gone past and nothing else. A floor gone past is the
+                    // point of having one, and colouring it would be the exact defect
+                    // `MacroTargets.Bound` was written to end.
+                    color = if (
+                        l.verdict == MealDraft.Verdict.OVER &&
+                        l.macro.bound == MacroTargets.Bound.BUDGET
+                    ) c.amber else c.muted,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                LcarsButton(
+                    text = "LOG THE PLATE",
+                    enabled = staged.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                    onClick = { vm.commitPlate() },
+                )
+                LcarsButton(
+                    text = if (staged.isEmpty()) "STOP" else "CLEAR",
+                    modifier = Modifier.weight(0.6f),
+                    onClick = { vm.clearPlate() },
+                )
+            }
+        }
+    }
+}
+
+/**
  * The log itself: search the databases, scan a barcode, or type four numbers off a label.
  *
  * ⚠️ QUICK ADD stays below the search rather than being replaced by it, and that is the point of
@@ -693,6 +788,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     // needs is hoisted into the composable that owns it.
     val day by vm.shownDay.collectAsStateWithLifecycle()
     val isToday = day == vm.todayStartMs()
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
 
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
@@ -702,6 +798,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
         item { DayStepper(vm) }
+        item { PlatePanel(vm) }
         item { FindAFood(vm, meal) }
         item { PhotoOfAMeal(vm, meal) }
         item { EatenBefore(vm, meal) }
@@ -762,7 +859,12 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         },
                     )
                     LcarsButton(
-                        text = if (keep && weight != null) "LOG IT AND KEEP IT" else "LOG IT",
+                        text = when {
+                            building && keep && weight != null -> "PLATE IT AND KEEP IT"
+                            building -> "ADD TO THE PLATE"
+                            keep && weight != null -> "LOG IT AND KEEP IT"
+                            else -> "LOG IT"
+                        },
                         enabled = energy != null && energy > 0.0,
                         onClick = {
                             vm.quickAdd(
@@ -785,6 +887,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                                 // trans fat" is printed on labels and is a real measurement.
                                 micros = typedMicros(labelled),
                                 extras = typedExtras(labelled),
+                                toPlate = building,
                             )
                             reset()
                         },
@@ -2781,7 +2884,7 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
                         LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
                     }
                 }
-                is HealthViewModel.MealShot.Plate -> PlateReview(st, meal, vm, onRetake = { shoot() })
+                is HealthViewModel.MealShot.MealDraft -> PlateReview(st, meal, vm, onRetake = { shoot() })
             }
         }
     }
@@ -2796,7 +2899,7 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
  */
 @Composable
 private fun PlateReview(
-    plate: HealthViewModel.MealShot.Plate,
+    plate: HealthViewModel.MealShot.MealDraft,
     meal: NutritionDay.Meal,
     vm: HealthViewModel,
     onRetake: () -> Unit,
@@ -3150,12 +3253,16 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
         }
+        // ⚠️ One button that changes what it says, rather than two side by side. A plate is a mode
+        // the person deliberately turned on and can see standing above this; offering "log" and "add
+        // to plate" together would make the mode meaningless and the choice ambiguous every time.
+        val building by vm.buildingPlate.collectAsStateWithLifecycle()
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             LcarsButton(
-                text = "LOG TO ${meal.label.uppercase()}",
+                text = if (building) "ADD TO THE PLATE" else "LOG TO ${meal.label.uppercase()}",
                 enabled = eaten != null,
                 modifier = Modifier.weight(1f),
-                onClick = { if (value != null) vm.logPortion(food, value, unit, meal) },
+                onClick = { if (value != null) vm.logPortion(food, value, unit, meal, toPlate = building) },
             )
             LcarsButton(text = "BACK", modifier = Modifier.weight(0.5f), onClick = { vm.pick(null) })
         }

@@ -54,7 +54,7 @@ the package you touched. Across every package it still reports about a dozen, an
 shapes it cannot model without being a compiler, both benign:
 
   - **nested declarations** — `private data class ApiAlbum` inside an object, an AIDL-generated
-    `IInferenceService`, a Room `Callback`. Only top-level names are collected;
+    `IInferenceService`, a Room `Callback`;
   - **unqualified enum entries in a `when`** — Kotlin 2.0 resolves `AIR ->` from the subject's type
     without an import, and knowing the subject's type requires type inference.
 
@@ -62,6 +62,25 @@ Both are reported as "used but not imported". Neither is worth chasing: the fix 
 checker, and the compiler already is one. What this catches — a name that resolves nowhere, and an
 import pointing at the wrong package — is the part the compiler only tells you about after a CI
 round.
+
+⚠️ **A NESTED DECLARATION ALSO CAUSES A FALSE NEGATIVE, which is far worse than the noise above, and
+an earlier version of this note got it exactly backwards by claiming "only top-level names are
+collected".** `declarations()` is anchored with `^\\s*`, so it collects an INDENTED `data class Plate`
+inside a `sealed interface` just as readily as a top-level one — measured, not assumed. Everything
+that file's package declares is then treated as same-package and needing no import, ACROSS MODULES,
+because a package here can span `:app` and `:core:health`.
+
+The consequence, found by writing code that hit it: `HealthViewModel.MealShot.Plate` is nested in
+`dev.mascwa.pulse.feature.health`, and a sibling file in that package using the unrelated top-level
+`dev.mascwa.pulse.core.telemetry.Plate` with **no import at all** was reported clean. Confirmed both
+ways — import removed, gate says clean; import restored, gate says clean.
+
+Not fixed here, deliberately. Telling a nested declaration from a top-level one needs brace-depth
+tracking, and the note above says nested declarations are ALSO the main source of this gate's
+false positives — so tightening it would trade a rare silent miss for a flood of noise, and a gate
+that floods is one people stop reading. The practical defence is the one that found it: **if a new
+type's simple name already exists anywhere in the package you are editing, rename it.** A third
+`Plate` in scope was a readability problem before it was a tooling one.
 """
 
 import re

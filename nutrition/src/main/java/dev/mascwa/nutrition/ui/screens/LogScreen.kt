@@ -1,11 +1,11 @@
 package dev.mascwa.nutrition.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.FoodPortion
+import dev.mascwa.pulse.core.telemetry.MealDraft
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.feature.health.HealthViewModel
@@ -45,11 +46,92 @@ fun LogScreen(vm: HealthViewModel) {
     var meal by remember { mutableStateOf(NutritionDay.Meal.SNACK) }
 
     MealPicker(meal) { meal = it }
+    PlateCard(vm)
     FindAFood(vm, meal)
     Recents(vm, meal)
     QuickAddCard(vm, meal)
     MyFoods(vm)
     RepeatADay(vm)
+}
+
+/**
+ * A meal being assembled, and what committing it would do to the day.
+ *
+ * ⚠️ **One control, not two.** With nothing being built this is a single button; once a plate is
+ * standing it becomes the plate, and every "add" on the screen below puts food here instead of into
+ * the record. Offering both everywhere would make the choice ambiguous on every single food.
+ *
+ * ⚠️ Nothing here refuses a commit or paints a meal as a failure. The lines state arithmetic — see
+ * `MealDraft`, and `MacroTargets.Bound` for why a surface that treats an honest over-budget meal as
+ * an error is working against the measurement this whole app rests on. This theme also takes the
+ * device's dynamic colours, so a hue could not carry a meaning here even if there were one to carry.
+ */
+@Composable
+private fun PlateCard(vm: HealthViewModel) {
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    val staged by vm.plate.collectAsStateWithLifecycle()
+    val effect by vm.plateEffect.collectAsStateWithLifecycle()
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+
+    if (!building) {
+        SectionCard(
+            "The plate",
+            subtitle = "Put a few things together, see what they come to, then log them in one go.",
+        ) {
+            Button(
+                onClick = { vm.setBuildingPlate(true) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Build a plate") }
+        }
+        return
+    }
+
+    SectionCard("The plate", subtitle = MealDraft.summary(effect)) {
+        if (staged.isEmpty()) {
+            Text(
+                "Search for a food below, or type one in, and it comes here instead of going " +
+                    "straight into the record.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        staged.forEach { e ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(e.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "${round(e.nutrients.kcal)} kcal · ${e.meal.label}" +
+                            // ⚠️ The day is named only where it differs from the one on screen.
+                            // Printing it on every row would be noise; leaving it off the one row
+                            // that needs it is how a meal lands somewhere nobody is looking.
+                            if (e.dayStartMs != day) " · added on another day" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { vm.unstage(e.id) }) { Text("Remove") }
+            }
+        }
+        effect.lines.forEach { l ->
+            Text(
+                l.sentence,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { vm.commitPlate() }, enabled = staged.isNotEmpty()) {
+                Text("Log the plate")
+            }
+            TextButton(onClick = { vm.clearPlate() }) {
+                Text(if (staged.isEmpty()) "Stop" else "Clear")
+            }
+        }
+    }
 }
 
 /**
@@ -272,11 +354,17 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
         )
     }
 
+    // ⚠️ One button that changes what it says, rather than two side by side. The plate is a mode
+    // the person deliberately turned on and can see standing at the top of this screen; offering
+    // both would make the choice ambiguous on every single food and the mode meaningless.
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
-            onClick = { if (n != null) vm.logPortion(food, n, unit, meal) },
+            onClick = { if (n != null) vm.logPortion(food, n, unit, meal, toPlate = building) },
             enabled = grams != null,
-        ) { Text("Add to ${meal.label.lowercase()}") }
+        ) {
+            Text(if (building) "Add to the plate" else "Add to ${meal.label.lowercase()}")
+        }
         TextButton(onClick = { vm.pick(null) }) { Text("Cancel") }
     }
 }

@@ -43,6 +43,10 @@ import dev.mascwa.pulse.feature.health.HealthViewModel
  */
 @Composable
 fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    // ⚠️ Read here rather than at the button, so the label and the call cannot disagree about the
+    // mode — a button reading "add to the plate" that logged straight into the record would be the
+    // worst failure this feature could have.
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
     var name by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
     var protein by remember { mutableStateOf("") }
@@ -107,13 +111,16 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
                     keepAsFood = keep && gramsValue != null,
                     micros = typedMicros(typed),
                     extras = typedExtras(typed),
+                    toPlate = building,
                 )
                 name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""
                 keep = false; typed.clear()
             },
             enabled = kcalValue != null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Add to ${meal.label.lowercase()}") }
+        ) {
+            Text(if (building) "Add to the plate" else "Add to ${meal.label.lowercase()}")
+        }
 
         // The density check, shown before it is committed rather than after it is refused.
         val per100 = if (gramsValue != null && kcalValue != null) {

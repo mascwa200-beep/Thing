@@ -413,6 +413,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.RecipeStore(appContext, json)
     }
 
+    /** A meal being assembled, kept on disk so a telephone call cannot lose it. */
+    val plateStore: dev.mascwa.pulse.data.health.PlateStore by lazy {
+        dev.mascwa.pulse.data.health.PlateStore(appContext, json)
+    }
+
     /** What was lifted, and the personal bests that outlive the sessions they were set in. */
     val trainingStore: dev.mascwa.pulse.data.health.TrainingStore by lazy {
         dev.mascwa.pulse.data.health.TrainingStore(appContext, json)
@@ -483,6 +488,7 @@ class AppContainer(private val appContext: Context) {
             healthConnect = healthConnect,
             customFoodStore = customFoodStore,
             recipeStore = recipeStore,
+            plateStore = plateStore,
             trainingStore = trainingStore,
             foodRepository = foodRepository,
             healthExporter = healthExporter,

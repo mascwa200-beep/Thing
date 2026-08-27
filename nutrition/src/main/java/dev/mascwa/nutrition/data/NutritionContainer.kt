@@ -18,6 +18,7 @@ import dev.mascwa.pulse.data.health.HealthDeps
 import dev.mascwa.pulse.data.health.HealthExporter
 import dev.mascwa.pulse.data.health.HealthImporter
 import dev.mascwa.pulse.data.health.OfflineFoodStore
+import dev.mascwa.pulse.data.health.PlateStore
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.health.RecipeStore
 import dev.mascwa.pulse.data.health.TrainingStore
@@ -158,6 +159,8 @@ class NutritionContainer(context: Context) {
     val customFoodStore: CustomFoodStore by lazyCustomFood
     private val lazyRecipe = lazy { RecipeStore(appContext, json) }
     val recipeStore: RecipeStore by lazyRecipe
+    private val lazyPlate = lazy { PlateStore(appContext, json) }
+    val plateStore: PlateStore by lazyPlate
     private val lazyTraining = lazy { TrainingStore(appContext, json) }
     val trainingStore: TrainingStore by lazyTraining
     val progressPhotoStore: ProgressPhotoStore by lazy { ProgressPhotoStore(appContext, json) }
@@ -179,6 +182,7 @@ class NutritionContainer(context: Context) {
         if (lazyFoodLog.isInitialized()) runCatching { foodLogStore.flushNow() }
         if (lazyCustomFood.isInitialized()) runCatching { customFoodStore.flushNow() }
         if (lazyRecipe.isInitialized()) runCatching { recipeStore.flushNow() }
+        if (lazyPlate.isInitialized()) runCatching { plateStore.flushNow() }
         if (lazyTraining.isInitialized()) runCatching { trainingStore.flushNow() }
     }
     val healthConnect: HealthConnectBridge by lazy { HealthConnectBridge(appContext) }
@@ -218,6 +222,7 @@ class NutritionContainer(context: Context) {
             healthConnect = healthConnect,
             customFoodStore = customFoodStore,
             recipeStore = recipeStore,
+            plateStore = plateStore,
             trainingStore = trainingStore,
             foodRepository = foodRepository,
             healthExporter = exporter,

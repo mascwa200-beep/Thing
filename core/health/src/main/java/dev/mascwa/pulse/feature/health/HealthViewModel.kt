@@ -14,6 +14,7 @@ import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.PeriodCompare
+import dev.mascwa.pulse.core.telemetry.MealDraft
 import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
@@ -670,34 +671,54 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * [FoodPortion.eaten]. Every source publishes per 100 grams; an entry stores what is on the plate.
      * Carrying a per-100-gram figure any further is how a 30-gram biscuit gets logged as a packet.
      */
-    fun logPortion(food: Food, amount: Double, unit: FoodPortion.Unit, meal: NutritionDay.Meal) {
+    fun logPortion(
+        food: Food,
+        amount: Double,
+        unit: FoodPortion.Unit,
+        meal: NutritionDay.Meal,
+        /**
+         * Put it on the plate instead of straight into the record.
+         *
+         * ⚠️ **A parameter on this function rather than a second function**, so both routes build
+         * the entry from the same lines. `PlateStore` promises that committing produces the entry
+         * the direct path would have produced, and two constructions of `NutritionDay.Entry` that
+         * are meant to agree is exactly how that promise quietly stops being true — one of them
+         * gains a field and the other does not, and the loss is invisible because the entry still
+         * looks complete.
+         */
+        toPlate: Boolean = false,
+    ) {
         val portion = FoodPortion.Portion(amount, unit)
         val grams = FoodPortion.gramsFor(portion, food.sizes) ?: return
         val eaten = FoodPortion.eaten(food.per100g, grams)
         val now = System.currentTimeMillis()
         viewModelScope.launch {
-            c.foodLogStore.add(
-                NutritionDay.Entry(
-                    id = UUID.randomUUID().toString(),
-                    dayStartMs = _today.value,
-                    atMs = now,
-                    name = food.display,
-                    grams = grams,
-                    nutrients = eaten,
-                    meal = meal,
-                    brand = food.brand,
-                    servingLabel = food.servingLabel,
-                    source = food.source,
-                    foodId = food.id,
-                    // Through the same scaling rule as the macros above — see FoodPortion.
-                    micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
-                    extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
-                ),
+            val entry = NutritionDay.Entry(
+                id = UUID.randomUUID().toString(),
+                dayStartMs = _today.value,
+                atMs = now,
+                name = food.display,
+                grams = grams,
+                nutrients = eaten,
+                meal = meal,
+                brand = food.brand,
+                servingLabel = food.servingLabel,
+                source = food.source,
+                foodId = food.id,
+                // Through the same scaling rule as the macros above — see FoodPortion.
+                micros = FoodPortion.eatenMicros(food.microsPer100g, grams),
+                extras = FoodPortion.eatenExtras(food.extrasPer100g, grams),
             )
+            if (toPlate) c.plateStore.stage(entry) else c.foodLogStore.add(entry)
             _picked.value = null
             _search.value = Search()
-            reloadEntries()
-            recompute.value++
+            // ⚠️ Neither happens for a staged item. Nothing has been eaten yet as far as the record
+            // is concerned, so reloading the day would show no change and recomputing the plan would
+            // move a target on the strength of food nobody has decided on.
+            if (!toPlate) {
+                reloadEntries()
+                recompute.value++
+            }
         }
     }
 
@@ -721,6 +742,8 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         keepAsFood: Boolean = false,
         micros: Micronutrients.Amounts = Micronutrients.Amounts(),
         extras: NutrientSet.Amounts = NutrientSet.Amounts(),
+        /** Put it on the plate instead of straight into the record — see [logPortion]. */
+        toPlate: Boolean = false,
     ) {
         val label = name.trim().ifBlank { "Quick add" }
         if (!kcal.isFinite() || kcal < 0.0) return
@@ -754,23 +777,108 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 } else {
                     null
                 }
-            c.foodLogStore.add(
-                NutritionDay.Entry(
-                    id = UUID.randomUUID().toString(),
-                    dayStartMs = _today.value,
-                    atMs = now,
-                    name = label,
-                    grams = grams,
-                    nutrients = eaten,
-                    meal = meal,
-                    micros = micros,
-                    extras = extras,
-                    source = NutritionDay.Source.CUSTOM,
-                    foodId = saved?.id.orEmpty(),
-                ),
+            val entry = NutritionDay.Entry(
+                id = UUID.randomUUID().toString(),
+                dayStartMs = _today.value,
+                atMs = now,
+                name = label,
+                grams = grams,
+                nutrients = eaten,
+                meal = meal,
+                micros = micros,
+                extras = extras,
+                source = NutritionDay.Source.CUSTOM,
+                foodId = saved?.id.orEmpty(),
             )
+            // ⚠️ The custom food above is saved either way, and deliberately. Keeping it is a
+            // separate decision from eating it — somebody who typed a label out and then thought
+            // better of the portion still wants the food remembered.
+            if (toPlate) c.plateStore.stage(entry) else c.foodLogStore.add(entry)
+            if (!toPlate) {
+                reloadEntries()
+                recompute.value++
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------------------------- the plate
+
+    /**
+     * Whether taps are building a plate rather than logging straight away.
+     *
+     * ⚠️ **A standing plate forces it on, whatever the toggle says**, and that is not a nicety. The
+     * plate is persisted precisely so it survives a process death, and the toggle is not — so
+     * without this, reopening the app after being killed would show a plate with three things on it
+     * while the next thing tapped went silently past it into the log.
+     */
+    private val _buildingPlate = MutableStateFlow(false)
+    val buildingPlate: StateFlow<Boolean> =
+        combine(_buildingPlate, c.plateStore.items) { building, items ->
+            building || items.isNotEmpty()
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setBuildingPlate(v: Boolean) {
+        _buildingPlate.value = v
+    }
+
+    /** What is on the plate, in the order it was put there. */
+    val plate: StateFlow<List<NutritionDay.Entry>> = c.plateStore.items
+
+    /**
+     * What is on the plate and what committing it would do to the day.
+     *
+     * ⚠️ Read against the SHOWN day's entries and the live plan, so it answers the question actually
+     * being asked — "what does this do to the day I am looking at" — rather than to today whichever
+     * day is on screen.
+     */
+    val plateEffect: StateFlow<MealDraft.Effect> =
+        combine(c.plateStore.items, _entries, state) { staged, logged, s ->
+            MealDraft.effect(staged, logged, (s.plan as? MacroTargets.Plan.Set)?.targets)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            MealDraft.effect(emptyList(), emptyList(), null),
+        )
+
+    fun unstage(id: String) {
+        viewModelScope.launch { c.plateStore.unstage(id) }
+    }
+
+    /**
+     * Write everything on the plate into the record.
+     *
+     * ⚠️ **Drained under the store's own lock rather than read-then-cleared**, because a commit
+     * button is exactly the control people double-tap and the read-then-clear version double-logs
+     * the lot. See `PlateStore.drain`.
+     *
+     * ⚠️ Each item goes to the day it was STAGED for, which is what the person meant, and the notice
+     * says so when that is not the day on screen — otherwise a plate assembled yesterday and
+     * committed today would land somewhere nobody is looking with nothing to say it had.
+     */
+    fun commitPlate() {
+        viewModelScope.launch {
+            val taken = c.plateStore.drain()
+            if (taken.isEmpty()) return@launch
+            for (e in taken) c.foodLogStore.add(e)
+            _buildingPlate.value = false
             reloadEntries()
             recompute.value++
+            val elsewhere = taken.count { it.dayStartMs != _today.value }
+            val what = if (taken.size == 1) "1 item" else "${taken.size} items"
+            _notice.value = when (elsewhere) {
+                0 -> "Logged $what."
+                taken.size -> "Logged $what to the day they were added on."
+                else -> "Logged $what — $elsewhere on an earlier day."
+            }
+        }
+    }
+
+    /** Throw the plate away. */
+    fun clearPlate() {
+        viewModelScope.launch {
+            c.plateStore.clear()
+            _buildingPlate.value = false
+            _notice.value = "MealDraft cleared."
         }
     }
 
@@ -830,7 +938,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     /**
      * What a photograph of a plate has turned into so far.
      *
-     * ⚠️ **This is a review step, and the state machine is what makes it one.** A [Plate] is a list
+     * ⚠️ **This is a review step, and the state machine is what makes it one.** A [MealDraft] is a list
      * of proposals sitting on screen waiting to be corrected; nothing reaches the log until somebody
      * presses the button. The portion especially is a guess — the model has weighed nothing — so
      * writing these straight into a day's total would put invented grams beside weighed ones with
@@ -839,7 +947,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     sealed interface MealShot {
         data object Idle : MealShot
         data object Reading : MealShot
-        data class Plate(
+        data class MealDraft(
             val proposals: List<MealPhotos.Proposal>,
             val summary: String,
         ) : MealShot
@@ -874,7 +982,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
         mealShotJob = viewModelScope.launch {
             _mealShot.value = when (val r = reader.read(context, uri)) {
-                is MealPhotos.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
+                is MealPhotos.Result.MealDraft -> MealShot.MealDraft(r.proposals, r.summary)
                 is MealPhotos.Result.NotFood -> MealShot.NotFood
                 is MealPhotos.Result.NoVision -> MealShot.NoVision
                 is MealPhotos.Result.Failed -> MealShot.Failed(r.reason)
@@ -886,7 +994,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     /** Correct a portion the model guessed at. Nutrition re-derives from the matched record. */
     fun editMealGrams(index: Int, grams: Double) {
-        val plate = _mealShot.value as? MealShot.Plate ?: return
+        val plate = _mealShot.value as? MealShot.MealDraft ?: return
         val p = plate.proposals.getOrNull(index) ?: return
         if (!grams.isFinite() || grams <= 0.0) return
         _mealShot.value = plate.copy(
@@ -898,7 +1006,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     /** Drop something the model saw that was not there, or that nobody ate. */
     fun dropMealItem(index: Int) {
-        val plate = _mealShot.value as? MealShot.Plate ?: return
+        val plate = _mealShot.value as? MealShot.MealDraft ?: return
         if (index !in plate.proposals.indices) return
         val left = plate.proposals.toMutableList().also { it.removeAt(index) }
         _mealShot.value = if (left.isEmpty()) MealShot.Idle else plate.copy(proposals = left)
@@ -922,7 +1030,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * believe a day is fully logged when it is not.
      */
     fun logPlate(meal: NutritionDay.Meal) {
-        val plate = _mealShot.value as? MealShot.Plate ?: return
+        val plate = _mealShot.value as? MealShot.MealDraft ?: return
         val loggable = plate.proposals.filter { it.loggable }
         if (loggable.isEmpty()) return
         val now = System.currentTimeMillis()
