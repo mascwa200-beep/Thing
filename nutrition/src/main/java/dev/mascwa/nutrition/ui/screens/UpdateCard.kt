@@ -88,9 +88,13 @@ fun UpdateCard(updates: NutritionUpdates) {
 
         if (hasToken == false) {
             Note(
-                "These builds live in a private repository, so updating needs a GitHub token with " +
-                    "repo scope. It is kept on this phone in plain preferences — this app has no " +
-                    "secure store of its own — so use a token that can do nothing but read releases.",
+                "These builds live in a private repository, so updating needs a GitHub token that " +
+                    "can read this repository's contents. The same token sends fault reports, and " +
+                    "that half needs WRITE access to contents — a read-only token keeps updates " +
+                    "working while every report is refused, which is a bad way to find out. Pick " +
+                    "whichever half you want and the other one will say plainly when it cannot. " +
+                    "The token is kept on this phone in plain preferences, because this app has no " +
+                    "secure store of its own.",
             )
         } else if (hasToken == true) {
             Note("A token is saved. Pasting a new one replaces it; saving a blank field clears it.")

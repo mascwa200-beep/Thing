@@ -121,6 +121,17 @@ fun DiagnosticsCard(container: NutritionContainer) {
             )
         }
 
+        // ⚠️ Said HERE, and not only on the update card, because a report that cannot be sent is a
+        // fact about this feature. The two share one token and want different things from it —
+        // updating needs read, sending needs write — so a token chosen for the other card silently
+        // disables this one, and the only sign was a raw "GitHub 403 on PUT" after the fact.
+        Text(
+            "Sending uses the same GitHub token as updates, and needs write access to contents. " +
+                "A read-only token leaves updates working and refuses every report.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

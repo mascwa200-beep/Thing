@@ -209,6 +209,36 @@ class CrashUploader(
         )
     }
 
+    /**
+     * Turn a refusal into the sentence somebody can act on.
+     *
+     * ⚠️ **The case this exists for is a token that can read and not write**, because that is the
+     * token the update card asks for and updating is the only other thing the token does. Every
+     * report then failed with the bare string "GitHub 403 on PUT", which names the symptom and
+     * nothing else — so the one feature whose whole purpose is to explain a failure was itself
+     * failing unexplained.
+     *
+     * ⚠️ **Only for the write methods.** A 404 on the GET of `git/ref/heads/debug-reports` is the
+     * ordinary first-ever-report case — the branch does not exist yet, [headSha] swallows it to null
+     * and [upload] then creates it — so mapping that one onto a permissions sentence would report a
+     * successful first upload as a broken token.
+     *
+     * ⚠️ 404 is grouped with 403 deliberately and hedged rather than asserted: GitHub answers 404
+     * rather than 403 when a credential cannot see a private repository at all, precisely so that an
+     * error does not confirm the repository exists. From here the two are one problem with the token.
+     */
+    private fun explain(code: Int, method: String): String = when {
+        method != "GET" && (code == 403 || code == 404) ->
+            "GitHub $code on $method — this token cannot write to the repository. Sending reports " +
+                "needs write access to contents; updating the app needs only read, so updates will " +
+                "keep working while reports do not."
+        code == 401 ->
+            "GitHub 401 — the token was rejected outright. It has probably expired or been revoked."
+        code == 429 || code == 503 ->
+            "GitHub $code — rate-limited or unavailable. Nothing is lost; this retries on the next launch."
+        else -> "GitHub $code on $method"
+    }
+
     private suspend fun request(method: String, url: String, body: JSONObject?): String =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder()
@@ -229,7 +259,7 @@ class CrashUploader(
                     // request back in an error, and this request's body is a report that may quote a
                     // credential the scrubber ran over — putting it into an exception would hand it
                     // straight to the next thing that logs the failure.
-                    throw IOException("GitHub ${response.code} on $method")
+                    throw IOException(explain(response.code, method))
                 }
                 text
             }
