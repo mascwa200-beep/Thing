@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.CheckIn
+import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.GoalProjection
 import dev.mascwa.pulse.core.telemetry.Habits
@@ -38,9 +39,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1008,6 +1011,74 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             reloadEntries()
             recompute.value++
         }
+    }
+
+    // -------------------------------------------------------------------------- the energy balance
+
+    private val _balanceSpan = MutableStateFlow(EnergyBalance.Span.MONTH)
+
+    /** Which interval the balance chart is showing. */
+    val balanceSpan: StateFlow<EnergyBalance.Span> = _balanceSpan.asStateFlow()
+
+    private val _balance = MutableStateFlow<EnergyBalance.Reading?>(null)
+
+    /** The interval, or null before anything has been asked for. */
+    val balance: StateFlow<EnergyBalance.Reading?> = _balance.asStateFlow()
+
+    private val _balanceLoading = MutableStateFlow(false)
+    val balanceLoading: StateFlow<Boolean> = _balanceLoading.asStateFlow()
+
+    /**
+     * Work out the balance over the chosen interval.
+     *
+     * ⚠️ **Asked for, never derived on every state build**, and the reason is the DISK rather than the
+     * arithmetic. A first version of this comment claimed the computation was expensive; measured, it
+     * is 2.4–3.4 ms on a JVM against eighteen months of daily weighing, and a third of a millisecond
+     * against three months of it — nothing. What is worth avoiding is [FoodLogStore.intakeDays], a
+     * read across a hundred and twenty days of the log, repeated on every logged meal and every
+     * weigh-in, for a chart nobody may be looking at.
+     *
+     * ⚠️ The intake list reaches back a window BEFORE the interval on purpose. A causal reading at the
+     * start of the interval needs the window that precedes it, and fetching only the interval's own
+     * days leaves the first four weeks of the line empty for no reason — a documented consequence
+     * with a test of its own.
+     */
+    fun loadBalance() {
+        if (_balanceLoading.value) return
+        _balanceLoading.value = true
+        viewModelScope.launch {
+            try {
+                val span = _balanceSpan.value
+                val today = todayStartMs()
+                val window = state.value.profile.expenditureWindowDays.coerceIn(14, 120)
+                val first = HealthDays.plus(today, -(span.days - 1).toLong())
+                val grid = (0 until span.days).map { HealthDays.plus(first, it.toLong()) }
+                // Reach back a window further for the food, so the readings at the start of the
+                // interval have something behind them.
+                val from = HealthDays.plus(first, -window.toLong())
+                val intake = withContext(Dispatchers.IO) {
+                    c.foodLogStore.intakeDays(from, HealthDays.plus(today, 1))
+                }
+                val w = weighins.value
+                _balance.value = withContext(Dispatchers.Default) {
+                    EnergyBalance.build(grid, w, intake, windowDays = window)
+                }
+            } catch (t: Throwable) {
+                // A chart that could not be worked out is not a reason to take the tab down. The
+                // surface shows its own empty state; leaving the previous interval up would be worse,
+                // because it would be labelled with the span nobody is now looking at.
+                _balance.value = null
+            } finally {
+                _balanceLoading.value = false
+            }
+        }
+    }
+
+    fun setBalanceSpan(span: EnergyBalance.Span) {
+        if (_balanceSpan.value == span) return
+        _balanceSpan.value = span
+        _balance.value = null
+        loadBalance()
     }
 
     // ---------------------------------------------------------------------------------- habits

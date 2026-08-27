@@ -108,6 +108,23 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # That reports `unresolved reference 'BuildConfig'` on its own import line, which is proof the
 # mechanism is generic rather than anything about your edit. Do check the member exists —
 # VERSION_CODE, VERSION_NAME and the flavour fields are the only ones this build generates.
+#
+# ⚠️ **CHOOSING THE CONTROL IS THE PART THAT GOES WRONG, and it goes wrong SILENTLY IN THE
+# REASSURING DIRECTION.** The technique is to plant a reference to something real and long-standing
+# beside the suspect one and see whether it is reported too. But this script DIFFERENCES against
+# HEAD, so a control the target file ALREADY references at HEAD has its message in the baseline
+# already and can never come back as new — planting it looks like the gate resolving it correctly,
+# which reads as "then my five complaints are real defects" and sends you chasing phantoms.
+#
+# A valid control is real, long-standing, AND absent from the target file at HEAD. Find one:
+#
+#     git show HEAD:<target.kt> > /tmp/head.kt
+#     git show HEAD:<the-declaring-file.kt> | grep -oE '^    (val|fun) [A-Za-z0-9_]+' | awk '{print $2}' \
+#       | sort -u | while read -r m; do grep -q "vm\.$m\b" /tmp/head.kt || echo "$m"; done
+#
+# ⚠️ And note `:core:health` is on NEITHER path here — not as sources, not as classes — so every
+# member of anything it declares cascades. That is a whole module's worth of false positives, and it
+# is the commonest one this repo hits.
 
 FEEDS=core/feeds/build/classes/kotlin/main
 OKHTTP=$(find "$GC/com.squareup.okhttp3" -name 'okhttp-*.jar' 2>/dev/null | head -1)

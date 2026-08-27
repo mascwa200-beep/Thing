@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.PulseApplication
@@ -1410,6 +1411,116 @@ private fun CheckInPanel(vm: HealthViewModel, state: HealthViewModel.State) {
     }
 }
 
+/**
+ * What you ate against what you burned, over an interval you choose.
+ *
+ * ⚠️ **The expenditure line is the reading that was in force each day, not today's figure drawn
+ * backwards**, and that distinction is the whole reason this chart is worth drawing — see
+ * [EnergyBalance] for why a single figure measured over the interval would agree with the scale by
+ * construction. It steps weekly because that is when the app publishes new targets.
+ *
+ * ⚠️ The intake series is split into contiguous RUNS rather than drawn as one line. A day nobody
+ * logged is a gap in the record, and joining across it would draw a smooth line through a fortnight
+ * of no data that reads exactly like a fortnight of steady eating. The split itself is
+ * `EnergyBalance.intakeRuns`, in the core, because both applications plot this series and both have
+ * to break it in the same places.
+ *
+ * ⚠️ Splitting costs nothing here because [LcarsTimeChart] draws no legend of its own — the key
+ * below is ours. It also drops any run of fewer than two points, so a single logged day marooned
+ * between two gaps is not plotted, which is the right answer for a chart made of lines and the
+ * reason the core keeps such a run rather than discarding it.
+ */
+@Composable
+private fun BalancePanel(vm: HealthViewModel, unit: BodyTrend.MassUnit) {
+    val c = Pulse.colors
+    val span by vm.balanceSpan.collectAsStateWithLifecycle()
+    val reading by vm.balance.collectAsStateWithLifecycle()
+    val loading by vm.balanceLoading.collectAsStateWithLifecycle()
+
+    // Asked for once when the page appears, and again whenever the span changes — never hung off the
+    // state flow, which would re-read four months of the food log on every logged meal.
+    LaunchedEffect(Unit) { if (vm.balance.value == null) vm.loadBalance() }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                EnergyBalance.Span.entries.forEach { s ->
+                    LcarsChip(s.label, selected = s == span, onClick = { vm.setBalanceSpan(s) })
+                }
+            }
+
+            val r = reading
+            when {
+                r == null && loading -> Text(
+                    "Working it out…",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+
+                r == null -> Text(
+                    "Nothing to show for this interval.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+
+                r is EnergyBalance.Reading.NotYet -> Text(
+                    r.why,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+
+                r is EnergyBalance.Reading.Ready -> {
+                    val eatenRuns = remember(r) { EnergyBalance.intakeRuns(r.days) }
+                    val burned = remember(r) { EnergyBalance.burnSeries(r.days) }
+                    LcarsTimeChart(
+                        series = eatenRuns.map { ChartSeries("EATEN", it, c.accent, filled = true) } +
+                            listOf(ChartSeries("BURNED", burned, c.positive)),
+                        modifier = Modifier.fillMaxWidth().height(132.dp),
+                        valueFormat = { Formatters.number(it, 0) },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Legend("EATEN", c.accent)
+                        Legend("BURNED", c.positive)
+                    }
+
+                    LcarsDataRow("EATEN", "${Formatters.number(r.intakeKcal, 0)} kcal")
+                    LcarsDataRow("BURNED", "${Formatters.number(r.expenditureKcal, 0)} kcal")
+                    LcarsDataRow(
+                        if (r.balanceKcal < 0) "UNDER" else "OVER",
+                        "${Formatters.number(abs(r.balanceKcal), 0)} kcal over ${r.pairedDays} days",
+                    )
+
+                    Text(
+                        EnergyBalance.summary(r, unit),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 16.sp,
+                    )
+                    EnergyBalance.reconciliation(r, unit)?.let { line ->
+                        // ⚠️ Amber only when there is genuinely something to look into. A gap inside
+                        // the estimate's own width is the ordinary case, and colouring it would put a
+                        // warning on the screen of somebody doing everything right.
+                        val remarks = (r.gapPerDayKcal ?: 0.0).let { abs(it) > EnergyBalance.REMARK_SDS * r.sdKcal }
+                        Text(
+                            line,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            color = if (remarks) c.amber else c.muted, lineHeight = 14.sp,
+                        )
+                    }
+                    Text(
+                        "The burn line is what the measurement said at the time, re-taken every week " +
+                            "from the record up to that day — not today's figure drawn backwards.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Legend(label: String, tint: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.height(3.dp).width(14.dp).background(tint))
+        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = Pulse.colors.muted)
+    }
+}
+
 @Composable
 fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val c = Pulse.colors
@@ -1458,6 +1569,9 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                 }
             }
         }
+
+        item { LcarsHeaderBar("ENERGY BALANCE") }
+        item { BalancePanel(vm, unit) }
 
         item { LcarsHeaderBar("PACE") }
         item {

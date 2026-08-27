@@ -1,11 +1,16 @@
 package dev.mascwa.nutrition.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -13,7 +18,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.mascwa.pulse.core.telemetry.MacroTargets
@@ -134,3 +142,100 @@ fun ProgressRow(
  */
 fun round(v: Double, places: Int = 0): String =
     String.format(Locale.getDefault(), "%.${places}f", v)
+
+/**
+ * Two lines over the same days: what you ate, and what you burned.
+ *
+ * ⚠️ **The first drawing of any kind in this application, and it stays deliberately plain.** No axes,
+ * no gridlines, no tooltips — the numbers that matter are stated in words directly beneath it, and
+ * this is the shape of them. What it adds over the sentence is the thing a sentence cannot carry: a
+ * total that is climbing, or a fortnight where the two lines crossed.
+ *
+ * ⚠️ **Both series are named in words beside the chart, not distinguished by colour alone.**
+ * [NutritionTheme] takes the device's dynamic colour scheme on Android 12+, so `primary` and
+ * `tertiary` are whatever the wallpaper made them and could be near-identical on some phones — and
+ * anybody reading it with a colour-vision difference has no hue to go on either way. The legend is
+ * the identification; the colour is a hint.
+ *
+ * [eaten] is a list of RUNS, so a stretch with nothing logged is a break in the line rather than a
+ * straight join across it — see `EnergyBalance.intakeRuns` for why that distinction is not cosmetic.
+ * A run of one point draws a dot, since a line needs two.
+ */
+@Composable
+fun EnergyChart(
+    eaten: List<List<Pair<Long, Double>>>,
+    burned: List<Pair<Long, Double>>,
+    modifier: Modifier = Modifier,
+) {
+    val eatenColor = MaterialTheme.colorScheme.primary
+    val burnedColor = MaterialTheme.colorScheme.tertiary
+    val axis = MaterialTheme.colorScheme.outlineVariant
+
+    val all = eaten.flatten() + burned
+    if (all.size < 2) {
+        Box(modifier)
+        return
+    }
+    val tMin = all.minOf { it.first }
+    val tMax = all.maxOf { it.first }
+    val tSpan = (tMax - tMin).takeIf { it > 0L } ?: 1L
+    var vMin = all.minOf { it.second }
+    var vMax = all.maxOf { it.second }
+    if (vMax - vMin < 1e-9) {
+        vMin -= 1.0
+        vMax += 1.0
+    }
+    val vSpan = vMax - vMin
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "${vMax.roundToInt()} kcal",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "${vMin.roundToInt()} kcal",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+            fun px(t: Long) = ((t - tMin).toDouble() / tSpan * size.width).toFloat()
+            fun py(v: Double) = (size.height - (v - vMin) / vSpan * size.height).toFloat()
+
+            drawLine(axis, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1f)
+
+            fun polyline(points: List<Pair<Long, Double>>, tint: Color) {
+                if (points.size == 1) {
+                    // A lone logged day between two gaps. A line needs two points; a dot is the
+                    // honest way to say that one day is there.
+                    drawCircle(tint, radius = 2.5f, center = Offset(px(points[0].first), py(points[0].second)))
+                    return
+                }
+                val path = Path()
+                points.forEachIndexed { i, (t, v) ->
+                    val x = px(t)
+                    val y = py(v)
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path, tint, style = Stroke(width = 2.5f))
+            }
+
+            eaten.forEach { polyline(it, eatenColor) }
+            polyline(burned, burnedColor)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ChartKey("Eaten", eatenColor)
+            ChartKey("Burned", burnedColor)
+        }
+    }
+}
+
+@Composable
+private fun ChartKey(label: String, tint: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.height(3.dp).width(16.dp).background(tint))
+        Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}

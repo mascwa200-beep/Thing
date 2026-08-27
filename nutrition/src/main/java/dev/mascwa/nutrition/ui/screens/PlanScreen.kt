@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,12 +23,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.data.NutritionContainer
+import dev.mascwa.nutrition.ui.EnergyChart
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.CheckIn
+import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Maintenance
@@ -218,6 +221,8 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
         }
     }
 
+    BalanceCard(vm)
+
     // ⚠️ **A wired capability with nowhere to reach it.** `setProteinGPerKg` is on the shared view
     // model, `MacroTargets` reads the override on every recomputation, and this app had no control
     // for it — so the split's own figure was the only one obtainable here.
@@ -278,6 +283,85 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
  * and a control that is present and inert is worse than one that is absent, since it teaches the
  * reader that this screen's controls sometimes do not work.
  */
+/**
+ * What you ate against what you burned, over an interval you choose.
+ *
+ * ⚠️ The burn line is the reading that was in force each day, worked out from the record up to that
+ * day and nothing later — see `EnergyBalance` for why a single figure measured over the whole
+ * interval would agree with the scale by construction and prove nothing. The caption says so on
+ * screen, because a chart of an estimate that looks like a chart of a measurement is a chart that
+ * claims more than it has.
+ *
+ * ⚠️ Asked for when the screen appears, never derived on every state build. It reads four months of
+ * the food log, and hanging that off the state flow would repeat it on every logged meal.
+ */
+@Composable
+private fun BalanceCard(vm: HealthViewModel) {
+    val span by vm.balanceSpan.collectAsStateWithLifecycle()
+    val reading by vm.balance.collectAsStateWithLifecycle()
+    val loading by vm.balanceLoading.collectAsStateWithLifecycle()
+    val state by vm.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { if (vm.balance.value == null) vm.loadBalance() }
+
+    SectionCard("Energy balance") {
+        ChipRow(
+            options = EnergyBalance.Span.entries.map { it to it.label.lowercase().replaceFirstChar(Char::uppercase) },
+            selected = span,
+        ) { vm.setBalanceSpan(it) }
+
+        val r = reading
+        when {
+            r == null && loading -> Text(
+                "Working it out…",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            r == null -> Text(
+                "Nothing to show for this interval.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            r is EnergyBalance.Reading.NotYet -> Text(
+                r.why,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            r is EnergyBalance.Reading.Ready -> {
+                EnergyChart(
+                    eaten = remember(r) { EnergyBalance.intakeRuns(r.days) },
+                    burned = remember(r) { EnergyBalance.burnSeries(r.days) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                StatRow("Eaten", "${round(r.intakeKcal)} kcal")
+                StatRow("Burned", "${round(r.expenditureKcal)} kcal")
+                StatRow(
+                    if (r.balanceKcal < 0) "Under" else "Over",
+                    "${round(abs(r.balanceKcal))} kcal across ${r.pairedDays} days",
+                    emphasis = true,
+                )
+                Text(EnergyBalance.summary(r, state.unit), style = MaterialTheme.typography.bodyMedium)
+                EnergyBalance.reconciliation(r, state.unit)?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    "The burn line is what the measurement said at the time, re-taken every week from " +
+                        "the record up to that day — not today's figure drawn backwards.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ProgramCard(vm: HealthViewModel, state: HealthViewModel.State) {
     val week = state.week
