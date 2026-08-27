@@ -637,6 +637,14 @@ def main(pkgdir: pathlib.Path) -> int:
         # ⚠️ Matched only after a NUMBER (`8.dp`, `0.5f.dp`), which is what makes it unambiguous. A
         # property named `dp` on somebody's own type would otherwise be reported for ever.
         used |= {m for m in re.findall(r'\d(?:f|F)?\.(dp|sp)\b', body)}
+
+        # ⚠️ Same blind spot, same remedy, one more name: `collectAsStateWithLifecycle` is a
+        # lowercase extension function and so was invisible here, which is how a file using it with
+        # no import reached CI. Measured before adding rather than assumed: 49 files in this repo
+        # use it and exactly ONE lacked the import -- the one that failed -- so watching it is a
+        # real catch at no cost in noise. Named specifically, as `dp` is, because a blanket
+        # lowercase rule would report every local variable in the repository.
+        used |= {m for m in re.findall(r'\b(collectAsStateWithLifecycle)\s*\(', body)}
         # ⚠️ **A class literal or a callable reference, which the first pattern cannot see**: it
         # requires the name be followed by `.`, `(` or `<`, and `SensorManager::class.java` is
         # followed by a colon. That hole let a genuinely missing `import android.hardware.SensorManager`
