@@ -1,6 +1,9 @@
 package dev.mascwa.nutrition
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.memory.MemoryCache
 import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.pulse.crash.Breadcrumbs
 import kotlinx.coroutines.CoroutineScope
@@ -23,7 +26,7 @@ import kotlinx.coroutines.launch
  * throws outright on a second instance. The activity used to build its own; now it reads this one,
  * so there is exactly one.
  */
-class NutritionApplication : Application() {
+class NutritionApplication : Application(), ImageLoaderFactory {
 
     /**
      * Built eagerly here, which costs nothing: every member of the container is `by lazy`, so
@@ -51,5 +54,38 @@ class NutritionApplication : Application() {
         // Anything recorded before this launch goes now — never at fault time, when the JVM is
         // unstable and the process is about to be killed. A no-op without a token, and it says so.
         scope.launch { container.crashUploader.uploadPending() }
+    }
+
+    /**
+     * How much of a cheap phone's heap this app is allowed to spend on pictures.
+     *
+     * ⚠️ **Coil's default is 20% of app memory, and this app has exactly one image on one screen.**
+     * Measured out of the shipped coil-base 2.7.0 bytecode rather than recalled:
+     * `coil.util.-Utils.defaultMemoryCacheSizePercent` returns **0.15 when
+     * `ActivityManager.isLowRamDevice` and 0.20 otherwise**. On a 4 GB phone with a standard heap
+     * that is roughly forty megabytes held back — for a `LazyRow` of 96 dp progress-photograph
+     * thumbnails, which is the only `AsyncImage` in the whole application.
+     *
+     * A 96 dp thumbnail at 3× is 288×288 in ARGB_8888, which is 331 kB. Six per cent of the same
+     * heap is about eleven megabytes, so roughly thirty-five of them — comfortably more than a row
+     * can show, and a quarter of what was reserved. The number matches the LCARS application, which
+     * arrived at it for the same reason with far more image surfaces than this.
+     *
+     * ⚠️ **No disk cache at all, and that costs nothing.** Coil's disk cache exists to avoid
+     * re-fetching over the network; every image here is a local file this app wrote itself, so the
+     * cache would be a second copy of a photograph already on the disk, in a directory Android may
+     * clear at any moment. This app makes no image request of any kind.
+     *
+     * ⚠️ Built lazily by Coil on the first image, not during `onCreate`, so it costs nothing at
+     * startup — which is the other half of what this class is for.
+     */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .memoryCache { MemoryCache.Builder(this).maxSizePercent(THUMBNAIL_HEAP_SHARE).build() }
+        .diskCache(null)
+        .build()
+
+    private companion object {
+        /** See [newImageLoader] — measured against Coil's own 0.20 default and the one call site. */
+        const val THUMBNAIL_HEAP_SHARE = 0.06
     }
 }

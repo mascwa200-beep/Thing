@@ -117,6 +117,16 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
 
+    // ⚠️ **What makes `src/main/baseline-prof.txt` do anything at all.** AGP packages the profile
+    // into the APK either way; on Play the store then delivers it to ART, and this APK is sideloaded
+    // from a GitHub release, so that path does not exist. This library's startup initializer is the
+    // only thing that writes the profile for ART to read. The file and this line are inert
+    // separately and were added on one commit for that reason.
+    //
+    // ⚠️ It also has to be a real dependency rather than an assumption: `:app` has carried both for
+    // months while this module — the one built for a cheap phone — had neither.
+    implementation(libs.androidx.profileinstaller)
+
     // ⚠️ Declared here as well as in `:core:health`, and it has to be. The shared library keeps
     // DataStore as `implementation`, which is right — none of its public types mention it — so it
     // reaches this module's RUNTIME classpath and not its COMPILE classpath, and `HealthSettingsStore`
