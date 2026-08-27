@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.DashboardLayout
 import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
@@ -117,6 +118,7 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
     // `LazyListScope.() -> Unit` lambda rather than a composable one, so a
     // `collectAsStateWithLifecycle()` inside it does not compile.
     val weekState by vm.week.collectAsStateWithLifecycle()
+    val prefs by vm.profile.collectAsStateWithLifecycle()
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
 
@@ -138,7 +140,35 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         val eaten = state.eatenToday
         val left = state.remaining!!
 
-        item {
+        // ⚠️ Every section's locals are computed HERE, above the loop, because a `when` branch
+        // cannot declare something the next branch needs and the order the branches run in is now
+        // whatever the reader arranged. Hoisting also revealed that the year was being read from
+        // the clock twice under two names.
+        val thisYear = LocalDate.now(ZoneId.systemDefault()).year
+        val guides = NutrientGuides.forDay(
+            eaten = eaten,
+            targetKcal = targets.kcal,
+            birthYear = state.profile.birthYear,
+            thisYear = thisYear,
+        ).mapNotNull { sv -> sv.guide.nutrient?.let { it to sv } }.toMap()
+        // ⚠️ Nothing logged means these totals are zero because the day is empty, not because the
+        // food had none of them — so the section is absent rather than showing four zeros and three
+        // explanations on a day nobody has eaten on yet.
+        val anythingLogged = eaten.kcal > 0.0
+        val micros = state.microsToday
+        val age = if (state.profile.birthYear > 0) thisYear - state.profile.birthYear else 0
+        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
+            .getOrDefault(Body.Sex.UNSPECIFIED)
+        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
+        val extras = state.extrasToday
+        val extrasPresent = NutrientSet.Nutrient.entries.filter { extras[it] != null }
+        val week = weekState
+        val set = plan as? MacroTargets.Plan.Set
+
+        DashboardLayout.arrange(MACRO_IDS, prefs.dashboardOrder, prefs.dashboardHidden.toSet())
+            .forEach { id -> when (id) {
+
+        MACRO_HEADLINE -> item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text(
@@ -160,7 +190,7 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
-        item {
+        MACRO_TILES -> item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 MacroTile("PROTEIN", eaten.proteinG, targets.proteinG, c.positive, MacroTargets.Macro.PROTEIN, Modifier.weight(1f))
                 MacroTile("FAT", eaten.fatG, targets.fatG, c.amber, MacroTargets.Macro.FAT, Modifier.weight(1f))
@@ -173,17 +203,7 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         // caller. Which of them can be shown is NutrientGuides' judgement, not this screen's — two of
         // the three need a calorie target and one needs an adult birth year, and inventing either
         // would produce a bar that looks measured.
-        val thisYear = LocalDate.now(ZoneId.systemDefault()).year
-        val guides = NutrientGuides.forDay(
-            eaten = eaten,
-            targetKcal = targets.kcal,
-            birthYear = state.profile.birthYear,
-            thisYear = thisYear,
-        ).mapNotNull { s -> s.guide.nutrient?.let { it to s } }.toMap()
-        // ⚠️ Nothing logged means these totals are zero because the day is empty, not because the
-        // food had none of them — so the section is absent rather than showing four zeros and three
-        // explanations on a day nobody has eaten on yet.
-        val anythingLogged = eaten.kcal > 0.0
+        MACRO_REST -> {
         if (anythingLogged) item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
         // ⚠️ **Every nutrient keeps its row whether or not a guide can be stated for it.** This used
         // to render only what `forDay` returned, so with no birth year the sodium TOTAL — a real
@@ -210,18 +230,13 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
             item { SugarRow(eaten.sugarG) }
         }
+        }
 
         // ⚠️ Vitamins and minerals, and the thing that makes them honest: how many of today's foods
         // actually reported each one. Only about a quarter of product records carry calcium, so a
         // total drawn from one food in six is not the day's calcium — and a screen that shows the
         // number without the denominator says it is.
-        val micros = state.microsToday
-        val year = LocalDate.now(ZoneId.systemDefault()).year
-        val age = if (state.profile.birthYear > 0) year - state.profile.birthYear else 0
-        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
-            .getOrDefault(Body.Sex.UNSPECIFIED)
-        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
-        if (present.isNotEmpty()) {
+        MACRO_VITAMINS -> if (present.isNotEmpty()) {
             item { LcarsHeaderBar("VITAMINS AND MINERALS") }
             items(present) { m -> MicroRow(m, micros, sex, age) }
         }
@@ -234,9 +249,7 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         // ⚠️ No reference intake beside them, unlike the eight above, because there is none this app
         // can honestly state for most of them. What each row CAN say is how much of the day it was
         // drawn from, which is the same caveat and the more important one here.
-        val extras = state.extrasToday
-        val extrasPresent = NutrientSet.Nutrient.entries.filter { extras[it] != null }
-        if (extrasPresent.isNotEmpty()) {
+        MACRO_EVERYTHING -> if (extrasPresent.isNotEmpty()) {
             item { LcarsHeaderBar("EVERYTHING ELSE RECORDED") }
             items(extrasPresent) { n -> ExtraNutrientRow(n, extras) }
         }
@@ -244,17 +257,17 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         // The week, which is the question somebody actually has after a fortnight: whether the plan
         // is being followed at all. It is also what makes the calorie target trustworthy — an
         // expenditure measured from a log with four days missing is measured from a fiction.
-        val week = weekState
-        if (week != null) {
+        MACRO_WEEK -> if (week != null) {
             item { LcarsHeaderBar("THE LAST ${week.windowDays} DAYS") }
             item { WeekPanel(week, targets.kcal) }
         }
 
-        item { LcarsHeaderBar("STANDING BACK") }
-        item { RollUpPanel(vm) }
+        MACRO_ROLLUP -> {
+            item { LcarsHeaderBar("STANDING BACK") }
+            item { RollUpPanel(vm) }
+        }
 
-        val set = plan as? MacroTargets.Plan.Set
-        if (set != null && set.adjustments.isNotEmpty()) {
+        MACRO_HELD -> if (set != null && set.adjustments.isNotEmpty()) {
             item { LcarsHeaderBar("WHAT WAS HELD BACK") }
             items(set.adjustments) { adj ->
                 LcarsFrame(Modifier.fillMaxWidth(), accent = c.amber) {
@@ -263,6 +276,17 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        // ⚠️ Unreachable: arrange() only ever returns ids it was handed. Present because a card
+        // added to MACRO_IDS and not to this list would draw nothing at all, which is why the two
+        // sit in the same file.
+        else -> Unit
+        } }
+
+        item { ArrangeThisPage(vm) }
+
+        // ⚠️ Pinned below the arrangement rather than being one of the cards. It is the sentence
+        // that says these numbers are an estimate, and a page that could put it away would be a
+        // page that could hide its own caveat.
         item {
             Text(
                 MacroTargets.DISCLAIMER,
@@ -3444,4 +3468,106 @@ private fun fieldValue(v: Double): String {
     if (!v.isFinite() || v <= 0.0) return ""
     val r = kotlin.math.floor(v * 10.0 + 0.5) / 10.0
     return if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
+}
+
+
+// ------------------------------------------------------------------------ arranging the MACROS page
+
+private const val MACRO_HEADLINE = "headline"
+private const val MACRO_TILES = "tiles"
+private const val MACRO_REST = "rest"
+private const val MACRO_VITAMINS = "vitamins"
+private const val MACRO_EVERYTHING = "everything"
+private const val MACRO_WEEK = "week"
+private const val MACRO_ROLLUP = "rollup"
+private const val MACRO_HELD = "held"
+
+/**
+ * Every card this page can draw, in the order it ships with, named as a person would name it.
+ *
+ * ⚠️ **The order here IS the default**, so it is considered rather than however the file grew: what
+ * is left first because that is the question the page exists to answer, then the macros, then the
+ * detail, then the week, then the standing-back view which is the only card not about today.
+ *
+ * ⚠️ These ids are persisted. Renaming one drops that card out of every arrangement already saved
+ * on a device — the card comes back, because [DashboardLayout.arrange] appends what it has never
+ * heard of, but wherever the person had put it does not.
+ *
+ * ⚠️ The ids are deliberately this page's own and not the standalone application's. The two draw
+ * different cards under different names and each keeps its arrangement in its own settings, so they
+ * never meet; sharing a vocabulary would only invite one to be edited for the other's sake.
+ */
+private val MACRO_CARDS: List<Pair<String, String>> = listOf(
+    MACRO_HEADLINE to "WHAT IS LEFT",
+    MACRO_TILES to "PROTEIN, FAT AND CARBS",
+    MACRO_REST to "THE REST OF WHAT YOU ATE",
+    MACRO_VITAMINS to "VITAMINS AND MINERALS",
+    MACRO_EVERYTHING to "EVERYTHING ELSE RECORDED",
+    MACRO_WEEK to "THE LAST FEW DAYS",
+    MACRO_ROLLUP to "STANDING BACK",
+    MACRO_HELD to "WHAT WAS HELD BACK",
+)
+
+private val MACRO_IDS: List<String> = MACRO_CARDS.map { it.first }
+
+/**
+ * Move the cards about, or put one away.
+ *
+ * ⚠️ Collapsed, and at the foot of the page. It is a control for something done once, and a
+ * permanent row of arrows on a page read every day is the page arranging itself against the reader.
+ *
+ * ⚠️ It lists cards that are put away as well as cards showing, or there is no way back and a hide
+ * control has quietly become a delete control.
+ */
+@Composable
+private fun ArrangeThisPage(vm: HealthViewModel) {
+    val c = Pulse.colors
+    var open by remember { mutableStateOf(false) }
+    val prefs by vm.profile.collectAsStateWithLifecycle()
+    val hidden = prefs.dashboardHidden.toSet()
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            DashboardLayout.describe(MACRO_IDS, prefs.dashboardOrder, hidden).uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+        )
+        LcarsButton(
+            text = if (open) "DONE" else "ARRANGE THIS PAGE",
+            onClick = { open = !open },
+        )
+        if (!open) return@Column
+
+        val order = DashboardLayout.editable(MACRO_IDS, prefs.dashboardOrder)
+        order.forEachIndexed { i, id ->
+            val away = id in hidden
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    MACRO_CARDS.firstOrNull { it.first == id }?.second ?: id,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (away) c.muted else c.ink,
+                    modifier = Modifier.weight(1f),
+                )
+                StepButton("▲", enabled = i > 0) { vm.moveCard(MACRO_IDS, id, -1) }
+                StepButton("▼", enabled = i < order.lastIndex) { vm.moveCard(MACRO_IDS, id, 1) }
+                Text(
+                    if (away) "SHOW" else "HIDE",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp,
+                    color = c.accent,
+                    modifier = Modifier
+                        .clickable { if (away) vm.showCard(id) else vm.hideCard(id) }
+                        .padding(7.dp),
+                )
+            }
+        }
+
+        // ⚠️ Only when it would change something. A reset that resets nothing teaches people the
+        // control does nothing, and then it is not reached for when it would have helped.
+        if (!DashboardLayout.isDefault(MACRO_IDS, prefs.dashboardOrder, hidden)) {
+            LcarsButton(text = "PUT IT BACK AS IT CAME", onClick = { vm.resetDashboard() })
+        }
+    }
 }
