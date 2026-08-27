@@ -645,6 +645,27 @@ def main(pkgdir: pathlib.Path) -> int:
         # real catch at no cost in noise. Named specifically, as `dp` is, because a blanket
         # lowercase rule would report every local variable in the repository.
         used |= {m for m in re.findall(r'\b(collectAsStateWithLifecycle)\s*\(', body)}
+
+        # ⚠️ Two more, and the second is a different shape entirely. `mutableStateOf` is an ordinary
+        # lowercase call; `getValue`/`setValue` are never CALLED at all — they are the operator
+        # functions a `by` delegate resolves to, so a file can need them while never naming them,
+        # and the compiler's message points at the delegation rather than at a missing import.
+        # `var open by remember { mutableStateOf(false) }` needs all three and mentions one.
+        #
+        # ⚠️ Restricted to Compose delegates (`by remember`, `by ...collectAsState...`) rather than
+        # every `by`, because `by lazy` and `by viewModels()` need neither and a blanket rule would
+        # report most of the repository. And a qualified use — `androidx.compose.runtime.mutableStateOf`
+        # — needs no import, which is how two files in this repo legitimately lack it.
+        #
+        # Measured before adding, as with `dp`: 69 files use mutableStateOf, 104 delegate a value and
+        # 69 delegate a var, and NONE of them lacks the import. So all three are a real catch at no
+        # cost in noise — and the failure that prompted them lacked two of the three.
+        used |= {m for m in re.findall(r'(?<![\w.])(mutableStateOf)\s*[(<]', body)}
+        for kw, expr in re.findall(r'\b(val|var)\s+\w+\s+by\s+([^\n]*)', body):
+            if 'remember' in expr or 'collectAsState' in expr:
+                used.add('getValue')
+                if kw == 'var':
+                    used.add('setValue')
         # ⚠️ **A class literal or a callable reference, which the first pattern cannot see**: it
         # requires the name be followed by `.`, `(` or `<`, and `SensorManager::class.java` is
         # followed by a colon. That hole let a genuinely missing `import android.hardware.SensorManager`

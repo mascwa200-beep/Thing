@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,6 +24,7 @@ import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Body
+import dev.mascwa.pulse.core.telemetry.DashboardLayout
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
@@ -49,37 +52,151 @@ fun TodayScreen(vm: HealthViewModel) {
     val day by vm.shownDay.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
 
+    // ⚠️ Pinned above the arrangement, and not one of the cards. It is how you move between days
+    // rather than something to read, so a page arranged with it third would leave somebody looking
+    // for the way back to yesterday.
     DayBar(vm, day)
 
+    val prefs by vm.profile.collectAsStateWithLifecycle()
     val plan = state.plan
-    when (plan) {
-        is MacroTargets.Plan.Set -> Targets(plan.targets, state.eatenToday)
-        is MacroTargets.Plan.Refused -> SectionCard("No targets yet") {
-            // ⚠️ The core's own sentence, not one written here. It says exactly which fact is
-            // missing -- a height, a weigh-in -- and rewording it would mean maintaining a second
-            // list of reasons that drifts from the first.
-            Text(plan.sentence, style = MaterialTheme.typography.bodyMedium)
+
+    DashboardLayout.arrange(TODAY_IDS, prefs.dashboardOrder, prefs.dashboardHidden.toSet())
+        .forEach { id ->
+            when (id) {
+                CARD_TARGETS -> when (plan) {
+                    is MacroTargets.Plan.Set -> Targets(plan.targets, state.eatenToday)
+                    is MacroTargets.Plan.Refused -> SectionCard("No targets yet") {
+                        // ⚠️ The core's own sentence, not one written here. It says exactly which
+                        // fact is missing -- a height, a weigh-in -- and rewording it would mean
+                        // maintaining a second list of reasons that drifts from the first.
+                        Text(plan.sentence, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    null -> SectionCard("No targets yet") {
+                        Text(
+                            "Fill in your height, birth year and goal on Plan, then record a " +
+                                "weight on Body.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                // ⚠️ Null, never a stand-in, when the plan has not been made. Two of the three
+                // guides in it are a share of this number, and substituting 2,000 would produce a
+                // fibre reference that looks measured — `NutrientGuides.fibre` refuses for exactly
+                // that reason and this must not undo it.
+                CARD_ALSO -> AlsoToday(
+                    eaten = state.eatenToday,
+                    targetKcal = (plan as? MacroTargets.Plan.Set)?.targets?.kcal,
+                    birthYear = state.profile.birthYear,
+                )
+                CARD_VITAMINS ->
+                    Vitamins(state.microsToday, state.profile.sex, state.profile.birthYear)
+                CARD_EVERYTHING -> Everything(state.extrasToday)
+                CARD_ENTRIES -> Entries(vm, entries)
+                CARD_ROLLUP -> RollUpCard(vm)
+                // ⚠️ Unreachable — arrange() only ever returns ids it was given — and present
+                // because a String `when` used as a statement still needs somewhere for anything
+                // else to go. A card added to TODAY_IDS and not to this list would draw nothing,
+                // which is why the two sit in the same file a few lines apart.
+                else -> Unit
+            }
         }
-        null -> SectionCard("No targets yet") {
-            Text(
-                "Fill in your height, birth year and goal on Plan, then record a weight on Body.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+
+    ArrangeThisPage(vm)
+}
+
+// ------------------------------------------------------------------------------------ the cards
+
+private const val CARD_TARGETS = "targets"
+private const val CARD_ALSO = "also"
+private const val CARD_VITAMINS = "vitamins"
+private const val CARD_EVERYTHING = "everything"
+private const val CARD_ENTRIES = "entries"
+private const val CARD_ROLLUP = "rollup"
+
+/**
+ * Every card this page can draw, in the order it ships with, with the name a person would call it.
+ *
+ * ⚠️ **The order here IS the default**, so it is a considered one rather than however the file grew:
+ * the plan first because most people open this page to see how much is left, the log last-but-one
+ * because it is long, and the roll-up after everything because it is the only card that is not
+ * about today.
+ *
+ * ⚠️ The ids are written down rather than generated, and they are what gets persisted. Renaming one
+ * silently drops that card out of every arrangement already saved on a device — the card comes back
+ * (see [DashboardLayout.arrange]) but wherever the person had put it does not.
+ */
+private val TODAY_CARDS: List<Pair<String, String>> = listOf(
+    CARD_TARGETS to "Against your plan",
+    CARD_ALSO to "Also today",
+    CARD_VITAMINS to "Vitamins and minerals",
+    CARD_EVERYTHING to "Everything else recorded",
+    CARD_ENTRIES to "What you logged",
+    CARD_ROLLUP to "Standing back",
+)
+
+private val TODAY_IDS: List<String> = TODAY_CARDS.map { it.first }
+
+/**
+ * Move the cards about, or put one away.
+ *
+ * ⚠️ Collapsed by default and last on the page. It is a control for a thing you do once, and a
+ * permanently-open row of arrows on a page you read every day is the page arranging itself against
+ * you.
+ *
+ * ⚠️ It lists cards that are put away as well as cards that are showing, because otherwise there is
+ * no way back and a hide control quietly becomes a delete control.
+ */
+@Composable
+private fun ArrangeThisPage(vm: HealthViewModel) {
+    var open by remember { mutableStateOf(false) }
+    val prefs by vm.profile.collectAsStateWithLifecycle()
+    val hidden = prefs.dashboardHidden.toSet()
+
+    SectionCard(
+        "Arrange this page",
+        subtitle = DashboardLayout.describe(TODAY_IDS, prefs.dashboardOrder, hidden),
+    ) {
+        TextButton(onClick = { open = !open }) { Text(if (open) "Done" else "Change the order") }
+        if (!open) return@SectionCard
+
+        val order = DashboardLayout.editable(TODAY_IDS, prefs.dashboardOrder)
+        order.forEachIndexed { i, id ->
+            val away = id in hidden
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    TODAY_CARDS.firstOrNull { it.first == id }?.second ?: id,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (away) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    enabled = i > 0,
+                    onClick = { vm.moveCard(TODAY_IDS, id, -1) },
+                ) { Text("Up") }
+                TextButton(
+                    enabled = i < order.lastIndex,
+                    onClick = { vm.moveCard(TODAY_IDS, id, 1) },
+                ) { Text("Down") }
+                TextButton(
+                    onClick = { if (away) vm.showCard(id) else vm.hideCard(id) },
+                ) { Text(if (away) "Show" else "Hide") }
+            }
+        }
+
+        // ⚠️ Only when it would change something. A reset that resets nothing teaches people the
+        // button does nothing, and then they do not reach for it when it would have helped.
+        if (!DashboardLayout.isDefault(TODAY_IDS, prefs.dashboardOrder, hidden)) {
+            TextButton(onClick = { vm.resetDashboard() }) { Text("Put it back as it came") }
         }
     }
-
-    // ⚠️ Null, never a stand-in, when the plan has not been made. Two of the three guides below are
-    // a share of this number, and substituting 2,000 would produce a fibre reference that looks
-    // measured — `NutrientGuides.fibre` refuses for exactly that reason and this must not undo it.
-    AlsoToday(
-        eaten = state.eatenToday,
-        targetKcal = (plan as? MacroTargets.Plan.Set)?.targets?.kcal,
-        birthYear = state.profile.birthYear,
-    )
-    Vitamins(state.microsToday, state.profile.sex, state.profile.birthYear)
-    Everything(state.extrasToday)
-    Entries(vm, entries)
-    RollUpCard(vm)
 }
 
 /**

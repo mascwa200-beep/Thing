@@ -60,6 +60,27 @@ data class HealthSettings(
     val expenditureWindowDays: Int = 28,
 
     /**
+     * How this page is arranged, by card id — see [dev.mascwa.pulse.core.telemetry.DashboardLayout].
+     *
+     * ⚠️ Held as a LIST rather than as an order plus a set of booleans, because the order IS the
+     * information and a map would need a second field to say what came first. Empty means untouched,
+     * which is what a page ships as.
+     *
+     * ⚠️ Ids the current build cannot draw are kept here on purpose, so a card that disappears for
+     * one release does not cost somebody the arrangement they made. The core caps the list.
+     */
+    val dashboardOrder: List<String> = emptyList(),
+
+    /**
+     * Card ids put away, by id.
+     *
+     * ⚠️ A list rather than a Set because this is a serialization key and a Set adds nothing on the
+     * wire; it is converted at the one place that uses it. Ids of cards that no longer exist are
+     * harmless — the core only counts a hidden id as an arrangement when the page could draw it.
+     */
+    val dashboardHidden: List<String> = emptyList(),
+
+    /**
      * Body fat as a percentage, or 0.0 for "not known".
      *
      * Knowing it selects a materially better resting-rate equation — one fitted on fat-free and fat

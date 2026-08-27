@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.CheckIn
+import dev.mascwa.pulse.core.telemetry.DashboardLayout
 import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.GoalProjection
@@ -2025,6 +2026,37 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     fun setProteinGPerKg(v: Double) = edit { it.copy(proteinGPerKg = v.coerceIn(0.0, 5.0)) }
     fun setMassUnit(v: BodyTrend.MassUnit) = edit { it.copy(massUnit = v.name) }
     fun setConfigured(v: Boolean) = edit { it.copy(configured = v) }
+
+    // ---------------------------------------------------------------- arranging the page
+
+    /**
+     * Move a card one place, or several.
+     *
+     * ⚠️ [available] comes from the surface because the two applications draw different cards, and a
+     * shared view model that knew either list would have to be edited every time one of them gained
+     * a panel.
+     *
+     * ⚠️ The move happens on the EDITABLE order — everything the page can draw, including what is
+     * put away — rather than on what is currently visible. Moving across a hidden card on the
+     * visible list would work and would quietly lose that card's own position, so bringing it back
+     * later would find it at the bottom for no reason anybody could see.
+     */
+    fun moveCard(available: List<String>, id: String, delta: Int) = edit { s ->
+        val order = DashboardLayout.editable(available, s.dashboardOrder)
+        val moved = DashboardLayout.move(order, id, delta)
+        s.copy(dashboardOrder = DashboardLayout.remember(moved, s.dashboardOrder))
+    }
+
+    fun hideCard(id: String) = edit {
+        it.copy(dashboardHidden = DashboardLayout.hide(it.dashboardHidden.toSet(), id).toList())
+    }
+
+    fun showCard(id: String) = edit {
+        it.copy(dashboardHidden = DashboardLayout.show(it.dashboardHidden.toSet(), id).toList())
+    }
+
+    /** Back to the order the page ships with, and everything showing. */
+    fun resetDashboard() = edit { it.copy(dashboardOrder = emptyList(), dashboardHidden = emptyList()) }
 
     // ------------------------------------------------------------------------------- the check-in
 
