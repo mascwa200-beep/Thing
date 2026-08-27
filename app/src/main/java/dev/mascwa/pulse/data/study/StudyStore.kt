@@ -755,9 +755,27 @@ class StudyStore(
     }
 
     /** Force buffered changes to disk now (e.g. on app stop). */
+    /**
+     * The outcome of the most recent write, so an explicit [flushNow] can report a failure it would
+     * otherwise swallow.
+     *
+     * ⚠️ **Both callers of [flushNow] already wrap it in a reporter that could never fire.** Every
+     * store of this shape catches its own DataStore edit and discards the `Result`, so the "the
+     * store could not be written to disk; anything recorded since is lost" report in `MainActivity`
+     * and `NutritionContainer` was structurally unreachable — a claim in a KDoc that nothing could
+     * make true. The debounced background flush still swallows, deliberately: an exception thrown
+     * there escapes into a launched coroutine and takes the process with it.
+     */
+    @Volatile
+    private var lastWrite: Result<*>? = null
+
     suspend fun flushNow() {
         flushJob?.cancel()
+        // ⚠️ Cleared first: [flush] returns early when nothing is owed, and a stale failure
+        // from an earlier write would then be reported against a write no longer outstanding.
+        lastWrite = null
         flush()
+        lastWrite?.getOrThrow()
     }
 
     /**
@@ -786,7 +804,7 @@ class StudyStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { state } ?: return
-        runCatching {
+        lastWrite = runCatching {
             context.studyDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
         }
     }

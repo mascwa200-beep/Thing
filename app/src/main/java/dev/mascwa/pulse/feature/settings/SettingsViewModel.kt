@@ -130,17 +130,23 @@ class SettingsViewModel(
         _auditLedger.value = "Verifying…"
         viewModelScope.launch {
             _auditLedger.value = runCatching {
-                val v = auditLedger.verify()
-                val signed = auditLedger.headSignatureValid()
-                val anchorMs = auditLedger.anchorTimeMs()
-                buildList {
-                    add(if (v.valid) "Intact" else "BROKEN at #${v.brokenAtSeq}")
-                    when (signed) {
+                val h = auditLedger.health()
+                // ⚠️ **The unreadable case leads, and it used to be invisible.** `verify()` runs over
+                // whatever chain is in memory, and when the stored blob cannot be decoded that is an
+                // empty replacement — trivially intact. So this row said "Intact" at precisely the
+                // moment the record had become unreachable and nothing new was reaching disk.
+                if (h.unreadable) {
+                    "STORED RECORD UNREADABLE — nothing is being written" +
+                        (if (h.unwritten > 0) "; ${h.unwritten} event(s) held in memory only" else "") +
+                        ". Clear the ledger to start a new chain."
+                } else buildList {
+                    add(if (h.verification.valid) "Intact" else "BROKEN at #${h.verification.brokenAtSeq}")
+                    when (h.signatureValid) {
                         true -> add("signed")
                         false -> add("bad signature")
                         null -> {}
                     }
-                    if (anchorMs != null) add("anchored ${DateUtils.getRelativeTimeSpanString(anchorMs)}")
+                    h.anchorMs?.let { add("anchored ${DateUtils.getRelativeTimeSpanString(it)}") }
                 }.joinToString(" · ")
             }.getOrDefault("Couldn't verify")
         }

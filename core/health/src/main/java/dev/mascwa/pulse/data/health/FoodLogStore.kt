@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -694,16 +695,63 @@ class FoodLogStore(
         }
     }
 
+    /**
+     * The outcome of the most recent write, so an explicit [flushNow] can report a failure it would
+     * otherwise swallow.
+     *
+     * ⚠️ **Both callers of [flushNow] already wrap it in a reporter that could never fire.** Every
+     * store of this shape catches its own DataStore edit and discards the `Result`, so the "the
+     * store could not be written to disk; anything recorded since is lost" report in `MainActivity`
+     * and `NutritionContainer` was structurally unreachable — a claim in a KDoc that nothing could
+     * make true. The debounced background flush still swallows, deliberately: an exception thrown
+     * there escapes into a launched coroutine and takes the process with it.
+     */
+    @Volatile
+    private var lastWrite: Result<*>? = null
+
     suspend fun flushNow() {
         flushJob?.cancel()
+        // ⚠️ Cleared first: [flush] returns early when nothing is owed, and a stale failure
+        // from an earlier write would then be reported against a write no longer outstanding.
+        lastWrite = null
         flush()
+        lastWrite?.getOrThrow()
     }
 
+    /**
+     * Trailing throttle: one flush per window.
+     *
+     * ⚠️ **`isActive` is true while the write is RUNNING, not only while it is waiting** — the job
+     * covers the delay and the flush together. So a meal logged during a write armed nothing, and
+     * since [flush] takes its snapshot before that meal existed, it stayed on disk-owed until some
+     * unrelated change happened to arm the next window. Flush-on-stop usually caught it, which is
+     * why it never showed as lost data; it is still a change with no timer behind it.
+     *
+     * ⚠️ Closed by re-arming AFTER the write rather than by clearing the job before it. Clearing it
+     * first is the shorter fix and lets an explicit [flushNow] run concurrently with a debounced
+     * one, and neither the snapshots nor the two `edit` calls are ordered with respect to each
+     * other — a stale snapshot could land last. Re-arming keeps exactly one write in flight.
+     *
+     * ⚠️ The dirty flags are the right thing to test because [flush] clears them at snapshot time
+     * and every later change sets them again, so "anything still owed" is already tracked here and
+     * needs no second flag to go stale against it. The other 21 stores of this shape have the same
+     * window and no such flags; they are left alone rather than each given new state to get wrong.
+     */
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
         flushJob = scope.launch {
             delay(FLUSH_DELAY_MS)
             flush()
+            // ⚠️ Only after a write that WORKED. A failed shard marks itself dirty again, so
+            // re-arming on that would spin every window for as long as the disk keeps refusing —
+            // and a busy loop on a full disk is a worse failure than the deferred write this closes.
+            // A failure falls back to the documented behaviour: retried by the next change.
+            val owed = lastWrite?.isFailure != true &&
+                mutex.withLock { indexDirty || dirtyShards.isNotEmpty() }
+            if (owed) {
+                flushJob = null // ⚠️ or the call below sees this very job and returns
+                scheduleFlush()
+            }
         }
     }
 
@@ -741,7 +789,16 @@ class FoodLogStore(
 
         if (stale(generation)) return
         idxJson?.let { text ->
-            runCatching { context.foodDataStore.edit { prefs -> prefs[indexKey] = text } }
+            lastWrite = runCatching { context.foodDataStore.edit { prefs -> prefs[indexKey] = text } }
+        }
+        // ⚠️ **The months hold the meals; the index is only their table of contents.** A shard that
+        // would not write is the loss worth reporting, and it happens BEFORE the index edit above —
+        // so without this the index's success would overwrite it and [flushNow] would report a clean
+        // write over a day that is not on disk. Last, so it wins whatever the index did.
+        if (failed.isNotEmpty()) {
+            lastWrite = Result.failure(
+                IOException("could not write ${failed.size} month file(s): ${failed.joinToString()}"),
+            )
         }
     }
 

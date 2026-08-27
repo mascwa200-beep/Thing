@@ -215,6 +215,12 @@ class NutritionContainer(context: Context) {
      * simply not there in the morning, with no evidence anywhere of what happened. This record is
      * the only thing that could ever explain it.
      *
+     * ⚠️ **And until now nothing it wrapped could fail.** All six stores caught their own DataStore
+     * edit and discarded the `Result`, so no exception could reach here and this reporter had never
+     * once been able to fire. Each store now keeps its last write's outcome and `flushNow` rethrows
+     * it; the debounced background flush still swallows, because an exception thrown there escapes
+     * into a launched coroutine and takes the process with it.
+     *
      * ⚠️ Still never throws. A failing flush must not stop the five stores behind it from writing,
      * and `reportNonFatal` is documented never to throw either — its own `write` is wrapped whole,
      * which matters because the likeliest cause of a failed flush is a disk that cannot take

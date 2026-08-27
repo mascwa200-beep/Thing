@@ -392,6 +392,13 @@ class MainActivity : ComponentActivity() {
      * Oracle's learning, none of which can be fetched again from anywhere. A failed write loses it
      * silently and the next launch simply has less in it than the last one did.
      *
+     * ⚠️ **And until now nothing it wrapped could fail.** Every store of this shape caught its own
+     * DataStore edit and discarded the `Result`, so no exception could reach here and this whole
+     * helper was unreachable — a reporter that had never once fired, under a KDoc describing what it
+     * would say when it did. Each store now keeps the outcome of its last write and `flushNow`
+     * rethrows it; the debounced background flush still swallows, because an exception thrown there
+     * escapes into a launched coroutine and takes the process with it.
+     *
      * ⚠️ Still never throws, so one failing store cannot stop the eighteen behind it from writing —
      * and `reportNonFatal` does not throw either, its own `write` being wrapped whole, which matters
      * because the likeliest cause of a failed flush is a disk with nothing left on it.
