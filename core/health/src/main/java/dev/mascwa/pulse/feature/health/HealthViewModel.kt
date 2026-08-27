@@ -740,6 +740,21 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         meal: NutritionDay.Meal,
         grams: Double = 0.0,
         keepAsFood: Boolean = false,
+        /**
+         * The four figures every panel states beside the macros, and which this door used to drop.
+         *
+         * ⚠️ [NutritionDay.Nutrients] has carried fibre, sugars, saturates and sodium all along;
+         * quickAdd simply never took them, so a food typed or read off a label recorded none of
+         * them however plainly the packet said so. Saturates and sugars are mandatory on a UK or EU
+         * panel and sodium on a United States one, so this was not an edge case — it was most of
+         * what a label says. They are NOT in either nutrient picker either: those cover the other
+         * twenty-nine, and these four live directly on Nutrients, which is exactly why nothing
+         * noticed. Defaulted, so no existing call site changes.
+         */
+        fibreG: Double = 0.0,
+        sugarG: Double = 0.0,
+        satFatG: Double = 0.0,
+        sodiumMg: Double = 0.0,
         micros: Micronutrients.Amounts = Micronutrients.Amounts(),
         extras: NutrientSet.Amounts = NutrientSet.Amounts(),
         /** Put it on the plate instead of straight into the record — see [logPortion]. */
@@ -748,7 +763,16 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         val label = name.trim().ifBlank { "Quick add" }
         if (!kcal.isFinite() || kcal < 0.0) return
         val now = System.currentTimeMillis()
-        val eaten = NutritionDay.Nutrients(kcal = kcal, proteinG = proteinG, fatG = fatG, carbG = carbG)
+        val eaten = NutritionDay.Nutrients(
+            kcal = kcal,
+            proteinG = proteinG,
+            fatG = fatG,
+            carbG = carbG,
+            fibreG = fibreG,
+            sugarG = sugarG,
+            satFatG = satFatG,
+            sodiumMg = sodiumMg,
+        )
         viewModelScope.launch {
             // ⚠️ Saved BEFORE the entry, so the log can carry the new food's id. Otherwise the entry
             // says CUSTOM with no foodId and nothing later can tell that the two are the same food.

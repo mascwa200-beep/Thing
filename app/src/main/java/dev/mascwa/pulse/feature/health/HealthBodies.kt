@@ -66,6 +66,7 @@ import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.NutritionLabel
 import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.core.telemetry.MealDraft
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
@@ -776,6 +777,14 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     var fat by remember { mutableStateOf("") }
     var carb by remember { mutableStateOf("") }
     var grams by remember { mutableStateOf("") }
+    // ⚠️ The four figures a panel always states and which had no way in at all: neither nutrient
+    // picker covers them, because they live directly on NutritionDay.Nutrients rather than in
+    // either enum, and quickAdd never took them. Saturates and sugars are mandatory on a UK or EU
+    // label and sodium on a United States one.
+    var fibre by remember { mutableStateOf("") }
+    var sugar by remember { mutableStateOf("") }
+    var satFat by remember { mutableStateOf("") }
+    var sodium by remember { mutableStateOf("") }
     var keep by remember { mutableStateOf(false) }
     // Whatever else was on the label, keyed by [LabelNutrient.key] and held as the text somebody
     // typed rather than a parsed number — so a half-finished "0." is not silently a zero, and a
@@ -792,6 +801,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
+        fibre = ""; sugar = ""; satFat = ""; sodium = ""
         labelled = emptyMap()
     }
 
@@ -821,6 +831,23 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         NumberCell("F", fat, { fat = it }, Modifier.weight(1f))
                         NumberCell("C", carb, { carb = it }, Modifier.weight(1f))
                         NumberCell("GRAMS", grams, { grams = it }, Modifier.weight(1.2f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        NumberCell("FIBRE", fibre, { fibre = it }, Modifier.weight(1f))
+                        NumberCell("SUGARS", sugar, { sugar = it }, Modifier.weight(1f))
+                        NumberCell("SAT", satFat, { satFat = it }, Modifier.weight(1f))
+                        NumberCell("SODIUM MG", sodium, { sodium = it }, Modifier.weight(1.4f))
+                    }
+                    ReadTheLabel { eaten, ate ->
+                        kcal = fieldValue(eaten.kcal)
+                        protein = fieldValue(eaten.proteinG)
+                        fat = fieldValue(eaten.fatG)
+                        carb = fieldValue(eaten.carbG)
+                        fibre = fieldValue(eaten.fibreG)
+                        sugar = fieldValue(eaten.sugarG)
+                        satFat = fieldValue(eaten.satFatG)
+                        sodium = fieldValue(eaten.sodiumMg)
+                        grams = fieldValue(ate)
                     }
                     MoreFromTheLabel(
                         typed = labelled,
@@ -879,6 +906,10 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                                 // does not reset itself when the field is emptied, and a save with no
                                 // weight is exactly what the core refuses. Re-checked at the call.
                                 keepAsFood = keep && weight != null,
+                                fibreG = fibre.toDoubleOrNull() ?: 0.0,
+                                sugarG = sugar.toDoubleOrNull() ?: 0.0,
+                                satFatG = satFat.toDoubleOrNull() ?: 0.0,
+                                sodiumMg = sodium.toDoubleOrNull() ?: 0.0,
                                 // ⚠️ A field left blank yields no key at all rather than a zero, and
                                 // that falls out of `toDoubleOrNull` rather than being enforced here.
                                 // It is the whole discipline of the sparse layer: a nutrient nobody
@@ -3320,4 +3351,97 @@ private fun EatenBefore(vm: HealthViewModel, meal: NutritionDay.Meal) {
             )
         }
     }
+}
+
+
+/**
+ * Read the panel off a packet, rather than picking eight numbers out of it by hand.
+ *
+ * ⚠️ **The parser is the feature; the typing is not.** [NutritionLabel] holds the traps: a comma
+ * that is a decimal point in most of the world, energy stated twice with kilojoules first,
+ * saturates that read as the total fat, salt that is not sodium, and a per-serving panel that never
+ * says what a serving weighs and so cannot honestly become a density. Each of those is a wrong
+ * number nobody would question. The text can come from anywhere and the arithmetic is the same.
+ *
+ * ⚠️ **On-device text recognition is a measured absence, not an oversight.** Google's ML Kit text
+ * recognition depends on play-services-base even in its bundled form, and this device runs
+ * GrapheneOS — the same reason barcode scanning here is ZXing. What remains is Tesseract, meaning
+ * a trained-data blob of roughly twenty megabytes plus native code for four architectures, on an
+ * artefact the updater re-downloads whole on every build. That is a size decision, so it is the
+ * owner's to make rather than one to slip in.
+ *
+ * Inline rather than a dialog on purpose: [LcarsDialog] measures with `IntrinsicSize.Min`, and a
+ * panel that wants a multi-line field and a variable number of lines beneath it is the wrong shape
+ * for that. The disclosure matches [MoreFromTheLabel] directly above it.
+ */
+@Composable
+private fun ReadTheLabel(onUse: (NutritionDay.Nutrients, Double) -> Unit) {
+    val c = Pulse.colors
+    var open by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+    var ate by remember { mutableStateOf("100") }
+
+    LcarsButton(text = if (open) "CLOSE THE LABEL" else "READ A LABEL", onClick = { open = !open })
+    if (!open) return
+
+    val reading = NutritionLabel.read(text)
+    val override = weight.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val per100 = reading?.let { NutritionLabel.per100g(it, override) }
+    val ateG = ate.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            "Type or paste the panel, one line per figure. Kilojoules, comma decimals and salt " +
+                "rather than sodium are all handled.",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+        )
+        LcarsField(
+            value = text,
+            onValueChange = { text = it.take(2000) },
+            placeholder = "Energy 1046 kJ / 250 kcal",
+            singleLine = false,
+            showClear = false,
+        )
+        if (reading != null) {
+            Text(
+                NutritionLabel.summary(reading),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            // ⚠️ Only when the panel is per serving and never says what one weighs. The core refuses
+            // rather than assuming a hundred grams, so this is the one thing that unblocks it — and
+            // it is asked for rather than guessed at.
+            if (per100 == null) {
+                NumberCell("A SERVING WEIGHS (G)", weight, { weight = it }, Modifier.fillMaxWidth())
+            }
+        }
+        NumberCell("YOU ATE (G)", ate, { ate = it }, Modifier.fillMaxWidth())
+        LcarsButton(
+            text = "USE THESE FIGURES",
+            enabled = per100 != null && ateG != null,
+            onClick = {
+                val d = per100 ?: return@LcarsButton
+                val g = ateG ?: return@LcarsButton
+                // Bounded by physics on the way through, exactly as a scanned food is.
+                onUse(FoodPortion.eaten(FoodPortion.sane(d), g), g)
+                open = false
+                text = ""
+                weight = ""
+            },
+        )
+    }
+}
+
+/**
+ * A figure as a field would hold it: no trailing zero, blank when there is nothing to say.
+ *
+ * ⚠️ `toString`, never a format string: [NumberCell] keeps only digits and a point, so on a
+ * comma-decimal device a formatted figure would arrive stripped of its separator and mean ten times
+ * what it said. Half-up rather than `kotlin.math.round`, which is banker's rounding and changes
+ * direction with the digit before it.
+ */
+private fun fieldValue(v: Double): String {
+    if (!v.isFinite() || v <= 0.0) return ""
+    val r = kotlin.math.floor(v * 10.0 + 0.5) / 10.0
+    return if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
 }

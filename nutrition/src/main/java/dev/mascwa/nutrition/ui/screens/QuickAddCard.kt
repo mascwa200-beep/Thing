@@ -33,6 +33,7 @@ import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.NutritionLabel
 import dev.mascwa.pulse.feature.health.HealthViewModel
 
 /**
@@ -54,6 +55,15 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
     var fat by remember { mutableStateOf("") }
     var carb by remember { mutableStateOf("") }
     var grams by remember { mutableStateOf("") }
+    // ⚠️ Real fields rather than hidden state carried over from a label read. If a label fills them
+    // and the weight is then changed, an invisible figure would silently stop matching the visible
+    // ones; on screen it can at least be corrected. They are also the only way to type saturates,
+    // sugars, fibre or sodium at all — neither nutrient picker covers them, because they live
+    // directly on NutritionDay.Nutrients rather than in either enum.
+    var fibre by remember { mutableStateOf("") }
+    var sugar by remember { mutableStateOf("") }
+    var satFat by remember { mutableStateOf("") }
+    var sodium by remember { mutableStateOf("") }
     var keep by remember { mutableStateOf(false) }
     // ⚠️ Keyed by the picker's own prefixed key, so one map carries both enums. See [LabelNutrients].
     val typed = remember { mutableStateMapOf<String, String>() }
@@ -78,6 +88,26 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
             NumberField("Protein (g)", protein, { protein = it }, Modifier.weight(1f))
             NumberField("Fat (g)", fat, { fat = it }, Modifier.weight(1f))
             NumberField("Carbs (g)", carb, { carb = it }, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Fibre (g)", fibre, { fibre = it }, Modifier.weight(1f))
+            NumberField("Sugars (g)", sugar, { sugar = it }, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Saturates (g)", satFat, { satFat = it }, Modifier.weight(1f))
+            NumberField("Sodium (mg)", sodium, { sodium = it }, Modifier.weight(1f))
+        }
+
+        ReadTheLabel { eaten, ate ->
+            kcal = trimmed(eaten.kcal)
+            protein = trimmed(eaten.proteinG)
+            fat = trimmed(eaten.fatG)
+            carb = trimmed(eaten.carbG)
+            fibre = trimmed(eaten.fibreG)
+            sugar = trimmed(eaten.sugarG)
+            satFat = trimmed(eaten.satFatG)
+            sodium = trimmed(eaten.sodiumMg)
+            grams = trimmed(ate)
         }
 
         MoreFromTheLabel(typed)
@@ -110,11 +140,16 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
                     // density is sanitised into a food with no numbers at all, which reads as the
                     // app having lost it.
                     keepAsFood = keep && gramsValue != null,
+                    fibreG = fibre.toDoubleOrNull() ?: 0.0,
+                    sugarG = sugar.toDoubleOrNull() ?: 0.0,
+                    satFatG = satFat.toDoubleOrNull() ?: 0.0,
+                    sodiumMg = sodium.toDoubleOrNull() ?: 0.0,
                     micros = typedMicros(typed),
                     extras = typedExtras(typed),
                     toPlate = building,
                 )
                 name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""
+                fibre = ""; sugar = ""; satFat = ""; sodium = ""
                 keep = false; typed.clear()
             },
             enabled = kcalValue != null,
@@ -335,4 +370,113 @@ private fun KeepThisFood(keep: Boolean, canKeep: Boolean, onToggle: (Boolean) ->
         }
         Switch(checked = keep && canKeep, onCheckedChange = onToggle, enabled = canKeep)
     }
+}
+
+
+/**
+ * Read the panel off a packet, rather than picking eight numbers out of it by hand.
+ *
+ * ⚠️ **The value here is the parser, not the typing.** [NutritionLabel] is where the traps live: a
+ * comma that is a decimal point in most of the world, energy stated twice with kilojoules first,
+ * saturates that read as the total fat, salt that is not sodium, and a per-serving panel that does
+ * not say what a serving weighs and therefore cannot honestly become a density. Every one of those
+ * is a wrong number a person would not question. The text can come from anywhere — typed, pasted
+ * from a shop's website, or one day from a photograph — and the arithmetic is the same.
+ *
+ * ⚠️ **On-device text recognition is not available here and that is a measured finding, not an
+ * omission.** Google's ML Kit text recognition depends on play-services-base even in its bundled
+ * form, and the device this is built for runs GrapheneOS while the standalone app claims to work on
+ * any phone at all — the same reason barcode scanning here uses ZXing. What is left is Tesseract,
+ * which means a trained-data blob of roughly twenty megabytes per application on top of native code
+ * for four architectures. That is a decision about size, not a detail, so it is not made quietly.
+ *
+ * The figures handed back are what was EATEN, scaled from the density by [FoodPortion.eaten], so
+ * they and the weight beside them always describe the same portion.
+ */
+@Composable
+private fun ReadTheLabel(onUse: (NutritionDay.Nutrients, Double) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+
+    TextButton(onClick = { open = true }) { Text("Read a label instead") }
+    if (!open) return
+
+    var text by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+    var ate by remember { mutableStateOf("100") }
+
+    val reading = NutritionLabel.read(text)
+    val override = weight.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val per100 = reading?.let { NutritionLabel.per100g(it, override) }
+    val ateG = ate.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+
+    AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text("Read a label") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+            ) {
+                Text(
+                    "Type or paste the nutrition panel — one line per figure. Kilojoules, commas " +
+                        "for decimals and salt instead of sodium are all handled.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.take(2000) },
+                    label = { Text("The panel") },
+                    minLines = 5,
+                    maxLines = 10,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (reading != null) {
+                    Text(NutritionLabel.summary(reading), style = MaterialTheme.typography.bodyMedium)
+
+                    // ⚠️ Only when the panel is per serving and never says what one weighs. The core
+                    // refuses rather than assuming a hundred grams, so this is the one thing that
+                    // can unblock it — and it is asked for here rather than guessed at.
+                    if (per100 == null) {
+                        NumberField(
+                            "What a serving weighs (g)",
+                            weight,
+                            { weight = it },
+                            Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                NumberField("How much did you eat (g)", ate, { ate = it }, Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = per100 != null && ateG != null,
+                onClick = {
+                    val d = per100 ?: return@TextButton
+                    val g = ateG ?: return@TextButton
+                    // Bounded by physics on the way through, exactly as a scanned food is.
+                    onUse(FoodPortion.eaten(FoodPortion.sane(d), g), g)
+                    open = false
+                },
+            ) { Text("Use these figures") }
+        },
+        dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+    )
+}
+
+/**
+ * A figure as a field would hold it: no trailing zero, and blank when there is nothing to say.
+ *
+ * ⚠️ Not [FoodPortion.trim], which is internal to its own module — formatting the initial value of
+ * a text field does not justify widening a core's API. And ⚠️ `toString`, never a format string:
+ * NumberField keeps only digits and a point, so on a comma-decimal device a formatted figure would
+ * arrive stripped of its separator and mean ten times what it said. Half-up rather than
+ * kotlin.math.round, which is banker's rounding and changes direction with the preceding digit.
+ */
+private fun trimmed(v: Double): String {
+    if (!v.isFinite() || v <= 0.0) return ""
+    val r = kotlin.math.floor(v * 10.0 + 0.5) / 10.0
+    return if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
 }
