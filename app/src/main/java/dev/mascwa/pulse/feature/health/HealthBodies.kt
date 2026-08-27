@@ -66,6 +66,7 @@ import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.core.util.Formatters
@@ -246,6 +247,9 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             item { LcarsHeaderBar("THE LAST ${week.windowDays} DAYS") }
             item { WeekPanel(week, targets.kcal) }
         }
+
+        item { LcarsHeaderBar("STANDING BACK") }
+        item { RollUpPanel(vm) }
 
         val set = plan as? MacroTargets.Plan.Set
         if (set != null && set.adjustments.isNotEmpty()) {
@@ -1320,6 +1324,9 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        item { LcarsHeaderBar("WHAT HAS CHANGED") }
+        item { LookBackPanel(vm) }
+
         item { LcarsHeaderBar("MEASUREMENTS") }
         item { Measurements(vm) }
 
@@ -1408,6 +1415,149 @@ private fun CheckInPanel(vm: HealthViewModel, state: HealthViewModel.State) {
                 LcarsButton(text = "WORK THEM OUT NOW", onClick = { vm.recalculateNow() })
             }
         }
+    }
+}
+
+/**
+ * What weight and every recorded measurement have done since a date you pick.
+ *
+ * ⚠️ The one question anybody actually has about a tape measure, and the page recorded readings for
+ * months without offering it. Weight is compared on the smoothed trend rather than on two raw
+ * weigh-ins — see `HealthViewModel.lookBack` for why that is not a detail.
+ *
+ * ⚠️ A refusal prints as a refusal. `PeriodCompare` produces a sentence either way, and a kind with
+ * only one reading near the window says so rather than reporting a change of zero, which would read
+ * as "you held steady".
+ */
+@Composable
+private fun LookBackPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val look by vm.look.collectAsStateWithLifecycle()
+    val changes by vm.lookBack.collectAsStateWithLifecycle()
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(HealthViewModel.Look.entries.toList()) { l ->
+                    LcarsChip(l.label, selected = l == look, onClick = { vm.setLook(l) })
+                }
+            }
+            if (changes.isEmpty()) {
+                Text(
+                    "Nothing recorded yet. Weigh in, or add a measurement below, and this fills in.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+            changes.forEach { change ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        change.label.uppercase(),
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted,
+                    )
+                    Text(
+                        PeriodCompare.sentence(change),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp,
+                        // ⚠️ Down is not good and up is not bad — somebody putting muscle on wants
+                        // both to climb. The direction is stated in words; the colour only separates
+                        // a real reading from a refusal.
+                        color = if (change.known) c.ink else c.muted,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The food log added up a day, a week or a month at a time.
+ *
+ * ⚠️ A different question from the energy balance chart above, which is why both are here: that one
+ * asks what the balance was and needs weigh-ins to answer, this one asks whether you are eating more
+ * than you were and works for somebody who has never owned a scale.
+ *
+ * ⚠️ The bar is the bucket's MEAN, never its total. The newest bucket is almost always a part-week,
+ * and a total-height bar would show it collapsing every time somebody opened the page on a Tuesday.
+ */
+@Composable
+private fun RollUpPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val grain by vm.grain.collectAsStateWithLifecycle()
+    val buckets by vm.rollUp.collectAsStateWithLifecycle()
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PeriodCompare.Grain.entries.forEach { g ->
+                    LcarsChip(g.label.uppercase(), selected = g == grain, onClick = { vm.setGrain(g) })
+                }
+            }
+            val shown = buckets.filter { it.loggedDays > 0 }.takeLast(12)
+            if (shown.isEmpty()) {
+                Text(
+                    "Nothing logged over this stretch yet.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+                return@Column
+            }
+            val steps = remember(shown) { PeriodCompare.steps(shown) }
+            val peak = shown.mapNotNull { it.mean }.maxOrNull() ?: 1.0
+            shown.forEachIndexed { i, b ->
+                val mean = b.mean ?: return@forEachIndexed
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            bucketLabel(b.startMs, grain),
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                            modifier = Modifier.width(58.dp),
+                        )
+                        Text(
+                            "${Formatters.number(mean, 0)} kcal a day",
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // ⚠️ The denominator, because a part-week is a real thing and this is where
+                        // somebody would otherwise read one as a bad week.
+                        Text(
+                            "${b.loggedDays}/${b.days}",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp,
+                            color = if (b.completeness < 0.6) c.amber else c.faint,
+                        )
+                    }
+                    LcarsFillRow(
+                        segments = listOf(
+                            (mean / peak).toFloat().coerceIn(0f, 1f) to c.accent,
+                            (1f - (mean / peak).toFloat()).coerceIn(0f, 1f) to c.raise,
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(5.dp),
+                        gap = 1.5.dp,
+                    )
+                    steps.getOrNull(i)?.let { step ->
+                        if (abs(step) >= 25.0) {
+                            Text(
+                                (if (step > 0) "+" else "") + "${Formatters.number(step, 0)} a day on the one before",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp,
+                                color = if (step > 0) c.amber else c.positive,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A bucket's date, at the coarseness it was bucketed by.
+ *
+ * ⚠️ Formatted with the device's own locale and zone, because these are dates a person reads. Every
+ * other date in this tab does the same.
+ */
+private fun bucketLabel(startMs: Long, grain: PeriodCompare.Grain): String {
+    val d = java.time.Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    return when (grain) {
+        PeriodCompare.Grain.DAY -> d.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+        PeriodCompare.Grain.WEEK -> d.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+        PeriodCompare.Grain.MONTH -> d.format(java.time.format.DateTimeFormatter.ofPattern("MMM yy"))
     }
 }
 

@@ -13,6 +13,7 @@ import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
@@ -1080,6 +1081,107 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         _balance.value = null
         loadBalance()
     }
+
+    // -------------------------------------------------------------------------- looking back
+
+    /** How far back the body comparison reaches. */
+    enum class Look(val days: Int, val label: String) {
+        MONTH(30, "1 MONTH"),
+        QUARTER(90, "3 MONTHS"),
+        HALF(182, "6 MONTHS"),
+        YEAR(365, "1 YEAR"),
+    }
+
+    private val _look = MutableStateFlow(Look.QUARTER)
+    val look: StateFlow<Look> = _look.asStateFlow()
+
+    fun setLook(v: Look) {
+        _look.value = v
+    }
+
+    /**
+     * What weight and every recorded tape measurement have done over [look].
+     *
+     * ⚠️ **Weight is compared on the SMOOTHED TREND, never on two raw weigh-ins**, and the difference
+     * is not academic: a single reading carries about [BodyTrend.SCALE_NOISE_KG] of noise, so picking
+     * the one nearest each end can report a gain in the middle of a real loss. A tape measurement has
+     * no smoother behind it, so there the raw readings are all there is and the comparison says so by
+     * being what it is.
+     *
+     * ⚠️ Derived rather than fetched: every input is already a flow this view model holds, so there is
+     * no disk read here and nothing to ask for. That is why this one is a `stateIn` where the energy
+     * balance is a `loadBalance()`.
+     */
+    val lookBack: StateFlow<List<PeriodCompare.Change>> =
+        combine(weighins, c.bodyStore.measurements, _look, profile) { w, m, look, p ->
+            val today = todayStartMs()
+            val from = HealthDays.plus(today, -look.days.toLong())
+            val unit = runCatching { BodyTrend.MassUnit.valueOf(p.massUnit) }
+                .getOrDefault(BodyTrend.MassUnit.KG)
+
+            val trend = BodyTrend.estimate(w) as? BodyTrend.Trend.Estimated
+            val weight = trend?.let {
+                PeriodCompare.compare(
+                    label = "Weight",
+                    unit = unit.label,
+                    // Readings are stored in kilograms, so the conversion happens here rather than in
+                    // the sentence — otherwise the two numbers and the difference between them would
+                    // be in different units.
+                    points = it.points.map { pt -> PeriodCompare.Point(pt.atMs, pt.trendKg * unit.perKg) },
+                    fromMs = from,
+                    toMs = today,
+                )
+            }
+
+            val tape = BodyStore.MeasureKind.entries.mapNotNull { kind ->
+                val pts = m.filter { it.kind == kind }.map { PeriodCompare.Point(it.atMs, it.cm) }
+                // ⚠️ A kind nobody has ever recorded is left out entirely rather than listed with a
+                // refusal beside it. Six "nothing recorded yet" rows would bury the one or two
+                // somebody actually keeps.
+                if (pts.isEmpty()) null else PeriodCompare.compare(kind.label, "cm", pts, from, today)
+            }
+
+            listOfNotNull(weight) + tape
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // ------------------------------------------------------------------------ reading it back
+
+    private val _grain = MutableStateFlow(PeriodCompare.Grain.WEEK)
+    val grain: StateFlow<PeriodCompare.Grain> = _grain.asStateFlow()
+
+    fun setGrain(v: PeriodCompare.Grain) {
+        _grain.value = v
+    }
+
+    /**
+     * The last stretch of the food log, added up a day, a week or a month at a time.
+     *
+     * ⚠️ **A different question from the energy balance chart, which is why both exist.** That one
+     * asks what the balance was and needs weigh-ins to answer; this one asks whether you are eating
+     * more than you were, and works for somebody who has never owned a scale.
+     *
+     * ⚠️ The bucket key comes from [HealthDays], never from arithmetic. A week is 7 × 24 h only until
+     * a clock change — see `HealthDays.weekStart` for the transition that proves it.
+     */
+    val rollUp: StateFlow<List<PeriodCompare.Bucket>> =
+        combine(c.foodLogStore.days, _grain, _today) { byDay, grain, today ->
+            val span = when (grain) {
+                PeriodCompare.Grain.DAY -> 14
+                PeriodCompare.Grain.WEEK -> 84
+                PeriodCompare.Grain.MONTH -> 365
+            }
+            val grid = HealthDays.grid(today, span)
+            val values = byDay
+                .filterValues { it.kcal > 0.0 }
+                .mapValues { (_, v) -> v.kcal }
+            PeriodCompare.bucket(grid, values) { d ->
+                when (grain) {
+                    PeriodCompare.Grain.DAY -> d
+                    PeriodCompare.Grain.WEEK -> HealthDays.weekStart(d)
+                    PeriodCompare.Grain.MONTH -> HealthDays.monthStart(d)
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ---------------------------------------------------------------------------------- habits
 

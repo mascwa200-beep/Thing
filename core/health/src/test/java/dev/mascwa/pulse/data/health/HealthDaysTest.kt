@@ -143,4 +143,90 @@ class HealthDaysTest {
         assertEquals(start(long), HealthDays.startOf(at(long, 23, 59), z))
         assertEquals(start(long), HealthDays.startOf(start(long), z))
     }
+
+    // ----------------------------------------------------------------------- weeks and months
+
+    @Test
+    fun `a week starts on its Monday, whatever day you ask about`() {
+        // 29 March 2026 is a Sunday, so its week began on Monday 23 March.
+        assertEquals(java.time.DayOfWeek.SUNDAY, short.dayOfWeek)
+        val monday = LocalDate.of(2026, 3, 23)
+        assertEquals(java.time.DayOfWeek.MONDAY, monday.dayOfWeek)
+        for (d in 0..6) {
+            assertEquals(
+                "day $d of that week",
+                start(monday),
+                HealthDays.weekStart(at(monday.plusDays(d.toLong()), 13, 45), z),
+            )
+        }
+        // And a Monday is its own week start rather than the one before.
+        assertEquals(start(monday), HealthDays.weekStart(start(monday), z))
+    }
+
+    @Test
+    fun `a week containing a clock change is still seven calendar days`() {
+        val monday = LocalDate.of(2026, 3, 23)
+        val span = start(monday.plusDays(7)) - start(monday)
+        assertEquals("that week really is an hour short", 7 * DAY_MS - 3_600_000L, span)
+        assertEquals(start(monday), HealthDays.weekStart(at(short, 12, 0), z))
+    }
+
+    @Test
+    fun `the arithmetic version misses where a clock change falls mid-week`() {
+        // ⚠️ **This test began as a London one and London does not demonstrate it — measured over
+        // 2020-2030, the arithmetic version is right on every single day there.** A UK transition
+        // always falls on a Sunday at 01:00 or 02:00, so it is the LAST day of a Monday-start week
+        // and always after midnight: counting back from the start of any day in that week crosses
+        // nothing.
+        //
+        // ⚠️ It then began as a Chile one, and the JDK's tz database disagreed with the reference
+        // data I had checked against — 5 April 2026 is 25 hours in one and 24 in the other, because
+        // a FUTURE rule for a country that keeps changing them is not a fixture. The assertion below
+        // is what caught that.
+        //
+        // What is stable is a HISTORICAL, mid-week transition. Egypt reinstated summer time in 2023
+        // and ended it overnight on Thursday 26 October, so the week of Monday 23 October is 169
+        // hours long and any day after the Thursday counts back an hour into its own Monday.
+        val eg = ZoneId.of("Africa/Cairo")
+        val friday = LocalDate.of(2023, 10, 27)
+        val monday = LocalDate.of(2023, 10, 23)
+        fun startIn(d: LocalDate) = d.atStartOfDay(eg).toInstant().toEpochMilli()
+
+        assertEquals("that week really is an hour long", 169 * 3_600_000L, startIn(monday.plusDays(7)) - startIn(monday))
+        // ⚠️ Thursday's length is `start(Friday) - start(Thursday)`. My first version subtracted
+        // Wednesday from Thursday, which is Wednesday's length — and it came back as an ordinary 24
+        // hours, which is the assertion doing its job.
+        assertEquals("and the extra hour is on the Thursday", 25 * 3_600_000L, startIn(friday) - startIn(friday.minusDays(1)))
+
+        val noon = LocalDateTime.of(friday, java.time.LocalTime.NOON).atZone(eg).toInstant().toEpochMilli()
+        assertEquals(4, HealthDays.weekdayIndex(noon, eg))
+        assertEquals(startIn(monday), HealthDays.weekStart(noon, eg))
+
+        val naive = HealthDays.startOf(noon, eg) - HealthDays.weekdayIndex(noon, eg) * DAY_MS
+        assertNotEquals("the arithmetic version must miss here", startIn(monday), naive)
+        assertEquals("and it misses by exactly the hour", 3_600_000L, naive - startIn(monday))
+    }
+
+    @Test
+    fun `weekStart and weekdayIndex agree about which day a week begins on`() {
+        // ⚠️ One statement of Monday-first. A separate copy assuming Sunday would group the record
+        // into weeks that disagree with the plan's own heavy-day toggles, and both would look right.
+        for (offset in 0..13) {
+            val d = LocalDate.of(2026, 6, 1).plusDays(offset.toLong())
+            val ms = at(d, 9, 30)
+            assertEquals(0, HealthDays.weekdayIndex(HealthDays.weekStart(ms, z), z))
+        }
+    }
+
+    @Test
+    fun `a month starts on its first, across a clock change and a leap year`() {
+        assertEquals(start(LocalDate.of(2026, 3, 1)), HealthDays.monthStart(at(short, 18, 0), z))
+        assertEquals(start(LocalDate.of(2026, 10, 1)), HealthDays.monthStart(at(long, 1, 30), z))
+        // 2024 is a leap year: the 29th of February belongs to February.
+        val leap = LocalDate.of(2024, 2, 29)
+        assertEquals(start(LocalDate.of(2024, 2, 1)), HealthDays.monthStart(at(leap, 23, 59), z))
+        // A first is its own month start.
+        val first = LocalDate.of(2026, 7, 1)
+        assertEquals(start(first), HealthDays.monthStart(start(first), z))
+    }
 }

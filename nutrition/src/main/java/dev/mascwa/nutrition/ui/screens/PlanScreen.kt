@@ -1,10 +1,8 @@
 package dev.mascwa.nutrition.ui.screens
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -23,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.data.NutritionContainer
+import dev.mascwa.nutrition.ui.ChipRow
 import dev.mascwa.nutrition.ui.EnergyChart
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
@@ -445,19 +444,4 @@ private fun NumberField(label: String, value: Double?, onCommit: (Double) -> Uni
     )
 }
 
-/** A pick-one row. Scrolls sideways because five activity levels do not fit a phone. */
-@Composable
-private fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        options.forEach { (value, label) ->
-            FilterChip(
-                selected = value == selected,
-                onClick = { onPick(value) },
-                label = { Text(label) },
-            )
-        }
-    }
-}
+// ChipRow moved to `ui/Common.kt` — a third caller was about to be written, and a copied one drifts.

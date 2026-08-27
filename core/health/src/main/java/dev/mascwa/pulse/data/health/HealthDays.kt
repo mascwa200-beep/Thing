@@ -89,6 +89,24 @@ object HealthDays {
     fun weekdayIndex(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): Int =
         dateOf(epochMs, zone).dayOfWeek.value - 1
 
+    /**
+     * The start of the Monday that begins [epochMs]'s week.
+     *
+     * ⚠️ **Derived from [weekdayIndex] rather than stating Monday-first a second time**, so the day
+     * a week starts on is decided in exactly one place. A separate copy that assumed Sunday would
+     * group somebody's record into weeks that disagree with the week's own heavy-day toggles, and
+     * both would look perfectly plausible.
+     *
+     * ⚠️ And it steps through [plus], so it is right across a clock change. Subtracting
+     * `index × 86_400_000` is the day-arithmetic defect this file exists to prevent.
+     */
+    fun weekStart(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+        plus(startOf(epochMs, zone), -weekdayIndex(epochMs, zone).toLong(), zone)
+
+    /** The start of the first of [epochMs]'s month. */
+    fun monthStart(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+        dateOf(epochMs, zone).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
     private fun dateOf(epochMs: Long, zone: ZoneId): LocalDate =
         Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
 }

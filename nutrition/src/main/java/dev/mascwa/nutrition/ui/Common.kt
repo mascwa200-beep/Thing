@@ -2,6 +2,7 @@ package dev.mascwa.nutrition.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -130,6 +133,32 @@ fun ProgressRow(
             modifier = Modifier.fillMaxWidth(),
             color = tint ?: MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/**
+ * A pick-one row. Scrolls sideways because five activity levels do not fit a phone.
+ *
+ * ⚠️ **Here rather than private to a screen, because the third caller was about to be written.** It
+ * began as a private helper in `PlanScreen`, and this repo has now corrected a duplicated definition
+ * six times — a palette five times over, the day-start rule three times, "render bytes as MB" four
+ * times, one of them wrong. A chip row is small enough that copying it looks harmless and drifts
+ * exactly the same way: one copy gains a scroll, another does not, and the two rows on two pages
+ * behave differently for no reason anybody can see.
+ */
+@Composable
+fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = value == selected,
+                onClick = { onPick(value) },
+                label = { Text(label) },
+            )
+        }
     }
 }
 

@@ -11,23 +11,30 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.nutrition.ui.ChipRow
 import dev.mascwa.nutrition.ui.ProgressRow
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.feature.health.HealthViewModel
 import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
 
 /**
  * What you ate on the day being shown, against what the plan asks for.
@@ -72,6 +79,94 @@ fun TodayScreen(vm: HealthViewModel) {
     Vitamins(state.microsToday, state.profile.sex, state.profile.birthYear)
     Everything(state.extrasToday)
     Entries(vm, entries)
+    RollUpCard(vm)
+}
+
+/**
+ * The food log added up a day, a week or a month at a time.
+ *
+ * ⚠️ **A different question from the energy balance chart on Plan, which is why both exist.** That
+ * one asks what the balance was and needs weigh-ins to answer; this one asks whether you are eating
+ * more than you were, and works for somebody who has never owned a scale.
+ *
+ * ⚠️ **The bar is the bucket's MEAN, never its total.** The newest bucket is almost always a
+ * part-week, and a total-height bar would show it collapsing every time somebody opened the page on
+ * a Tuesday. The denominator is printed beside it for the same reason.
+ *
+ * ⚠️ Last, because it is the one thing here that is not about today. Everything above answers "how
+ * am I doing right now"; this answers "how have I been", and it belongs after the question it
+ * follows on from rather than in front of it.
+ */
+@Composable
+private fun RollUpCard(vm: HealthViewModel) {
+    val grain by vm.grain.collectAsStateWithLifecycle()
+    val buckets by vm.rollUp.collectAsStateWithLifecycle()
+
+    SectionCard("Standing back") {
+        ChipRow(
+            options = PeriodCompare.Grain.entries.map { it to it.label },
+            selected = grain,
+        ) { vm.setGrain(it) }
+
+        val shown = buckets.filter { it.loggedDays > 0 }.takeLast(12)
+        if (shown.isEmpty()) {
+            Text(
+                "Nothing logged over this stretch yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+        val steps = remember(shown) { PeriodCompare.steps(shown) }
+        val peak = shown.mapNotNull { it.mean }.maxOrNull() ?: 1.0
+        shown.forEachIndexed { i, b ->
+            val mean = b.mean ?: return@forEachIndexed
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                StatRow(
+                    bucketLabel(b.startMs, grain),
+                    "${round(mean)} kcal a day · ${b.loggedDays}/${b.days} days",
+                )
+                LinearProgressIndicator(
+                    progress = { (mean / peak).toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                steps.getOrNull(i)?.let { step ->
+                    // ⚠️ A quarter of a snack either way is noise, not a trend, and a line under
+                    // every single bucket saying so would bury the two that matter.
+                    if (abs(step) >= 25.0) {
+                        Text(
+                            // The sign is written here rather than taken from `round(step)`, so
+                            // that a rise carries a "+" — the same reason the fall carries the
+                            // plain hyphen every other number in this app is formatted with.
+                            (if (step > 0) "+" else "-") +
+                                "${round(abs(step))} a day on the one before",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A bucket's date, at the coarseness it was bucketed by.
+ *
+ * ⚠️ The device's own locale and zone, because these are dates a person reads — the opposite of the
+ * rule for a number crossing into another program, which is always `Locale.US`.
+ */
+private fun bucketLabel(startMs: Long, grain: PeriodCompare.Grain): String {
+    val d = Date(startMs)
+    return when (grain) {
+        PeriodCompare.Grain.MONTH ->
+            SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(d)
+        else ->
+            SimpleDateFormat("d MMM", Locale.getDefault()).format(d)
+    }
 }
 
 @Composable

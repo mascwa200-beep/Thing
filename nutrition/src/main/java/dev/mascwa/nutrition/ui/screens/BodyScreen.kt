@@ -29,10 +29,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import dev.mascwa.nutrition.ui.ChipRow
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
@@ -113,6 +115,8 @@ fun BodyScreen(vm: HealthViewModel) {
         }
     }
 
+    LookBackCard(vm)
+
     SectionCard(
         "Measurements",
         subtitle = "Only the newest of each is kept, so correcting one replaces it.",
@@ -138,6 +142,63 @@ fun BodyScreen(vm: HealthViewModel) {
 
     ProgressPhotos(vm)
     HealthConnect(vm)
+}
+
+/**
+ * What weight and every recorded measurement have done since a date you pick.
+ *
+ * ⚠️ **Weight is compared on the smoothed trend, never on two raw weigh-ins.** A single reading
+ * carries a couple of pounds of water either way, so picking the one nearest each end of a stretch
+ * can report a gain in the middle of a real loss — see `HealthViewModel.lookBack`, which is where the
+ * decision is made so that both applications answer the question the same way.
+ *
+ * ⚠️ **A refusal prints as a refusal**, in the core's own words. A kind with only one reading near
+ * the window says so rather than reporting a change of exactly zero, which reads as "you held
+ * steady" — a very different thing to tell somebody.
+ */
+@Composable
+private fun LookBackCard(vm: HealthViewModel) {
+    val look by vm.look.collectAsStateWithLifecycle()
+    val changes by vm.lookBack.collectAsStateWithLifecycle()
+
+    SectionCard("What has changed") {
+        ChipRow(
+            options = HealthViewModel.Look.entries.map {
+                it to it.label.lowercase().replaceFirstChar(Char::uppercase)
+            },
+            selected = look,
+        ) { vm.setLook(it) }
+
+        if (changes.isEmpty()) {
+            Text(
+                "Weigh in, or add a measurement below, and this fills in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        changes.forEach { change ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    change.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    PeriodCompare.sentence(change),
+                    style = MaterialTheme.typography.bodyMedium,
+                    // ⚠️ Down is not good and up is not bad — somebody putting muscle on wants both
+                    // to climb, and this theme takes the device's dynamic colours anyway, so a hue
+                    // could not carry a meaning even if there were one to carry. The direction is in
+                    // the words; the colour only separates a reading from a refusal.
+                    color = if (change.known) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
