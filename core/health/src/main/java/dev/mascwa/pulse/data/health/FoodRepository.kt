@@ -233,6 +233,18 @@ class FoodRepository(
     }
 
     private companion object {
+        /**
+         * The 13,186 generic USDA foods, bundled.
+         *
+         * ⚠️ **It is an asset of THIS module, not of either application, and that is what makes
+         * the standalone app able to find a food by name at all.** It used to sit in `:app`'s
+         * assets, so `:nutrition` shipped without it: searching "chicken breast" found nothing
+         * generic, describing a meal matched nothing (that path searches the seed only, by
+         * design) and a meal photograph's proposals matched nothing — each swallowed and
+         * rendered as "no such food". An Android library's assets are merged into every app
+         * that depends on it, so one committed copy beside the code that reads it reaches both,
+         * including a local build, with nothing in a workflow needing to know.
+         */
         const val SEED_ASSET = "food/seed.tsv"
 
         /**

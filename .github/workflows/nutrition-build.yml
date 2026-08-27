@@ -247,6 +247,24 @@ jobs:
             echo "::warning::no food database in this APK — barcodes will not be recognised offline"
           fi
 
+          # ⚠️ And the generic-food seed, which is a HARD failure rather than a warning. The database
+          # above is built and cached, so a run that legitimately skipped it should still publish;
+          # the seed is a small committed file inside :core:health, so its absence can only mean the
+          # library asset merge stopped working. This app shipped without it for its whole life —
+          # searching "chicken breast" found nothing generic, describing a meal matched nothing, and
+          # every one of those was swallowed and rendered as "no such food".
+          if unzip -l "$apk" | grep -q "assets/food/seed.tsv"; then
+            unzip -l "$apk" | grep "assets/food/seed.tsv"
+          else
+            echo "::error::no generic-food seed in this APK — no food can be found by name"
+            unzip -l "$apk" | grep "assets/food/" || echo "(no food assets at all)"
+            exit 1
+          fi
+          if unzip -l "$apk" | grep -q "assets/food/this-seed-must-not-exist.tsv"; then
+            echo "::error::the sentinel matched — this check cannot tell present from absent"
+            exit 1
+          fi
+
       # ⚠️ **Without this there is nothing to download on the run's own page, and that is exactly
       # how somebody looking for the app fails to find it.** The release under `nutrition-latest` is
       # a different page entirely — you have to know it exists and go to Releases — whereas the

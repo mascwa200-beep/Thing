@@ -75,7 +75,8 @@ scratchpad/**/corpus.tsv
 
 # The offline food database: ~4.5M retail barcodes, 296 MB. Built by CI (or locally with
 # tools/food/build_food_db.py) and cached between runs — never committed, because GitHub hard-
-# rejects files over 100 MB and this repository has no LFS. The seed.tsv beside it IS committed.
+# rejects files over 100 MB and this repository has no LFS. The generic-food seed.tsv IS
+# committed, and lives in :core:health, whose assets both applications inherit.
 app/src/main/assets/food/food.db
 app/src/main/assets/food/food.db.gz
 # The standalone nutrition app packages its own copy of the same database, from the same cache.

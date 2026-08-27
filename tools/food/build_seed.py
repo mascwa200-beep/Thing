@@ -365,7 +365,7 @@ def rows(data: dict, key: str, tag: str, complaints: list):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", default="/tmp/usda", help="where the downloaded archives are kept")
-    ap.add_argument("--out", default="app/src/main/assets/food/seed.tsv")
+    ap.add_argument("--out", default="core/health/src/main/assets/food/seed.tsv")
     args = ap.parse_args()
 
     work = pathlib.Path(args.work)

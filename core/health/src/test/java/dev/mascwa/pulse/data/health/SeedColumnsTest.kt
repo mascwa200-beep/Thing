@@ -15,11 +15,11 @@ import java.io.File
  * which is the half that survives a hand edit, a bad merge, or an editor that strips the trailing
  * tabs a row of unrecorded nutrients ends in.
  *
- * ⚠️ **This one test stays in `:app` while the rest of the health tests live beside their code in
- * `:core:health`.** It reads the seed by a path relative to the module directory, and the seed is
- * an asset of the application rather than of the library -- moving the test would leave it
- * looking for a file that is not there, which would fail in a way that looks like a corpus
- * problem rather than a path problem.
+ * ⚠️ **This test used to live in `:app`, and its own note said it had to**, because the seed was an
+ * asset of that application rather than of the library. It is not any more: the seed sits beside
+ * `FoodRepository`, the code that reads it, and reaches both applications because an Android
+ * library's assets are merged into every app that depends on it. So the test moved with the file it
+ * validates, and reads it by a path relative to this module.
  *
  * ⚠️ The offsets below are restated from `FoodRepository`, which is the authority, because they are
  * private to that file. That restatement is exactly what [waterLandsInTheWaterColumn] exists to

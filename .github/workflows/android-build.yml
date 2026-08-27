@@ -566,6 +566,31 @@ jobs:
           fi
           echo "food database packaged: $((size / 1048576)) MB uncompressed (sentinel correctly absent)"
 
+          # ⚠️ And the generic-food seed, which is a different asset with a different failure mode.
+          # The database above is built and cached, so a run that skipped it should still publish;
+          # the seed is a small committed file and is now an asset of :core:health rather than of
+          # this application, so its absence can only mean the LIBRARY ASSET MERGE stopped working —
+          # which would take the generic foods out of both applications at once, silently, and
+          # render as "no such food" on every search by name.
+          seed=$(unzip -l "$apk" | grep "assets/food/seed.tsv" || true)
+          if [ -z "$seed" ]; then
+            echo "FAIL: the generic-food seed is not in the APK — the :core:health asset merge broke."
+            unzip -l "$apk" | grep "assets/food/" || echo "(no food assets at all)"
+            exit 1
+          fi
+          seedSize=$(echo "$seed" | awk '{print $1}')
+          # Uncompressed, like the figure above. The real file is ~3.1 MB across 13,186 foods; a
+          # truncated one parses perfectly and just answers fewer questions.
+          if [ "$seedSize" -lt 2000000 ]; then
+            echo "FAIL: the packaged seed is only $seedSize bytes — that is not 13,186 foods."
+            exit 1
+          fi
+          if unzip -l "$apk" | grep -q "assets/food/this-seed-must-not-exist.tsv"; then
+            echo "FAIL: the sentinel matched — this check cannot distinguish present from absent."
+            exit 1
+          fi
+          echo "generic-food seed packaged: $seedSize bytes (sentinel correctly absent)"
+
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
         # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64
