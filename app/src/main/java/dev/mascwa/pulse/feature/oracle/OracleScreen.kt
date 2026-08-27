@@ -100,7 +100,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                                     modifier = Modifier.padding(top = 6.dp, start = 2.dp),
                                 )
                             }
-                            items(list.drop(1), key = { it.id }) { ins -> InsightCard(ins, onOpenRoute) }
+                            items(list.drop(1), key = { "insight:${it.id}" }) { ins -> InsightCard(ins, onOpenRoute) }
                         }
                     }
 
@@ -120,7 +120,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                         // same entry produce two identical beats, and a repeated key is a crash.
                         itemsIndexed(
                             state.dayAhead,
-                            key = { i, b -> "$i-${b.atMs}-${b.kind}" },
+                            key = { i, b -> "beat:$i-${b.atMs}-${b.kind}" },
                         ) { _, beat -> BeatRow(beat) }
                     }
                 }

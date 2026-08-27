@@ -72,14 +72,14 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
                 contentPadding = PaddingValues(bottom = 12.dp),
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("WORKS RIGHT NOW", c.positive) }
-                items(offlineReadyTiles(), key = { it.route }) { tile ->
+                items(offlineReadyTiles(), key = { "ready:${it.route}" }) { tile ->
                     SurviveTileCard(tile, onOpenRoute)
                 }
                 if (cached.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         SectionLabel("LAST RECEIVED — NOT CURRENT", c.amber)
                     }
-                    items(cached, key = { it.route }) { tile ->
+                    items(cached, key = { "cached:${it.route}" }) { tile ->
                         SurviveTileCard(tile, onOpenRoute)
                     }
                 }

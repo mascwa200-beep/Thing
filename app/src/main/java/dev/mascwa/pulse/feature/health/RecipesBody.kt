@@ -95,11 +95,11 @@ fun RecipesBody(vm: HealthViewModel) {
         }
         if (dishes.isNotEmpty()) {
             item { SectionLabel("RECIPES") }
-            items(dishes, key = { it.id }) { r -> SavedRecipe(vm, r) }
+            items(dishes, key = { "dish:${it.id}" }) { r -> SavedRecipe(vm, r) }
         }
         if (meals.isNotEmpty()) {
             item { SectionLabel("SAVED MEALS") }
-            items(meals, key = { it.id }) { r -> SavedRecipe(vm, r) }
+            items(meals, key = { "meal:${it.id}" }) { r -> SavedRecipe(vm, r) }
         }
     }
 }

@@ -31,20 +31,43 @@ import java.io.File
  * is then run over the real tree of BOTH applications. A gate whose rules are only ever exercised
  * by the code they pass on is a gate nobody can trust.
  *
- * ⚠️ Two rules only, and both are exact. A third — "two `items()` blocks in one scope keyed by the
- * same expression" — was measured and deliberately left out: `OfflineSurvivalScreen` and
- * `RecipesBody` both have that shape and both are safe by construction (disjoint by `needs`, unique
- * ids from one store), so it would ship two standing false positives. A gate with standing noise is
- * one people learn to ignore.
+ * ⚠️ **A third rule was added later, and the reason the original two were not enough is worth
+ * keeping.** This file used to record that "two `items()` blocks in one scope keyed by the same
+ * expression" had been measured and deliberately left out, because `OfflineSurvivalScreen` and
+ * `RecipesBody` both have that shape, both are safe by construction, and a gate with standing noise
+ * is one people learn to ignore. Both halves of that were true and the conclusion was still wrong,
+ * for two reasons the measurement did not reach:
+ *
+ *  - **"The same expression" is the wrong test.** `JarvisMemoryScreen` carried EIGHT keyed lists in
+ *    one `LazyColumn`, keyed by three DIFFERENT expressions — `it.id` on notes, `it.id` on episodic
+ *    memories, `it.seq` on ledger entries — over three tables whose ids are all dense sequences from
+ *    0 or 1. One remembered note plus one episodic memory was enough, both stores persist, and that
+ *    screen died before drawing every single time. A same-expression rule sees nothing there.
+ *  - **"Safe by construction" is not a property anything checks.** `InterrogatorScreen` had the
+ *    same-expression shape too — `finding.atMs` beside `line.atMs` — and was the exact opposite of
+ *    safe: a finding is DERIVED from a transcript line, so they share an instant by construction.
+ *
+ * So the third rule is the one thing that is checkable in the source text: where a scope carries
+ * several `items()` key lambdas, each must open with a **distinct string literal**.
+ * `{ "note:${it.id}" }` beside `{ "episodic:${it.id}" }` cannot collide whatever the ids do. The
+ * standing-noise objection was answered by fixing all twelve sites rather than by relaxing the rule,
+ * so it ships with zero false positives — which is checked below over the real tree.
  */
 class LazyKeyTest {
 
     // --- the tree ---------------------------------------------------------------------------------
 
-    /** Both applications. The nutrition module is a sibling of this one. */
+    /**
+     * All three Compose modules. The nutrition and desktop modules are siblings of this one.
+     *
+     * ⚠️ The desktop module is here because it has its own screens and no test CI runs on every
+     * push the way `:app:testDebugUnitTest` does — and it had two of the twelve prefix violations.
+     * Its sources are under `kotlin`, not `java`.
+     */
     private val roots = listOf(
         File("src/main/java"),
         File("../nutrition/src/main/java"),
+        File("../desktop/src/main/kotlin"),
     )
 
     private val destinations = File("src/main/java/dev/mascwa/pulse/navigation/Destinations.kt")
@@ -74,6 +97,10 @@ class LazyKeyTest {
         assertTrue(
             "the nutrition module was not scanned — is it still a sibling of :app?",
             files.any { it.path.contains("nutrition") },
+        )
+        assertTrue(
+            "the desktop module was not scanned — is it still a sibling of :app?",
+            files.any { it.path.contains("desktop") },
         )
         assertTrue("Destinations.kt not found at ${destinations.absolutePath}", destinations.isFile)
         assertTrue("no route constants parsed out of Destinations.kt", routeValues().size > 20)
@@ -112,6 +139,50 @@ class LazyKeyTest {
         }
         assertEquals(
             "a fixed key equals a route in a scope keyed by route — this is the MenuScreen crash",
+            emptyList<String>(),
+            broken,
+        )
+    }
+
+    /**
+     * A key lambda's opening string literal, or null when it does not open with one.
+     *
+     * ⚠️ The optional `params ->` is not decoration: an `itemsIndexed` key reads
+     * `{ i, b -> "beat:$i-…" }`, so a pattern anchored straight after the brace calls a correctly
+     * prefixed list unprefixed — and the whole argument for adding this rule was that it can ship
+     * with no standing noise.
+     */
+    private fun literalPrefix(key: String): String? =
+        Regex("""^\{\s*(?:[^{}"\n]*->\s*)?"([^"$]+)""").find(key)?.groupValues?.get(1)
+
+    /** Only an `items(…)`/`itemsIndexed(…)` key is a lambda; `item(key = x)` is a plain expression. */
+    private fun lambdaKeys(scope: LazyKeyScan.Scope): List<String> =
+        scope.dynamic.filter { it.startsWith("{") }
+
+    @Test
+    fun `several keyed lists in one lazy scope open with distinct literal prefixes`() {
+        var scopesWithSeveral = 0
+        val broken = scopesInTree().mapNotNull { scope ->
+            val keys = lambdaKeys(scope)
+            if (keys.size < 2) return@mapNotNull null
+            scopesWithSeveral++
+            val prefixes = keys.map(::literalPrefix)
+            if (prefixes.none { it == null } && prefixes.distinct().size == prefixes.size) {
+                return@mapNotNull null
+            }
+            "${scope.file}: lazy scope at line ${scope.line} has ${keys.size} keyed lists that can " +
+                "collide:\n" + keys.zip(prefixes).joinToString("\n") { (k, p) ->
+                "        prefix=${p ?: "NONE"}  ${k.replace(Regex("\\s+"), " ").take(72)}"
+            }
+        }
+        // Vacuity guard, in the shape of the fixture test above: if this reads zero the scanner has
+        // stopped seeing key lambdas, not the codebase stopped having them.
+        assertTrue(
+            "found no lazy scope with several keyed lists — has the scanner stopped matching?",
+            scopesWithSeveral >= 5,
+        )
+        assertEquals(
+            "these lazy scopes can collide on a key, which Compose throws on",
             emptyList<String>(),
             broken,
         )
@@ -214,6 +285,80 @@ class LazyKeyTest {
         )
         assertEquals(1, scopes.size)
         assertEquals(listOf("only"), scopes.single().literals.map { it.first })
+    }
+
+    /** MEMORY, reduced to the three lists whose ids are all dense sequences from 0 or 1. */
+    private val theMemoryCrash = """
+        LazyColumn {
+            item { SectionBar("REMEMBERED") }
+            items(notes, key = { it.id }) { MemoryCard(it) }
+            item { SectionBar("EPISODIC") }
+            items(episodic, key = { it.id }) { EpisodicCard(it) }
+            item { SectionBar("AUDIT LEDGER") }
+            items(audit, key = { it.seq }) { AuditCard(it) }
+        }
+    """.trimIndent()
+
+    @Test
+    fun `the prefix rule fires on the shape that killed MEMORY`() {
+        val scope = LazyKeyScan.scan(theMemoryCrash, "JarvisMemoryScreen.kt").single()
+        val keys = lambdaKeys(scope)
+        assertEquals(
+            "the scanner did not read all three key lambdas — it cannot be testing anything",
+            3,
+            keys.size,
+        )
+        assertTrue("a bare `it.id` was read as prefixed", keys.map(::literalPrefix).all { it == null })
+    }
+
+    @Test
+    fun `two lists sharing one prefix are as broken as none at all`() {
+        // The near-miss: somebody prefixes both lists and copies the same word into each.
+        val scope = LazyKeyScan.scan(
+            """
+            LazyColumn {
+                items(dishes, key = { "dish:${'$'}{it.id}" }) { A(it) }
+                items(meals, key = { "dish:${'$'}{it.id}" }) { B(it) }
+            }
+            """.trimIndent(),
+            "RecipesBody.kt",
+        ).single()
+        val prefixes = lambdaKeys(scope).map(::literalPrefix)
+        assertEquals(listOf("dish:", "dish:"), prefixes)
+        assertTrue("distinctness is what the rule turns on", prefixes.distinct().size != prefixes.size)
+    }
+
+    @Test
+    fun `an itemsIndexed key is read past its own parameters`() {
+        // ⚠️ The false positive this rule would otherwise ship: the literal follows `i, b ->`, and a
+        // pattern anchored straight after the brace calls a correctly prefixed list unprefixed.
+        val scope = LazyKeyScan.scan(
+            """
+            LazyColumn {
+                items(list, key = { "insight:${'$'}{it.id}" }) { A(it) }
+                itemsIndexed(beats, key = { i, b -> "beat:${'$'}i-${'$'}{b.atMs}" }) { i, b -> B(i, b) }
+            }
+            """.trimIndent(),
+            "OracleScreen.kt",
+        ).single()
+        assertEquals(listOf("insight:", "beat:"), lambdaKeys(scope).map(::literalPrefix))
+    }
+
+    @Test
+    fun `a plain item key is not treated as a list key`() {
+        // `item(key = someExpression)` is one slot, not a list, so it cannot collide with itself and
+        // has no business being asked for a prefix. Rule one already covers a repeated fixed key.
+        val scope = LazyKeyScan.scan(
+            """
+            LazyColumn {
+                item(key = headerId) { Header() }
+                items(rows, key = { "row:${'$'}{it.id}" }) { Row(it) }
+            }
+            """.trimIndent(),
+            "Fixture.kt",
+        ).single()
+        assertEquals(listOf("{ \"row:\${it.id}\" }"), lambdaKeys(scope))
+        assertTrue("the plain item key was mistaken for a list key", scope.dynamic.size == 2)
     }
 }
 

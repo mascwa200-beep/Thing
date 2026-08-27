@@ -67,7 +67,7 @@ fun JarvisDossierScreen(vm: JarvisDossierViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(profile, key = { it.category.name + "·" + it.text }) { entry ->
+            items(profile, key = { "profile:${it.category.name}·${it.text}" }) { entry ->
                 DossierRow(entry.category.name, entry.text, c)
             }
 
@@ -75,7 +75,7 @@ fun JarvisDossierScreen(vm: JarvisDossierViewModel, onBack: () -> Unit) {
             if (objectives.isEmpty()) {
                 item { EmptyLine("No objectives on record. Tracked tasks and waypoints appear here.", c) }
             }
-            items(objectives, key = { it.title }) { task ->
+            items(objectives, key = { "objective:${it.title}" }) { task ->
                 DossierRow(task.status.name, task.title, c)
             }
 

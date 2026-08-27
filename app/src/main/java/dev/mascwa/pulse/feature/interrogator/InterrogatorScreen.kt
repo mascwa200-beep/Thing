@@ -123,7 +123,11 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
                         )
                     }
                     // Everything but the newest, which the card above is already showing.
-                    items(log.drop(1), key = { it.atMs }) { EarlierFinding(it) }
+                    //
+                    // ⚠️ The prefix is load-bearing: a finding is DERIVED from a transcript line, so
+                    // its `atMs` is that line's instant by construction — and both lists sit in this
+                    // one lazy scope, which Compose refuses with `Key "…" was already used`.
+                    items(log.drop(1), key = { "finding:${it.atMs}" }) { EarlierFinding(it) }
                 }
                 item {
                     Row(
@@ -158,7 +162,7 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
                         )
                     }
                 } else {
-                    items(lines, key = { it.atMs }) { line -> TranscriptRow(line) }
+                    items(lines, key = { "line:${it.atMs}" }) { line -> TranscriptRow(line) }
                 }
             }
         }

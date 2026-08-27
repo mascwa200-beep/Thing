@@ -154,7 +154,7 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
                             val rows = grouped[type].orEmpty()
                             if (rows.isNotEmpty()) {
                                 item(key = "h_$label") { SectionLabel(label) }
-                                items(rows, key = { it.id }) { q -> CyberRowFrame(onClick = { selected = q }) { QuoteRow(q) } }
+                                items(rows, key = { "s_${it.id}" }) { q -> CyberRowFrame(onClick = { selected = q }) { QuoteRow(q) } }
                                 item(key = "d_$label") { HorizontalDivider() }
                             }
                         }
