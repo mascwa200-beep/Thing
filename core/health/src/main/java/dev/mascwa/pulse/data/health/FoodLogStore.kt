@@ -432,10 +432,14 @@ class FoodLogStore(
     suspend fun add(entry: NutritionDay.Entry) {
         mutex.withLock {
             val map = indexLocked()
-            // ⚠️ Eating clears the fast, and it has to be here rather than left to the user. The two
-            // are contradictory claims about the same day, and a stale mark would send the day to
-            // the expenditure measurement as zero calories while the index also carried what was
-            // eaten — the same day counted twice, once wrongly.
+            // ⚠️ Eating clears the fast, and it has to be here rather than left to the user: the two
+            // are contradictory claims about the same day, and the screen would show both.
+            //
+            // ⚠️ It is NOT what stops the day being counted twice — an earlier version of this
+            // comment said so and was wrong. `intakeDays` and `loggedDayCount` each test
+            // `!indexLocked().containsKey(day)` before passing a fast through, so the arithmetic
+            // holds either way. That is exactly why the same omission in [importEntries] went
+            // unnoticed: nothing computed a wrong number, the day simply claimed two things.
             fastedLocked().remove(entry.dayStartMs)
             val month = monthOf(entry.dayStartMs)
             val shard = shardLocked(month)
@@ -527,7 +531,20 @@ class FoodLogStore(
             }
             // ⚠️ After every shard is in place, so a day whose entries arrived in more than one batch
             // is counted once and correctly. Re-indexing inside the loop would publish a half-built day.
-            touchedDays.forEach { day -> reindexLocked(day, shardLocked(monthOf(day)), map) }
+            //
+            // ⚠️ And the fast marks go with them, exactly as [add] clears one when something is
+            // eaten. This is the other path that puts food onto a day, and it did not — so importing
+            // an export onto a phone where a day had been marked a fast left the day claiming both
+            // at once: the screen said "fasted" above a list of what was eaten. The arithmetic was
+            // never wrong (`intakeDays` and `loggedDayCount` both already ignore a fast on a day
+            // that has entries), which is precisely why nothing showed it. `reindexLocked` below
+            // sets `indexDirty`, and the fasted set is persisted in the same blob, so the removal
+            // needs no flag of its own.
+            val fasts = fastedLocked()
+            touchedDays.forEach { day ->
+                fasts.remove(day)
+                reindexLocked(day, shardLocked(monthOf(day)), map)
+            }
         }
         if (added > 0) scheduleFlush()
         return added

@@ -65,6 +65,19 @@ class ProgressPhotoStore(
 
     private val _photos = MutableStateFlow<List<Photo>>(emptyList())
 
+    /**
+     * Slots handed out by [reserve] that have not yet been confirmed or discarded.
+     *
+     * ⚠️ **The orphan sweep in [loadLocked] must never touch one of these.** While the camera app is
+     * writing into a reserved file, this app is in the background and any `load()` — a widget, the
+     * board, a returning screen — would otherwise find a file with no index row and delete the
+     * photograph out from under the shutter.
+     *
+     * In memory rather than persisted, deliberately: a process that dies mid-capture forgets its
+     * reservation, and the sweep on the next launch is then exactly what should collect it.
+     */
+    private val inFlight = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
     /** Newest first, which is how a gallery of these is read. */
     val photos: StateFlow<List<Photo>> = _photos.asStateFlow()
 
@@ -91,7 +104,31 @@ class ProgressPhotoStore(
         loaded = next
         _photos.value = next.photos.sortedByDescending { it.atMs }
         if (next !== s) writeLocked(next)
+        sweepOrphansLocked(next)
         next
+    }
+
+    /**
+     * Delete files in the directory that no index row claims.
+     *
+     * ⚠️ **The other half of the divergence, and the one nothing was doing.** The filter above drops
+     * a ROW whose file has gone; this drops a FILE that no row points at, which is what a cancelled
+     * capture leaves behind. [reserve] hands out a `content://` URI and the camera app creates the
+     * file when it opens the stream — so backing out of the camera leaves a zero-byte file that no
+     * sweep could see, because the only thing wrong with it is that nothing refers to it. Neither
+     * call site can fix that on its own: a process killed between the tap and the shutter never runs
+     * a callback at all, and only a sweep on the next launch collects that one.
+     *
+     * ⚠️ Files reserved in THIS process are exempt — see [inFlight]. Without that this would delete
+     * the photograph currently being taken.
+     */
+    private fun sweepOrphansLocked(s: Stored) {
+        runCatching {
+            val known = s.photos.mapTo(HashSet()) { it.id }
+            dir().listFiles()?.forEach { f ->
+                if (f.isFile && f.name !in known && f.name !in inFlight) runCatching { f.delete() }
+            }
+        }
     }
 
     suspend fun load() {
@@ -111,11 +148,26 @@ class ProgressPhotoStore(
     fun reserve(nowMs: Long): Pair<String, Uri>? {
         val id = "progress_$nowMs.jpg"
         val uri = uriFor(id) ?: return null
+        inFlight += id
         return id to uri
+    }
+
+    /**
+     * A capture that did not happen — cancelled, or the camera app failed.
+     *
+     * ⚠️ Both call sites do `if (ok) confirm(id)` and used to do nothing at all on the other branch,
+     * so backing out of the camera left the file it had created sitting in the directory for ever.
+     * [sweepOrphansLocked] would collect it eventually; this collects it now, and — more usefully —
+     * takes the id out of [inFlight] so the sweep is allowed to.
+     */
+    fun discard(id: String) {
+        inFlight -= id
+        runCatching { fileFor(id).delete() }
     }
 
     /** Record a capture that actually happened. Refuses an empty file, which is a failed capture. */
     suspend fun confirm(id: String, atMs: Long): Boolean {
+        inFlight -= id
         val f = fileFor(id)
         if (!f.exists() || f.length() <= 0L) {
             runCatching { f.delete() }

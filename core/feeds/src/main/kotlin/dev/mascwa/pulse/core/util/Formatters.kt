@@ -86,19 +86,6 @@ object Formatters {
     }
 
     /**
-     * "3m ago", "2h ago", "yesterday", "Jun 12", "Jun 12 2024".
-     *
-     * Past a week this becomes a date, and the year appears as soon as the date is not in the year
-     * we are currently in. Without that, a news feed shows "Aug 12" for an article from last August
-     * and one from this August identically, which is precisely the confusion a timestamp exists to
-     * prevent — and a resurfaced old story is exactly the case where the reader most needs to know.
-     *
-     * Device locale and zone throughout, deliberately: this is a date for a person to read, not a
-     * value anything parses back, so the reader's own conventions and calendar are the right ones.
-     * That also means "this year" means this year *where the reader is*, which is the answer they
-     * would give themselves.
-     */
-    /**
      * A size on disk, to one decimal, in the unit a phone's own storage screen means by "MB".
      *
      * ⚠️ **Mebibytes — 1,048,576 — not a million.** The two differ by about 5%, which is not a
@@ -115,26 +102,50 @@ object Formatters {
     fun megabytes(bytes: Long): String =
         if (bytes < 0L) "?" else String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
 
+    /**
+     * "3m ago", "2h ago", "yesterday", "Jun 12", "Jun 12 2024".
+     *
+     * Past a week this becomes a date, and the year appears as soon as the date is not in the year
+     * we are currently in. Without that, a news feed shows "Aug 12" for an article from last August
+     * and one from this August identically, which is precisely the confusion a timestamp exists to
+     * prevent — and a resurfaced old story is exactly the case where the reader most needs to know.
+     *
+     * Device locale and zone throughout, deliberately: this is a date for a person to read, not a
+     * value anything parses back, so the reader's own conventions and calendar are the right ones.
+     * That also means "this year" means this year *where the reader is*, which is the answer they
+     * would give themselves.
+     *
+     * ⚠️ **"Yesterday" and "N days ago" are CALENDAR claims, so they are answered by a calendar and
+     * not by elapsed time.** The day branches used to divide the elapsed milliseconds — so anything
+     * between 24 and 48 hours old read as "yesterday", and something posted on Monday morning was
+     * still called yesterday on Wednesday. That is the shape of defect this whole family has: a
+     * sentence about which day it was, decided by how much time has passed. `relativeDay` in the
+     * health feature had the same one and was fixed the same way.
+     *
+     * ⚠️ It also means a day is not 24 hours. Where the clocks go back, a local day runs 25 hours —
+     * so more than a day of elapsed time can still be the same date, and the hour reading is the
+     * honest one there. The zero case below is that, not padding.
+     */
     fun relativeTime(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
         if (epochMs <= 0) return ""
         val diff = nowMs - epochMs
         if (diff < 0) return "just now"
         val mins = TimeUnit.MILLISECONDS.toMinutes(diff)
         val hours = TimeUnit.MILLISECONDS.toHours(diff)
-        val days = TimeUnit.MILLISECONDS.toDays(diff)
+        if (mins < 1) return "just now"
+        if (mins < 60) return "${mins}m ago"
+        if (hours < 24) return "${hours}h ago"
+
+        val zone = java.time.ZoneId.systemDefault()
+        val then = java.time.Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
+        val today = java.time.Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+        val calendarDays = java.time.temporal.ChronoUnit.DAYS.between(then, today)
         return when {
-            mins < 1 -> "just now"
-            mins < 60 -> "${mins}m ago"
-            hours < 24 -> "${hours}h ago"
-            days < 2 -> "yesterday"
-            days < 7 -> "${days}d ago"
+            calendarDays <= 0L -> "${hours}h ago"
+            calendarDays == 1L -> "yesterday"
+            calendarDays < 7L -> "${calendarDays}d ago"
             else -> {
-                val cal = java.util.Calendar.getInstance()
-                cal.timeInMillis = nowMs
-                val nowYear = cal.get(java.util.Calendar.YEAR)
-                cal.timeInMillis = epochMs
-                val thenYear = cal.get(java.util.Calendar.YEAR)
-                val pattern = if (thenYear == nowYear) "MMM d" else "MMM d yyyy"
+                val pattern = if (then.year == today.year) "MMM d" else "MMM d yyyy"
                 java.text.SimpleDateFormat(pattern, Locale.getDefault())
                     .format(java.util.Date(epochMs))
             }

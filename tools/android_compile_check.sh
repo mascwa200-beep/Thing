@@ -35,6 +35,28 @@
 # live in a separate `-android` variant. `lifecycle-runtime-compose:2.8.7` unpacks to 229 bytes and
 # nothing else; `lifecycle-runtime-compose-android:2.8.7` is the one with the code in it. If a -l
 # resolves but the symbols still do not, try the `-android` suffix before concluding anything.
+#
+# `:core:health` — THE RECIPE, because believing it impossible cost a CI round
+# ---------------------------------------------------------------------------
+# ⚠️ The standing note in this repo said `:core:health` "is an Android library module that cannot be
+# built in this container". **That is wrong, and it is the module whose miss cost a round.** The
+# belief came from reaching for the plain KMP DataStore AAR, which is manifest-only (see above) —
+# every store in that module then reported hundreds of unresolved names and the conclusion drawn was
+# that the module was out of reach. With the `-android`/`-jvm` variant coordinates it compiles:
+#
+#   tools/android_compile_check.sh -s \
+#     -l androidx.datastore:datastore-preferences-android:1.1.1 \
+#     -l androidx.datastore:datastore-preferences-core-jvm:1.1.1 \
+#     -l androidx.datastore:datastore-core-android:1.1.1 \
+#     -l androidx.datastore:datastore-core-okio-jvm:1.1.1 \
+#     core/health/src/main/java/dev/mascwa/pulse/data/health/FoodLogStore.kt \
+#     core/health/src/main/java/dev/mascwa/pulse/data/health/FoodLogFiling.kt \
+#     $(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')
+#
+# -s is required (every store there is @Serializable); the sibling files a store references have to
+# be passed alongside it; and the whole of `:core:telemetry` goes on as sources, which is what the
+# grep produces. `tools/check_changed.sh` runs exactly this automatically for changed core/health
+# files, so the usual path is to run that rather than to retype the above.
 set -uo pipefail
 
 G=/opt/gradle-8.14.3/lib

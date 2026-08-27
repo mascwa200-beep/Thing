@@ -1,13 +1,20 @@
 *.iml
 .gradle/
 # Gradle's own Kotlin-compiler-daemon/session working directory at the repo root — same root cause as the
-# build/
+# build/ rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
+.kotlin/
 
 # Python bytecode from the tools/ scripts. Same class of gap as the leading-slash `build/` fixed
 # earlier: harmless while nothing here ever ran locally, real now that it does.
+#
+# ⚠️ These two lines were inserted INTO the middle of the two-line comment above, which left `# build/`
+# commented out on its own and appended the sentence's tail to the `*.pyc` line — so git read the whole
+# of `*.pyc rule below (only ever appears …)` as ONE pattern, which matches nothing. `*.pyc` has not
+# been ignored since. Nothing showed it, because every .pyc CPython writes lands inside a
+# `__pycache__/` directory that the line above already covers; a stray one written anywhere else was
+# committable. Keep a rule and its comment adjacent, and never split a wrapped comment to insert.
 __pycache__/
-*.pyc rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
-.kotlin/
+*.pyc
 /local.properties
 /.idea/
 .DS_Store

@@ -124,7 +124,10 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 #
 # ⚠️ And note `:core:health` is on NEITHER path here — not as sources, not as classes — so every
 # member of anything it declares cascades. That is a whole module's worth of false positives, and it
-# is the commonest one this repo hits.
+# is the commonest one this repo hits. It does NOT follow that the module is beyond checking: the
+# whole of it compiles against the real platform classes in about twenty seconds, and
+# `tools/check_changed.sh` now runs that automatically whenever a `core/health` file changes. When
+# this gate blames a health symbol, that compile is the instrument to reach for — not a shrug.
 #
 # ⚠️ **DO NOT PASS A TEST FILE. This is for main sources, and a test file poisons the whole run.**
 # JUnit is not on the classpath, so `Test`, `assertEquals` and `assertTrue` come back unresolved —

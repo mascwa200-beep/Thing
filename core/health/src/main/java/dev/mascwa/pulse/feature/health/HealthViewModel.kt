@@ -1227,6 +1227,18 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
     }
 
+    /**
+     * The capture came back false — cancelled, or the camera app failed.
+     *
+     * ⚠️ Both surfaces used to do nothing on this branch, which left the file the camera had already
+     * created sitting in the directory with no index row pointing at it. The store sweeps those on
+     * its next load either way; saying so here is what makes it prompt, and what releases the id
+     * from the in-flight set so the sweep is permitted to touch it at all.
+     */
+    fun photoCancelled(id: String) {
+        c.progressPhotoStore.discard(id)
+    }
+
     fun forgetPhoto(id: String) {
         viewModelScope.launch { c.progressPhotoStore.remove(id) }
     }

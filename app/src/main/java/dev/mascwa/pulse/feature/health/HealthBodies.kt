@@ -2747,9 +2747,11 @@ private fun ProgressPhotos(vm: HealthViewModel) {
     var viewing by remember { mutableStateOf<String?>(null) }
 
     val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        // ⚠️ Recorded only on success. A cancelled capture leaves a zero-byte file behind, and an
-        // index row pointing at one renders as a thumbnail that can never load.
-        pending?.let { if (ok) vm.photoTaken(it) }
+        // ⚠️ Recorded only on success — an index row pointing at a zero-byte file renders as a
+        // thumbnail that can never load. But the other branch is not nothing: a cancelled capture
+        // leaves the file the camera app already created, with no row pointing at it, and this used
+        // to walk away from it.
+        pending?.let { if (ok) vm.photoTaken(it) else vm.photoCancelled(it) }
         pending = null
     }
 

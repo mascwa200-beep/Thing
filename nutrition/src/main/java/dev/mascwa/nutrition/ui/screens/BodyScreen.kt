@@ -297,7 +297,10 @@ private fun ProgressPhotos(vm: HealthViewModel) {
     val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val id = pending
         pending = null
-        if (ok && id != null) vm.photoTaken(id)
+        // ⚠️ The false branch is not nothing. A cancelled capture leaves the file the camera app
+        // already created, with no index row pointing at it — so it is invisible to every sweep
+        // that looks for rows, and it used to stay on the disk for ever.
+        if (id != null) { if (ok) vm.photoTaken(id) else vm.photoCancelled(id) }
     }
 
     SectionCard(

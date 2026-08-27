@@ -59,7 +59,19 @@ class DebugUploader(
         val pending = crashReporter.entries().filter { it.timeMs.toString() !in sent }
         if (pending.isEmpty()) return@withContext Result.Skipped("nothing new")
         var last: Result = Result.Skipped("nothing new")
-        for (e in pending.take(5)) {
+        // ⚠️ **Oldest first, and that is the whole point of the sort.** `entries()` hands these back
+        // newest-first, so `take(5)` was sending the five most recent — while `CrashReporter.trim`
+        // deletes the OLDEST beyond twenty. On a phone crashing at every launch those two rules pull
+        // against each other: each launch writes a new report, the uploader sends the newest five,
+        // and the report from the FIRST crash — the one that explains the loop, where every later
+        // one is a consequence — is deleted having never been sent. Prioritising what is about to
+        // be discarded is the only ordering that gets it off the device.
+        //
+        // ⚠️ A failure deliberately does NOT stop the loop. It is tempting on a phone with no
+        // network, where all five will fail alike, but a single report that fails permanently — too
+        // large, or badly encoded — would then be first in the queue for ever and block every newer
+        // one behind it. Five attempts on a bad launch is the cheaper mistake.
+        for (e in pending.sortedBy { it.timeMs }.take(5)) {
             val bundle = buildBundle("crash", crashReporter.read(e))
             last = upload("crash", bundle)
             if (last is Result.Ok) markSent(e.timeMs.toString())

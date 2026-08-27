@@ -116,6 +116,70 @@ else
     bash tools/android_resolve_check.sh $APP 2>&1 | tail -12 | sed 's/^/   /'
 fi
 
+# ---- 4. :core:health, compiled in full ----------------------------------------------------------
+# ⚠️ This is the strongest gate in this file and it exists because its absence cost a CI round.
+# `Result.failure(...)` assigned to a `Result<*>?` cannot infer T; it parses, every name in it
+# resolves, and it fails `:core:health:compileDebugKotlin`. Neither gate above can see that shape.
+#
+# ⚠️ The standing note that this module "cannot be built in this container" was WRONG, and believing
+# it is what left the hole. The plain KMP DataStore AAR is manifest-only, so reaching for it made
+# every store report hundreds of unresolved names and the conclusion drawn was that the module was
+# out of reach. With the `-android`/`-jvm` variants the WHOLE module — stores, Health Connect
+# bridge, the 1,370-line view model — compiles against the real platform in about twenty seconds.
+#
+# The two shared cores go on as COMPILED CLASSES, never sources, so a cross-module smart cast still
+# fails here exactly as it does in CI. `:core:database` is the one exception: it is a Room module
+# that cannot be built here, so its single file is folded in as a source and a smart cast across
+# that one boundary would be invisible.
+HEALTH_CHANGED=$(echo "$CHANGED" | grep '^core/health/src/main/' || true)
+if [ -n "$HEALTH_CHANGED" ]; then
+    echo
+    echo "== :core:health full compile =="
+    TCLASSES=core/telemetry/build/classes/kotlin/main
+    FCLASSES=core/feeds/build/classes/kotlin/main
+    # ⚠️ Rebuilt rather than assumed current: a stale class directory reports a member added to a
+    # core this hour as unresolved, which is indistinguishable from a real defect.
+    ./gradlew :core:telemetry:classes :core:feeds:classes \
+        --configure-on-demand --no-configuration-cache -q >/tmp/coreclasses.txt 2>&1
+    if [ ! -d "$TCLASSES" ] || [ ! -d "$FCLASSES" ]; then
+        echo "   COULD NOT BUILD the shared cores — this gate did not run:"
+        tail -5 /tmp/coreclasses.txt | sed 's/^/         /'
+        FAIL=1
+    else
+        HEALTH_SRC=$(ls core/health/src/main/java/dev/mascwa/pulse/data/health/*.kt \
+                        core/health/src/main/java/dev/mascwa/pulse/feature/health/*.kt)
+        # shellcheck disable=SC2086
+        OUT=$(bash tools/android_compile_check.sh -s -m "$TCLASSES" -m "$FCLASSES" \
+            -l androidx.datastore:datastore-preferences-android:1.1.1 \
+            -l androidx.datastore:datastore-preferences-core-jvm:1.1.1 \
+            -l androidx.datastore:datastore-core-android:1.1.1 \
+            -l androidx.datastore:datastore-core-okio-jvm:1.1.1 \
+            -l androidx.core:core:1.15.0 \
+            -l androidx.core:core-ktx:1.15.0 \
+            -l androidx.lifecycle:lifecycle-viewmodel-android:2.8.7 \
+            -l androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7 \
+            -l androidx.activity:activity:1.9.3 \
+            -l androidx.health.connect:connect-client:1.1.0-beta01 \
+            -l androidx.sqlite:sqlite:2.4.0 \
+            -l androidx.room:room-runtime:2.6.1 \
+            -l androidx.room:room-common:2.6.1 \
+            -l org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.7.3 \
+            -l com.squareup.okhttp3:okhttp:4.12.0 \
+            $HEALTH_SRC \
+            core/database/src/main/java/dev/mascwa/pulse/data/food/db/FoodDatabase.kt 2>&1 \
+            | grep -vE '^curl:')
+        # ⚠️ Require the success line rather than treating quiet as clean. This script has reported
+        # "compiles clean" having compiled nothing once already, and an empty result from a run that
+        # died before reading a line looks identical to a pass.
+        if echo "$OUT" | grep -q '^compiles clean'; then
+            echo "   ok    the whole module compiles against the real platform classes"
+        else
+            echo "$OUT" | tail -12 | sed 's/^/   /'
+            FAIL=1
+        fi
+    fi
+fi
+
 echo
 [ "$FAIL" = 0 ] && echo "gates clean — CI is still the compile gate" || echo "REVIEW THE ABOVE"
 exit "$FAIL"

@@ -67,8 +67,16 @@ class SpaceWeatherRepository(
         lon: Double? = null,
         heavy: Boolean = true,
     ): Fetched<SpaceWeather> {
+        // ⚠️ Locale.US, like every other cache key in this package. A bare `"%.0f".format(v)` takes
+        // the DEVICE locale, so the same coordinate spells itself differently depending on what
+        // language the phone is set to — a comma decimal separator here, Arabic-Indic digits there.
+        // Nothing breaks loudly: the key is hashed to a filename, so it stays stable while the
+        // locale does. It stops being stable the moment somebody changes the phone's language, and
+        // every entry written before then is orphaned rather than superseded.
         val key = if (lat != null && lon != null)
-            "space_weather_${"%.0f".format(lat)}_${"%.0f".format(lon)}" else "space_weather"
+            "space_weather_${String.format(java.util.Locale.US, "%.0f", lat)}" +
+                "_${String.format(java.util.Locale.US, "%.0f", lon)}"
+        else "space_weather"
         if (!force) {
             cache.read(key, ttl, SpaceWeather.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)
