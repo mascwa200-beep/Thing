@@ -2,6 +2,7 @@ package dev.mascwa.pulse.crash
 
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import android.util.Base64
 import dev.mascwa.pulse.core.util.SecretScrub
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +150,19 @@ class CrashUploader(
                 append("_No fault has been recorded on this device. This report is the context only._\n\n")
             }
             append("## What was happening just now\n\n```\n").append(Breadcrumbs.render(now)).append("```\n\n")
-            append("## Logcat — this process only, last lines\n\n```\n").append(readOwnLogcat()).append("\n```\n")
+            // ⚠️ **Filtered rather than tailed, and the heading no longer claims something untrue.**
+            // This used to append the raw last 400 records under "this process only". Counted over
+            // the three reports actually sent from two phones: 254 lines, of which 149 were
+            // `VRI[MainActivity]`, `ImeTracker` and `InsetsController` keyboard-and-window chatter,
+            // and NOT ONE came from this application's own code. The heading was false as well —
+            // one report carried lines from five different pids, because logcat's ring buffer
+            // outlives a process and `-t 400` reaches back through earlier launches.
+            append("## Logcat\n\n")
+            val log = readOwnLogcat()
+            append(
+                if (log == null) "_The log buffer could not be read on this device._\n"
+                else LogcatFilter.report(log, Process.myPid(), MAX_LOGCAT_CHARS),
+            )
         }
         return SecretScrub.scrub(raw, secrets().filter { it.length >= 8 })
     }
@@ -162,19 +175,28 @@ class CrashUploader(
      * still goes through the scrubber, and it is a large part of why the auto-send switch is visible
      * rather than assumed.
      */
-    private fun readOwnLogcat(): String = runCatching {
+    private fun readOwnLogcat(): String? = runCatching {
         val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "threadtime", "-t", "400"))
         val out = proc.inputStream.bufferedReader().use { it.readText() }
         runCatching { proc.destroy() }
-        if (out.length > MAX_LOGCAT_CHARS) out.takeLast(MAX_LOGCAT_CHARS) else out.ifBlank { "(no logcat captured)" }
-    }.getOrDefault("(logcat unavailable on this device)")
+        // ⚠️ Returned WHOLE and unbounded, unlike before: the budget belongs to [LogcatFilter],
+        // which is choosing what to keep. Tailing here first would throw away the warnings and
+        // errors from earlier launches that are the most useful thing in the dump — and `-t 400`
+        // already bounds this to 400 records.
+        out
+    }.getOrNull()
 
     private suspend fun upload(kind: String, body: String): Result = runCatching {
         // ⚠️ Create the branch on first use, and only then. Asking for its head is one cheap request;
         // creating it unconditionally would fail on every later report with a 422 that reads like a
         // real error.
         if (headSha(BRANCH) == null) {
-            val main = headSha("main") ?: return@runCatching Result.Failed("could not read main")
+            // ⚠️ Reachable now only when `main` genuinely does not exist, which is why the sentence
+            // can say so. Before [headSha] told a 404 from a refusal, every rejected token and every
+            // rate limit arrived here as the same null and printed this line — a message about the
+            // repository's branches for a problem with the credential.
+            val main = headSha("main")
+                ?: return@runCatching Result.Failed("the repository has no main branch to start the report branch from")
             createBranch(BRANCH, main)
         }
         val path = "reports/$stream/${System.currentTimeMillis()}-$kind.md"
@@ -182,10 +204,23 @@ class CrashUploader(
         Result.Ok(path) as Result
     }.getOrElse { Result.Failed(it.message ?: "upload failed") }
 
-    private suspend fun headSha(branch: String): String? = runCatching {
-        JSONObject(request("GET", "$API/git/ref/heads/$branch", null))
-            .getJSONObject("object").getString("sha")
-    }.getOrNull()
+    /**
+     * The branch's head, or null when the branch does not exist yet.
+     *
+     * ⚠️ **Only a 404 becomes null.** This used to be `runCatching { … }.getOrNull()`, which swallowed
+     * every failure alike — so a rejected token, a rate limit and a genuinely absent branch all
+     * arrived at the caller as the same nothing, and the caller printed "could not read main". Every
+     * sentence [explain] writes for a 401, a 429 or a 503 was therefore unreachable from the one
+     * path that reaches GitHub first. A 404 on a GET is the ordinary first-ever-report answer and is
+     * the whole reason this returns null at all; anything else is a real failure and must travel.
+     */
+    private suspend fun headSha(branch: String): String? =
+        try {
+            JSONObject(request("GET", "$API/git/ref/heads/$branch", null))
+                .getJSONObject("object").getString("sha")
+        } catch (e: GitHubError) {
+            if (e.code == 404) null else throw e
+        }
 
     private suspend fun createBranch(name: String, fromSha: String) {
         request(
@@ -210,6 +245,15 @@ class CrashUploader(
     }
 
     /**
+     * What GitHub said, carried rather than flattened.
+     *
+     * ⚠️ The code travels beside the sentence because [headSha] has to tell an absent branch from a
+     * refused request, and an `IOException` carrying only text cannot answer that without matching on
+     * the message — which is how a sentence becomes load-bearing and then gets reworded.
+     */
+    private class GitHubError(val code: Int, message: String) : IOException(message)
+
+    /**
      * Turn a refusal into the sentence somebody can act on.
      *
      * ⚠️ **The case this exists for is a token that can read and not write**, because that is the
@@ -219,9 +263,9 @@ class CrashUploader(
      * failing unexplained.
      *
      * ⚠️ **Only for the write methods.** A 404 on the GET of `git/ref/heads/debug-reports` is the
-     * ordinary first-ever-report case — the branch does not exist yet, [headSha] swallows it to null
-     * and [upload] then creates it — so mapping that one onto a permissions sentence would report a
-     * successful first upload as a broken token.
+     * ordinary first-ever-report case — the branch does not exist yet, [headSha] answers null for
+     * that one code alone and [upload] then creates it — so mapping it onto a permissions sentence
+     * would report a successful first upload as a broken token.
      *
      * ⚠️ 404 is grouped with 403 deliberately and hedged rather than asserted: GitHub answers 404
      * rather than 403 when a credential cannot see a private repository at all, precisely so that an
@@ -259,7 +303,7 @@ class CrashUploader(
                     // request back in an error, and this request's body is a report that may quote a
                     // credential the scrubber ran over — putting it into an exception would hand it
                     // straight to the next thing that logs the failure.
-                    throw IOException(explain(response.code, method))
+                    throw GitHubError(response.code, explain(response.code, method))
                 }
                 text
             }

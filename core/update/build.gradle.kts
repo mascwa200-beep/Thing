@@ -40,4 +40,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+
+    // ⚠️ This module had NO test dependency and no tests, so its update policy and its whole
+    // crash-report path were gated by nothing at all. `LogcatFilter` is deliberately free of Android
+    // imports for exactly this reason: the decision about what to keep out of a dump is testable on
+    // the JVM, and the real dumps off the real phones can be handed straight to it.
+    testImplementation(libs.junit)
 }

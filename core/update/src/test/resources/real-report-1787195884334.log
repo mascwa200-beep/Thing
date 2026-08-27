@@ -1,0 +1,58 @@
+--------- beginning of system
+08-19 20:50:56.753 24811 24811 D InsetsController: hide(ime())
+08-19 20:50:56.753 24811 24811 I ImeTracker: dev.mascwa.pulse.debug:e33e7439: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 20:51:07.895 24811 24811 D InsetsController: hide(ime())
+08-19 20:51:07.895 24811 24811 I ImeTracker: dev.mascwa.pulse.debug:beea2fb3: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 20:51:24.488 24811 24811 D InsetsController: hide(ime())
+08-19 20:51:24.488 24811 24811 I ImeTracker: dev.mascwa.pulse.debug:2f3d9917: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 20:51:44.876  5178  5261 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+08-19 20:51:46.886  5178  5178 D InsetsController: hide(ime())
+08-19 20:51:46.886  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:d77b9717: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 20:52:02.281  5178  5178 E VibratorInfo: Invalid frequency profile received from HAL. resonantFrequencyHz=NaN, frequenciesHz=null, outputAccelerationsGs=null
+08-19 20:55:33.405  5178  5178 D InsetsController: show(ime())
+08-19 20:55:33.406  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:a99fe69f: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false userId 0 displayId 0
+08-19 20:55:33.407  5178  5178 D InsetsController: Setting requestedVisibleTypes to 511 (was 503)
+08-19 20:55:33.420  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:77b4898b: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false userId 0 displayId 0
+08-19 20:55:33.420  5178  5178 D InsetsController: show(ime())
+08-19 20:55:33.420  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:77b4898b: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES
+08-19 20:55:33.845  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:54f9051: onShown
+08-19 20:56:00.661  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:43f415df: onRequestUser at ORIGIN_CLIENT reason CONTROL_WINDOW_INSETS_ANIMATION fromUser false userId 0 displayId 0
+08-19 20:56:00.661  5178  5178 D InsetsController: Setting requestedVisibleTypes to 503 (was 511)
+08-19 20:56:00.672  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:43f415df: onDispatched
+08-19 20:56:00.690  5178  5178 I ImeTracker: system_server:fe077474: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+08-19 20:56:00.989  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:43f415df: onUserFinished hidden
+08-19 20:56:44.630  5178  5178 D InsetsController: hide(ime())
+08-19 20:56:44.630  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:dd557d22: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_BY_INSETS_API fromUser false userId 0 displayId 0
+08-19 20:56:44.630  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:dd557d22: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 21:02:10.833  5178  5178 D InsetsController: hide(ime())
+08-19 21:02:10.833  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:a9592454: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-19 21:05:24.946  5178  5178 D InsetsController: show(ime())
+08-19 21:05:24.946  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:2834e3d9: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false userId 0 displayId 0
+08-19 21:05:24.946  5178  5178 D InsetsController: Setting requestedVisibleTypes to 511 (was 503)
+08-19 21:05:24.954  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:c369435f: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false userId 0 displayId 0
+08-19 21:05:24.955  5178  5178 D InsetsController: show(ime())
+08-19 21:05:24.955  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:c369435f: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES
+08-19 21:05:25.340  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:2834e3d9: onShown
+08-19 21:05:33.879  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:d330ec88: onRequestUser at ORIGIN_CLIENT reason CONTROL_WINDOW_INSETS_ANIMATION fromUser false userId 0 displayId 0
+08-19 21:05:33.879  5178  5178 D InsetsController: Setting requestedVisibleTypes to 503 (was 511)
+08-19 21:05:33.892  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:d330ec88: onDispatched
+08-19 21:05:33.912  5178  5178 I ImeTracker: system_server:9eca49b9: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+08-19 21:05:34.193  5178  5178 I ImeTracker: dev.mascwa.pulse.debug:d330ec88: onUserFinished hidden
+--------- beginning of crash
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: FATAL EXCEPTION: main
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: Process: dev.mascwa.pulse.debug, PID: 5178
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: java.lang.IllegalArgumentException: Key "search" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: 	at T0.A$c.A(SourceFile:160)
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: 	at androidx.compose.foundation.gestures.i$a.invoke(SourceFile:26)
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: 	at androidx.compose.foundation.gestures.e$a.invokeSuspend(SourceFile:58)
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:397)
+08-19 21:05:39.169  5178  5178 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9569)
+08-19 21:17:25.003  7549  7549 I DisplayManager: Implicitly registering for refresh rate
+--------- beginning of main
+08-19 23:08:08.057  7549  7622 D getCurrentLocation (GLocationService.kt:48): kotlin.Unit [ ]
+08-19 23:14:26.088  7549  7549 D WM-SystemJobService: onStartJob for WorkGenerationalId(workSpecId=57589fa2, generation=178)
+08-19 23:14:26.103  7549  7549 D WM-WorkerWrapper: Starting work for dev.mascwa.pulse.notifications.RefreshWorker
+08-19 23:14:33.919  7549  7549 I Surface : Creating surface for consumer unnamed-7549-3 with slotExpansion=1 for 64 slots
+08-19 23:14:33.919  7549  7549 W RenderThread: type=1400 audit(0.0:22374): avc:  denied  { read } for  name="uevent" dev="sysfs" ino=32840 scontext=u:r:untrusted_app_34:s0:c205,c256,c512,c768 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0 app=dev.mascwa.pulse.debug
+08-19 23:14:37.442  7549  8525 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=57589fa2, tags={ dev.mascwa.pulse.notifications.RefreshWorker,pulse_periodic_refresh } ]
+08-19 23:18:03.360  7549  7549 D CompatChangeReporter: Compat change id reported: 309578419; UID 10205; state: ENABLED

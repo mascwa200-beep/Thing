@@ -290,7 +290,11 @@ jobs:
           # and a JVM module has no build variants — so the Android task name simply does not exist
           # there any more. Getting this wrong does not fail loudly: gradle would report an unknown
           # task, and 1,322 core tests would stop being a gate.
-          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :core:health:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
+          # ⚠️ `:core:update` was absent from this line and had no tests at all, so its update
+          # policy and its crash-report path were gated by nothing. It is an Android library,
+          # so `testDebugUnitTest` is the right task name here — see the warning above about
+          # getting that wrong quietly.
+          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :core:health:testDebugUnitTest :core:update:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       # ─────────────────────────── the offline food database ───────────────────────────
       # ~4.5M retail barcodes, so a scan works in a supermarket basement with no signal. Built

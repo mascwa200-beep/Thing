@@ -2,22 +2,24 @@ package dev.mascwa.pulse.data.diagnostics
 
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.core.device.DeviceGate
 import dev.mascwa.pulse.core.device.GrapheneOs
 import dev.mascwa.pulse.core.util.SecretScrub
 import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.pulse.crash.CrashReporter
+import dev.mascwa.pulse.crash.LogcatFilter
 import dev.mascwa.pulse.data.selfcode.GitHubRepo
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.settings.allSecretValues
 import dev.mascwa.pulse.data.usage.UsageRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Pushes scrubbed debug/diagnostic reports to a dedicated `debug-reports` branch in the repo so they can
@@ -118,18 +120,35 @@ class DebugUploader(
                 append(TS.format(Date(it.epochMs))).append("  ").append(it.category).append("  ").append(it.label).append('\n')
             }
             append("```\n\n")
-            append("## Logcat — this process, last lines\n\n```\n").append(readOwnLogcat()).append("\n```\n")
+            // ⚠️ **Filtered rather than tailed, and the heading no longer claims something untrue.**
+            // Counted over the three reports actually sent from two phones, the raw tail was 254
+            // lines of which 149 were keyboard-and-window chatter and NOT ONE came from this
+            // application's own code; and "this process" was false, because logcat's ring buffer
+            // outlives a process and one report carried five different pids. See `LogcatFilter`.
+            append("## Logcat\n\n")
+            val log = readOwnLogcat()
+            append(
+                if (log == null) "_The log buffer could not be read on this device._\n"
+                else LogcatFilter.report(log, Process.myPid()),
+            )
         }
         return SecretScrub.scrub(raw, liveSecrets())
     }
 
-    /** Reads THIS app's own recent logcat (non-privileged apps are restricted to their own process). */
-    private fun readOwnLogcat(): String = runCatching {
+    /**
+     * Reads THIS app's own recent logcat (non-privileged apps are restricted to their own UID).
+     *
+     * ⚠️ Returned WHOLE, and null only when it genuinely could not be read. The budget and the
+     * choosing belong to [LogcatFilter]; tailing here first would throw away the warnings and errors
+     * from an earlier launch, which is the one thing in the dump that can explain a crash the fault
+     * handler did not survive to record.
+     */
+    private fun readOwnLogcat(): String? = runCatching {
         val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "threadtime", "-t", "500"))
         val out = proc.inputStream.bufferedReader().use { it.readText() }
         runCatching { proc.destroy() }
-        if (out.length > 40_000) out.takeLast(40_000) else out.ifBlank { "(no logcat captured)" }
-    }.getOrDefault("(logcat unavailable on this device)")
+        out
+    }.getOrNull()
 
     private suspend fun upload(kind: String, bundle: String): Result = runCatching {
         // Ensure the debug-reports branch exists (create from main on first use).
