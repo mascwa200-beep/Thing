@@ -36,6 +36,7 @@ import dev.mascwa.pulse.data.health.HealthDays
 import dev.mascwa.pulse.data.health.ProgressPhotoStore
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.data.food.FoodLookup
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -345,6 +346,13 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * snaps forward, but only when nobody chose the day being shown: yanking somebody out of Tuesday
      * because they happened to reopen the tab after midnight would be a worse bug than the one being
      * fixed, and far more confusing, because the log would look like it had lost their entries.
+     *
+     * ⚠️ **[refresh] only snaps forward when something calls it, and for a long time nothing did.**
+     * The standalone application builds this view model with `by viewModels`, so `init` ran once per
+     * process and the day it decided on was the day every meal was filed under until the process
+     * died — which on a phone left on a counter is days. Both applications now call [refresh] on
+     * every foreground, and [watchForMidnight] covers the screen somebody is actually looking at.
+     * Anything that hosts this view model owes it that call.
      */
     private var pinnedDay = false
 
@@ -361,6 +369,39 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             c.progressPhotoStore.load()
             reloadEntries()
             recompute.value++
+        }
+    }
+
+    /**
+     * Roll onto the new day the moment the calendar does.
+     *
+     * ⚠️ **This is the second of two mechanisms, and the weaker one.** Whether a suspended [delay]
+     * fires promptly after a phone has spent the night asleep is a property of the monotonic clock
+     * that no build machine can settle, so the load-bearing half is each application calling
+     * [refresh] when it comes back to the foreground — which asks the calendar outright and cannot
+     * be wrong about it. This timer is what makes the header honest for somebody who is *looking at*
+     * the screen as midnight passes, which the foreground signal by definition cannot cover.
+     *
+     * ⚠️ It rolls only when the calendar day genuinely differs from the one on show, so an early or
+     * spurious wake costs nothing at all, and somebody who deliberately stepped onto another day
+     * ([pinnedDay]) is left where they put themselves.
+     */
+    private fun watchForMidnight() {
+        viewModelScope.launch {
+            while (true) {
+                val now = System.currentTimeMillis()
+                // ⚠️ Asked of the calendar rather than added as 86_400_000, because a local day is
+                // 23 hours the morning the clocks go forward and 25 the morning they go back, and
+                // a fixed stride would put the roll an hour out for the rest of that week.
+                val next = HealthDays.plus(HealthDays.startOf(now, zone), 1, zone)
+                delay((next - now).coerceAtLeast(1_000L))
+                val today = todayStartMs()
+                if (!pinnedDay && today != _today.value) {
+                    _today.value = today
+                    reloadEntries()
+                    recompute.value++
+                }
+            }
         }
     }
 
@@ -2389,6 +2430,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     init {
         refresh()
+        watchForMidnight()
         // ⚠️ The publish happens HERE and not inside `composeHealthReading`, because that function is
         // a read path shared with the `health` assistant tool — a write there would hand down a new
         // set of targets every time the Computer was asked a question.

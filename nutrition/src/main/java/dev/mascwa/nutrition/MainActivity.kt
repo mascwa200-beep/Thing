@@ -104,9 +104,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * ⚠️ **[HealthViewModel.refresh] on every foreground, and the day is why.** The view model is
+     * held `by viewModels`, so its `init` runs once per PROCESS — and a phone left on a kitchen
+     * counter keeps this process alive for days. Without this call the day it settled on at
+     * construction stays the day every meal is filed under, so breakfast lands on yesterday under a
+     * header that says "Today", and the expenditure window then reads a day with two breakfasts
+     * beside a day with none. The view model refuses to move somebody who deliberately stepped onto
+     * another day, so this cannot yank a reader out of Tuesday.
+     */
     override fun onStart() {
         super.onStart()
         Breadcrumbs.drop("app", "foregrounded")
+        vm.refresh()
         maybeAutoUpdate()
     }
 

@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
@@ -60,11 +62,17 @@ fun HealthScreen(vm: HealthViewModel) {
     val idx by vm.tabIndex.collectAsStateWithLifecycle()
     val tab = HealthTab.entries[idx.coerceIn(0, HealthTab.entries.lastIndex)]
 
-    // ⚠️ On every entry, not once. The view model outlives the composition — this app's panel
-    // transitions take a tab's composable out of composition when you leave it — so `LaunchedEffect(Unit)`
-    // genuinely re-runs on return, which is what carries the log across midnight and picks up a
-    // weigh-in recorded from somewhere else since.
-    LaunchedEffect(Unit) { vm.refresh() }
+    // ⚠️ On every entry AND on every foreground, which are not the same thing and the difference is
+    // the one that matters. `LaunchedEffect(Unit)` re-runs on return because this app's panel
+    // transitions take a tab's composable out of composition when you leave it — but backgrounding
+    // the app while it is ON this tab retains the composition, so it does NOT re-run, and the
+    // commonest way to be here after midnight is exactly that. The comment this replaces claimed the
+    // effect carried the log across midnight; it carried it only across a tab change.
+    //
+    // ON_START is a strict superset: `LifecycleRegistry.addObserver` walks `upFrom(state)` and
+    // dispatches to bring a new observer up to the current state, so registering while already
+    // STARTED replays ON_START immediately — which is the cold-entry case the old effect covered.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.refresh() }
 
     PulseScaffold(title = "Health") { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
