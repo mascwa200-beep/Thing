@@ -9451,3 +9451,108 @@ on the Pixel, in order: describe a meal and check the readback before pressing L
 unmatched name says so rather than vanishing; mark a day a fast and confirm it says so on Today
 rather than reading "nothing logged"; and read the new line under WHAT YOU BURN — if you are losing
 weight it should now tell you the resting rate has been discounted, and by how much.
+
+### FOUR THINGS THAT WERE RIGHT AND HAD NO CALLER (this session, PR #464 cont.)
+
+The MacroFactor plan is complete, so this arc was **found by hunting** — a sweep of the shared view
+model's 103 public functions and 70 exposed values for anything only one application reaches, then
+the same question asked of the crash layer. **Zero subagent and zero workflow spend**, per the
+standing plan-usage constraint, which overrides the ultracode reminder as it has for every arc since.
+
+⚠️ **Three of the four are one shape — the mechanism is correct and nothing calls it — and two had a
+false claim standing in front of them, which is exactly why they survived.** That combination is
+this project's most durable defect class and the sweep for it is worth repeating whenever a plan
+finishes: a slice that ships machinery and forgets the wiring passes CI, reads as done in the commit
+log, and leaves a KDoc asserting the behaviour actually works.
+
+- **`88e925d` — a phone left on the counter files tomorrow's breakfast under today.** `_today` is
+  re-derived only by `refresh()`, and the standalone app calls it once, from `init`, with the view
+  model held `by viewModels` — so once per PROCESS, and a process survives being backgrounded for
+  days. Every meal then lands on yesterday under a header saying "Today", and `Expenditure` reads a
+  day carrying two breakfasts beside a day carrying none, which is the input the calorie target is
+  derived from. `pinnedDay`'s own KDoc says it "exists for midnight". LCARS was half-covered and its
+  comment overstated that too: `LaunchedEffect(Unit)` re-runs on a tab change but **not** on
+  background-and-return, which is the commonest way to be there after midnight.
+  ⚠️ Both apps now call `refresh()` on every foreground — the load-bearing half, because it asks the
+  calendar outright. LCARS moves to `LifecycleEventEffect(ON_START)`, a strict superset of the effect
+  it replaces: `LifecycleRegistry.addObserver` walks `upFrom(state)` and dispatches, so registering
+  while already STARTED replays ON_START and the cold-entry case still fires. **Read out of the
+  shipped lifecycle-runtime 2.8.7 bytecode rather than recalled.**
+  ⚠️ `watchForMidnight()` covers the screen somebody is looking at as midnight passes, and is
+  documented as the weaker half on purpose: whether a suspended `delay` fires promptly after a night
+  of deep sleep is a monotonic-clock property no build machine can settle. Its next-midnight comes
+  from the calendar, never `+ 86_400_000` — a local day is 23 hours one morning a year and 25 another.
+
+- **`85bf418` — the one token the app asks for cannot send the reports it promises.** The standalone
+  app has one credential; the only place asking for it said *"use a token that can do nothing but
+  read releases"*, and pushing to `debug-reports` is a write. Updates work, every report 403s, and
+  the failure read `GitHub 403 on PUT` — the symptom and nothing else, from the one part of the app
+  built to turn a symptom into a cause. The note also contradicted itself, asking for "repo scope"
+  (read AND write on a classic token) one sentence before saying read-only.
+  ⚠️ **It bites the careful reader hardest**: a classic `repo` token carries write and works by
+  accident; a fine-grained Contents:Read token — exactly what that sentence describes — is the one
+  that breaks. Both cards now say what each half needs; `CrashUploader.explain` turns the refusal
+  into a sentence.
+  ⚠️ `explain` maps 403/404 **only for the write methods**. A 404 on the GET of
+  `git/ref/heads/debug-reports` is the ordinary first-ever-report case — the branch does not exist
+  yet, `headSha` swallows it to null and `upload` creates it — so mapping that one would report a
+  perfectly successful first upload as a broken token. Verified by extracting the shipped function
+  by brace-matching and **running it over twelve real (code, method) pairs**, not by reading it.
+
+- **`e037894` — twenty-five silent writes on the one path where nothing could say so.** Both apps
+  flush from `onStop` with bare `runCatching { }` and the result discarded — six in the standalone
+  app, nineteen in LCARS. What is buffered there is the half of these apps that cannot be refetched:
+  the food log, weigh-ins, recipes, training, and on the LCARS side the assistant's memory and
+  profile, the diary, the study deck, the Oracle's learning and the security audit. A failed write
+  loses it at the exact moment no screen exists, and in the standalone app `onStop` may then commit
+  an update that tears the process down. **This was the plan's own X3 half-landed**: `reportNonFatal`
+  shipped with a rate limit and a screen and then had exactly ONE call site.
+  ⚠️ `inline` on the helper is load-bearing, not style — `flushNow()` is suspend and the helper is
+  not, so the lambda reaches a coroutine body only by being inlined into the suspend caller.
+  Negative-tested: dropping `inline` fails with *"suspension functions can only be called within
+  coroutine body"*.
+
+- **`4dfc44a` — a fault report arrives with the fault and no account of what led to it.**
+  `Breadcrumbs` shipped with the crash layer and reached almost nothing: five crumbs, all in the
+  standalone app, all lifecycle and navigation, so the best a report could say was which tab was
+  open. **LCARS was worse — it drops no crumbs AND its bundle never rendered the section**, so the
+  whole mechanism was invisible from the application with the most going on. Fifteen action crumbs
+  at the shared view model's write and network chokepoints, plus the section and lifecycle crumbs
+  on the LCARS side.
+  ⚠️ **A lambda on `HealthDeps`, not a dependency** — the ring lives in `:core:update` beside the
+  crash reporter and the health module has no business depending on the updater to say what was
+  being done a moment ago. Defaulted to a no-op, so adding it changed no existing construction.
+  ⚠️ **The content rule travels with the parameter and is honoured at all fifteen: a category and an
+  action, never a subject.** Checked by listing each crumb against its enclosing function with `awk`,
+  not by reading down the file — every value is a literal.
+
+**Negative results, recorded so nobody re-chases them.** All 40 exposed view-model flows are read by
+both applications. `FoodLookup` already separates Found / NoNutrition / NotInDatabase / Unreachable,
+each with its own sentence, so the conflation this class usually produces is not there.
+`FoodDatabase.open` is already reported, from the container — the right shape, since the shared
+modules cannot depend on the crash package. `HealthConnectBridge` and `NutritionUpdates` put their
+failures on screen where somebody is looking. X5's application class and manifest are correct in both
+apps, and both install the reporter first thing. `HealthSettings` carries **no** credential — the
+token lives under its own preference key and never enters the widely-collected settings object.
+`HealthSettingsStore.updateToken` as a Flow has no consumer (every caller takes the one-shot
+`currentUpdateToken()`), which is a dead API with no false claim on screen: recorded, not churned.
+
+⚠️ **THE RESOLVE GATE'S CASCADE, PROVEN TWICE RATHER THAN SHRUGGED AT.** Its classpath is
+`:core:telemetry` + `:core:feeds` + stdlib and **no androidx and no `:core:update` at all**, so every
+symbol from those is unresolved and only NEWLY-ADDED ones survive the differencing. Both reports this
+arc were settled by planting a symbol that unquestionably compiles in CI and watching it report
+identically — `DisposableEffect` for the androidx case, `CrashReporter` (used two lines above in the
+same file) for the `:core:update` one. **That plant-a-known-good-symbol control is the cheap way to
+tell a cascade from a defect; do it rather than reasoning about it.**
+
+⚠️ **Operational notes.** `get_check_runs` on the PR returns `total_count: 0` while the head's run is
+still QUEUED — that is not evidence the workflow did not fire; `actions_list` on the workflow file
+shows the run. `list_workflow_runs` still blows the tool's token limit, so save the result and parse
+it with python. And ⚠️ **hold pushes while a run is packaging**: `cancel-in-progress` means a new push
+cancels the publish to `latest`, so the fixes would compile green and never reach the phone.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a clock, it cannot wait for midnight or fill a disk.**
+The everyday one is checkable now: a weigh-in or measurement recorded **yesterday evening** should
+read "Yesterday" this morning, not "Today". Then, if you want fault reports reaching me, the token
+needs write access to contents — the diagnostics card says so now, and a refusal names the cause
+rather than printing a status code.
