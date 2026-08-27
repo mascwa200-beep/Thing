@@ -126,9 +126,10 @@ class FoodRepository(
         val mine = custom.search(query)
         val seed = searchSeed(query)
         // ⚠️ The bundled products come LAST of the three local sources, and that ordering is
-        // deliberate. It is a name-prefix scan with no ranking behind it — the seed and your own
-        // foods are scored by `FoodSearch` — so putting 4.4 million packaged rows above them would
-        // bury a lab analysis of "Egg, whole, raw" under every product whose name starts "Egg".
+        // deliberate. It is a name-prefix scan ranked only by name length — the seed and your own
+        // foods are scored by `FoodSearch`, which needs whole words and so cannot rank a fragment —
+        // so putting 4.4 million packaged rows above them would bury a lab analysis of "Egg, whole,
+        // raw" under every product whose name starts "Egg".
         val bundled = offline?.searchByName(query).orEmpty()
         val seen = (mine + seed).mapTo(HashSet()) { it.id }
         val local = mine + seed + bundled.filterNot { it.id in seen }

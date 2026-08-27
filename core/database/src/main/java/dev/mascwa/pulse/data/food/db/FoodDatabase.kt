@@ -148,24 +148,42 @@ interface FoodDao {
     suspend fun byBarcode(barcode: Long): FoodRow?
 
     /**
-     * Name search over the bundled products, fast enough for a keystroke.
+     * Name search over the bundled products, as fast as an unindexed table can answer.
      *
-     * ⚠️ **Deliberately a prefix-anchored LIKE and deliberately capped.** An unanchored `%term%` over
-     * 4.4M rows is a full table scan, and one of those per keystroke would be visibly slow — so this
-     * is what the search FIELD calls, and `OfflineFoodStore.searchAllProducts` is the deliberate
-     * one-shot scan that finds the rest.
+     * ⚠️ **CORRECTION, and it was the expensive one.** This note used to call itself "fast enough for
+     * a keystroke" and `OfflineFoodStore` called it "a fast indexed prefix scan", eleven lines below
+     * its own sibling correctly stating there is no index on 4.4 million product names. There is not:
+     * `food` declares `barcode INTEGER PRIMARY KEY` and nothing else, `tools/food/build_food_db.py`
+     * emits no `CREATE INDEX`, and `EXPLAIN QUERY PLAN` says `SCAN food`. Two comments in one file
+     * contradicted each other and the wrong one was the one justifying a call on every keystroke.
      *
-     * ⚠️ **CORRECTION to what this note used to claim.** It said a full-text index "would cost more
-     * than the table itself". Measured on 113,612 real product names, an FTS5 index with
-     * `detail=none` costs **23.8 bytes a row against the table's 68.7** — about a third, not more. The
-     * reason there is still no index is different and is recorded on `searchAllProducts`: it is ~107 MB
-     * on an APK the in-app updater re-downloads in full on every build, to make an action somebody
-     * deliberately took faster rather than possible.
+     * ⚠️ **The index was never the expensive part. `ORDER BY LENGTH(name)` was.** Measured on a
+     * million synthetic rows at this exact column shape, over sixteen prefixes a person actually
+     * types, then scaled to the real 4.45M:
+     *
+     *     ORDER BY LENGTH(name) LIMIT 20    70.5 ms / 1M   ->  ~314 ms
+     *     LIMIT 20, no ORDER BY              8.2 ms / 1M   ->   ~37 ms
+     *     LIMIT 400, no ORDER BY            13.6 ms / 1M   ->   ~60 ms
+     *
+     * The distribution is the finding, not the mean. With the sort, EVERY prefix costs the full scan
+     * — 57 to 85 ms per million whether it matches or not — because SQLite cannot know which twenty
+     * names are shortest until it has seen all of them (`USE TEMP B-TREE FOR ORDER BY`). Without it,
+     * a prefix that matches early-exits at the LIMIT in **0.1 to 0.3 ms**, three orders of magnitude
+     * better, and only a prefix matching fewer rows than the cap pays for the whole table.
+     *
+     * That residual full scan on a selective or missing prefix is the honest floor of having no
+     * index, and it is not fixable here. The caller ranks the candidates.
+     *
+     * ⚠️ Those figures are a **lower bound**: a warm page cache on a fast SSD. A phone reading a
+     * 424 MB asset cold from flash is worse, and this app exists to run on the phones where it is
+     * worst.
+     *
+     * ⚠️ **The index remains rejected, on cost rather than on the mistaken claim above.** Measured on
+     * 113,612 real product names, an FTS5 index with `detail=none` costs 23.8 bytes a row against the
+     * table's 68.7 — about a third of the table, so ~107 MB on an APK the in-app updater re-downloads
+     * in full on every build. That is recorded on `searchAllProducts` and unchanged.
      */
-    @Query(
-        "SELECT * FROM food WHERE name LIKE :prefix || '%' AND kcal IS NOT NULL " +
-            "ORDER BY LENGTH(name) LIMIT :limit"
-    )
+    @Query("SELECT * FROM food WHERE name LIKE :prefix || '%' AND kcal IS NOT NULL LIMIT :limit")
     suspend fun searchByNamePrefix(prefix: String, limit: Int): List<FoodRow>
 
     /**

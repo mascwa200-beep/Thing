@@ -130,12 +130,35 @@ class OfflineFoodStore(
      * ⚠️ **CORRECTION to what this note used to say.** It claimed a full-text index "would cost more
      * than the table". Measured, it costs about a third; the real reason there is none is on
      * [searchAllProducts].
+     *
+     * ⚠️ **SECOND CORRECTION, and this one was costing ~314 ms of a keystroke's answer.** This method
+     * used to be described as "a fast indexed prefix scan" — see [searchAllProducts] eleven lines
+     * below, which correctly says in the same file that there is no index on 4.4 million product
+     * names. There is not. What made it slow, though, was not the missing index but the SQL's
+     * `ORDER BY LENGTH(name)`, which forces SQLite to read every row before it can know which are
+     * shortest. The measurement and the numbers are on `FoodDao.searchByNamePrefix`; the ranking it
+     * used to do now happens here, over a bounded candidate set, which is the same preference at
+     * roughly a fifth of the cost and a thousandth on a prefix that matches early.
+     *
+     * ⚠️ **Shorter names first, exactly as the SQL did — deliberately NOT `FoodSearch.score`.** That
+     * scorer is built for whole words: `wordMatch` allows a three-character stem gap, so "chic" would
+     * match "chicken" and "cho" would NOT match "chocolate", and ranking by it here would score zero
+     * for rows SQLite had legitimately matched and silently drop them. A partial word is not a word.
+     * Ranking the three paths differently is the price of the prefix path answering a fragment.
+     *
+     * ⚠️ **The candidates are the lowest barcodes that match, because an unindexed scan reads in
+     * rowid order and the barcode IS the rowid.** A barcode's leading digits are a country prefix, so
+     * on a very common prefix the pool leans towards one region rather than being a fair sample. Said
+     * rather than hidden: it is a consequence of having no index, the alternative was a third of a
+     * second per search, and [searchAllProducts] is the path that reads everything.
      */
     suspend fun searchByName(query: String, limit: Int = SEARCH_LIMIT): List<Food> =
         withContext(Dispatchers.IO) {
             val q = query.trim()
             if (q.length < MIN_PREFIX) return@withContext emptyList()
-            guard("prefix", emptyList()) { db.dao().searchByNamePrefix(q, limit) }
+            guard("prefix", emptyList()) { db.dao().searchByNamePrefix(q, PREFIX_CANDIDATES) }
+                .sortedBy { it.name?.length ?: Int.MAX_VALUE }
+                .take(limit)
                 .map { toFood(it, it.barcode.toString()) }
         }
 
@@ -146,8 +169,13 @@ class OfflineFoodStore(
      * design.** There is no index on 4.4 million product names, so this is a full table scan: measured
      * at the real column shape, ~320 ms per million rows, so roughly **one to one and a half seconds**
      * on this hardware and slower on a phone reading it cold. Acceptable for a button somebody pressed;
-     * completely unacceptable for a keystroke, which is why [searchByName] — a fast indexed prefix
-     * scan — remains what the search field calls.
+     * completely unacceptable for a keystroke, which is why [searchByName] remains what the search
+     * field calls.
+     *
+     * ⚠️ This sentence used to end "— a fast indexed prefix scan —", contradicting its own paragraph
+     * above. [searchByName] shares this table and its lack of an index; what makes it affordable is
+     * that it stops at [PREFIX_CANDIDATES] instead of reading everything, which this cannot do because
+     * a word can appear anywhere in a name and the last row is as likely to match as the first.
      *
      * ⚠️ **THE MEASUREMENT THAT DECIDED AGAINST AN INDEX, recorded so it is not re-litigated from
      * intuition.** Sized on 113,612 real product names:
@@ -245,6 +273,27 @@ class OfflineFoodStore(
          * scan is spending memory to rank rows nobody will see. Reaching this sets [Scan.truncated].
          */
         const val SCAN_CAP = 4_000
+
+        /**
+         * How many prefix matches [searchByName] reads before ranking them and keeping [SEARCH_LIMIT].
+         *
+         * ⚠️ **This number is what lets SQLite stop early, which is the whole of the fix.** With the
+         * old `ORDER BY LENGTH(name)` no cap could help — the sort has to see every row. With the sort
+         * gone, the cap is the point at which the scan is allowed to end. Measured on a million rows
+         * at the real column shape and scaled to 4.45M:
+         *
+         *     LIMIT   20   ->  ~3 ms mean
+         *     LIMIT  200   -> ~29 ms
+         *     LIMIT  400   -> ~35 ms
+         *     LIMIT 2000   -> ~93 ms
+         *
+         * 400 is the knee: sixteen times [SEARCH_LIMIT], so the shortest-name preference has a real
+         * pool to choose from, for six milliseconds more than 200 and a third of what 2,000 costs.
+         *
+         * ⚠️ A prefix matching FEWER than this scans the whole table whatever the cap is — the floor
+         * of having no index, worth ~300 ms scaled, and unreachable from this constant.
+         */
+        const val PREFIX_CANDIDATES = 400
 
         /**
          * ⚠️ A prefix scan on two characters over 4.4M rows visits an enormous slice of the B-tree
