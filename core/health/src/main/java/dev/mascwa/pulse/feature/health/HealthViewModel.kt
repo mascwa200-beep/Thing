@@ -824,8 +824,14 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         toPlate: Boolean = false,
     ) {
         c.crumb("log", "portion")
-        val entry = entryFor(food, amount, unit, meal) ?: return
         viewModelScope.launch {
+            // ⚠️ Inside the coroutine now, because the food has to be hydrated first — a product
+            // found by NAME arrives with none of its further nutrients and one found by BARCODE
+            // arrives with all of them. See `FoodRepository.withExtras`. Nothing observed the old
+            // synchronous early return: this function has always returned Unit and no caller reads
+            // a result, so a portion whose weight cannot be worked out still does nothing.
+            val entry = entryFor(c.foodRepository.withExtras(food), amount, unit, meal)
+                ?: return@launch
             if (toPlate) c.plateStore.stage(entry) else c.foodLogStore.add(entry)
             _picked.value = null
             _search.value = Search()
@@ -1067,14 +1073,17 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      */
     fun logDescribed(meal: NutritionDay.Meal, toPlate: Boolean = false) {
         val rows = _describe.value.items
-        val entries = rows.mapNotNull { r ->
-            val food = r.food ?: return@mapNotNull null
-            val p = r.item.portion ?: return@mapNotNull null
-            entryFor(food, p.amount, p.unit, meal)
-        }
-        if (entries.isEmpty()) return
         val left = rows.filterNot { it.ready }
         viewModelScope.launch {
+            // Hydrated one row at a time, for the same reason as `logPortion` — see
+            // `FoodRepository.withExtras`. Each is one indexed lookup on a composite primary key,
+            // and a described meal is a handful of rows somebody has already read through.
+            val entries = rows.mapNotNull { r ->
+                val food = r.food ?: return@mapNotNull null
+                val p = r.item.portion ?: return@mapNotNull null
+                entryFor(c.foodRepository.withExtras(food), p.amount, p.unit, meal)
+            }
+            if (entries.isEmpty()) return@launch
             entries.forEach { if (toPlate) c.plateStore.stage(it) else c.foodLogStore.add(it) }
             _describe.value = DescribeState(items = left)
             if (!toPlate) {
@@ -2002,28 +2011,38 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      */
     fun draftAdd(food: Food, amount: Double, unit: FoodPortion.Unit) {
         val grams = FoodPortion.gramsFor(FoodPortion.Portion(amount, unit), food.sizes) ?: return
-        editDraft {
-            it.copy(
-                components = it.components + Recipes.Component(
-                    foodId = food.id,
-                    name = food.display,
-                    per100g = food.per100g,
-                    grams = grams,
-                    micros = food.microsPer100g,
-                    // ⚠️ Carried, not dropped. Without this a dish built entirely out of foods that
-                    // record magnesium logs no magnesium — the figure is on the ingredient and would
-                    // be discarded at the component, which is the same defect the micronutrient path
-                    // had before it was fixed.
-                    extras = food.extrasPer100g,
-                ),
-            )
+        viewModelScope.launch {
+            // ⚠️ Hydrated first, or the sentence six lines below is only half true. It says the
+            // further nutrients are CARRIED rather than dropped at the component — and they are,
+            // from whatever the food arrived with. An ingredient picked out of a name search
+            // arrived with none, so a dish built entirely from foods that record magnesium still
+            // recorded none: the same defect one layer up from where it was fixed. See
+            // `FoodRepository.withExtras`.
+            val hydrated = c.foodRepository.withExtras(food)
+            editDraft {
+                it.copy(
+                    components = it.components + Recipes.Component(
+                        foodId = hydrated.id,
+                        name = hydrated.display,
+                        per100g = hydrated.per100g,
+                        grams = grams,
+                        micros = hydrated.microsPer100g,
+                        // ⚠️ Carried, not dropped. Without this a dish built entirely out of foods
+                        // that record magnesium logs no magnesium — the figure is on the ingredient
+                        // and would be discarded at the component, which is the same defect the
+                        // micronutrient path had before it was fixed.
+                        extras = hydrated.extrasPer100g,
+                    ),
+                )
+            }
+            _picked.value = null
+            _search.value = Search()
+            // If this add answered an imported line, that line is dealt with. Read AFTER the add
+            // rather than before it, because `gramsFor` above can refuse and return early —
+            // retiring the line first would lose it on exactly the portion the app could not
+            // convert.
+            _recipeImport.value.matching?.let { dropImported(it) }
         }
-        _picked.value = null
-        _search.value = Search()
-        // If this add answered an imported line, that line is dealt with. Read AFTER the add rather
-        // than before it, because `gramsFor` above can refuse and return early — retiring the line
-        // first would lose it on exactly the portion the app could not convert.
-        _recipeImport.value.matching?.let { dropImported(it) }
     }
 
     /**

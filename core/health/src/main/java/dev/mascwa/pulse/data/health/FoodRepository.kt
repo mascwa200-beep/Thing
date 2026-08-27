@@ -147,6 +147,37 @@ class FoodRepository(
     }
 
     /**
+     * The same food, with its further nutrients fetched if it does not already carry them.
+     *
+     * ⚠️ **A product found by NAME arrived with none of them, and a product found by BARCODE arrived
+     * with all of them — the same product, two different records, and only the second one worth
+     * anything.** `OfflineFoodStore.toFood` takes its extras as a defaulted parameter; the barcode
+     * path passes them and both search paths do not, because reading the side table for every one
+     * of twenty-five results is work for rows nobody will log. That was the right call about WHEN,
+     * and it left nothing to do it LATER: `extrasFor` was made public with a comment saying "so a
+     * detail opened from a search result can ask for them", and had no caller anywhere.
+     *
+     * So the figures were fetched at the moment of a scan and silently absent at the moment of a
+     * search, and the record kept whichever it happened to get. This is the later.
+     *
+     * ⚠️ **Called when a food is LOGGED, never while a list is browsed.** `food_extra` has a
+     * composite primary key on `(barcode, nutrient)` and is `WITHOUT ROWID`, so this is one indexed
+     * lookup rather than a scan — but twenty-five of them per keystroke would still be work for
+     * results that are mostly read and discarded.
+     *
+     * Unchanged, and cheaply so, when the food already has them (a recipe component, a saved food,
+     * an Open Food Facts hit), when there is no bundled database, or when the product has none —
+     * which is roughly two in three, so an empty answer is the ordinary one and not a failure.
+     */
+    suspend fun withExtras(food: Food): Food {
+        if (food.extras.isNotEmpty()) return food
+        val store = offline ?: return food
+        val fetched = store.extrasFor(food.id).values
+        if (fetched.isEmpty()) return food
+        return food.copy(extras = fetched.mapKeys { (n, _) -> n.name })
+    }
+
+    /**
      * Every bundled product whose name holds all of [query]'s words — the deliberate full scan.
      *
      * ⚠️ Kept as its own method rather than folded into [search], because it is not the same kind of
