@@ -304,6 +304,7 @@ private fun MacroTile(
  * difference is load-bearing: this app measures expenditure from what you log, so a day somebody
  * eats over and then does not log is a hole in the window that degrades the estimate for four weeks.
  */
+@Composable
 private fun overColor(
     eaten: Double,
     target: Double,
@@ -1357,6 +1358,7 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
 // ==================================================================================== COACH
 
 /** The plan: where you are going, how fast, and what the app has actually measured about you. */
+
 @Composable
 fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val c = Pulse.colors

@@ -67,6 +67,20 @@ else
     FAIL=1
 fi
 
+# ---- 1b. a function that reads a composition local must be @Composable ---------------------------
+# ⚠️ Nothing else here can catch this: the message comes from the COMPOSE COMPILER PLUGIN, which the
+# parse gate does not run, the resolve gate cannot see (it differences unresolved NAMES) and
+# `android_compile_check.sh` does not load. A shipped `overColor` that read `Pulse.colors` without the
+# annotation passed every gate below and failed CI on `:app:compileDebugKotlin`.
+echo
+echo "== composition-local gate =="
+if echo "$CHANGED" | xargs -r python3 tools/compose_local_check.py > /tmp/composecheck.txt 2>&1; then
+  echo "   ok    every changed function that reads a composition local is @Composable"
+else
+  echo "   NOT @Composable — this is the exact shape that fails :app:compileDebugKotlin:"
+  sed 's/^/   /' /tmp/composecheck.txt
+fi
+
 # ---- 2. parse only: braces and syntax, in seconds ------------------------------------------------
 # ⚠️ Says NOTHING about whether a name resolves. Two CI failures have gone straight past it.
 echo
