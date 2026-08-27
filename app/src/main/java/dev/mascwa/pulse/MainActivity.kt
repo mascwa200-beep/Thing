@@ -381,31 +381,59 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * One store's write, and a record of it when it does not happen.
+     *
+     * ⚠️ **This is the worst place in the app for a swallowed failure and it swallowed nineteen.**
+     * These calls were bare `runCatching { }` with the result discarded, on the one path where no
+     * screen exists to say anything — the app is already going away, and what is buffered here is
+     * the health record, the assistant's memory and profile, the diary, the study deck and the
+     * Oracle's learning, none of which can be fetched again from anywhere. A failed write loses it
+     * silently and the next launch simply has less in it than the last one did.
+     *
+     * ⚠️ Still never throws, so one failing store cannot stop the eighteen behind it from writing —
+     * and `reportNonFatal` does not throw either, its own `write` being wrapped whole, which matters
+     * because the likeliest cause of a failed flush is a disk with nothing left on it.
+     *
+     * ⚠️ The tag carries the store name and nothing variable, so the per-tag rate limit gives one
+     * report per store per process rather than one every time the app is backgrounded.
+     */
+    private inline fun flush(name: String, write: () -> Unit) {
+        runCatching(write).onFailure { failure ->
+            app.container.crashReporter.reportNonFatal(
+                "flush.$name",
+                failure,
+                note = "The $name store could not be written to disk. Anything recorded since the " +
+                    "last successful write is lost.",
+            )
+        }
+    }
+
     override fun onStop() {
         app.container.appForeground.value = false
         runCatching { hud?.stop() }
         hud = null
         // Best-effort: persist any buffered on-device learning before the process may be reclaimed.
         lifecycleScope.launch {
-            runCatching { app.container.usageRepository.flushNow() }
-            runCatching { app.container.cerebellumStore.flushNow() }
-            runCatching { app.container.procedureStore.flushNow() }
-            runCatching { app.container.profileStore.flushNow() }
-            runCatching { app.container.taskStore.flushNow() }
-            runCatching { app.container.memoryStream.flushNow() }
-            runCatching { app.container.diaryStore.flushNow() }
-            runCatching { app.container.interestStore.flushNow() }
-            runCatching { app.container.findingStore.flushNow() }
-            runCatching { app.container.securityAuditStore.flushNow() }
-            runCatching { app.container.oracleLearningStore.flushNow() }
-            runCatching { app.container.sensoriumStore.flushNow() }
-            runCatching { app.container.studyStore.flushNow() }
-            runCatching { app.container.bodyStore.flushNow() }
-            runCatching { app.container.foodLogStore.flushNow() }
-            runCatching { app.container.recipeStore.flushNow() }
-            runCatching { app.container.trainingStore.flushNow() }
-            runCatching { app.container.customFoodStore.flushNow() }
-            runCatching { app.container.plateStore.flushNow() }
+            flush("usageRepository") { app.container.usageRepository.flushNow() }
+            flush("cerebellumStore") { app.container.cerebellumStore.flushNow() }
+            flush("procedureStore") { app.container.procedureStore.flushNow() }
+            flush("profileStore") { app.container.profileStore.flushNow() }
+            flush("taskStore") { app.container.taskStore.flushNow() }
+            flush("memoryStream") { app.container.memoryStream.flushNow() }
+            flush("diaryStore") { app.container.diaryStore.flushNow() }
+            flush("interestStore") { app.container.interestStore.flushNow() }
+            flush("findingStore") { app.container.findingStore.flushNow() }
+            flush("securityAuditStore") { app.container.securityAuditStore.flushNow() }
+            flush("oracleLearningStore") { app.container.oracleLearningStore.flushNow() }
+            flush("sensoriumStore") { app.container.sensoriumStore.flushNow() }
+            flush("studyStore") { app.container.studyStore.flushNow() }
+            flush("bodyStore") { app.container.bodyStore.flushNow() }
+            flush("foodLogStore") { app.container.foodLogStore.flushNow() }
+            flush("recipeStore") { app.container.recipeStore.flushNow() }
+            flush("trainingStore") { app.container.trainingStore.flushNow() }
+            flush("customFoodStore") { app.container.customFoodStore.flushNow() }
+            flush("plateStore") { app.container.plateStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

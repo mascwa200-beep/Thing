@@ -178,12 +178,44 @@ class NutritionContainer(context: Context) {
      * initialised are asked, which is why this checks rather than simply calling.
      */
     suspend fun flushAll() {
-        if (lazyBody.isInitialized()) runCatching { bodyStore.flushNow() }
-        if (lazyFoodLog.isInitialized()) runCatching { foodLogStore.flushNow() }
-        if (lazyCustomFood.isInitialized()) runCatching { customFoodStore.flushNow() }
-        if (lazyRecipe.isInitialized()) runCatching { recipeStore.flushNow() }
-        if (lazyPlate.isInitialized()) runCatching { plateStore.flushNow() }
-        if (lazyTraining.isInitialized()) runCatching { trainingStore.flushNow() }
+        flush("body", lazyBody) { bodyStore.flushNow() }
+        flush("foodlog", lazyFoodLog) { foodLogStore.flushNow() }
+        flush("customfood", lazyCustomFood) { customFoodStore.flushNow() }
+        flush("recipe", lazyRecipe) { recipeStore.flushNow() }
+        flush("plate", lazyPlate) { plateStore.flushNow() }
+        flush("training", lazyTraining) { trainingStore.flushNow() }
+    }
+
+    /**
+     * One store's write, and a record of it when it does not happen.
+     *
+     * ⚠️ **This is the worst place in the app for a swallowed failure and it swallowed six.** These
+     * calls used to be bare `runCatching { }` with the result discarded, and the call site is
+     * `onStop` — so a write that fails takes the day's logging with it at the one moment when no
+     * screen exists to say so, and the very next thing `onStop` may do is commit an update that
+     * tears the process down and the in-memory copy with it. Nothing crashes; the entries are
+     * simply not there in the morning, with no evidence anywhere of what happened. This record is
+     * the only thing that could ever explain it.
+     *
+     * ⚠️ Still never throws. A failing flush must not stop the five stores behind it from writing,
+     * and `reportNonFatal` is documented never to throw either — its own `write` is wrapped whole,
+     * which matters because the likeliest cause of a failed flush is a disk that cannot take
+     * another byte, and that would fail this write too.
+     *
+     * ⚠️ The tag carries the store name and nothing variable, so the per-tag rate limit means one
+     * report per store per process rather than one per backgrounding. A store that fails every time
+     * says so once; six failing stores are six distinct reports rather than one ambiguous line.
+     */
+    private inline fun flush(name: String, lazy: Lazy<*>, write: () -> Unit) {
+        if (!lazy.isInitialized()) return
+        runCatching(write).onFailure { failure ->
+            crashReporter.reportNonFatal(
+                "flush.$name",
+                failure,
+                note = "The $name store could not be written to disk. Anything recorded since the " +
+                    "last successful write is lost.",
+            )
+        }
     }
     val healthConnect: HealthConnectBridge by lazy { HealthConnectBridge(appContext) }
 
