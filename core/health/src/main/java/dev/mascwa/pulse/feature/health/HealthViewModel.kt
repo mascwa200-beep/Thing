@@ -155,6 +155,18 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         val person: Body.Person? = null,
         val trend: BodyTrend.Trend = BodyTrend.Trend.TooLittle(0, ""),
         val formula: Expenditure.Estimate.Known? = null,
+        /**
+         * The resting rate the equations produced, WHOLE — the number, which equation gave it, and
+         * any dieting discount applied.
+         *
+         * ⚠️ **Only `kcal` used to survive the composition**, and everything [BmrEquations] kept so
+         * a surface could explain the figure was discarded one line after it was made: the equation
+         * label ("so a surface can say, not imply"), [BmrEquations.describe], and the adaptation
+         * factor — which takes up to 8% OFF the resting rate and therefore off the calories somebody
+         * eats to. A number lowered by an invisible factor is exactly what this app documents as
+         * needing to be said out loud.
+         */
+        val resting: BmrEquations.Estimate? = null,
         val measured: Expenditure.Estimate? = null,
         val expenditure: Expenditure.Estimate.Known? = null,
         /** How much of [expenditure] is measured rather than guessed, 0..1. Worth showing while it climbs. */
@@ -2539,6 +2551,7 @@ suspend fun composeHealthReading(
         person = person,
         trend = trend,
         formula = formula,
+        resting = resting,
         // ⚠️ The WIDENED measurement, not the raw one, so the interval on screen is the same
         // interval the blend weighted by. Showing a tighter figure than the arithmetic used would
         // be two statements of one number that disagree — the defect class this app keeps finding.

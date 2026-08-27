@@ -26,6 +26,7 @@ import dev.mascwa.nutrition.ui.EnergyChart
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
+import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.CheckIn
@@ -168,6 +169,29 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
         // figure from four days is not the same as the same figure from four weeks.
         StatRow("Measured", "${round(state.measuredShare * 100)}%")
         StatRow("Days logged", "${state.loggedDaysInWindow} of ${p.expenditureWindowDays}")
+
+        // ⚠️ **Where the unmeasured half comes from**, and shown whether or not anything has been
+        // measured yet — on the first day the whole figure IS the formula, so that is when saying so
+        // matters most. `BmrEquations` kept the equation label and the dieting discount precisely
+        // "so a surface can say, not imply", and both were computed and thrown away a line later
+        // until this read them. The discount takes up to 8% off the resting rate, and therefore off
+        // the calories this screen tells somebody to eat.
+        //
+        // ⚠️ Hoisted to locals before the null tests: `State` is declared in `:core:health`, and
+        // Kotlin will not smart-cast a public property across a module boundary.
+        val resting = state.resting
+        val formula = state.formula
+        if (resting != null) {
+            if (formula != null) {
+                StatRow("Formula alone", "${round(formula.kcal)} kcal a day")
+                StatRow("Resting", "${round(resting.kcal)} kcal a day")
+            }
+            Text(
+                BmrEquations.describe(resting),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         // ⚠️ Beside the figure it qualifies rather than in the steps card above, for the reason that
         // card gives about the step shift: a measured number that lags with no explanation reads as a

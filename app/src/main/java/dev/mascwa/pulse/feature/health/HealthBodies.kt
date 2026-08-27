@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
@@ -1920,6 +1921,32 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             "${(state.measuredShare * 100).roundToInt()}% of that is measured from your own " +
                                 "record; the rest is still the formula. It moves on its own as the measurement " +
                                 "tightens — there is no switch.",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                        )
+                    }
+                    // ⚠️ **Where the formula half comes from**, and shown whether or not anything
+                    // has been measured yet — on the first day the whole figure IS the formula, so
+                    // that is when saying so matters most. `BmrEquations` kept the equation label
+                    // and the adaptation factor precisely "so a surface can say, not imply"; both
+                    // were computed and discarded a line later until this read them.
+                    //
+                    // ⚠️ Hoisted to locals before the null tests. `State` is declared in
+                    // `:core:health`, and Kotlin will not smart-cast a public property across a
+                    // module boundary.
+                    val restingNow = state.resting
+                    val formulaNow = state.formula
+                    if (restingNow != null) {
+                        Text(
+                            buildString {
+                                if (formulaNow != null) {
+                                    append("The formula on its own says ")
+                                    append(formulaNow.kcal.roundToInt())
+                                    append(" kcal a day, from a resting ")
+                                    append(restingNow.kcal.roundToInt())
+                                    append(". ")
+                                }
+                                append(BmrEquations.describe(restingNow))
+                            },
                             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
                         )
                     }
