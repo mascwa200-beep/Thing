@@ -83,6 +83,44 @@ class NutritionApplication : Application(), ImageLoaderFactory {
         .memoryCache { MemoryCache.Builder(this).maxSizePercent(THUMBNAIL_HEAP_SHARE).build() }
         .diskCache(null)
         .build()
+        .also { loader = it }
+
+    /**
+     * The loader Coil actually built, or null if it never asked for one.
+     *
+     * ⚠️ **Held here so [onTrimMemory] can clear a cache that EXISTS without creating one that does
+     * not.** `Coil.imageLoader(context)` builds on demand, so reaching for it under memory pressure
+     * would allocate a fresh memory cache in response to being told memory is short — precisely
+     * backwards. Somebody who has never opened the photographs screen has no loader and should be
+     * left with none.
+     */
+    @Volatile
+    private var loader: ImageLoader? = null
+
+    /**
+     * Give the pictures back when the phone needs the room.
+     *
+     * ⚠️ **The whole point of this app is that it runs on a cheap phone, and nothing here released
+     * anything.** `Application` implements `ComponentCallbacks2` already — confirmed against the
+     * platform class rather than recalled — so the callback was arriving and being ignored, and the
+     * thumbnail cache stayed held whatever else the system was trying to do. It is a small cache by
+     * design (six per cent of the heap, ~11 MB on a 4 GB phone), which is the reason to hand it back
+     * rather than a reason not to: a decoded bitmap is the largest single thing this process holds.
+     *
+     * ⚠️ There is deliberately nothing else to drop. The food log keeps at most four months resident
+     * behind its own cap, and the barcode database is read by SQLite through its own page cache,
+     * which Android already trims. Clearing either from here would be re-implementing a bound that
+     * already exists.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        runCatching { loader?.memoryCache?.clear() }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        runCatching { loader?.memoryCache?.clear() }
+    }
 
     private companion object {
         /** See [newImageLoader] — measured against Coil's own 0.20 default and the one call site. */

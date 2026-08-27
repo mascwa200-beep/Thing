@@ -796,7 +796,9 @@ class FoodLogStore(
         // so without this the index's success would overwrite it and [flushNow] would report a clean
         // write over a day that is not on disk. Last, so it wins whatever the index did.
         if (failed.isNotEmpty()) {
-            lastWrite = Result.failure(
+            // ⚠️ The type argument is explicit because it cannot be inferred: `lastWrite` is a
+            // `Result<*>?`, and a star projection gives the compiler nothing to infer `T` from.
+            lastWrite = Result.failure<Unit>(
                 IOException("could not write ${failed.size} month file(s): ${failed.joinToString()}"),
             )
         }

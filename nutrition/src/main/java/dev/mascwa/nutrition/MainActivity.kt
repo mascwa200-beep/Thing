@@ -63,12 +63,25 @@ class MainActivity : ComponentActivity() {
      * pulling it over a mobile connection because somebody opened the app on a train is not a cost
      * to impose silently. When the network cannot be classified the answer is "metered", which is
      * the safe direction — it costs a delayed update, never an unexpected bill.
+     *
+     * ⚠️ **Throttled, because this runs on every foreground and logging a meal is a foreground.**
+     * Somebody who opens this app at breakfast, lunch, a snack and dinner, and again to check a
+     * label in a shop, made a network round trip to GitHub for each of them — for an answer that
+     * cannot have changed in the meantime. The interval matches the LCARS app's, which has had one
+     * since auto-update was written; this is the same rule arriving late rather than a new one.
+     * In memory rather than persisted on purpose: a fresh process SHOULD check, and it is the
+     * repeated open of a live one that is wasteful.
      */
     private fun maybeAutoUpdate() {
         lifecycleScope.launch {
             if (!container.updates.clearPendingIfLanded()) return@launch
             if (container.updates.hasDownload) return@launch
+            val now = System.currentTimeMillis()
+            if (now - lastUpdateCheckMs < UPDATE_CHECK_MIN_INTERVAL_MS) return@launch
             if (!unmetered()) return@launch
+            // ⚠️ Stamped only once the metered check has passed, so a run of opens on mobile data
+            // does not consume the window and leave the first Wi-Fi open silently skipped.
+            lastUpdateCheckMs = now
             val info = container.updates.check() ?: return@launch
             container.updates.download(info)
         }
@@ -132,5 +145,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private var lastUpdateCheckMs = 0L
+
+    private companion object {
+        /** Matches the LCARS app's, so one rule rather than two that can drift. */
+        const val UPDATE_CHECK_MIN_INTERVAL_MS = 15 * 60 * 1000L
     }
 }

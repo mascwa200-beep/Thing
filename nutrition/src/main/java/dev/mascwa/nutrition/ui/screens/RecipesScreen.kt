@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -183,14 +185,53 @@ private fun Saved(vm: HealthViewModel) {
         }
         return
     }
-    recipes.forEach { r -> SavedCard(vm, r) }
+    // ⚠️ **One card is open at a time, and that is a performance decision as much as a design one.**
+    // Every saved recipe used to compose its whole interior at once: a text field, six chips, two
+    // buttons, per-recipe state and a `Recipes.problems` pass — measured and laid out for all of
+    // them whether or not they were on screen, because this screen is one scrolling Column and a
+    // Column composes every child. Twenty recipes is several hundred nodes to do nothing with.
+    //
+    // ⚠️ Deliberately NOT a `LazyColumn`. This screen already scrolls vertically, and a lazy list
+    // nested inside a scroll of the same direction swallows the drag — a mistake this project has
+    // already made and recorded. Collapsing is the change that fits the screen it is on.
+    var openId by rememberSaveable { mutableStateOf<String?>(null) }
+    recipes.forEach { r ->
+        SavedCard(
+            vm = vm,
+            r = r,
+            open = openId == r.id,
+            // Tapping the open one closes it, so there is always a way back to the plain list.
+            onToggle = { openId = if (openId == r.id) null else r.id },
+        )
+    }
 }
 
 @Composable
-private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe) {
-    var meal by remember(r.id) { mutableStateOf(NutritionDay.Meal.DINNER) }
+private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onToggle: () -> Unit) {
     val servingG = Recipes.servingGrams(r)
     val total = Recipes.yieldGrams(r)
+
+    if (!open) {
+        // The closed row: a name, what it is, and enough of a number to recognise it by. Nothing
+        // here allocates state or measures a control.
+        Card(Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(r.name.ifBlank { "Untitled" }, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    buildList {
+                        add(if (Recipes.isMeal(r)) "A meal" else "A recipe")
+                        add("${r.components.size} " + if (Recipes.isMeal(r)) "foods" else "ingredients")
+                        if (total > 0.0) add("${round(total)} g")
+                    }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
+
+    var meal by remember(r.id) { mutableStateOf(NutritionDay.Meal.DINNER) }
 
     // ⚠️ Meals have no serving arithmetic — `servingGrams` is about a dish divided into portions —
     // so a meal is scaled by a MULTIPLIER and a recipe by an AMOUNT. Two different questions asked
@@ -204,7 +245,13 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe) {
     }
     var byServings by remember(r.id) { mutableStateOf(true) }
 
-    SectionCard(r.name.ifBlank { "Untitled" }, subtitle = if (Recipes.isMeal(r)) "A meal" else "A recipe") {
+    SectionCard(
+        r.name.ifBlank { "Untitled" },
+        // ⚠️ Tapping the header is the way OUT. Without it the only route back to a short list is
+        // to open a different recipe, which is a list you can never fully close.
+        modifier = Modifier.clickable(onClick = onToggle),
+        subtitle = if (Recipes.isMeal(r)) "A meal" else "A recipe",
+    ) {
         val per100 = Recipes.per100g(r)
         if (per100 != null && !Recipes.isMeal(r)) {
             StatRow("Per 100 g", "${round(per100.kcal)} kcal")
