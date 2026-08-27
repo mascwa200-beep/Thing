@@ -149,7 +149,24 @@ class NutritionContainer(context: Context) {
                 note = "The bundled barcode database did not open — every scan falls back to the network.",
             )
         }
-        db?.let { OfflineFoodStore(it) }
+        db?.let {
+            OfflineFoodStore(it) { op, t ->
+                // ⚠️ **The other half of the report above, and the half that actually fires on a
+                // cheap phone.** `open` returning null is the asset never having shipped; THIS is
+                // the asset shipping and the unpack failing — Room copies 424 MB out of the APK on
+                // the first query, and the ordinary way that fails is a phone with no room left. It
+                // throws from then on, every scan reported "not in the database", every offline
+                // search returned nothing, and the network path covered for it well enough that
+                // nobody would ever have found out.
+                crashReporter.reportNonFatal(
+                    "food.db.$op",
+                    t,
+                    note = "The bundled barcode database could not answer a '$op' query. Scanning " +
+                        "and offline search fall back to the network until this is fixed; the usual " +
+                        "cause is no room left on the phone to unpack the database.",
+                )
+            }
+        }
     }
 
     private val lazyBody = lazy { BodyStore(appContext, json) }

@@ -441,7 +441,22 @@ class AppContainer(private val appContext: Context) {
      */
     val offlineFoodStore: dev.mascwa.pulse.data.health.OfflineFoodStore? by lazy {
         dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
-            ?.let { dev.mascwa.pulse.data.health.OfflineFoodStore(it) }
+            ?.let {
+                dev.mascwa.pulse.data.health.OfflineFoodStore(it) { op, t ->
+                    // ⚠️ A query that THREW is not a query that found nothing, and until now both
+                    // arrived on screen as "not in the database". The unpack above is where this
+                    // fails in practice — a phone with no room left throws on the first query and
+                    // every one after it — so without this the offline half is dead for good with
+                    // the network path quietly covering for it.
+                    crashReporter.reportNonFatal(
+                        "food.db.$op",
+                        t,
+                        note = "The bundled barcode database could not answer a '$op' query. Every " +
+                            "scan and offline search falls back to the network until this is fixed; " +
+                            "the usual cause is no room left to unpack the database.",
+                    )
+                }
+            }
     }
 
     /**

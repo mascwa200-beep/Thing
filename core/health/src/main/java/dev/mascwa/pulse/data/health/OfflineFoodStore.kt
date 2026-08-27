@@ -25,7 +25,53 @@ import kotlinx.coroutines.withContext
  * the multiplications below are their only inverse; a second copy of them anywhere would be a second
  * chance to divide somebody's sodium by ten.
  */
-class OfflineFoodStore(private val db: FoodDatabase) {
+class OfflineFoodStore(
+    private val db: FoodDatabase,
+
+    /**
+     * Told when the database could not answer, with the operation's name and what threw.
+     *
+     * ⚠️ **A lambda rather than a dependency on the crash reporter, for the reason `HealthDeps` gives
+     * for its own four.** That class lives in `:core:update` and this module has no business
+     * depending on the updater to say a query failed. Each application passes its own.
+     *
+     * ⚠️ **Defaulted to nothing so adding it changed no construction** — but both applications DO
+     * pass one, because a silent version of this is the defect being fixed rather than a fallback.
+     */
+    private val onFailure: (String, Throwable) -> Unit = { _, _ -> },
+) {
+
+    /**
+     * Run one query, and SAY SO when it cannot run.
+     *
+     * ⚠️ **This exists because every path in this file used to answer a broken database and an empty
+     * one identically, and on a cheap phone the broken case is the likely one.** The bundled asset is
+     * unpacked by Room on the FIRST query — 424 MB of it — and the ordinary way that fails is a
+     * phone with no room left. It throws out of the DAO call, `runCatching{}.getOrNull()` turned it
+     * into null, and from there every scan reported "not in the database", every offline search
+     * returned nothing, and the app fell back to the network — so with a connection it half-worked
+     * and nobody ever learned the offline half was dead. Permanently, and with nothing anywhere
+     * saying why.
+     *
+     * ⚠️ `CancellationException` is RETHROWN. A search is cancelled on every keystroke by design, and
+     * a helper that swallowed it would both report a fault that is not one and break the structured
+     * concurrency of the caller. This is the one thing `runCatching` gets wrong and the reason this
+     * is not simply `runCatching`.
+     *
+     * ⚠️ Still never throws anything else: a database that will not open must not take the network
+     * path down with it. The report is what makes the failure visible — `CrashReporter.reportNonFatal`
+     * is rate-limited to one per tag per process (a repeat is a single set lookup), so calling this
+     * on every keystroke costs nothing and reports once.
+     */
+    private inline fun <T> guard(op: String, fallback: T, block: () -> T): T =
+        try {
+            block()
+        } catch (cancel: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancel
+        } catch (t: Throwable) {
+            onFailure(op, t)
+            fallback
+        }
 
     /**
      * The product with this barcode, or null if the bundle has never heard of it.
@@ -38,7 +84,7 @@ class OfflineFoodStore(private val db: FoodDatabase) {
      */
     suspend fun byBarcode(barcode: String): Food? = withContext(Dispatchers.IO) {
         val key = BarcodeScan.normalize(barcode) ?: return@withContext null
-        val row = runCatching { db.dao().byBarcode(key) }.getOrNull() ?: return@withContext null
+        val row = guard("barcode", null) { db.dao().byBarcode(key) } ?: return@withContext null
         // ⚠️ The further nutrients are a SECOND read, and only on this path. A scan is one product
         // and the person is about to look at it; a search is twenty rows nobody will read a
         // magnesium figure off, and doing this per row would be a query per result per keystroke.
@@ -58,7 +104,7 @@ class OfflineFoodStore(private val db: FoodDatabase) {
     }
 
     private suspend fun extras(key: Long): NutrientSet.Amounts {
-        val rows = runCatching { db.dao().extrasFor(key) }.getOrDefault(emptyList())
+        val rows = guard("extras", emptyList()) { db.dao().extrasFor(key) }
         if (rows.isEmpty()) return NutrientSet.Amounts()
         val m = LinkedHashMap<NutrientSet.Nutrient, Double>(rows.size)
         for (r in rows) {
@@ -89,8 +135,7 @@ class OfflineFoodStore(private val db: FoodDatabase) {
         withContext(Dispatchers.IO) {
             val q = query.trim()
             if (q.length < MIN_PREFIX) return@withContext emptyList()
-            runCatching { db.dao().searchByNamePrefix(q, limit) }
-                .getOrDefault(emptyList())
+            guard("prefix", emptyList()) { db.dao().searchByNamePrefix(q, limit) }
                 .map { toFood(it, it.barcode.toString()) }
         }
 
@@ -131,14 +176,14 @@ class OfflineFoodStore(private val db: FoodDatabase) {
         withContext(Dispatchers.IO) {
             val terms = FoodSearch.tokens(query)
             if (terms.isEmpty()) return@withContext Scan(emptyList(), false)
-            val hits = runCatching {
+            val hits = guard("scan", null) {
                 db.dao().searchByNameWords(
                     SimpleSQLiteQuery(
                         "SELECT * FROM food WHERE kcal IS NOT NULL AND name IS NOT NULL " +
                             "AND ${sqlFor(terms)} LIMIT $SCAN_CAP",
                     ),
                 )
-            }.getOrNull() ?: return@withContext Scan(emptyList(), false)
+            } ?: return@withContext Scan(emptyList(), false)
 
             val scored = hits.mapNotNull { row ->
                 val name = row.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -180,12 +225,12 @@ class OfflineFoodStore(private val db: FoodDatabase) {
 
     /** How many products are bundled, for the attribution line. Null if the database will not answer. */
     suspend fun count(): Int? = withContext(Dispatchers.IO) {
-        runCatching { db.dao().count() }.getOrNull()
+        guard("count", null) { db.dao().count() }
     }
 
     /** A value from the database's own `meta` table — the build date, the source, the licence. */
     suspend fun meta(key: String): String? = withContext(Dispatchers.IO) {
-        runCatching { db.dao().meta(key) }.getOrNull()
+        guard("meta", null) { db.dao().meta(key) }
     }
 
     private companion object {
