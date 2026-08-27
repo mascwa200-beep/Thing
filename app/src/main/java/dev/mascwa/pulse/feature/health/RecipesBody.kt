@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.RecipeImport
@@ -302,7 +303,7 @@ private fun LogAHelping(vm: HealthViewModel, r: Recipes.Recipe) {
     var byServings by remember(r.id) { mutableStateOf(true) }
     var amount by remember(r.id) { mutableStateOf("1") }
     var meal by remember(r.id) { mutableStateOf(NutritionDay.Meal.DINNER) }
-    val n = amount.trim().toDoubleOrNull()
+    val n = Decimals.parse(amount)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -523,7 +524,7 @@ private fun YieldField(d: Recipes.Recipe, vm: HealthViewModel) {
             text,
             {
                 text = it
-                vm.draftYield(it.trim().toDoubleOrNull())
+                vm.draftYield(Decimals.parse(it))
             },
             placeholder = "Cooked weight in grams — leave blank if you did not weigh it",
         )
@@ -619,7 +620,7 @@ private fun HowMuchWentIn(food: Food, vm: HealthViewModel, meal: Boolean, seedGr
             },
         )
     }
-    val n = amount.trim().toDoubleOrNull()
+    val n = Decimals.parse(amount)
     val grams = n?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

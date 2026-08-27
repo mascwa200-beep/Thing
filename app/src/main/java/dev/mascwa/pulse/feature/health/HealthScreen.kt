@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.feature.common.LcarsButton
@@ -114,11 +115,11 @@ private fun HealthSetup(vm: HealthViewModel, state: HealthViewModel.State) {
     var year by remember(p.birthYear) { mutableStateOf(if (p.birthYear > 0) p.birthYear.toString() else "") }
     var weight by remember { mutableStateOf("") }
 
-    val heightOk = height.toDoubleOrNull()?.let { it in Body.MIN_HEIGHT_CM..Body.MAX_HEIGHT_CM } == true
+    val heightOk = Decimals.parse(height)?.let { it in Body.MIN_HEIGHT_CM..Body.MAX_HEIGHT_CM } == true
     val thisYear = LocalDate.now().year
     val yearOk = year.toIntOrNull()?.let { thisYear - it in Body.MIN_AGE_YEARS..Body.MAX_AGE_YEARS } == true
     val haveWeighin = state.latest != null
-    val weightOk = haveWeighin || weight.toDoubleOrNull()?.let { it in Body.MIN_KG..Body.MAX_KG } == true
+    val weightOk = haveWeighin || Decimals.parse(weight)?.let { it in Body.MIN_KG..Body.MAX_KG } == true
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(13.dp)) {
         item {
@@ -185,7 +186,7 @@ private fun HealthSetup(vm: HealthViewModel, state: HealthViewModel.State) {
                 SetupField(
                     label = "WEIGH IN NOW — KILOGRAMS",
                     value = weight,
-                    onChange = { weight = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                    onChange = { weight = Decimals.keep(it, 6) },
                     ok = weightOk,
                     why = "The trend starts here. One reading is enough to begin.",
                 )
@@ -197,9 +198,9 @@ private fun HealthSetup(vm: HealthViewModel, state: HealthViewModel.State) {
                     text = "START",
                     enabled = heightOk && yearOk && weightOk,
                     onClick = {
-                        height.toDoubleOrNull()?.let(vm::setHeightCm)
+                        Decimals.parse(height)?.let(vm::setHeightCm)
                         year.toIntOrNull()?.let(vm::setBirthYear)
-                        weight.toDoubleOrNull()?.takeIf { !haveWeighin }?.let(vm::recordWeighin)
+                        Decimals.parse(weight)?.takeIf { !haveWeighin }?.let(vm::recordWeighin)
                         vm.setConfigured(true)
                     },
                 )

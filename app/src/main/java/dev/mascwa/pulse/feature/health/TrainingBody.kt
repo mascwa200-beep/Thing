@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.Training
 import dev.mascwa.pulse.data.health.TrainingStore
 import dev.mascwa.pulse.feature.common.LcarsButton
@@ -230,14 +231,14 @@ private fun SetLine(
             NumberCell(
                 "KG",
                 set.loadKg?.let { trimKg(it) }.orEmpty(),
-                { onChange(set.copy(loadKg = it.toDoubleOrNull())) },
+                { onChange(set.copy(loadKg = Decimals.parse(it))) },
                 Modifier.weight(1.2f),
             )
         }
         NumberCell(
             "RPE",
             set.rpe?.let { trimKg(it) }.orEmpty(),
-            { onChange(set.copy(rpe = it.toDoubleOrNull())) },
+            { onChange(set.copy(rpe = Decimals.parse(it))) },
             Modifier.weight(1f),
         )
     }

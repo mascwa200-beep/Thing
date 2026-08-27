@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Micronutrients
 import dev.mascwa.pulse.core.telemetry.NutrientSet
@@ -68,8 +69,8 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
     // ⚠️ Keyed by the picker's own prefixed key, so one map carries both enums. See [LabelNutrients].
     val typed = remember { mutableStateMapOf<String, String>() }
 
-    val gramsValue = grams.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
-    val kcalValue = kcal.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+    val gramsValue = Decimals.parse(grams)?.takeIf { it.isFinite() && it > 0.0 }
+    val kcalValue = Decimals.parse(kcal)?.takeIf { it.isFinite() && it >= 0.0 }
 
     SectionCard("Type it in", subtitle = "What is printed on the packet, for the portion you ate.") {
         OutlinedTextField(
@@ -129,9 +130,9 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 vm.quickAdd(
                     name = name,
                     kcal = kcalValue ?: 0.0,
-                    proteinG = protein.toDoubleOrNull() ?: 0.0,
-                    fatG = fat.toDoubleOrNull() ?: 0.0,
-                    carbG = carb.toDoubleOrNull() ?: 0.0,
+                    proteinG = Decimals.parse(protein) ?: 0.0,
+                    fatG = Decimals.parse(fat) ?: 0.0,
+                    carbG = Decimals.parse(carb) ?: 0.0,
                     meal = meal,
                     grams = gramsValue ?: 0.0,
                     // ⚠️ Re-checked rather than trusted: the switch does not clear itself when the
@@ -140,10 +141,10 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
                     // density is sanitised into a food with no numbers at all, which reads as the
                     // app having lost it.
                     keepAsFood = keep && gramsValue != null,
-                    fibreG = fibre.toDoubleOrNull() ?: 0.0,
-                    sugarG = sugar.toDoubleOrNull() ?: 0.0,
-                    satFatG = satFat.toDoubleOrNull() ?: 0.0,
-                    sodiumMg = sodium.toDoubleOrNull() ?: 0.0,
+                    fibreG = Decimals.parse(fibre) ?: 0.0,
+                    sugarG = Decimals.parse(sugar) ?: 0.0,
+                    satFatG = Decimals.parse(satFat) ?: 0.0,
+                    sodiumMg = Decimals.parse(sodium) ?: 0.0,
                     micros = typedMicros(typed),
                     extras = typedExtras(typed),
                     toPlate = building,
@@ -163,9 +164,9 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
             FoodPortion.per100gFrom(
                 NutritionDay.Nutrients(
                     kcal = kcalValue,
-                    proteinG = protein.toDoubleOrNull() ?: 0.0,
-                    fatG = fat.toDoubleOrNull() ?: 0.0,
-                    carbG = carb.toDoubleOrNull() ?: 0.0,
+                    proteinG = Decimals.parse(protein) ?: 0.0,
+                    fatG = Decimals.parse(fat) ?: 0.0,
+                    carbG = Decimals.parse(carb) ?: 0.0,
                 ),
                 gramsValue,
             )
@@ -183,7 +184,7 @@ fun QuickAddCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
 private fun NumberField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier) {
     OutlinedTextField(
         value = value,
-        onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '.' }.take(7)) },
+        onValueChange = { onChange(Decimals.keep(it, 7)) },
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         singleLine = true,
         modifier = modifier,
@@ -235,7 +236,7 @@ private fun typedMicros(typed: Map<String, String>): Micronutrients.Amounts =
     Micronutrients.Amounts(
         LabelNutrients.mapNotNull { n ->
             val m = n.micro ?: return@mapNotNull null
-            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
         }.toMap(),
     )
 
@@ -244,7 +245,7 @@ private fun typedExtras(typed: Map<String, String>): NutrientSet.Amounts =
     NutrientSet.Amounts(
         LabelNutrients.mapNotNull { n ->
             val e = n.extra ?: return@mapNotNull null
-            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
         }.toMap(),
     )
 
@@ -271,7 +272,7 @@ private fun MoreFromTheLabel(typed: androidx.compose.runtime.snapshots.SnapshotS
         ) {
             OutlinedTextField(
                 value = typed[n.key].orEmpty(),
-                onValueChange = { typed[n.key] = it.filter { ch -> ch.isDigit() || ch == '.' }.take(8) },
+                onValueChange = { typed[n.key] = Decimals.keep(it, 8) },
                 label = { Text("${n.label} (${n.unit})", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
@@ -405,9 +406,9 @@ private fun ReadTheLabel(onUse: (NutritionDay.Nutrients, Double) -> Unit) {
     var ate by remember { mutableStateOf("100") }
 
     val reading = NutritionLabel.read(text)
-    val override = weight.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val override = Decimals.parse(weight)?.takeIf { it.isFinite() && it > 0.0 }
     val per100 = reading?.let { NutritionLabel.per100g(it, override) }
-    val ateG = ate.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val ateG = Decimals.parse(ate)?.takeIf { it.isFinite() && it > 0.0 }
 
     AlertDialog(
         onDismissRequest = { open = false },

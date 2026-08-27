@@ -125,6 +125,17 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # ⚠️ And note `:core:health` is on NEITHER path here — not as sources, not as classes — so every
 # member of anything it declares cascades. That is a whole module's worth of false positives, and it
 # is the commonest one this repo hits.
+#
+# ⚠️ **DO NOT PASS A TEST FILE. This is for main sources, and a test file poisons the whole run.**
+# JUnit is not on the classpath, so `Test`, `assertEquals` and `assertTrue` come back unresolved —
+# which is obvious enough — but the damage does not stop there. Adding a file full of unresolved
+# names to the same compilation changes how far the frontend gets before it gives up, and it then
+# reports names in the OTHER files that resolve perfectly well without it. Measured: passing one new
+# test file alongside four main files produced five complaints, one of them `theme`, in a file that
+# had not changed; dropping the test file from the same run reported "no new complaints since HEAD".
+# The tell is a reported name that has nothing to do with what you edited. `tools/check_changed.sh`
+# derives its file list from `git diff`, so a new test WILL be swept in — run the main files alone
+# as a control before believing anything it says.
 
 FEEDS=core/feeds/build/classes/kotlin/main
 OKHTTP=$(find "$GC/com.squareup.okhttp3" -name 'okhttp-*.jar' 2>/dev/null | head -1)

@@ -30,6 +30,7 @@ import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.CheckIn
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import dev.mascwa.pulse.core.telemetry.MacroTargets
@@ -464,7 +465,7 @@ private fun NumberField(label: String, value: Double?, onCommit: (Double) -> Uni
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { f -> if (!f.isFocused) text.trim().toDoubleOrNull()?.let(onCommit) },
+            .onFocusChanged { f -> if (!f.isFocused) Decimals.parse(text)?.let(onCommit) },
     )
 }
 

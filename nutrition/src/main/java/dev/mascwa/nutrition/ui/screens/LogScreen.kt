@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.round
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPhrase
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.MealDraft
@@ -507,7 +508,7 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
 
     OutlinedTextField(
         value = amount,
-        onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' }.take(7) },
+        onValueChange = { amount = Decimals.keep(it, 7) },
         label = { Text("How much") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
@@ -521,7 +522,7 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
 
     // What that portion actually comes to, before it is committed. The same arithmetic the log will
     // use, so the preview cannot disagree with the entry.
-    val n = amount.toDoubleOrNull()
+    val n = Decimals.parse(amount)
     val grams = n?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
     if (grams != null) {
         val eaten = FoodPortion.eaten(food.per100g, grams)

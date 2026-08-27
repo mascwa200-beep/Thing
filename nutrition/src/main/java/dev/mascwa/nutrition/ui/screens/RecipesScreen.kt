@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import dev.mascwa.pulse.core.telemetry.RecipeImport
@@ -227,14 +228,14 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe) {
         if (Recipes.isMeal(r)) {
             OutlinedTextField(
                 value = amount,
-                onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' }.take(5) },
+                onValueChange = { amount = Decimals.keep(it, 5) },
                 label = { Text("How many times over") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
-                onClick = { amount.toDoubleOrNull()?.let { vm.logMeal(r, it, meal) } },
-                enabled = amount.toDoubleOrNull()?.let { it > 0.0 } == true && r.components.isNotEmpty(),
+                onClick = { Decimals.parse(amount)?.let { vm.logMeal(r, it, meal) } },
+                enabled = Decimals.parse(amount)?.let { it > 0.0 } == true && r.components.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Log every food in it") }
         } else {
@@ -257,12 +258,12 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe) {
             }
             OutlinedTextField(
                 value = amount,
-                onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                onValueChange = { amount = Decimals.keep(it, 6) },
                 label = { Text(if (byServings && servingG != null) "How many portions" else "How many grams") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            val n = amount.toDoubleOrNull()
+            val n = Decimals.parse(amount)
             val eaten = n?.let {
                 if (byServings && servingG != null) Recipes.eatenServings(r, it) else Recipes.eatenGrams(r, it)
             }
@@ -321,8 +322,8 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
             OutlinedTextField(
                 value = r.cookedYieldG?.let { round(it) } ?: "",
                 onValueChange = { s ->
-                    val v = s.filter { ch -> ch.isDigit() || ch == '.' }.take(6)
-                    vm.draftYield(v.toDoubleOrNull())
+                    val v = Decimals.keep(s, 6)
+                    vm.draftYield(Decimals.parse(v))
                 },
                 label = { Text("Weight after cooking (g), if you weighed it") },
                 singleLine = true,
@@ -464,7 +465,7 @@ private fun IngredientWeight(vm: HealthViewModel, food: Food, seedGrams: Double?
     Text(food.display, style = MaterialTheme.typography.titleSmall)
     OutlinedTextField(
         value = amount,
-        onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' }.take(7) },
+        onValueChange = { amount = Decimals.keep(it, 7) },
         label = { Text("How much of it") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
@@ -474,7 +475,7 @@ private fun IngredientWeight(vm: HealthViewModel, food: Food, seedGrams: Double?
             FilterChip(selected = unit == u, onClick = { unit = u }, label = { Text(u.label) })
         }
     }
-    val n = amount.toDoubleOrNull()
+    val n = Decimals.parse(amount)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { if (n != null) vm.draftAdd(food, n, unit) },

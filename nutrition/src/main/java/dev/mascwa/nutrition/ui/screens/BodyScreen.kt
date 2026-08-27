@@ -34,6 +34,7 @@ import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.PeriodCompare
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.health.BodyStore
@@ -222,10 +223,10 @@ private fun WeighinEntry(vm: HealthViewModel, unit: BodyTrend.MassUnit) {
                 // ⚠️ Divided back into kilograms before it is stored. Everything downstream is
                 // kilograms and the unit is a display choice; storing whatever the field said would
                 // make a pound reading indistinguishable from a very light day.
-                text.trim().toDoubleOrNull()?.let { vm.recordWeighin(it / unit.perKg) }
+                Decimals.parse(text)?.let { vm.recordWeighin(it / unit.perKg) }
                 text = ""
             },
-            enabled = text.trim().toDoubleOrNull() != null,
+            enabled = Decimals.parse(text) != null,
         ) { Text("Record") }
     }
 }
@@ -253,10 +254,10 @@ private fun MeasurementEntry(vm: HealthViewModel) {
         )
         Button(
             onClick = {
-                text.trim().toDoubleOrNull()?.let { vm.recordMeasurement(kind, it) }
+                Decimals.parse(text)?.let { vm.recordMeasurement(kind, it) }
                 text = ""
             },
-            enabled = text.trim().toDoubleOrNull() != null,
+            enabled = Decimals.parse(text) != null,
         ) { Text("Save") }
     }
 }

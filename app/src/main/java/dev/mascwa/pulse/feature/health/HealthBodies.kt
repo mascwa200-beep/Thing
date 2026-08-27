@@ -54,6 +54,7 @@ import dev.mascwa.pulse.core.telemetry.Body
 import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
 import dev.mascwa.pulse.core.telemetry.DashboardLayout
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
@@ -885,16 +886,16 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         onChange = { key, v -> labelled = labelled + (key to v) },
                         onRemove = { key -> labelled = labelled - key },
                     )
-                    val energy = kcal.toDoubleOrNull()
-                    val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
+                    val energy = Decimals.parse(kcal)
+                    val weight = Decimals.parse(grams)?.takeIf { it > 0.0 }
                     // ⚠️ The numbers above are what was EATEN; the density is what a saved food has to
                     // be. Only the density can be impossible — two thousand calories is an ordinary
                     // day — so the check happens after the conversion and only when a weight exists.
                     val typedEaten = NutritionDay.Nutrients(
                         kcal = energy ?: 0.0,
-                        proteinG = protein.toDoubleOrNull() ?: 0.0,
-                        fatG = fat.toDoubleOrNull() ?: 0.0,
-                        carbG = carb.toDoubleOrNull() ?: 0.0,
+                        proteinG = Decimals.parse(protein) ?: 0.0,
+                        fatG = Decimals.parse(fat) ?: 0.0,
+                        carbG = Decimals.parse(carb) ?: 0.0,
                     )
                     val densityWrong = weight
                         ?.let { FoodPortion.per100gFrom(typedEaten, it) }
@@ -928,19 +929,19 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             vm.quickAdd(
                                 name = name,
                                 kcal = energy ?: 0.0,
-                                proteinG = protein.toDoubleOrNull() ?: 0.0,
-                                fatG = fat.toDoubleOrNull() ?: 0.0,
-                                carbG = carb.toDoubleOrNull() ?: 0.0,
+                                proteinG = Decimals.parse(protein) ?: 0.0,
+                                fatG = Decimals.parse(fat) ?: 0.0,
+                                carbG = Decimals.parse(carb) ?: 0.0,
                                 meal = meal,
                                 grams = weight ?: 0.0,
                                 // ⚠️ `keep` can be true with the weight since cleared — the switch
                                 // does not reset itself when the field is emptied, and a save with no
                                 // weight is exactly what the core refuses. Re-checked at the call.
                                 keepAsFood = keep && weight != null,
-                                fibreG = fibre.toDoubleOrNull() ?: 0.0,
-                                sugarG = sugar.toDoubleOrNull() ?: 0.0,
-                                satFatG = satFat.toDoubleOrNull() ?: 0.0,
-                                sodiumMg = sodium.toDoubleOrNull() ?: 0.0,
+                                fibreG = Decimals.parse(fibre) ?: 0.0,
+                                sugarG = Decimals.parse(sugar) ?: 0.0,
+                                satFatG = Decimals.parse(satFat) ?: 0.0,
+                                sodiumMg = Decimals.parse(sodium) ?: 0.0,
                                 // ⚠️ A field left blank yields no key at all rather than a zero, and
                                 // that falls out of `toDoubleOrNull` rather than being enforced here.
                                 // It is the whole discipline of the sparse layer: a nutrient nobody
@@ -1192,7 +1193,7 @@ private fun typedMicros(typed: Map<String, String>): Micronutrients.Amounts =
     Micronutrients.Amounts(
         LabelNutrients.mapNotNull { n ->
             val m = n.micro ?: return@mapNotNull null
-            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
         }.toMap(),
     )
 
@@ -1201,7 +1202,7 @@ private fun typedExtras(typed: Map<String, String>): NutrientSet.Amounts =
     NutrientSet.Amounts(
         LabelNutrients.mapNotNull { n ->
             val e = n.extra ?: return@mapNotNull null
-            typed[n.key]?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
         }.toMap(),
     )
 
@@ -1244,7 +1245,7 @@ private fun MoreFromTheLabel(
                 Box(Modifier.width(92.dp)) {
                     LcarsField(
                         value = typed[n.key].orEmpty(),
-                        onValueChange = { onChange(n.key, it.filter { ch -> ch.isDigit() || ch == '.' }.take(8)) },
+                        onValueChange = { onChange(n.key, Decimals.keep(it, 8)) },
                         placeholder = "0",
                         showClear = false,
                     )
@@ -1326,7 +1327,7 @@ internal fun NumberCell(label: String, value: String, onChange: (String) -> Unit
         Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
         LcarsField(
             value = value,
-            onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '.' }.take(6)) },
+            onValueChange = { onChange(Decimals.keep(it, 6)) },
             placeholder = "0",
             showClear = false,
         )
@@ -1419,16 +1420,16 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     }
                     LcarsField(
                         value = entry,
-                        onValueChange = { entry = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                        onValueChange = { entry = Decimals.keep(it, 6) },
                         placeholder = "0.0",
                     )
                     LcarsButton(
                         text = "RECORD",
-                        enabled = entry.toDoubleOrNull()?.let { it > 0.0 } == true,
+                        enabled = Decimals.parse(entry)?.let { it > 0.0 } == true,
                         onClick = {
                             // Stored in kilograms always; the unit is a display choice, and converting
                             // at the boundary is what stops a pound ever reaching a core.
-                            entry.toDoubleOrNull()?.let { vm.recordWeighin(it / unit.perKg) }
+                            Decimals.parse(entry)?.let { vm.recordWeighin(it / unit.perKg) }
                             entry = ""
                         },
                     )
@@ -2321,7 +2322,7 @@ private fun GoalField(vm: HealthViewModel, state: HealthViewModel.State) {
     var focused by remember { mutableStateOf(false) }
 
     fun commit() {
-        val typed = text.toDoubleOrNull()
+        val typed = Decimals.parse(text)
         when {
             text.isBlank() -> vm.setGoalKg(0.0)
             typed != null && typed > 0.0 -> vm.setGoalKg(typed / unit.perKg)
@@ -2337,7 +2338,7 @@ private fun GoalField(vm: HealthViewModel, state: HealthViewModel.State) {
             )
             LcarsField(
                 value = text,
-                onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                onValueChange = { text = Decimals.keep(it, 6) },
                 placeholder = "optional",
                 // ⚠️ LcarsField's `modifier` IS the text field's own, so a focus observer here really
                 // sees the field rather than a wrapper around it.
@@ -2693,14 +2694,14 @@ private fun Measurements(vm: HealthViewModel) {
             }
             LcarsField(
                 value = cm,
-                onValueChange = { cm = it.filter { ch -> ch.isDigit() || ch == '.' }.take(5) },
+                onValueChange = { cm = Decimals.keep(it, 5) },
                 placeholder = "centimetres",
             )
             LcarsButton(
                 text = "RECORD ${kind.label.uppercase()}",
-                enabled = cm.toDoubleOrNull()?.let { it > 0.0 } == true,
+                enabled = Decimals.parse(cm)?.let { it > 0.0 } == true,
                 onClick = {
-                    cm.toDoubleOrNull()?.let { vm.recordMeasurement(kind, it) }
+                    Decimals.parse(cm)?.let { vm.recordMeasurement(kind, it) }
                     cm = ""
                 },
             )
@@ -3151,7 +3152,7 @@ private fun PlateRow(
                 value = text,
                 onChange = {
                     text = it
-                    it.toDoubleOrNull()?.let(onGrams)
+                    Decimals.parse(it)?.let(onGrams)
                 },
                 modifier = Modifier.width(GRAMS_W),
             )
@@ -3514,7 +3515,7 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
     var unit by remember(food.id) { mutableStateOf(units.first()) }
     var amount by remember(food.id) { mutableStateOf(if (unit == FoodPortion.Unit.GRAM) "100" else "1") }
 
-    val value = amount.replace(',', '.').toDoubleOrNull()
+    val value = Decimals.parse(amount)
     val grams = value?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
     val eaten = grams?.let { FoodPortion.eaten(food.per100g, it) }
 
@@ -3643,9 +3644,9 @@ private fun ReadTheLabel(onUse: (NutritionDay.Nutrients, Double) -> Unit) {
     if (!open) return
 
     val reading = NutritionLabel.read(text)
-    val override = weight.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val override = Decimals.parse(weight)?.takeIf { it.isFinite() && it > 0.0 }
     val per100 = reading?.let { NutritionLabel.per100g(it, override) }
-    val ateG = ate.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+    val ateG = Decimals.parse(ate)?.takeIf { it.isFinite() && it > 0.0 }
 
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(

@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.Training
 import dev.mascwa.pulse.feature.health.HealthViewModel
 
@@ -221,10 +222,15 @@ private fun NumberBox(
 ) {
     OutlinedTextField(
         value = value,
-        onValueChange = { text ->
-            val cleaned = text.filter { it.isDigit() || it == '.' }
-            onChange(cleaned.toDoubleOrNull())
-        },
+        // ⚠️ **The pre-filter here used to be `isDigit() || it == '.'`, and it was the one input in
+        // either application that turned a fractional number into a wrong one rather than into
+        // nothing.** Deleting a comma closes the gap, so on a keyboard whose decimal key is a comma
+        // `2,5` became the string `25` and a two-and-a-half kilogram plate was recorded as
+        // twenty-five — a value ten times too large, looking exactly like it had worked, feeding the
+        // progression advice from then on. Nothing is stripped now; `Decimals.parse` decides what is
+        // a number, and anything that is not one is null, which is the same refusal every other
+        // field in both apps gives.
+        onValueChange = { text -> onChange(Decimals.parse(text)) },
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
