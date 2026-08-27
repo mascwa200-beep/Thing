@@ -114,8 +114,15 @@ class OpenFoodFactsRepository(
             throw e
         }
 
+        // ⚠️ **An unreadable answer is not "no such food".** This returned an empty page, which the
+        // screen renders as "nothing matched" — so a server sending nonsense looked exactly like a
+        // successful search for something that does not exist, and the reader would go on to type
+        // the name in three more ways. `byBarcode`, fifty lines up in this same file, already tells
+        // those two apart (`FoodLookup.Unreachable("…sent something unreadable")`); this did not.
+        // Thrown rather than returned, matching the network `catch` above, which serves the cache
+        // and then rethrows — so every caller already handles a failure from here.
         val root = runCatching { http.json.parseToJsonElement(body).jsonObject }.getOrNull()
-            ?: return FoodSearchPage(q, emptyList())
+            ?: throw IllegalStateException("Open Food Facts sent something unreadable")
         val hits = (root["hits"] as? kotlinx.serialization.json.JsonArray).orEmpty()
 
         val foods = hits.mapNotNull { hit ->

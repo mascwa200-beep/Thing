@@ -364,7 +364,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 val space = async {
                     widgetSource<String>(Source.SPACE, outcomes) {
-                        c.spaceWeatherRepository.fetch(force = false).data?.kp
+                        c.spaceWeatherRepository.fetch(force = false, heavy = false).data?.kp
                             ?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }
                     }
                 }

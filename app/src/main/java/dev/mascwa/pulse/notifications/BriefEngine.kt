@@ -128,7 +128,7 @@ object BriefEngine {
                 severe = WeatherCode.isSevere(d.weatherCode)
             }
         }
-        val kp = runCatching { container.spaceWeatherRepository.fetch(false).data.kp }.getOrNull()
+        val kp = runCatching { container.spaceWeatherRepository.fetch(false, heavy = false).data.kp }.getOrNull()
 
         // --- Agenda: next calendar event + open tasks + how many reminders are queued. ---
         // upcoming() is a blocking ContentResolver query, not suspend — keep it off the caller's dispatcher.

@@ -47,6 +47,19 @@ class SpaceWeatherRepository(
      * `force = true` purely to read `kp`, and those five products are ~546 KB of the ~596 KB
      * payload — roughly 57 MB a day to obtain one number. A light fetch skips them and carries the
      * previously cached values forward rather than overwriting them with blanks.
+     *
+     * ⚠️ **Defaulting to true means every caller that forgets is a heavy one, and five had.** The
+     * board, the Oracle, the lock widget and both desktop standby paths read nothing but `kp` and
+     * were asking for the whole payload; `force = false` hid it most of the time, because a warm
+     * cache costs nothing — but the moment the TTL had lapsed each of them pulled ~596 KB for one
+     * number, on paths that run unattended. All five pass `heavy = false` now. The default stays
+     * true so a NEW caller gets everything rather than silently missing a panel; the cost of
+     * getting it wrong in that direction is a wasted fetch, and in the other it is a blank screen.
+     *
+     * ⚠️ [heavy] is deliberately NOT part of the cache key. A light fetch writes a COMPLETE record
+     * — the carried-forward values above — so there is one entry to read whichever way it was
+     * filled. Keying on it would double the entries and leave the light callers unable to see
+     * anything the console had already fetched.
      */
     suspend fun fetch(
         force: Boolean,

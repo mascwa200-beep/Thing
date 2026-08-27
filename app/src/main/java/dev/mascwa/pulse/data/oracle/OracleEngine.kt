@@ -92,7 +92,7 @@ object OracleEngine {
                 .mapNotNull { q -> q.changePercent?.let { OracleMover(name = q.label, changePct = it, onWatchlist = true) } }
         }.getOrDefault(emptyList())
 
-        val kp = runCatching { container.spaceWeatherRepository.fetch(force = false).data.kp }.getOrNull()
+        val kp = runCatching { container.spaceWeatherRepository.fetch(force = false, heavy = false).data.kp }.getOrNull()
 
         val emergency = runCatching {
             container.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data
