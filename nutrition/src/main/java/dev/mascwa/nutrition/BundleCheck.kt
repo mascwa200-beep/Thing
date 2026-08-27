@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Build
 import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.data.food.db.FoodDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * What this install actually got, asked of the device rather than assumed.
@@ -41,10 +43,16 @@ data class BundleReport(
     val failure: String?,
 ) {
     companion object {
-        suspend fun read(context: Context): BundleReport {
+        suspend fun read(context: Context): BundleReport = withContext(Dispatchers.IO) {
+            // ⚠️ **On IO, and `FoodDatabase.open` is why.** The DAO calls below are Room `suspend`
+            // functions, which Room dispatches to its own executor — so those were never on the main
+            // thread. `open` is a plain function: it probes the asset (a read from a 118 MB deflated
+            // zip entry) and builds the Room instance, both on whatever thread called it, and every
+            // caller here is a `LaunchedEffect`, which runs on the main one. The comment at that
+            // call site already asserted this must not happen on the main thread; now it does not.
             val nutrients = NutrientSet.Nutrient.entries.size
             val db = FoodDatabase.open(context)
-                ?: return BundleReport(
+                ?: return@withContext BundleReport(
                     present = false,
                     products = null, withNutrition = null, extraFigures = null,
                     extraNutrients = nutrients, builtAt = null, attribution = null,
@@ -52,13 +60,28 @@ data class BundleReport(
                         "injects it, so a locally built copy never has one — everything else works, " +
                         "and a scanned barcode simply will not be recognised.",
                 )
-            return runCatching {
+            return@withContext runCatching {
                 val dao = db.dao()
                 BundleReport(
                     present = true,
-                    products = dao.count(),
+                    // ⚠️ **These two came from COUNT(*) over 4.5 million rows apiece, for numbers the
+                    // builder had already written into the `meta` table.** `build_food_db.py` writes
+                    // `rows` and `extra_rows` beside `with_nutrition`, which the line below was
+                    // already reading — so the table was known to be there and two full table scans
+                    // were run anyway, over a 424 MB database, on a phone this app exists to run on.
+                    // `food_extra` is WITHOUT ROWID, so counting it walks the whole composite B-tree.
+                    //
+                    // ⚠️ Worse than slow: this is the FIRST thing that touches the database, so it is
+                    // what triggers Room's 424 MB unpack — and it fires from a LaunchedEffect on the
+                    // Plan tab, so it ran again on every visit to that tab.
+                    //
+                    // ⚠️ **The scan is kept as a fallback and that is not belt-and-braces.** A
+                    // database built before those keys existed has no `rows` value, and answering
+                    // "not recorded" for a database that is sitting right there would be worse than
+                    // the cost. On every database this build ships, meta answers and nothing scans.
+                    products = dao.meta("rows")?.toIntOrNull() ?: dao.count(),
                     withNutrition = dao.meta("with_nutrition")?.toIntOrNull(),
-                    extraFigures = dao.extraCount(),
+                    extraFigures = dao.meta("extra_rows")?.toIntOrNull() ?: dao.extraCount(),
                     extraNutrients = nutrients,
                     builtAt = dao.meta("built_at"),
                     attribution = dao.meta("attribution"),
