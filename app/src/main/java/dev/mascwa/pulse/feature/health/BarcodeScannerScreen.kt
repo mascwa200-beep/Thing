@@ -49,6 +49,7 @@ import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import androidx.compose.material3.Text
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
@@ -63,6 +64,25 @@ import java.util.concurrent.Executors
  * Sensorium's next burst would tear this down mid-scan with nothing to show for it but a frozen
  * viewfinder. The release is in `onDispose`, which runs on the back gesture and on any navigation
  * this screen did not initiate — a floor left claimed is ambient sensing silently off for ever.
+ *
+ * ⚠️ **The camera itself was NOT released by that teardown, and the floor made it look as though it
+ * were.** `bindToLifecycle` is given the only `LifecycleOwner` a composable can reach, which here is
+ * the navigation back stack entry for the whole HEALTH route — so closing the scanner card left the
+ * camera device open and ZXing decoding every frame for as long as that tab stayed on the stack.
+ * The floor being handed back merely let ambient sensing take the camera away again, which
+ * *incidentally* cleaned up after this screen; with ambient sensing switched off, nothing ever did.
+ * [ScannerBinding] ties the release to this composable rather than to a lifetime it does not own.
+ *
+ * ⚠️ **One `DisposableEffect`, not two, and the order inside it is load-bearing.** The camera has to
+ * be unbound BEFORE the floor is handed back: released first, the Sensorium's next burst can bind
+ * between the two statements and `unbindAll()` then tears down the sampler that has just started.
+ * Two separate effects would leave that ordering to Compose's disposal order, which is not a
+ * guarantee worth resting a race on.
+ *
+ * ⚠️ **A near-verbatim twin of `:nutrition`'s `BarcodeScanner`**, which is not shared because doing
+ * so would put CameraX on `:core:health`, a module every consumer of the health *data* layer
+ * depends on. The two must be changed together; a shared `:core:scan` is the real answer if a third
+ * ever appears.
  */
 @Composable
 fun BarcodeScanner(
@@ -88,12 +108,21 @@ fun BarcodeScanner(
     var progress by remember { mutableStateOf(BarcodeScan.Progress()) }
     var fired by remember { mutableStateOf(false) }
 
+    // ⚠️ Declared out here rather than inside the `granted` branch. Permission is state: a refusal
+    // followed by a grant re-enters that branch, and a binding remembered inside it would be a
+    // different object each time with the previous one holding a camera nobody can now release.
+    val binding = remember { ScannerBinding() }
+
     // ⚠️ Claimed for the whole time this composable is on screen, not just while a camera is bound.
     // The permission dialog is part of that time, and a burst taken during it would be bound and
     // unbound underneath the preview the moment the person granted it.
     DisposableEffect(Unit) {
         CameraFloor.claim()
-        onDispose { CameraFloor.release() }
+        onDispose {
+            // Camera first, floor second — see the ordering note in this file's header.
+            binding.release()
+            CameraFloor.release()
+        }
     }
 
     LcarsFrame(modifier.fillMaxWidth()) {
@@ -124,7 +153,7 @@ fun BarcodeScanner(
                         factory = { ctx ->
                             PreviewView(ctx).also { view ->
                                 view.scaleType = PreviewView.ScaleType.FILL_CENTER
-                                bindScanner(ctx, view, lifecycleOwner) { code ->
+                                bindScanner(ctx, view, lifecycleOwner, binding) { code ->
                                     // ⚠️ Guarded, because analysis frames keep arriving after the
                                     // confirmation while the screen tears down. Without `fired` the
                                     // same barcode would be handed over several times, and the
@@ -178,10 +207,71 @@ private val PRODUCT_FORMATS = listOf(
     BarcodeFormat.ITF,
 )
 
+/**
+ * What the scanner is holding, so that closing the scanner can put it down.
+ *
+ * ⚠️ **Every field here outlives the composable unless it is explicitly released**, and each leaks
+ * something different:
+ *  - the **provider** holds the camera device open, which is what keeps the operating system's
+ *    camera indicator lit and the battery draining;
+ *  - the **analysis** use case holds the analyzer lambda, which closes over this screen's state
+ *    setters — so the composition itself cannot be collected;
+ *  - the **frames** executor is a `newSingleThreadExecutor`, whose thread is **not** a daemon, so a
+ *    forgotten one stays alive for the life of the process. Opening the scanner ten times left ten.
+ *
+ * ⚠️ Both entry points run on the **main** thread — the provider future is listened to on the main
+ * executor and Compose applies `onDispose` there too — so there is no interleaving to guard against
+ * and no lock is needed. What [took] guards is *ordering*: the future can resolve after the screen
+ * has gone, and binding a camera to a dead screen is worse than not binding at all.
+ *
+ * ⚠️ Twinned with `:nutrition`'s copy. See this file's header for why it is not shared.
+ */
+private class ScannerBinding {
+    private var provider: ProcessCameraProvider? = null
+    private var analysis: ImageAnalysis? = null
+    private var frames: ExecutorService? = null
+    private var released = false
+
+    /**
+     * Take ownership of what is about to be bound; `false` means do not bind, the screen has gone.
+     *
+     * ⚠️ Called **before** `bindToLifecycle`, not after. Recording it afterwards leaves a window in
+     * which a camera is bound and nothing knows to release it, and that window is exactly the one a
+     * user creates by opening the scanner and immediately changing their mind.
+     */
+    fun took(provider: ProcessCameraProvider, analysis: ImageAnalysis, frames: ExecutorService): Boolean {
+        if (released) {
+            frames.shutdown()
+            return false
+        }
+        this.provider = provider
+        this.analysis = analysis
+        this.frames = frames
+        return true
+    }
+
+    fun release() {
+        released = true
+        // ⚠️ Ordered: drop the analyzer reference first, because that is the one holding the
+        // composition. `unbindAll` stops the frames but leaves the lambda attached to the use case.
+        analysis?.clearAnalyzer()
+        runCatching { provider?.unbindAll() }
+        // ⚠️ `shutdown`, not `shutdownNow`. A decode in flight is holding an `ImageProxy` and closes
+        // it in a `finally`; interrupting it risks losing that close, and a leaked proxy stalls the
+        // pipeline's bounded buffer pool. Backpressure keeps at most one frame queued, so a graceful
+        // shutdown finishes in milliseconds.
+        frames?.shutdown()
+        provider = null
+        analysis = null
+        frames = null
+    }
+}
+
 private fun bindScanner(
     context: android.content.Context,
     view: PreviewView,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+    binding: ScannerBinding,
     onDecode: (String) -> Unit,
 ) {
     val future = ProcessCameraProvider.getInstance(context)
@@ -197,10 +287,13 @@ private fun bindScanner(
                 ),
             )
         }
+        val frames = Executors.newSingleThreadExecutor()
         val analysis = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
-            .also { it.setAnalyzer(Executors.newSingleThreadExecutor()) { proxy -> decode(proxy, reader, onDecode) } }
+            .also { it.setAnalyzer(frames) { proxy -> decode(proxy, reader, onDecode) } }
+
+        if (!binding.took(provider, analysis, frames)) return@addListener
 
         val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
         runCatching {
