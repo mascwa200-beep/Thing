@@ -878,7 +878,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         viewModelScope.launch {
             c.plateStore.clear()
             _buildingPlate.value = false
-            _notice.value = "MealDraft cleared."
+            _notice.value = "Plate cleared."
         }
     }
 
@@ -938,7 +938,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     /**
      * What a photograph of a plate has turned into so far.
      *
-     * ⚠️ **This is a review step, and the state machine is what makes it one.** A [MealDraft] is a list
+     * ⚠️ **This is a review step, and the state machine is what makes it one.** A [Plate] is a list
      * of proposals sitting on screen waiting to be corrected; nothing reaches the log until somebody
      * presses the button. The portion especially is a guess — the model has weighed nothing — so
      * writing these straight into a day's total would put invented grams beside weighed ones with
@@ -947,7 +947,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     sealed interface MealShot {
         data object Idle : MealShot
         data object Reading : MealShot
-        data class MealDraft(
+        data class Plate(
             val proposals: List<MealPhotos.Proposal>,
             val summary: String,
         ) : MealShot
@@ -982,7 +982,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
         mealShotJob = viewModelScope.launch {
             _mealShot.value = when (val r = reader.read(context, uri)) {
-                is MealPhotos.Result.MealDraft -> MealShot.MealDraft(r.proposals, r.summary)
+                is MealPhotos.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
                 is MealPhotos.Result.NotFood -> MealShot.NotFood
                 is MealPhotos.Result.NoVision -> MealShot.NoVision
                 is MealPhotos.Result.Failed -> MealShot.Failed(r.reason)
@@ -994,7 +994,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     /** Correct a portion the model guessed at. Nutrition re-derives from the matched record. */
     fun editMealGrams(index: Int, grams: Double) {
-        val plate = _mealShot.value as? MealShot.MealDraft ?: return
+        val plate = _mealShot.value as? MealShot.Plate ?: return
         val p = plate.proposals.getOrNull(index) ?: return
         if (!grams.isFinite() || grams <= 0.0) return
         _mealShot.value = plate.copy(
@@ -1006,7 +1006,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     /** Drop something the model saw that was not there, or that nobody ate. */
     fun dropMealItem(index: Int) {
-        val plate = _mealShot.value as? MealShot.MealDraft ?: return
+        val plate = _mealShot.value as? MealShot.Plate ?: return
         if (index !in plate.proposals.indices) return
         val left = plate.proposals.toMutableList().also { it.removeAt(index) }
         _mealShot.value = if (left.isEmpty()) MealShot.Idle else plate.copy(proposals = left)
@@ -1030,7 +1030,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * believe a day is fully logged when it is not.
      */
     fun logPlate(meal: NutritionDay.Meal) {
-        val plate = _mealShot.value as? MealShot.MealDraft ?: return
+        val plate = _mealShot.value as? MealShot.Plate ?: return
         val loggable = plate.proposals.filter { it.loggable }
         if (loggable.isEmpty()) return
         val now = System.currentTimeMillis()

@@ -2884,7 +2884,7 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
                         LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
                     }
                 }
-                is HealthViewModel.MealShot.MealDraft -> PlateReview(st, meal, vm, onRetake = { shoot() })
+                is HealthViewModel.MealShot.Plate -> PlateReview(st, meal, vm, onRetake = { shoot() })
             }
         }
     }
@@ -2899,7 +2899,7 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
  */
 @Composable
 private fun PlateReview(
-    plate: HealthViewModel.MealShot.MealDraft,
+    plate: HealthViewModel.MealShot.Plate,
     meal: NutritionDay.Meal,
     vm: HealthViewModel,
     onRetake: () -> Unit,
