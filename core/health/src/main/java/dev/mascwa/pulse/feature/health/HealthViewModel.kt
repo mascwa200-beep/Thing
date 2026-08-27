@@ -318,7 +318,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     val week: StateFlow<IntakeWeek.Week?> =
         combine(c.foodLogStore.days, state) { byDay, s ->
             IntakeWeek.score(byDay, s.targets?.kcal, dayGrid(IntakeWeek.DEFAULT_WINDOW_DAYS))
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        }.stateIn(viewModelScope, PANEL_SHARING, null)
 
     /**
      * ⚠️ Delegates to [composeHealthReading], which is a TOP-LEVEL function rather than a method
@@ -1124,7 +1124,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             MealDraft.effect(staged, logged, (s.plan as? MacroTargets.Plan.Set)?.targets)
         }.stateIn(
             viewModelScope,
-            SharingStarted.Eagerly,
+            PANEL_SHARING,
             MealDraft.effect(emptyList(), emptyList(), null),
         )
 
@@ -1198,7 +1198,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      */
     val photoBytes: StateFlow<Long> = c.progressPhotoStore.photos
         .map { c.progressPhotoStore.bytesOnDisk() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+        .stateIn(viewModelScope, PANEL_SHARING, 0L)
 
     fun photoUri(id: String): android.net.Uri? = c.progressPhotoStore.uriFor(id)
 
@@ -1564,7 +1564,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             }
 
             listOfNotNull(weight) + tape
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }.stateIn(viewModelScope, PANEL_SHARING, emptyList())
 
     // ------------------------------------------------------------------------ reading it back
 
@@ -1603,7 +1603,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     PeriodCompare.Grain.MONTH -> HealthDays.monthStart(d)
                 }
             }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }.stateIn(viewModelScope, PANEL_SHARING, emptyList())
 
     // ---------------------------------------------------------------------------------- habits
 
@@ -1649,7 +1649,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 Habits.Habit.HIT_PROTEIN to Habits.streak(protein, today, ::dayBefore),
                 Habits.Habit.STAY_IN_BAND to Habits.streak(inBand, today, ::dayBefore),
             )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+        }.stateIn(viewModelScope, PANEL_SHARING, emptyMap())
 
     /**
      * Fold a raw pedometer reading in.
@@ -2461,6 +2461,30 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         const val MIN_QUERY = 2
         /** Long enough that an ordinary typist fires one search per word, short enough to feel live. */
         const val DEBOUNCE_MS = 280L
+
+        /**
+         * How the panel-only derivations are shared: only while something is looking at them.
+         *
+         * ⚠️ **Every flow in this file used `SharingStarted.Eagerly`, and every other view model in
+         * the repository uses `WhileSubscribed`.** Eagerly starts the upstream at construction and
+         * never stops it, so a derivation runs whether or not its panel exists — six of them did,
+         * over the whole record, before the first frame was drawn. In the standalone app the view
+         * model lives for the process, so a tab nobody opened still paid for its arithmetic on every
+         * write to the log.
+         *
+         * ⚠️ **Deliberately NOT applied to `profile`, `state`, `measurements` or `buildingPlate`, and
+         * the reason is different for each.** `state` and `profile` are read synchronously through
+         * `.value` — by `loadBalance` and `recalculateNow`, both reached from surfaces that collect
+         * `state`, so they would in fact be warm, but the cost of being wrong there is a screen
+         * publishing targets built from `State()` defaults and that is not a risk worth taking for
+         * arithmetic that is going to be observed anyway. `buildingPlate` decides where a tapped food
+         * GOES rather than what a panel shows, so it has to be right even in the instant before
+         * anything collects it. `measurements` is a `groupBy` over a short list and saves nothing.
+         *
+         * The five seconds is the standard grace: a tab switch, a rotation and a brief background
+         * are all shorter than it, so the flow survives them rather than tearing down and rebuilding.
+         */
+        val PANEL_SHARING = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000)
     }
 }
 
