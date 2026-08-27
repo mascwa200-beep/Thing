@@ -363,6 +363,45 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         // ⚠️ Refreshed here rather than once at construction: something logged a moment ago is the
         // most likely thing to be logged again, and a list that never moves is one nobody looks at.
         _recents.value = c.foodLogStore.recentFoods(System.currentTimeMillis())
+        // ⚠️ Read HERE and nowhere else, because this is the one place every day change and every
+        // add or removal passes through. `FoodLogStore.add` CLEARS the fast on the day it lands on,
+        // so a flag refreshed only when the day changes would keep saying "fasted" over a day with
+        // food in it — the screen and the record disagreeing about the same day.
+        _fasted.value = c.foodLogStore.isFasted(_today.value)
+    }
+
+    /**
+     * Whether the day on screen is marked as a deliberate fast.
+     *
+     * ⚠️ **This flag is the whole reason [Expenditure.IntakeDay.fasted] means anything.** The core
+     * distinguishes a day worth zero calories from a day nobody recorded — a fast counts toward
+     * completeness and pulls the intake mean down honestly, a gap does neither — and until something
+     * could SET it, every day was a gap and the distinction did nothing at all.
+     */
+    private val _fasted = MutableStateFlow(false)
+    val fastedDay: StateFlow<Boolean> = _fasted.asStateFlow()
+
+    /**
+     * Mark the day on screen as a fast, or take the mark off.
+     *
+     * ⚠️ The store REFUSES to mark a day that has entries, and that refusal is passed on as a
+     * sentence rather than swallowed. Marking a fast on a day with food logged asserts two
+     * contradictory things about it; the honest answer is to say so and let somebody delete the
+     * entries if the day really was a fast.
+     */
+    fun setFasted(fasted: Boolean) {
+        val day = _today.value
+        viewModelScope.launch {
+            val took = c.foodLogStore.setFasted(day, fasted)
+            if (!took) {
+                _notice.value = "There is food logged on that day, so it cannot be a fast. " +
+                    "Remove the entries first."
+                return@launch
+            }
+            _fasted.value = c.foodLogStore.isFasted(day)
+            // A fast is a real intake day, so the measurement moves the moment it is marked.
+            recompute.value++
+        }
     }
 
     fun recordWeighin(kg: Double) {

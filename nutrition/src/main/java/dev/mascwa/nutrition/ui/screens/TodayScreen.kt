@@ -495,9 +495,21 @@ private fun Everything(day: NutrientSet.Day) {
 
 @Composable
 private fun Entries(vm: HealthViewModel, entries: List<NutritionDay.Entry>) {
+    // ⚠️ A marked fast says so HERE, not only on the control that set it. This is the screen
+    // somebody actually looks at, and a fast reading "nothing logged" on it is indistinguishable
+    // from the lapse the mark exists to tell it apart from.
+    val fasted by vm.fastedDay.collectAsStateWithLifecycle()
     SectionCard(
-        if (entries.isEmpty()) "Nothing logged" else "${entries.size} logged",
-        subtitle = if (entries.isEmpty()) "Add food on the Log tab." else null,
+        when {
+            entries.isNotEmpty() -> "${entries.size} logged"
+            fasted -> "A deliberate fast"
+            else -> "Nothing logged"
+        },
+        subtitle = when {
+            entries.isNotEmpty() -> null
+            fasted -> "A real day, worth nothing eaten — not a day you missed."
+            else -> "Add food on the Log tab."
+        },
     ) {
         // ⚠️ Grouped by meal in the enum's own order rather than by the time each was added: a
         // breakfast entered at nine in the evening still belongs with breakfast, and sorting by

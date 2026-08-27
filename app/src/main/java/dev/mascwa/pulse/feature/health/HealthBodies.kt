@@ -823,6 +823,9 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val day by vm.shownDay.collectAsStateWithLifecycle()
     val isToday = day == vm.todayStartMs()
     val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    // Hoisted with the rest, per the note above, and read in two places: the control that sets it
+    // and the empty state, which must not describe a marked fast as nothing.
+    val fasted by vm.fastedDay.collectAsStateWithLifecycle()
 
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
@@ -833,6 +836,7 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
         item { DayStepper(vm) }
+        item { FastedDay(vm, entries, fasted) }
         item { PlatePanel(vm) }
         item { DescribeAMeal(vm, meal) }
         item { FindAFood(vm, meal) }
@@ -986,8 +990,15 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
         if (entries.isEmpty()) {
             item {
+                // ⚠️ A marked fast says so HERE, not only on the control that set it. This is the
+                // screen somebody actually looks at, and a fast that reads "nothing logged" on it is
+                // indistinguishable from the lapse the mark exists to distinguish it from.
                 NotYet(
-                    if (isToday) "Nothing logged yet today." else "Nothing was logged that day.",
+                    when {
+                        fasted -> "Marked as a deliberate fast — a real day, worth nothing eaten."
+                        isToday -> "Nothing logged yet today."
+                        else -> "Nothing was logged that day."
+                    },
                 )
             }
             // ⚠️ Offered only on an EMPTY day, and it is the difference between a shortcut and a
@@ -1056,6 +1067,51 @@ private fun StepButton(glyph: String, enabled: Boolean, onClick: () -> Unit) {
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
             .padding(horizontal = 9.dp, vertical = 5.dp),
     )
+}
+
+/**
+ * Say that the day on screen was a deliberate fast.
+ *
+ * ⚠️ **Without this control the distinction it records did nothing at all.** `Expenditure` separates
+ * a day worth zero calories from a day nobody logged — a fast counts toward completeness and pulls
+ * the intake mean down honestly, a gap does neither and is priced as missing — and `FoodLogStore`
+ * has carried a fasted set the whole time with nothing anywhere able to put a day into it. Every
+ * fast was therefore read as a lapse, which is the opposite of what it was.
+ */
+@Composable
+private fun FastedDay(vm: HealthViewModel, entries: List<NutritionDay.Entry>, fasted: Boolean) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "A DELIBERATE FAST",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+                )
+                Text(
+                    when {
+                        fasted -> "Marked. This day counts as a real day worth nothing eaten."
+                        // ⚠️ Said BEFORE it is tried as well as after. The store refuses a day with
+                        // entries and the view model passes that refusal on — but a switch that
+                        // looks live and answers with a complaint is worse than one that explains.
+                        entries.isNotEmpty() -> "There is food logged here, so it cannot be a fast."
+                        else -> "Unmarked, this reads as a day you forgot rather than one you chose."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (fasted) c.ink else c.muted, lineHeight = 14.sp,
+                )
+            }
+            LcarsSwitch(
+                checked = fasted,
+                onCheckedChange = { vm.setFasted(it) },
+                enabled = fasted || entries.isEmpty(),
+            )
+        }
+    }
 }
 
 /** Repeat a previous day onto this one, which is how a routine gets logged in one tap. */

@@ -13,6 +13,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +55,60 @@ fun LogScreen(vm: HealthViewModel) {
     QuickAddCard(vm, meal)
     MyFoods(vm)
     RepeatADay(vm)
+    FastedDay(vm)
+}
+
+/**
+ * Say that a day was a deliberate fast.
+ *
+ * ⚠️ **Without this control the distinction it records did nothing at all.** `Expenditure` separates
+ * a day worth zero calories from a day nobody logged — a fast counts toward completeness and pulls
+ * the intake mean down honestly, a gap does neither and is priced as missing — and the store has
+ * carried a fasted set the whole time with nothing able to put a day in it. So every fast was read
+ * as a lapse, which is the opposite of what it was.
+ *
+ * ⚠️ It sits at the bottom with "repeat a day" because both are statements about a whole day rather
+ * than about a food, and it is deliberately not near the meal picker: this is the rarer thing, and
+ * a switch that says "I ate nothing" wants to be somewhere nobody reaches by accident.
+ */
+@Composable
+private fun FastedDay(vm: HealthViewModel) {
+    val fasted by vm.fastedDay.collectAsStateWithLifecycle()
+    val entries by vm.entries.collectAsStateWithLifecycle()
+
+    SectionCard(
+        "Or say you fasted",
+        subtitle = "A deliberate fast is a record of what you ate. Left unmarked it reads as a day " +
+            "you forgot, which is priced quite differently.",
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (fasted) "This day is marked as a fast." else "Nothing marked.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                // ⚠️ Said before it is tried, as well as after. The store refuses a day that has
+                // entries and the view model reports that refusal — but a switch that looks live and
+                // answers with a complaint is worse than one that explains itself first.
+                if (entries.isNotEmpty() && !fasted) {
+                    Text(
+                        "There is food logged on this day, so it cannot be a fast.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Switch(
+                checked = fasted,
+                onCheckedChange = { vm.setFasted(it) },
+                enabled = fasted || entries.isEmpty(),
+            )
+        }
+    }
 }
 
 /**
