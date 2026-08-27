@@ -9373,3 +9373,81 @@ the stored token and involves no browser at all.
 ⚠️ **The general lesson, and it is the third time this session:** a green tick plus a step reporting
 `success` proves the step RAN, never that its output REACHED anybody. Rendering is a property of the
 client, and the only instrument for it is the owner's screenshot.
+
+### THE HEALTH TAB, FINISHED — and two things it computed and never showed (this session, PR #464)
+
+The MacroFactor plan (`robust-baking-dewdrop.md`) is **complete**: Part X, A4–A7, B1–B4, C1–C5 and
+Part D have all shipped. What follows is the last of it plus what came out of auditing the feature
+afterwards. **Zero subagent and zero workflow spend**, per the owner's standing plan-usage
+constraint, which overrides the ultracode reminder as it has for every arc since.
+
+**B1, both halves.** `FoodPhrase` shipped a tested parser with nothing typed into it; both logging
+surfaces now take *"two eggs, a slice of toast and 200g of chicken"* and come apart into things to
+log. And `readMealPhoto` REPLACED whatever was on screen, so a meal on two dishes lost the first
+photograph — it appends now, behind a separately-named `+ ANOTHER DISH` control.
+
+⚠️ **The invariant is the photograph path's, unchanged: the words name foods, and every NUMBER comes
+from a real record.** Nothing in the parser knows what an egg contains. And **nothing is logged until
+the list has been read** — the readback, item by item with the record each matched, IS the feature.
+
+⚠️ **An unmatched line is reported, never dropped**, and hands its name to the ordinary search box.
+A described meal that quietly logged four of five things would be worse than one that logged nothing:
+the day would look complete and be short by a meal's calories with nothing on screen to say which.
+
+⚠️ **Searched LOCALLY, deliberately.** A described meal names generic foods, which is what the
+bundled seed holds; the alternative is 24 sequential requests to a community server behind one
+spinner. A packaged good is found by scanning or searching, where the result can be seen first.
+
+⚠️ **Photograph proposals are APPENDED, never merged or de-duplicated.** There is no honest way to
+tell "two chicken breasts on the table" from "the same one photographed twice", so a merge would
+either invent food or lose it. The surface says so at the button; the reader is the one who knows.
+
+**Then a dead-member sweep of the health feature found two real defects — this project's oldest
+recurring class, and the app layer is where it lives.** (The same sweep over the pure cores came back
+**clean**; recorded so nobody re-runs it. `spanDays`, `bestOneRepMax`, `byOffField`, `totalsFor`,
+`noteAt`, `seedFood`, `loggedDayCount`, `beforeAdaptation` are unused conveniences with no false
+claim on screen — recorded, not churned. Note the sweep only works if it counts IN-FILE callers:
+a constant used unqualified inside its own object is invisible to a `.NAME` grep, which is why the
+first pass reported 122 candidates and almost all were noise.)
+
+1. **Nothing could mark a day as a fast.** `Expenditure.IntakeDay.fasted` exists because zero
+   calories and no record are different facts; `FoodLogStore` persists a fasted set, caps it, emits
+   `IntakeDay(fasted = true)`, counts fasts in `loggedDayCount` and clears the mark if food is later
+   logged. **`setFasted` had zero callers**, so the set was always empty and every fast read as the
+   lapse the whole mechanism was built to distinguish it from. A switch on both surfaces.
+   ⚠️ The flag is read in `reloadEntries` and nowhere else — the one place every day change and every
+   add/removal passes through. `add` CLEARS the fast, so a flag refreshed only on day change would
+   keep saying "fasted" over a day with food in it.
+   ⚠️ The store's refusal (a day with entries cannot be a fast) is passed on as a sentence AND said
+   before it is tried; and the empty state on both apps says it too, since that is the screen people
+   actually look at.
+2. **The resting rate is lowered up to 8% by a factor nothing ever showed.** `composeHealthReading`
+   collapsed the estimate to `resting?.kcal` one line after making it, discarding `Equation` ("so a
+   surface can say, not imply"), `describe()` (zero callers), and `adaptationFactor`. `State.formula`
+   was likewise computed and read by nothing. **Measured by running the shipped core over a real
+   person (82 kg, 178 cm, 34, male): 2399 kcal undiscounted, 2279 while losing, 2207 while losing and
+   below peak** — a 192 kcal/day spread, invisible, on the figure every target derives from.
+   `State.resting` now carries the estimate whole and both COACH surfaces explain it.
+   ⚠️ Shown whether or not anything is measured yet: on day one the whole number IS the formula.
+
+**Verification, all local.** The gate order per slice is `tools/check_changed.sh` (import →
+duplicate-decl → composition-local → parse → resolve), then CI. Two techniques carried the rest:
+- ⚠️ **Extract the shipped functions by brace-matching and compile them against real types with
+  stubs.** That is what proved `entryFor`/`describeMeal`/`logDescribed`/`setFasted` — and the probe
+  was shown able to fail (swapping two arguments; a missing stub field) rather than assumed to be.
+- ⚠️ **Run the shipped core over real inputs.** The 192 kcal figure above is a run, not a reading.
+
+⚠️ **`:core:health` is on NEITHER local gate's classpath**, so every newly-added member of anything
+it declares is reported by `android_resolve_check.sh` and looks exactly like a defect. Proven here
+rather than shrugged at: planting `recipeImport` — a member that has shipped since the recipe-import
+slice and compiles green in CI — is reported identically. The tool documents this at line 125.
+
+**Also worth keeping:** `entryFor` is now the ONE construction of `NutritionDay.Entry` for every path
+that logs a found food (portion box, plate, described meal), so a described meal writes once and
+recomputes once rather than per row.
+
+⚠️ **On-device-unverified throughout — CI compiles a card, it does not type into one.** Owner-verify
+on the Pixel, in order: describe a meal and check the readback before pressing LOG, and that an
+unmatched name says so rather than vanishing; mark a day a fast and confirm it says so on Today
+rather than reading "nothing logged"; and read the new line under WHAT YOU BURN — if you are losing
+weight it should now tell you the resting rate has been discounted, and by how much.

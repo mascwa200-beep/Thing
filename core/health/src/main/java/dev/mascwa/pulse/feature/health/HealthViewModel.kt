@@ -1210,7 +1210,22 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
      * megapixels and both the decode and the base64 pass are long enough to drop frames. The reader
      * itself suspends on a network call, so the whole thing belongs in a coroutine regardless.
      */
-    fun readMealPhoto(context: android.content.Context, uri: android.net.Uri) {
+    /**
+     * Read a photograph of a plate into proposals.
+     *
+     * ⚠️ [addTo] carries the proposals already on screen, so a meal spread over several dishes can be
+     * photographed one dish at a time and reviewed as one list. **They are APPENDED, never merged or
+     * de-duplicated**, and that is deliberate rather than lazy: there is no honest way to tell "two
+     * chicken breasts on the table" from "the same chicken breast photographed twice", and a merge
+     * that guessed would either invent food or lose it. Because of that the surface offers this as a
+     * separate, deliberately-named control — appending has to be chosen, not implied by taking
+     * another photograph.
+     */
+    fun readMealPhoto(
+        context: android.content.Context,
+        uri: android.net.Uri,
+        addTo: List<MealPhotos.Proposal> = emptyList(),
+    ) {
         mealShotJob?.cancel()
         _mealShot.value = MealShot.Reading
         val reader = c.mealPhotoReader
@@ -1222,10 +1237,18 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
         }
         mealShotJob = viewModelScope.launch {
             _mealShot.value = when (val r = reader.read(context, uri)) {
-                is MealPhotos.Result.Plate -> MealShot.Plate(r.proposals, r.summary)
-                is MealPhotos.Result.NotFood -> MealShot.NotFood
+                is MealPhotos.Result.Plate ->
+                    MealShot.Plate(addTo + r.proposals, r.summary)
+                // ⚠️ A failed second photograph must not throw away a good first one. The dish
+                // already reviewed goes back on screen with the reason beside it, rather than the
+                // whole plate being lost to a picture of a tablecloth.
+                is MealPhotos.Result.NotFood ->
+                    if (addTo.isEmpty()) MealShot.NotFood
+                    else MealShot.Plate(addTo, "That last one did not look like food, so nothing was added.")
                 is MealPhotos.Result.NoVision -> MealShot.NoVision
-                is MealPhotos.Result.Failed -> MealShot.Failed(r.reason)
+                is MealPhotos.Result.Failed ->
+                    if (addTo.isEmpty()) MealShot.Failed(r.reason)
+                    else MealShot.Plate(addTo, "That last one could not be read — ${r.reason}")
             }
         }
     }

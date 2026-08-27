@@ -2960,18 +2960,26 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
     val shot by vm.mealShot.collectAsStateWithLifecycle()
     var pending by remember { mutableStateOf<android.net.Uri?>(null) }
 
+    // What the next photograph should be ADDED TO, empty for a fresh start. Held beside `pending`
+    // because the launcher's callback fires long after the button was pressed, and the decision to
+    // append was made at the press.
+    var addTo by remember { mutableStateOf<List<MealPhotos.Proposal>>(emptyList()) }
+
     val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         // ⚠️ Read only on success. A cancelled capture leaves a zero-byte file behind, and decoding
         // one produces a null bitmap — which would surface as "that photograph could not be read"
         // for a photograph nobody took.
         val uri = pending
+        val onto = addTo
         pending = null
-        if (ok && uri != null) vm.readMealPhoto(context, uri)
+        addTo = emptyList()
+        if (ok && uri != null) vm.readMealPhoto(context, uri, onto)
     }
 
-    fun shoot() {
+    fun shoot(onto: List<MealPhotos.Proposal> = emptyList()) {
         val uri = createCameraImageUri(context) ?: return
         pending = uri
+        addTo = onto
         capture.launch(uri)
     }
 
@@ -3024,7 +3032,14 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
                         LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
                     }
                 }
-                is HealthViewModel.MealShot.Plate -> PlateReview(st, meal, vm, onRetake = { shoot() })
+                is HealthViewModel.MealShot.Plate -> PlateReview(
+                    st, meal, vm,
+                    onRetake = { shoot() },
+                    // ⚠️ Passes the proposals already on screen, so the next photograph is added to
+                    // them rather than replacing them. A meal on several dishes is photographed one
+                    // dish at a time and reviewed as one list.
+                    onAnother = { shoot(st.proposals) },
+                )
             }
         }
     }
@@ -3043,6 +3058,7 @@ private fun PlateReview(
     meal: NutritionDay.Meal,
     vm: HealthViewModel,
     onRetake: () -> Unit,
+    onAnother: () -> Unit,
 ) {
     val c = Pulse.colors
     val loggable = plate.proposals.count { it.loggable }
@@ -3079,9 +3095,20 @@ private fun PlateReview(
             enabled = loggable > 0,
             onClick = { vm.logPlate(meal) },
         )
+        // ⚠️ RETAKE replaces this list; ANOTHER DISH adds to it. Two words apart and opposite in
+        // effect, so they are named for what they do rather than both being "take a photo".
         LcarsButton(text = "RETAKE", onClick = onRetake)
+        LcarsButton(text = "+ ANOTHER DISH", onClick = onAnother)
         LcarsButton(text = "DISCARD", onClick = { vm.clearMealShot() })
     }
+    // ⚠️ Said where the button is, because the failure it prevents is silent and doubles a meal.
+    // Nothing here can tell one plate photographed twice from two plates of the same thing, so the
+    // list is only ever appended to and the reader is the one who knows which happened.
+    Text(
+        "ANOTHER DISH adds to the list above rather than replacing it — for a meal spread over " +
+            "several plates. Photograph the same plate twice and it will be listed twice.",
+        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+    )
 }
 
 /**
