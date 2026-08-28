@@ -96,6 +96,105 @@ class SkyFieldPlanTest {
         assertEquals(-90.0, south.declinationDeg, 0.01)
     }
 
+    // ---- drawing equatorial stars without converting them ---------------------------------------
+
+    @Test
+    fun `a star drawn from equatorial coordinates lands exactly where the horizon path puts it`() {
+        // ⚠️ THE PROPERTY THE STAR FIELD RESTS ON, and it has no visible failure mode. Holding stars
+        // in horizon coordinates means reconverting all of them as the Earth turns — which at a
+        // narrow field, where a screen pixel is a fraction of an arcsecond, is every single frame.
+        // So they are held in equatorial coordinates and the rotation goes into the projection basis
+        // instead, built from the view direction and the observer's zenith rather than from the
+        // world's vertical.
+        //
+        // If that basis is wrong the map still draws a full, plausible sky — in the wrong place, or
+        // mirrored, or rotated. Nothing throws. So the two paths are required to agree to the last
+        // bit of the arithmetic rather than merely to look similar.
+        var worst = 0.0
+        var worstAt = ""
+        for (lat in listOf(-45.0, -10.0, 0.0, 51.5, 78.0)) {
+            for (hours in 0..20 step 5) {
+                val at = FIXED_EPOCH_MS + hours * 3_600_000L
+                val lon = -3.2
+                for (viewAz in listOf(0.0, 95.0, 180.0, 300.0)) {
+                    for (viewAlt in listOf(-20.0, 5.0, 40.0, 80.0)) {
+                        for (roll in listOf(0.0, 37.0)) {
+                            val view = SkyProjection.View(viewAz, viewAlt, 40.0, roll)
+
+                            // The equatorial basis: forward is where the middle of the screen points,
+                            // and up is the observer's zenith — declination equal to their latitude,
+                            // right ascension equal to the local sidereal time.
+                            val centre = Ephemeris.toEquatorial(
+                                Ephemeris.Horizontal(view.altitudeDeg, view.azimuthDeg, 0.0), lat, lon, at,
+                            )
+                            val zenith = Ephemeris.toEquatorial(
+                                Ephemeris.Horizontal(90.0, 0.0, 0.0), lat, lon, at,
+                            )
+                            val z = SkyProjection.equatorialVector(
+                                zenith.rightAscensionDeg, zenith.declinationDeg,
+                            )
+                            val basis = SkyProjection.basisOf(
+                                SkyProjection.equatorialVector(
+                                    centre.rightAscensionDeg, centre.declinationDeg,
+                                ),
+                                z[0], z[1], z[2], view.fovDeg, view.rollDeg,
+                            )
+
+                            for (ra in 0..340 step 47) {
+                                for (dec in -80..80 step 31) {
+                                    val eq = Ephemeris.Equatorial(ra.toDouble(), dec.toDouble(), 0.0)
+                                    val h = Ephemeris.toHorizontal(eq, lat, lon, at)
+
+                                    val viaHorizon = SkyProjection.project(h.azimuthDeg, h.altitudeDeg, view)
+                                    val v = SkyProjection.equatorialVector(
+                                        eq.rightAscensionDeg, eq.declinationDeg,
+                                    )
+                                    val viaEquatorial = SkyProjection.projectUnit(v[0], v[1], v[2], basis)
+
+                                    assertEquals(
+                                        "visibility disagrees at ra=$ra dec=$dec, view $viewAz/$viewAlt lat=$lat",
+                                        viaHorizon.visible, viaEquatorial.visible,
+                                    )
+                                    if (!viaHorizon.visible) continue
+                                    val d = maxOf(
+                                        Math.abs(viaHorizon.x - viaEquatorial.x),
+                                        Math.abs(viaHorizon.y - viaEquatorial.y),
+                                    )
+                                    if (d > worst) {
+                                        worst = d
+                                        worstAt = "ra=$ra dec=$dec view $viewAz/$viewAlt roll=$roll lat=$lat +${hours}h"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // A screen unit is half the short screen dimension, so this is a millionth of a pixel on any
+        // real display — the two paths are doing the same arithmetic in a different order.
+        assertTrue("the two paths disagree by $worst screen units at $worstAt", worst < 1e-9)
+    }
+
+    @Test
+    fun `the observer's zenith is their latitude, at the sidereal time`() {
+        // The anchor under the test above, which a self-consistent pair of wrong transforms would
+        // otherwise satisfy. Straight up from 51.5° north is declination 51.5°, whatever the hour;
+        // only the right ascension turns with the day.
+        val first = Ephemeris.toEquatorial(
+            Ephemeris.Horizontal(90.0, 0.0, 0.0), 51.5, -0.1, FIXED_EPOCH_MS,
+        )
+        val sixHoursLater = Ephemeris.toEquatorial(
+            Ephemeris.Horizontal(90.0, 0.0, 0.0), 51.5, -0.1, FIXED_EPOCH_MS + 6 * 3_600_000L,
+        )
+        assertEquals(51.5, first.declinationDeg, 0.01)
+        assertEquals(51.5, sixHoursLater.declinationDeg, 0.01)
+        // Six hours of rotation is ninety degrees of right ascension, give or take the sidereal day
+        // being four minutes short of a solar one.
+        val turned = ((sixHoursLater.rightAscensionDeg - first.rightAscensionDeg) + 360.0) % 360.0
+        assertEquals(90.0, turned, 0.5)
+    }
+
     // ---- the field ------------------------------------------------------------------------------
 
     @Test

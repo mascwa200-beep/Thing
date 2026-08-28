@@ -169,12 +169,20 @@ object SkyProjection {
      *
      * Components are held as scalars rather than arrays because the arrays were the allocation.
      */
-    class Basis internal constructor(view: View) {
+    class Basis internal constructor(
+        forward: DoubleArray,
+        upX: Double,
+        upY: Double,
+        upZ: Double,
+        fovDeg: Double,
+        rollDeg: Double,
+    ) {
         internal val fx: Double
         internal val fy: Double
         internal val fz: Double
         internal val rx: Double
         internal val ry: Double
+        internal val rz: Double
         internal val ux: Double
         internal val uy: Double
         internal val uz: Double
@@ -196,33 +204,91 @@ object SkyProjection {
         val usable: Boolean
 
         init {
-            val f = unit(view.azimuthDeg, view.altitudeDeg.coerceIn(-MAX_ALTITUDE_DEG, MAX_ALTITUDE_DEG))
-            fx = f[0]; fy = f[1]; fz = f[2]
-            // Right is the look direction crossed with the world's vertical; up completes the frame.
-            val nx = f[1]
-            val ny = -f[0]
-            val n = sqrt(nx * nx + ny * ny)
+            fx = forward[0]; fy = forward[1]; fz = forward[2]
+            // Right is the look direction crossed with whichever way is up for the viewer, which is
+            // NOT a fixed axis: in horizon coordinates it is the world's vertical, and in equatorial
+            // coordinates it is the observer's zenith, which moves as the Earth turns. Passing it in
+            // is what lets one basis serve both.
+            // ⚠️ forward x up, in that order. The other way round is the negative, which mirrors
+            // the whole chart left-to-right — and it compiles, draws a perfectly plausible sky, and
+            // is wrong. The existing projection tests caught it when I wrote it backwards.
+            val nx = fy * upZ - fz * upY
+            val ny = fz * upX - fx * upZ
+            val nz = fx * upY - fy * upX
+            val n = sqrt(nx * nx + ny * ny + nz * nz)
             usable = n >= 1e-9
             if (usable) {
                 rx = nx / n
                 ry = ny / n
-                // u = r x f, with r's third component known to be zero.
-                ux = ry * fz
-                uy = -rx * fz
+                rz = nz / n
+                // u = r x f.
+                ux = ry * fz - rz * fy
+                uy = rz * fx - rx * fz
                 uz = rx * fy - ry * fx
             } else {
-                rx = 0.0; ry = 0.0; ux = 0.0; uy = 0.0; uz = 0.0
+                rx = 0.0; ry = 0.0; rz = 0.0; ux = 0.0; uy = 0.0; uz = 0.0
             }
-            invScale = 1.0 / edgeRadius(view.fovDeg)
-            rolled = view.rollDeg != 0.0
-            val a = view.rollDeg * DEG
+            invScale = 1.0 / edgeRadius(fovDeg)
+            rolled = rollDeg != 0.0
+            val a = rollDeg * DEG
             cosRoll = cos(a)
             sinRoll = sin(a)
         }
     }
 
-    /** The per-frame constants of a view, computed once. */
-    fun basisOf(view: View): Basis = Basis(view)
+    /** The per-frame constants of a view in horizon coordinates, computed once. */
+    fun basisOf(view: View): Basis = Basis(
+        unit(view.azimuthDeg, view.altitudeDeg.coerceIn(-MAX_ALTITUDE_DEG, MAX_ALTITUDE_DEG)),
+        // In the horizon frame the viewer's up IS the world's vertical.
+        0.0, 0.0, 1.0,
+        view.fovDeg,
+        view.rollDeg,
+    )
+
+    /**
+     * A basis for stars held in some other frame — in practice, equatorial.
+     *
+     * ⚠️ **This is what stops a star map reloading its catalogue as the clock runs.** Held in horizon
+     * coordinates, every star's position changes continuously as the Earth turns, so the loaded set
+     * goes stale within seconds — and at a narrow field, where a pixel is a fraction of an
+     * arcsecond, within a single frame. Held in equatorial coordinates nothing moves at all except
+     * by proper motion, which is a matter of decades, and the whole of the Earth's rotation lives in
+     * this basis instead: two vectors recomputed once per frame rather than tens of thousands.
+     *
+     * @param forward where the middle of the screen points, as a unit vector in the stars' own frame.
+     * @param up which way is up for the viewer, in that same frame — for equatorial stars, the
+     *   observer's zenith. Need not be perpendicular to [forward]; only its component across the
+     *   look direction is used.
+     */
+    fun basisOf(
+        forward: DoubleArray,
+        upX: Double,
+        upY: Double,
+        upZ: Double,
+        fovDeg: Double,
+        rollDeg: Double = 0.0,
+    ): Basis = Basis(forward, upX, upY, upZ, fovDeg, rollDeg)
+
+    /**
+     * A right ascension and declination as a unit vector.
+     *
+     * ⚠️ **NOT [unit] with different arguments, and getting that wrong mirrors the entire sky.** The
+     * horizon frame measures azimuth CLOCKWISE from north, so its axes come out (east, north, up);
+     * right ascension runs the other way, EASTWARD, so the standard equatorial axes are x toward
+     * (0h, 0°), y toward (6h, 0°) and z toward the north celestial pole. Feeding a right ascension
+     * into `unit` swaps x and y, which is a reflection — a left-handed frame.
+     *
+     * The consequence is not a crash or a blank screen. It is a complete, plausible, reflected sky,
+     * and it was measured at ninety-two degrees of error before a test caught it. Hence its own
+     * implementation rather than a delegate, and hence the test that requires a star drawn this way
+     * to land exactly where the horizon path puts it.
+     */
+    fun equatorialVector(raDeg: Double, decDeg: Double): DoubleArray {
+        val r = raDeg * DEG
+        val d = decDeg * DEG
+        val cd = cos(d)
+        return doubleArrayOf(cd * cos(r), cd * sin(r), sin(d))
+    }
 
     /**
      * A direction already held as a unit vector, projected into a prepared view.
@@ -236,7 +302,7 @@ object SkyProjection {
         if (!basis.usable) return Screen(0.0, 0.0, visible = false)
         val z = vx * basis.fx + vy * basis.fy + vz * basis.fz
         if (z <= MIN_FORWARD) return Screen(0.0, 0.0, visible = false)
-        val x = vx * basis.rx + vy * basis.ry
+        val x = vx * basis.rx + vy * basis.ry + vz * basis.rz
         val y = vx * basis.ux + vy * basis.uy + vz * basis.uz
 
         // Stereographic from the antipode of the view centre.
@@ -272,7 +338,7 @@ object SkyProjection {
      */
     fun project(azimuthDeg: Double, altitudeDeg: Double, view: View): Screen {
         val v = unit(azimuthDeg, altitudeDeg)
-        return projectUnit(v[0], v[1], v[2], Basis(view))
+        return projectUnit(v[0], v[1], v[2], basisOf(view))
     }
 
     /**
