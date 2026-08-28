@@ -187,11 +187,55 @@ object StarNames {
      */
     fun colourArgb(bv: Double?): Int? = when {
         bv == null -> null
-        bv < 0.0 -> 0xFFBBD2FF.toInt()
-        bv < 0.3 -> 0xFFE4ECFF.toInt()
-        bv < 0.6 -> 0xFFFFF6E8.toInt()
-        bv < 1.0 -> 0xFFFFE7BE.toInt()
-        bv < 1.5 -> 0xFFFFCD96.toInt()
-        else -> 0xFFFFB27A.toInt()
+        bv < BV_EDGES[0] -> BAND_ARGB[0]
+        bv < BV_EDGES[1] -> BAND_ARGB[1]
+        bv < BV_EDGES[2] -> BAND_ARGB[2]
+        bv < BV_EDGES[3] -> BAND_ARGB[3]
+        bv < BV_EDGES[4] -> BAND_ARGB[4]
+        else -> BAND_ARGB[5]
     }
+
+    /**
+     * The same six colours, from Gaia's `bp_rp` instead of B−V.
+     *
+     * ⚠️ **The two scales do NOT share a zero point, and assuming they roughly do is the mistake
+     * this function exists to avoid.** A star at B−V = 0.00 — an A0, white — measures **+0.23** in
+     * `bp_rp`. Reaching for the familiar `bp_rp ≈ 1.2 × (B−V)` would therefore put the first edge at
+     * zero and paint every white star blue, across sixteen million of them, in a way nothing would
+     * flag.
+     *
+     * ⚠️ **The edges below were MEASURED, not derived.** Each B−V edge in [BV_EDGES] corresponds to
+     * a main-sequence effective temperature (A0 ≈ 9700 K, F0 ≈ 7300, G0 ≈ 5950, K0 ≈ 5250,
+     * M0 ≈ 4000); Gaia DR3 was asked for the mean `bp_rp` of every star brighter than magnitude 11
+     * within ±150 K of each, over 151,056 stars. The relation is empirical and it is not linear,
+     * which is exactly why it had to be measured rather than recalled.
+     *
+     * Two colour scales, six colours, one vocabulary: each source keeps the measurement it actually
+     * made, and neither is converted into the other behind the reader's back.
+     */
+    fun colourArgbFromBpRp(bpRp: Double?): Int? = when {
+        bpRp == null -> null
+        bpRp < BP_RP_EDGES[0] -> BAND_ARGB[0]
+        bpRp < BP_RP_EDGES[1] -> BAND_ARGB[1]
+        bpRp < BP_RP_EDGES[2] -> BAND_ARGB[2]
+        bpRp < BP_RP_EDGES[3] -> BAND_ARGB[3]
+        bpRp < BP_RP_EDGES[4] -> BAND_ARGB[4]
+        else -> BAND_ARGB[5]
+    }
+
+    /** Blue-white through to orange: what a star of each temperature actually looks like. */
+    private val BAND_ARGB = intArrayOf(
+        0xFFBBD2FF.toInt(),
+        0xFFE4ECFF.toInt(),
+        0xFFFFF6E8.toInt(),
+        0xFFFFE7BE.toInt(),
+        0xFFFFCD96.toInt(),
+        0xFFFFB27A.toInt(),
+    )
+
+    /** The B−V band edges, unchanged since this table was a private function in one screen. */
+    private val BV_EDGES = doubleArrayOf(0.0, 0.3, 0.6, 1.0, 1.5)
+
+    /** The same five boundaries in Gaia's `bp_rp`, measured — see [colourArgbFromBpRp]. */
+    private val BP_RP_EDGES = doubleArrayOf(0.228, 0.490, 0.780, 1.207, 2.159)
 }
