@@ -38,6 +38,13 @@ import java.io.File
  *   nothing to connect them to the button that was pressed. Only the directories nobody holds open
  *   are swept by hand.
  *
+ * ⚠️ One consequence of that asymmetry, stated rather than left to be discovered: pressing clear in
+ * a process that has never drawn a picture builds the image loader in order to empty a cache that
+ * was never allocated, and Coil's disk cache creates its directory and journal on the way. A few
+ * hundred bytes, on a directory that would exist the moment anything showed a thumbnail — so it is
+ * left alone rather than guarded, because the guard would need a second spelling of a path
+ * [dev.mascwa.pulse.di.AppContainer] owns, and a drifting path is the worse risk.
+ *
  * ⚠️ So [clear] frees less than [bytes] reports, and the caller must say what was actually freed
  * rather than imply the directory is now empty. `packs/` is left alone — it holds one download in
  * progress at a time and the repository deletes it in a `finally`, so it is self-clearing, and it is
