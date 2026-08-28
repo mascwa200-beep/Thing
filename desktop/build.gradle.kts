@@ -77,6 +77,11 @@ tasks.processResources {
     // the phone and the companion cannot end up on different versions of the same face, and the
     // OFL notice that ships in the survival assets already covers them.
     from(rootProject.file("app/src/main/res/font")) { into("font") }
+    // The 8,404 naked-eye stars, borrowed the same way. A quarter of a megabyte of tab-separated
+    // text, one copy in the repository, so the phone's chart and the companion's can never disagree
+    // about where a star is. Its NOTICE.txt travels with it — the catalogue is CDS-licensed and the
+    // attribution is a condition rather than a courtesy.
+    from(rootProject.file("app/src/main/assets/sky")) { into("sky") }
     from(writeBuildInfo)
 }
 

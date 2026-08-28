@@ -120,6 +120,7 @@ import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.DesktopUnits
 import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.settings.UnitPrefs
+import dev.mascwa.pulse.desktop.sky.StarCatalogSource
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
@@ -308,6 +309,10 @@ fun PulseDesktopApp(
         val spaceWeatherVm = remember {
             SpaceWeatherViewModel(scope, spaceWeatherRepository, settings)
         }
+        // The bundled star catalogue. Held here rather than inside the view model so its 800 kB of
+        // parsed rows is read once for the whole console — a torn-off observatory window is the same
+        // composition, so it shares this instance rather than parsing a quarter of a megabyte again.
+        val stars = remember { StarCatalogSource() }
         val observatoryVm = remember {
             ObservatoryViewModel(
                 scope,
@@ -317,6 +322,7 @@ fun PulseDesktopApp(
                 OrbitalRepository(http, cache) { "DEMO_KEY" },
                 LaunchRepository(http, cache),
                 CometRepository(http, cache),
+                stars,
                 settings,
             )
         }

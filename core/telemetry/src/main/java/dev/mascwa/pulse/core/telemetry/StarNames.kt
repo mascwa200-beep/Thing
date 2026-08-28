@@ -165,4 +165,33 @@ object StarNames {
      * entire stated purpose is a guard in another module cannot be `internal`.
      */
     fun properKeys(): Set<String> = PROPER.keys
+
+    /**
+     * What colour a star actually looks, from its B-V index, as packed ARGB.
+     *
+     * ⚠️ **Real, not decorative.** B-V is a measurement of how much brighter a star is in one filter
+     * than another, and it maps almost directly onto what the eye sees: Rigel at −0.03 is blue-white,
+     * Betelgeuse at +1.85 is visibly orange. A chart drawn in one colour looks wrong to anybody who
+     * has looked up.
+     *
+     * ⚠️ **Null in, null out, and that is the contract rather than an oversight.** About three per
+     * cent of the catalogue has no measured colour, and the honest answer there is the drawing
+     * surface's own ink rather than a guess — which is a palette question, and palettes belong to
+     * the platform. Returning a made-up white here would put a claim about a measurement into a
+     * value nobody could tell from a real one.
+     *
+     * ⚠️ It returns an **Int**, not a Compose `Color`, for the reason `Oracle.urgencyArgb` does: this
+     * module carries no UI dependency, and two consoles now draw the same catalogue. One table, so
+     * the phone and the companion cannot end up disagreeing about what colour Betelgeuse is — the
+     * duplicated-definition drift this project has corrected six times.
+     */
+    fun colourArgb(bv: Double?): Int? = when {
+        bv == null -> null
+        bv < 0.0 -> 0xFFBBD2FF.toInt()
+        bv < 0.3 -> 0xFFE4ECFF.toInt()
+        bv < 0.6 -> 0xFFFFF6E8.toInt()
+        bv < 1.0 -> 0xFFFFE7BE.toInt()
+        bv < 1.5 -> 0xFFFFCD96.toInt()
+        else -> 0xFFFFB27A.toInt()
+    }
 }

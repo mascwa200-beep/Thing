@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,13 +15,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.Comets
 import dev.mascwa.pulse.core.telemetry.Eclipses
+import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.orbital.CometRepository
@@ -29,6 +33,7 @@ import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
+import dev.mascwa.pulse.desktop.sky.StarCatalogSource
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.DesktopUnits
 import dev.mascwa.pulse.desktop.settings.LocalUnits
@@ -54,6 +59,7 @@ class ObservatoryViewModel(
     orbital: OrbitalRepository,
     launches: LaunchRepository,
     comets: CometRepository,
+    stars: StarCatalogSource,
     settings: DesktopSettingsStore,
 ) {
     val sky = WorldFeed<OrbitalData>(scope, settings) { lat, lon, force ->
@@ -90,6 +96,54 @@ class ObservatoryViewModel(
             Eclipses.upcoming(now, now + ECLIPSE_HORIZON_MS).map { e ->
                 val local = Eclipses.local(e, lat, lon)
                 EclipseNight(e, local, Eclipses.advice(e, local))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /** One star, already turned into a look angle from here. */
+    data class PlottedStar(
+        val azimuthDeg: Double,
+        val altitudeDeg: Double,
+        val magnitude: Double,
+        /** ARGB from the star's measured B-V, or null where the catalogue has none. */
+        val colourArgb: Int?,
+        /** Only the brightest are named — a chart that labels four hundred stars is unreadable. */
+        val label: String?,
+    )
+
+    /**
+     * The naked-eye sky above this machine, from the bundled catalogue.
+     *
+     * ⚠️ **Magnitude 4.5 is a measured cut, not a round number.** The catalogue holds 8,404 stars;
+     * 904 are brighter than 4.5 and roughly half of those are above the horizon at any moment, which
+     * is about four hundred dots — dense enough to read as the sky and far short of what would turn
+     * a chart into grey mush. Going one magnitude fainter triples it to 2,887.
+     *
+     * ⚠️ **Positions are J2000 and drawn as if of-date, exactly as the phone's chart does.**
+     * Precession moves a star about 50 arcseconds a year, so by 2050 the sky will have drifted a
+     * couple of fifths of a degree — smaller than the dot a star is drawn as. Correcting it would be
+     * arithmetic nobody could see. (The occultation list on the phone DOES precess, because there
+     * the answer turns on arcseconds; that difference is deliberate.)
+     */
+    val chart = WorldFeed<List<PlottedStar>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            stars.brighterThan(CHART_MAGNITUDE_LIMIT).mapNotNull { star ->
+                val h = Ephemeris.toHorizontal(
+                    Ephemeris.Equatorial(star.rightAscensionDeg, star.declinationDeg, 0.0),
+                    lat, lon, now,
+                )
+                // Below the horizon is behind the ground. Dropped here rather than drawn faintly:
+                // this is a "what can I see right now" chart, not an all-sky map.
+                if (h.altitudeDeg <= 0.0) return@mapNotNull null
+                PlottedStar(
+                    azimuthDeg = h.azimuthDeg,
+                    altitudeDeg = h.altitudeDeg,
+                    magnitude = star.magnitude,
+                    colourArgb = StarNames.colourArgb(star.colourIndex),
+                    label = if (star.magnitude <= CHART_LABEL_LIMIT) star.name else null,
+                )
             }
         }
         Fetched(data = list, fromCache = false)
@@ -155,12 +209,25 @@ class ObservatoryViewModel(
         )
     }
 
-    private companion object {
+    /**
+     * ⚠️ `internal`, not `private`, and the reason is a rule this project keeps re-learning: the
+     * caption under the chart quotes [CHART_MAGNITUDE_LIMIT], and a screen that cannot see the
+     * constant would have to restate the number — a second copy of a measured value, free to drift
+     * from the one that actually filters the catalogue. The same trap is recorded against
+     * `StarNames.properKeys` and `Stardate.clockOf`.
+     */
+    internal companion object {
         /** Enough to be worth reading; [Comets.visible] has already dropped what cannot be seen. */
         const val COMET_LIMIT = 10
 
         /** See [eclipses] — measured, not rounded. */
         const val ECLIPSE_HORIZON_MS = 2L * 365L * 86_400_000L
+
+        /** See [chart] — 904 stars in the catalogue, about four hundred of them up. */
+        const val CHART_MAGNITUDE_LIMIT = 4.5
+
+        /** 23 stars in the whole sky, about a dozen up. Any more and the labels overlap. */
+        const val CHART_LABEL_LIMIT = 1.5
     }
 }
 
@@ -178,6 +245,7 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
     val eclipsesLocated by vm.eclipses.located.collectAsState()
     val showers: Async<List<ObservatoryViewModel.ShowerNight>> by vm.showers.state.collectAsState()
     val showersLocated by vm.showers.located.collectAsState()
+    val chart: Async<List<ObservatoryViewModel.PlottedStar>> by vm.chart.state.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
@@ -185,6 +253,7 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
         vm.launches.ensureLoaded()
         vm.comets.ensureLoaded()
         vm.eclipses.ensureLoaded()
+        vm.chart.ensureLoaded()
     }
 
     // ⚠️ **The one thing on this page with a timer, and only while the page is open.** Whether a
@@ -264,21 +333,47 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                 // it reports where the station is over the Earth, not where to look for it from here.
                 // Drawing it would mean inventing a sighting, so it stays off until the pass search
                 // the phone runs is ported.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LcarsSkyPlot(
-                        points = visible.map { p ->
-                            SkyPoint(
-                                azimuthDeg = p.azimuthDeg,
-                                altitudeDeg = p.altitudeDeg,
-                                label = p.name.take(3),
-                                // Brighter is bigger, which is what the eye is looking for.
-                                color = c.amber,
-                                radiusDp = if (p.magnitude < 0.0) 4.dp else 3.dp,
-                            )
-                        },
-                        modifier = Modifier.size(SKY_PLOT).padding(top = 3.dp),
-                    )
-                    LcarsFrame(Modifier.weight(1f)) {
+                // ⚠️ **The stars are drawn FIRST, and the order is the whole point.** A planet
+                // plotted behind four hundred stars is a planet nobody can find; the list below
+                // names them, and the chart has to agree with the list at a glance.
+                val stars = chart.data.orEmpty()
+                LcarsSkyPlot(
+                    points = stars.map { star ->
+                        SkyPoint(
+                            azimuthDeg = star.azimuthDeg,
+                            altitudeDeg = star.altitudeDeg,
+                            label = star.label,
+                            // ⚠️ The measured colour where the catalogue has one, and the page's own
+                            // ink where it does not — which is about three per cent of entries. A
+                            // made-up white there would be indistinguishable from a real measurement.
+                            color = star.colourArgb?.let { Color(it) } ?: c.ink,
+                            radiusDp = starRadius(star.magnitude),
+                        )
+                    } + visible.map { p ->
+                        SkyPoint(
+                            azimuthDeg = p.azimuthDeg,
+                            altitudeDeg = p.altitudeDeg,
+                            label = p.name.take(3),
+                            // Amber against the stars' natural colours, because a planet is the
+                            // thing on this chart you are most likely to be looking for.
+                            color = c.amber,
+                            radiusDp = if (p.magnitude < 0.0) 5.dp else 4.dp,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(SKY_CHART_HEIGHT).padding(top = 3.dp),
+                )
+                Text(
+                    if (stars.isEmpty()) {
+                        "Planets only — the star catalogue has not loaded."
+                    } else {
+                        "${stars.size} stars above the horizon, to magnitude " +
+                            "${ObservatoryViewModel.CHART_MAGNITUDE_LIMIT} · " +
+                            "Bright Star Catalogue, bundled and offline"
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                LcarsFrame(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     Column {
                         visible.sortedBy { it.magnitude }.forEach { p ->
                             LcarsDataRow(
@@ -287,7 +382,6 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                                     "mag ${String.format(java.util.Locale.US, "%.1f", p.magnitude)}",
                             )
                         }
-                    }
                     }
                 }
             }
@@ -643,5 +737,31 @@ private fun compass(deg: Double): String {
 /** See the loop in [ObservatoryScreen] — five minutes, for a reason stated there. */
 private const val SHOWER_REFRESH_MS = 5L * 60_000L
 
-/** Square, because a polar plot that is not square is an ellipse and lies about the sky. */
-private val SKY_PLOT = 168.dp
+/**
+ * How tall the sky chart is drawn.
+ *
+ * ⚠️ A HEIGHT rather than a square size, and the plot is given the full width. [LcarsSkyPlot] draws
+ * its circle off `minDimension`, so a wide box still yields a true circle with margins either side
+ * rather than the ellipse a stretched one would be — while a strict square would be as tall as the
+ * window is wide, which on a torn-off pane is most of the screen.
+ *
+ * 168 dp was the old size, chosen when the plot sat in a row beside a list of five planets. Four
+ * hundred stars need room, and this is a desktop.
+ */
+private val SKY_CHART_HEIGHT = 420.dp
+
+/**
+ * How big a star is drawn, from its magnitude.
+ *
+ * ⚠️ Magnitude is backwards — smaller is brighter — and it is logarithmic, so a linear map either
+ * loses the brightest stars in the crowd or turns the faint ones into blobs. These five bands are
+ * the same shape the phone's chart uses: the two dozen first-magnitude stars are unmistakable, and
+ * the four-hundred-odd at the limit are just visible as texture.
+ */
+private fun starRadius(magnitude: Double): Dp = when {
+    magnitude <= 0.5 -> 3.dp
+    magnitude <= 1.5 -> 2.5.dp
+    magnitude <= 2.5 -> 2.dp
+    magnitude <= 3.5 -> 1.5.dp
+    else -> 1.dp
+}

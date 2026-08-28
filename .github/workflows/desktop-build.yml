@@ -23,6 +23,9 @@ on:
       # It bundles the typefaces out of the app's resource directory too, so removing or renaming
       # one there would break the desktop at render time with nothing in this workflow to catch it.
       - "app/src/main/res/font/**"
+      # And the star catalogue, for the same reason: it is bundled out of the app's asset directory,
+      # so a change to it changes what this module ships and what its bundle guard has to check.
+      - "app/src/main/assets/sky/**"
       # The module's own build file too, not just its sources — :desktop depends on this project
       # now, so a dependency change there changes what the desktop compiles against.
       - "core/telemetry/**"

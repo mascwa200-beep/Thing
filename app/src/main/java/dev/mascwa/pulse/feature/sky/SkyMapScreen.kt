@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.SkyProjection
+import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFrame
@@ -262,16 +263,15 @@ private fun starRadiusPx(magnitude: Double, limit: Double): Float {
  * another, and it maps almost directly onto what the eye sees. Rigel at −0.03 is blue-white,
  * Betelgeuse at +1.85 is visibly orange, and the sky looks wrong without it. A star with no measured
  * colour is drawn white rather than guessed at.
+ *
+ * ⚠️ **The table moved to [StarNames.colourArgb] and this is now a two-line adapter.** The companion
+ * draws the same bundled catalogue, so a second copy of six colour bands would be the drifted
+ * duplicate this project has corrected six times. The null case stays here on purpose: "no measured
+ * colour" resolves to the drawing surface's own ink, which is a palette fact and belongs to the
+ * platform rather than to a module with no UI dependency.
  */
-private fun starColour(bv: Double?, c: NightwirePalette): Color = when {
-    bv == null -> c.ink
-    bv < 0.0 -> Color(0xFFBBD2FF)
-    bv < 0.3 -> Color(0xFFE4ECFF)
-    bv < 0.6 -> Color(0xFFFFF6E8)
-    bv < 1.0 -> Color(0xFFFFE7BE)
-    bv < 1.5 -> Color(0xFFFFCD96)
-    else -> Color(0xFFFFB27A)
-}
+private fun starColour(bv: Double?, c: NightwirePalette): Color =
+    StarNames.colourArgb(bv)?.let { Color(it) } ?: c.ink
 
 // ---- chrome ------------------------------------------------------------------------------------
 
