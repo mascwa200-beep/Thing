@@ -154,6 +154,23 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 #     reported ZERO errors attributed to the target and left only the declaring file's own missing
 #     transitive deps, which is proof the target is fine rather than an argument that it might be.
 #
+# ⚠️ **A NEW OR RENAMED FUNCTION IN A FILE THAT ALREADY CASCADES REPORTS AS UNRESOLVED, AND THAT
+# SAYS NOTHING ABOUT IT.** In a Compose screen every `LazyListScope` extension and every call to one
+# is unresolved here, because androidx is on neither path — so all of them are in the HEAD baseline
+# and cancel. Add one and its name is new, so it survives the differencing and reads as the one real
+# defect on the page. `it` comes along with it whenever the new function has a lambda.
+#
+# The control that settles it in one command, and it is a positive rather than an argument: RENAME
+# an existing function in the same file — one that unquestionably compiles in CI today — and re-run.
+# Measured on `OrbitalScreen.kt`: renaming `chartTab` to `chartTabZZ` produced
+# `unresolved reference 'chartTabZZ'` beside the new function's own, from code that has shipped for
+# months. Restore the rename afterwards and verify with `cmp`.
+#
+# ⚠️ Note the WRONG control for this one: adding a brand-new function alongside and checking whether
+# IT reports. It may not, because the cascade depends on where the call sits — a call from a plain
+# top-level function resolved cleanly while the identical call from inside the `@Composable` body did
+# not. Rename something real instead.
+#
 # ⚠️ **DO NOT PASS A TEST FILE. This is for main sources, and a test file poisons the whole run.**
 # JUnit is not on the classpath, so `Test`, `assertEquals` and `assertTrue` come back unresolved —
 # which is obvious enough — but the damage does not stop there. Adding a file full of unresolved

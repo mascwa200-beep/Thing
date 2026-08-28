@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.sky
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
@@ -77,6 +78,23 @@ class OrbitalViewModel(
     private val _launches = MutableStateFlow<List<UpcomingLaunch>>(emptyList())
     val launches: StateFlow<List<UpcomingLaunch>> = _launches.asStateFlow()
 
+    /**
+     * One shower, dated and seen from here.
+     *
+     * ⚠️ The three parts travel together because they are one answer. Handing the screen an
+     * occurrence and letting it call [MeteorShowers.viewing] itself would put a second clock read in
+     * the composition, so the peak countdown and the radiant altitude could describe two different
+     * instants — the shape that has already produced two separate defects in this app.
+     */
+    data class ShowerNight(
+        val occurrence: MeteorShowers.Occurrence,
+        val viewing: MeteorShowers.Viewing,
+        val advice: String,
+    )
+
+    private val _showers = MutableStateFlow<List<ShowerNight>>(emptyList())
+    val showers: StateFlow<List<ShowerNight>> = _showers.asStateFlow()
+
     init { load(force = false) }
 
     fun refresh() = load(force = true)
@@ -90,6 +108,7 @@ class OrbitalViewModel(
             launch { _state.load(force) { repo.fetch(loc?.latitude, loc?.longitude, it) } }
             if (loc != null) {
                 launch { computeTonight(loc.latitude, loc.longitude) }
+                launch { computeShowers(loc.latitude, loc.longitude) }
                 launch { loadPasses(loc, force) }
             }
         }
@@ -124,6 +143,29 @@ class OrbitalViewModel(
                     moonPosition = Ephemeris.moonPosition(lat, lon, now),
                 )
             }.getOrNull()
+        }
+    }
+
+    /**
+     * Which showers are on, and whether tonight is worth it from here.
+     *
+     * ⚠️ **One clock read, shared by both halves.** The peak countdown and the radiant's altitude
+     * have to describe the same instant, and calling `System.currentTimeMillis()` twice is how they
+     * come to disagree by however long the first computation took.
+     *
+     * Pure maths and no network, like [computeTonight] — the whole table is on the device, so this
+     * works with the radio off. Off the main thread anyway: thirteen solar-longitude solves each run
+     * a handful of Newton steps over the Sun's series, which is fast and not free.
+     */
+    private suspend fun computeShowers(lat: Double, lon: Double) {
+        val now = System.currentTimeMillis()
+        _showers.value = withContext(Dispatchers.Default) {
+            runCatching {
+                MeteorShowers.upcoming(now).map { occurrence ->
+                    val viewing = MeteorShowers.viewing(occurrence.shower, lat, lon, now)
+                    ShowerNight(occurrence, viewing, MeteorShowers.advice(occurrence, viewing))
+                }
+            }.getOrDefault(emptyList())
         }
     }
 

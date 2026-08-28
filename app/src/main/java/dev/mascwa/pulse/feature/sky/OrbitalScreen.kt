@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
+import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
@@ -65,6 +66,7 @@ import kotlin.math.roundToInt
 private enum class SkyTab(val label: String) {
     TONIGHT("TONIGHT"),
     SATELLITES("SATELLITES"),
+    SHOWERS("SHOWERS"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
     ASTEROIDS("ASTEROIDS"),
@@ -93,6 +95,7 @@ fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
     val passesLoading by vm.passesLoading.collectAsStateWithLifecycle()
     val tracked by vm.trackedCount.collectAsStateWithLifecycle()
     val launches by vm.launches.collectAsStateWithLifecycle()
+    val showers by vm.showers.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
     var tab by remember { mutableStateOf(SkyTab.TONIGHT) }
@@ -127,6 +130,7 @@ fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
                         SkyTab.TONIGHT -> tonightTab(tonight, passes, passesLoading, site != null, c)
                         SkyTab.SATELLITES ->
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
+                        SkyTab.SHOWERS -> showersTab(showers, site != null, c)
                         SkyTab.CHART -> chartTab(d, tonight, c)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
                         SkyTab.ASTEROIDS -> asteroidsTab(d, c)
@@ -285,6 +289,96 @@ private fun PassCard(pass: SatellitePasses.Pass, c: NightwirePalette) {
             )
         }
     }
+}
+
+// ---- SHOWERS -----------------------------------------------------------------------------------
+
+/**
+ * What is falling, and whether it is worth going outside.
+ *
+ * ⚠️ **Ordered by how close the peak is, not by how impressive the shower is.** The Geminids are the
+ * best of the year and in April they are eight months away; sorting by rate would put them at the
+ * top of a page whose whole question is "tonight?".
+ */
+private fun LazyListScope.showersTab(
+    showers: List<OrbitalViewModel.ShowerNight>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    val active = showers.filter { it.occurrence.active }
+    item { LcarsHeaderBar("On now", trailing = "${active.size}") }
+    if (active.isEmpty()) {
+        item {
+            Hint(
+                "No shower is inside its activity window today. The next one is below — a few " +
+                    "sporadic meteors an hour is the background rate all year round.",
+                c,
+            )
+        }
+    } else {
+        items(active, key = { "active-${it.occurrence.shower.id}" }) { ShowerCard(it, c) }
+    }
+
+    val ahead = showers.filterNot { it.occurrence.active }
+    if (ahead.isNotEmpty()) {
+        item { LcarsHeaderBar("Coming up", trailing = "${ahead.size}") }
+        items(ahead, key = { "ahead-${it.occurrence.shower.id}" }) { ShowerCard(it, c) }
+    }
+}
+
+@Composable
+private fun ShowerCard(night: OrbitalViewModel.ShowerNight, c: NightwirePalette) {
+    val s = night.occurrence.shower
+    val v = night.viewing
+    // ⚠️ Colour follows whether it is watchable NOW rather than how good the shower is, so a glance
+    // down the page answers the question the page is for.
+    val accent = when {
+        v.hindrance != MeteorShowers.Hindrance.NONE -> c.muted
+        night.occurrence.active -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    s.name,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(peakPhrase(night.occurrence), fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent)
+            }
+            Text(
+                night.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                // The ZHR is quoted as what it is — an idealisation — rather than as an expectation,
+                // because the count above already carries the real answer for here and now.
+                "Up to ${s.zhr}/hr in ideal conditions · ${s.speedKmS} km/s, ${s.pace} · from ${s.parent}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            if (s.caveat.isNotBlank()) {
+                Text(
+                    s.caveat,
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.amber,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/** "Peaks tonight" / "Peaks in 9 days" / "Peaked 3 days ago", never a bare signed number. */
+private fun peakPhrase(o: MeteorShowers.Occurrence): String = when {
+    o.daysFromPeak == 0 -> "PEAKS TONIGHT"
+    o.daysFromPeak < 0 -> "PEAKS IN ${-o.daysFromPeak}D"
+    else -> "PEAKED ${o.daysFromPeak}D AGO"
 }
 
 // ---- SKY CHART ---------------------------------------------------------------------------------
@@ -632,6 +726,10 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Passes propagated on-device (SGP4) from Celestrak element sets."
         SkyTab.CHART, SkyTab.SUN_MOON ->
             "Sun and Moon computed on-device — no network needed."
+        SkyTab.SHOWERS ->
+            "Peaks solved from the Sun's own position on-device, from a bundled table of radiants " +
+                "— no network needed. Rates are an ideal-conditions figure scaled for the radiant's " +
+                "height and the Moon; light pollution is not modelled."
         SkyTab.ASTEROIDS -> "Source: NASA NeoWs."
         SkyTab.LAUNCHES -> "Source: The Space Devs Launch Library (keyless)."
     }
