@@ -10133,3 +10133,106 @@ all** — a row reading 0 MB beside a button that frees nothing invites the tap 
 seven fields have consumers, so P9's wiring holds. The remaining owner-verify items from the arc are
 unchanged: whether the tiering *feels* right on the Galaxy A16, thermal behaviour under load, and the
 first-run unpack on slow flash — all device-only, and the owner's hardware is the only instrument.
+
+### THE SKY ARC — comets, and the companion catches up (this session, PR #464)
+
+Owner's directive: *"Make maps and sky showcase more features and stuff about space and our astral
+bodies near and far, like eclipses and anything, even astrology. Make the sky chart not so small and
+capable of acting as a real map. Do not stop optimizing everything from all workflows, desktop,
+mobile and nutrition… do not use any of the plan usage data."*
+
+⚠️ **That last clause is the credit directive and it OVERRIDES the standing ultracode reminder.**
+**Zero subagents and zero workflows this entire session.** Every check was local kotlinc + JUnit,
+`./gradlew :desktop:build`, a live measurement, or CI.
+
+**MAPS & SKY is complete on the phone** (#346): eclipses, occultations, meteor showers and now
+comets, plus the zodiac surface and the full-screen chart. The rest of the arc was the **companion**
+catching up, which the tandem rule puts squarely in scope.
+
+- **Comets** — `Comets.kt` (three orbit branches: elliptic Kepler, Barker's parabolic, hyperbolic
+  `M = e sinh F − F`), `CometRepository` over the MPC's own `CometEls.txt`, and the COMETS tab.
+- **`OpenFeed`, and a real defect it exposed.** `WorldFeed` resolves a coordinate before it fetches
+  and **returns early when there is none** — correct for every feed it was written for. Launches were
+  nonetheless routed through it, with a comment at the call site AND one on the field both explaining
+  that a rocket leaves from where it leaves from regardless of the observer. True of the lambda,
+  false of the class around it. So on a machine where nobody had typed a place, the desktop's launch
+  list **never loaded at all** — silently, in exact contradiction of the sentence written to justify
+  the arrangement. `OpenFeed` is what those two comments always described; `WorldFeed`'s KDoc now
+  points at it so the next coordinate-free feed cannot inherit the fault.
+- **Eclipses + meteor showers** on the desktop, both pure astronomy over the machine's own clock, so
+  they are the only things on that page that work with the cable out.
+  ⚠️ **The shower reading goes stale in a way nothing else there does**, so the screen refreshes it
+  on a five-minute loop **inside the composition** — a console left on the observatory overnight
+  would otherwise still read *"too bright, come back once the Sun is well down"* at two in the
+  morning. A machine sitting on any other screen runs no timer at all; the same shape the news feed
+  settled on.
+- **A real star chart.** The companion's sky plot was 168 dp square and drew five planets. The
+  Bright Star Catalogue is now **borrowed into the desktop jar** by `processResources`, exactly as
+  the Knowledge Base and the typefaces are — one copy in the repository, so the two consoles cannot
+  disagree about where a star is. 420 dp across the full width, magnitude 4.5, planets in amber on top.
+- **Occultations**, the last tab the companion lacked. Its blocker *was* the star catalogue.
+
+**Measured rather than chosen, every time:**
+
+| | measurement |
+|---|---|
+| star chart cut | 904 of 8,404 brighter than mag 4.5, ~half up → ~400 dots; one magnitude fainter triples it to 2,887 |
+| chart labels | mag ≤ 1.5 is 23 stars in the whole sky, ~a dozen up; more and they overlap |
+| occultation window | 9/28/57/118 ms of scan over ten targets for 1/3/6/12 months, returning 5/11/23/38 candidates |
+| of which visible | **3 of 23** were actually occulted from London — what a parallax four times the Moon's own diameter does |
+
+⚠️ **That last measurement CORRECTED a KDoc I had written an hour earlier.** It claimed cost was what
+capped the occultation search at six months. Two years is a few hundred milliseconds — affordable.
+The binding reason is the **length of the list**, and the comment now says so. In this tree an
+overstated comment is a defect.
+
+**Two definitions stopped being stated twice, both by this project's own precedent
+(`Oracle.urgencyArgb`):**
+- **The B-V star-colour table** → `StarNames.colourArgb`, returning an **Int** because
+  `:core:telemetry` carries no UI dependency. ⚠️ **Null in, null out is the contract**: about three
+  per cent of the catalogue has no measured colour, and the honest answer is the drawing surface's
+  own ink — a palette fact, which belongs to the platform. A made-up white would put a claim about a
+  measurement into a value nothing could tell from a real one.
+- **The occultation constants** (five star names, two uncertainties, the window) → `Occultations`.
+  The uncertainty pair is the worst in the app to let drift: it is what decides whether an
+  occultation is **called or refused** near the Moon's edge, and the two differ ninety-fold.
+
+⚠️ **Deliberate asymmetry worth not "fixing": the chart does NOT precess star positions and the
+occultation search DOES.** On a chart the drift by 2050 is smaller than the dot a star is drawn as;
+in an occultation the whole answer turns on arcseconds against a limb half a degree across. That is
+exactly why `Occultations.Target` takes a position FUNCTION rather than a coordinate.
+
+**New gate: `StarCatalogBundleTest`** (6 tests). ⚠️ Every way the borrowed catalogue can break is
+silent — the copy not running, the wrong prefix, a resource path read relative to a package rather
+than the jar root, a rebuilt catalogue reordering its columns. None is a compile error, none throws
+(the loader answers an empty list by design), and all look identical from here. It asserts the count,
+that RA/Dec are angles, that Sirius is the first row **at Sirius's coordinates**, that the file is
+still sorted brightest first (what makes `brighterThan` a prefix rather than a walk of eight
+thousand), that the five occultable stars still resolve, and that **the CDS attribution shipped** —
+a licence condition, and the same copy that would leave the notice behind is the one that puts the
+stars there.
+
+**Verification:** 2,248 core tests and 280 desktop tests, both executed locally; **twelve
+load-bearing rules negative-tested** against a baseline asserted green first, each perturbation
+asserted to have matched the source and each restore byte-compared.
+
+⚠️ **The cross-module smart cast bit for the FOURTH time** — `v.perHour != null && v.perHour > 0`,
+where `perHour` is a public property of another module. Three of the previous four were CI failures;
+**this is the first one a local build caught**, which is the argument for the desktop module carrying
+real features.
+
+⚠️ **And the recorded kotlinc trap bit again, in a throwaway benchmark: without kotlinx-coroutines on
+the COMPILER's own `-cp` it dies in `CoreApplicationEnvironment` before reading a line — and my grep
+printed "compiled" for a run that produced no class files at all.** Assert the output exists.
+
+⚠️ **Owner-verify on Windows — this container has no GL context, so none of the desktop render is
+provable here.** The observatory should now carry: a large star chart with the planets in amber over
+it and a line saying how many stars are up; ECLIPSES with two years of them, an eclipse that misses
+you drawn muted rather than omitted; METEOR SHOWERS whose advice changes on its own as the evening
+goes on; the Moon's occultations with a graze called out as a refusal rather than a yes; and comets
+brightest first. On the Pixel nothing should have changed at all except that the star colours now
+come from the shared table.
+
+**Open / steerable:** the desktop still has no ZODIAC surface — `Astrology` is in the core and
+`PlanetCalc` is available, so it is the same small shape as the eclipse slice whenever the owner
+wants it.
