@@ -155,6 +155,14 @@ object StarNames {
         else -> null
     }
 
-    /** Only for the test that walks the real asset. */
-    internal fun properKeys(): Set<String> = PROPER.keys
+    /**
+     * Only for the test that walks the real asset — every key here must name a star the catalogue
+     * actually carries, or a proper name is shipped that nothing can ever display.
+     *
+     * ⚠️ **Public, and `internal` was wrong.** `internal` is MODULE-scoped, and the one caller is
+     * `StarCatalogAssetTest` in `:app` — so it could not see this at all and CI refused to compile
+     * the test source. The same trap is already recorded against `Stardate.clockOf`. A member whose
+     * entire stated purpose is a guard in another module cannot be `internal`.
+     */
+    fun properKeys(): Set<String> = PROPER.keys
 }

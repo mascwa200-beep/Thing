@@ -67,6 +67,23 @@ else
     FAIL=1
 fi
 
+# ---- 1a2. an `internal` member of a shared core cannot be reached from another module ------------
+# ⚠️ `internal` is MODULE-scoped. Nothing else here can catch a crossing: the parse gate does not
+# resolve names, the resolve gate differences *unresolved* references and this is a VISIBILITY error,
+# and `:app` unit tests cannot be built in this container at all. It has cost two red CI rounds
+# (`Stardate.clockOf`, then `StarNames.properKeys` on run 2084) and the script says how.
+#
+# Runs unconditionally rather than on the changed set: the two halves of the mistake live in
+# different modules, so a change to either one can create it.
+echo
+echo "== cross-module internal gate =="
+if python3 tools/cross_module_internal_check.py > /tmp/cmi.txt 2>&1; then
+    sed 's/^/   /' /tmp/cmi.txt
+else
+    sed 's/^/   /' /tmp/cmi.txt
+    FAIL=1
+fi
+
 # ---- 1b. a function that reads a composition local must be @Composable ---------------------------
 # ⚠️ Nothing else here can catch this: the message comes from the COMPOSE COMPILER PLUGIN, which the
 # parse gate does not run, the resolve gate cannot see (it differences unresolved NAMES) and
