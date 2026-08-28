@@ -231,6 +231,17 @@ object Ephemeris {
     /** The true obliquity of the ecliptic — mean, plus the nutation in it. */
     private fun trueObliquityDeg(t: Double): Double = obliquityDeg(t) + nutationObliquityDeg(t)
 
+    /**
+     * The true obliquity for an instant — the tilt of the Earth's axis, which is the angle every
+     * conversion between ecliptic and equatorial coordinates turns on.
+     *
+     * ⚠️ Public because [Astrology] needs it and `private` inside this object is invisible even to
+     * the same module. It returns the TRUE obliquity rather than the mean one, so a caller gets the
+     * same value the Sun and Moon are computed with and the three cannot drift apart — which is the
+     * mistake that had those two bodies in different frames until it was measured.
+     */
+    fun trueObliquityDeg(epochMs: Long): Double = trueObliquityDeg(centuries(julianDateTT(epochMs)))
+
     /** Geocentric equatorial position of the Sun (Meeus ch. 25, apparent). */
     fun sunEquatorial(epochMs: Long): Equatorial {
         val jd = julianDateTT(epochMs)
@@ -476,6 +487,26 @@ object Ephemeris {
         val alt = asin(sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(h))
         val az = atan2(sin(h), cos(h) * sin(lat) - tan(dec) * cos(lat))
         return Horizontal(alt / DEG, norm360(az / DEG + 180.0), eq.distanceKm)
+    }
+
+    /**
+     * A body's ecliptic longitude — where it sits along the Sun's own path, which is the coordinate
+     * the sky's calendar and the zodiac are both kept in.
+     *
+     * ⚠️ **The inverse of the rotation [toHorizontal]'s callers have already been through**, using
+     * the same true obliquity, so a longitude converted out and back returns exactly where it
+     * started. That is what [Astrology] needs and what nothing here could produce: every body's
+     * longitude is computed on the way to its right ascension and then discarded — the Moon's as
+     * `lambda` in [moonEquatorial], each planet's as an intermediate in the planetary theory.
+     * Deriving it back out costs four trigonometric calls and touches none of that working code,
+     * where extracting it would have meant restructuring the one function whose accuracy this
+     * project has spent a session measuring.
+     */
+    fun eclipticLongitudeOf(eq: Equatorial, epochMs: Long): Double {
+        val eps = trueObliquityDeg(epochMs) * DEG
+        val ra = eq.rightAscensionDeg * DEG
+        val dec = eq.declinationDeg * DEG
+        return norm360(atan2(sin(ra) * cos(eps) + tan(dec) * sin(eps), cos(ra)) / DEG)
     }
 
     /** Great-circle angle between two equatorial positions, degrees. */

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Astrology
 import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
@@ -70,6 +71,7 @@ private enum class SkyTab(val label: String) {
     SATELLITES("SATELLITES"),
     SHOWERS("SHOWERS"),
     ECLIPSES("ECLIPSES"),
+    ZODIAC("ZODIAC"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
     ASTEROIDS("ASTEROIDS"),
@@ -114,6 +116,7 @@ fun OrbitalBody(
     val launches by vm.launches.collectAsStateWithLifecycle()
     val showers by vm.showers.collectAsStateWithLifecycle()
     val eclipses by vm.eclipses.collectAsStateWithLifecycle()
+    val zodiac by vm.zodiac.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
     var tab by remember { mutableStateOf(SkyTab.TONIGHT) }
@@ -150,6 +153,7 @@ fun OrbitalBody(
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
                         SkyTab.SHOWERS -> showersTab(showers, site != null, c)
                         SkyTab.ECLIPSES -> eclipsesTab(eclipses, site != null, c)
+                        SkyTab.ZODIAC -> zodiacTab(zodiac, site != null, c)
                         SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
                         SkyTab.ASTEROIDS -> asteroidsTab(d, c)
@@ -542,6 +546,147 @@ private fun countdown(epochMs: Long, nowMs: Long = System.currentTimeMillis()): 
     }
 }
 
+// ---- ZODIAC ------------------------------------------------------------------------------------
+
+/**
+ * Where the classical bodies sit along the ecliptic, in both zodiacs.
+ *
+ * ⚠️ **The disclaimer is the first thing on the page and it is not negotiable.** Every position
+ * here is measured and checkable; every meaning attached to it is tradition that has been tested
+ * and does not predict. Saying so once, plainly, is what makes it defensible to compute the rest
+ * properly — and it is said without sneering, because doing the tradition well and being honest
+ * about its standing are not in tension.
+ */
+private fun LazyListScope.zodiacTab(
+    zodiac: OrbitalViewModel.Zodiac?,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (zodiac == null) {
+        item { Hint("Working out where everything is.", c) }
+        return
+    }
+    item {
+        Hint(
+            "The positions below are real: the same ephemeris the rest of this app uses, good to a " +
+                "few arcseconds against JPL. What the signs are said to MEAN is a system of " +
+                "correspondences about three thousand years old, which has been tested and does not " +
+                "predict anything. Both are worth knowing; they are not the same kind of thing.",
+            c,
+        )
+    }
+
+    item { LcarsHeaderBar("Where they are", trailing = "${zodiac.bodies.size}") }
+    items(zodiac.bodies, key = { "z-${it.name}" }) { ZodiacRow(it, c) }
+
+    item {
+        LcarsHeaderBar("The angles", trailing = if (zodiac.ascendantDeg == null) "—" else "2")
+    }
+    item {
+        LcarsFrame(Modifier.fillMaxWidth()) {
+            Column {
+                Text(
+                    zodiac.ascendantDeg?.let { "Rising  ${Astrology.format(it)}" }
+                        ?: "Rising  — undefined at this latitude, where the ecliptic never crosses " +
+                            "the horizon in the ordinary way",
+                    fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                )
+                Text(
+                    "Midheaven  ${Astrology.format(zodiac.midheavenDeg)}",
+                    fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "The rising degree is the point of the ecliptic on your eastern horizon right " +
+                        "now, and the midheaven the point crossing your meridian. Both are ordinary " +
+                        "astronomy and both move about a degree every four minutes.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+
+    if (zodiac.aspects.isNotEmpty()) {
+        item { LcarsHeaderBar("Angles between them", trailing = "${zodiac.aspects.size}") }
+        items(zodiac.aspects, key = { "a-${it.a}-${it.b}-${it.kind}" }) { AspectRow(it, c) }
+    }
+
+    item {
+        LcarsFrame(Modifier.fillMaxWidth(), accent = c.muted) {
+            Column {
+                Text(
+                    "Why two columns",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    "Western signs are measured from the March equinox, which drifts against the " +
+                        "stars by about fifty arcseconds a year. Two thousand years on, the two " +
+                        "systems are ${fmt("%.1f", zodiac.ayanamsaDeg)}° apart — most of a whole " +
+                        "sign. So a Sun \"in Aries\" is usually standing in front of Pisces. The " +
+                        "second column is the constellation-anchored answer Indian astrology uses.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZodiacRow(body: OrbitalViewModel.ZodiacBody, c: NightwirePalette) {
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (body.retrograde) c.amber else c.accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    body.name,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                    color = c.ink,
+                )
+                Text(
+                    // ⚠️ Real, and the one piece of astrological vocabulary that names something a
+                    // telescope can see: the Earth overtaking an outer planet on the inside.
+                    if (body.retrograde) "℞ RETROGRADE" else "",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                )
+            }
+            Text(
+                "${body.tropical.symbol}  ${Astrology.format(body.longitudeDeg)}",
+                fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                "${body.tropical.element.label} · ${body.tropical.mode.label}  ·  " +
+                    "against the stars: ${body.sidereal.label}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AspectRow(aspect: Astrology.Aspect, c: NightwirePalette) {
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (aspect.exact) c.violet else c.muted) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "${aspect.a} ${aspect.kind.symbol} ${aspect.b}",
+                fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                "${aspect.kind.label} · ${fmt("%.1f", aspect.orbDeg)}° off",
+                fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = if (aspect.exact) c.violet else c.muted,
+            )
+        }
+    }
+}
+
 // ---- SKY CHART ---------------------------------------------------------------------------------
 
 private fun LazyListScope.chartTab(
@@ -900,6 +1045,10 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Passes propagated on-device (SGP4) from Celestrak element sets."
         SkyTab.CHART, SkyTab.SUN_MOON ->
             "Sun and Moon computed on-device — no network needed."
+        SkyTab.ZODIAC ->
+            "Positions computed on-device from the same ephemeris as every other tab. The zodiac " +
+                "labels are a three-thousand-year-old system of correspondences, not a measurement " +
+                "— see the note at the top of the tab."
         SkyTab.ECLIPSES ->
             "Computed on-device from the shipped ephemeris — no network needed. Checked against " +
                 "JPL DE421: every eclipse of 2025-2028 agrees in kind, greatest eclipse within 30 " +

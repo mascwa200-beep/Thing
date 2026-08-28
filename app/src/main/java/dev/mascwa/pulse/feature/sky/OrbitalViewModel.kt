@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.sky
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.Astrology
 import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
@@ -10,6 +11,7 @@ import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
 import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalData
+import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
@@ -112,6 +114,33 @@ class OrbitalViewModel(
     private val _eclipses = MutableStateFlow<List<EclipseNight>>(emptyList())
     val eclipses: StateFlow<List<EclipseNight>> = _eclipses.asStateFlow()
 
+    /** One body's place along the ecliptic, in both conventions, and which way it is going. */
+    data class ZodiacBody(
+        val name: String,
+        val longitudeDeg: Double,
+        val tropical: Astrology.Sign,
+        val sidereal: Astrology.Sign,
+        val retrograde: Boolean,
+    )
+
+    /**
+     * The sky as the zodiac divides it — real positions, traditional labels.
+     *
+     * ⚠️ The ascendant is nullable and stays that way all the way to the screen: it is the only
+     * thing here that needs to know where the observer is standing, and at the poles it does not
+     * exist at all rather than merely being unknown.
+     */
+    data class Zodiac(
+        val bodies: List<ZodiacBody>,
+        val aspects: List<Astrology.Aspect>,
+        val ascendantDeg: Double?,
+        val midheavenDeg: Double,
+        val ayanamsaDeg: Double,
+    )
+
+    private val _zodiac = MutableStateFlow<Zodiac?>(null)
+    val zodiac: StateFlow<Zodiac?> = _zodiac.asStateFlow()
+
     init { load(force = false) }
 
     fun refresh() = load(force = true)
@@ -127,6 +156,7 @@ class OrbitalViewModel(
                 launch { computeTonight(loc.latitude, loc.longitude) }
                 launch { computeShowers(loc.latitude, loc.longitude) }
                 launch { computeEclipses(loc.latitude, loc.longitude) }
+                launch { computeZodiac(loc.latitude, loc.longitude) }
                 launch { loadPasses(loc, force) }
             }
         }
@@ -209,6 +239,75 @@ class OrbitalViewModel(
                     EclipseNight(e, local, Eclipses.advice(e, local))
                 }
             }.getOrDefault(emptyList())
+        }
+    }
+
+    /**
+     * Where the seven classical bodies are along the ecliptic, and what tradition calls it.
+     *
+     * ⚠️ **The positions are the app's ordinary, measured ones** — the same [Ephemeris] that agrees
+     * with JPL to a few arcseconds, and [PlanetCalc] for the planets. Nothing here is computed
+     * differently because it is going to be labelled with a zodiac sign; the labelling is the only
+     * part that is tradition, and [Astrology] documents that at length.
+     *
+     * ⚠️ **One clock read, shared by every body and by the retrograde comparison.** Calling for the
+     * time twice is how the aspect between two bodies comes to describe two different instants —
+     * the shape that has already produced two separate defects in this app.
+     */
+    private suspend fun computeZodiac(lat: Double, lon: Double) {
+        val now = System.currentTimeMillis()
+        val later = now + Astrology.RETROGRADE_BASELINE_MS
+        _zodiac.value = withContext(Dispatchers.Default) {
+            runCatching {
+                val longitudes = LinkedHashMap<String, Double>()
+                val bodies = ArrayList<ZodiacBody>()
+
+                fun add(name: String, lonNow: Double, lonLater: Double) {
+                    longitudes[name] = lonNow
+                    bodies += ZodiacBody(
+                        name = name,
+                        longitudeDeg = lonNow,
+                        tropical = Astrology.signOf(lonNow),
+                        sidereal = Astrology.siderealSignOf(lonNow, now),
+                        retrograde = Astrology.isRetrograde(lonNow, lonLater),
+                    )
+                }
+
+                add(
+                    "Sun",
+                    Ephemeris.sunApparentLongitudeDeg(now),
+                    Ephemeris.sunApparentLongitudeDeg(later),
+                )
+                add(
+                    "Moon",
+                    Ephemeris.eclipticLongitudeOf(Ephemeris.moonEquatorial(now), now),
+                    Ephemeris.eclipticLongitudeOf(Ephemeris.moonEquatorial(later), later),
+                )
+                // The observer's position changes nothing about a geocentric longitude, but
+                // PlanetCalc needs one to compute at all, so it gets the real one.
+                val soon = PlanetCalc.planetsNow(lat, lon, later).associateBy { it.name }
+                for (p in PlanetCalc.planetsNow(lat, lon, now)) {
+                    val thenP = soon[p.name] ?: continue
+                    add(
+                        p.name,
+                        Ephemeris.eclipticLongitudeOf(
+                            Ephemeris.Equatorial(p.rightAscensionDeg, p.declinationDeg, 1.0), now,
+                        ),
+                        Ephemeris.eclipticLongitudeOf(
+                            Ephemeris.Equatorial(thenP.rightAscensionDeg, thenP.declinationDeg, 1.0),
+                            later,
+                        ),
+                    )
+                }
+
+                Zodiac(
+                    bodies = bodies,
+                    aspects = Astrology.aspects(longitudes),
+                    ascendantDeg = Astrology.ascendantDeg(now, lat, lon),
+                    midheavenDeg = Astrology.midheavenDeg(now, lon),
+                    ayanamsaDeg = Astrology.ayanamsaDeg(now),
+                )
+            }.getOrNull()
         }
     }
 

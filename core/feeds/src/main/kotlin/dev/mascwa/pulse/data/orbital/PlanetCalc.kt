@@ -112,7 +112,7 @@ object PlanetCalc {
                 "Saturn" -> -9.0 + 5 * log10(r * bigR) + 0.044 * fv
                 else -> 0.0
             }
-            Planet(p.name, alt, az, mag, alt > 0)
+            Planet(p.name, alt, az, mag, alt > 0, ra, dec)
         }
     }
 }

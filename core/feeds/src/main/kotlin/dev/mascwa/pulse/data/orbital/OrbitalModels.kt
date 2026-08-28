@@ -70,6 +70,11 @@ data class Planet(
     val azimuthDeg: Double,    // from true north, clockwise
     val magnitude: Double,     // lower = brighter
     val aboveHorizon: Boolean,
+    // ⚠️ Computed by PlanetCalc on the way to the altitude and azimuth above, and thrown away until
+    // something needed a coordinate that does not depend on where the observer is standing. Both
+    // default to zero so every existing construction still compiles; PlanetCalc fills them in.
+    val rightAscensionDeg: Double = 0.0,
+    val declinationDeg: Double = 0.0,
 )
 
 @Serializable
