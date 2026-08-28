@@ -178,17 +178,21 @@ class SkyProjectionTest {
 
     @Test
     fun `the magnitude limit deepens as the field narrows`() {
-        val wide = SkyProjection.magnitudeLimit(SkyProjection.MAX_FOV_DEG)
-        val tight = SkyProjection.magnitudeLimit(SkyProjection.MIN_FOV_DEG)
+        // ⚠️ The depth is stated rather than defaulted, because the function no longer has a
+        // default — see its KDoc for the defect that removed one. This test is about the SHAPE of
+        // the curve, so the shallow catalogue is the right thing to state here.
+        val NAKED_EYE = SkyProjection.NAKED_EYE_LIMIT
+        val wide = SkyProjection.magnitudeLimit(SkyProjection.MAX_FOV_DEG, NAKED_EYE)
+        val tight = SkyProjection.magnitudeLimit(SkyProjection.MIN_FOV_DEG, NAKED_EYE)
         assertEquals("the widest field is the shallowest", SkyProjection.WIDEST_LIMIT, wide, 1e-9)
         assertEquals("tight should reach the catalogue's floor", 6.5, tight, 1e-9)
-        assertTrue(SkyProjection.magnitudeLimit(60.0) in wide..tight)
+        assertTrue(SkyProjection.magnitudeLimit(60.0, NAKED_EYE) in wide..tight)
         // Monotonic, so zooming never makes a star that was drawn disappear.
         var previous = wide
         var fov = SkyProjection.MAX_FOV_DEG
         while (fov > SkyProjection.MIN_FOV_DEG) {
             fov -= 5.0
-            val here = SkyProjection.magnitudeLimit(fov)
+            val here = SkyProjection.magnitudeLimit(fov, NAKED_EYE)
             assertTrue("limit went backwards at $fov", here >= previous - 1e-12)
             previous = here
         }

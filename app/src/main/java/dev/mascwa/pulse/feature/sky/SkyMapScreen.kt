@@ -136,6 +136,9 @@ private fun SkyCanvas(
     val site by vm.site.collectAsStateWithLifecycle()
     val hours by vm.hourOffset.collectAsStateWithLifecycle()
     val deepRevision = vm.revision.collectAsStateWithLifecycle()
+    // ⚠️ How faint the catalogue actually goes. Omitting it is not a default, it is a cut at the
+    // naked-eye limit — see SkyMapViewModel.deepestMagnitude for what that measured.
+    val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
 
     // ⚠️ Held rather than read in the draw pass, so the sky does not creep while somebody pans. The
     // instant only moves when the scrubber does, which is what the existing map has always done.
@@ -194,7 +197,7 @@ private fun SkyCanvas(
 
         drawHorizon(view, c, half, cx, cy, viewport, cardinalPaint)
 
-        val limit = SkyProjection.magnitudeLimit(view.fovDeg)
+        val limit = SkyProjection.magnitudeLimit(view.fovDeg, deepest)
         val here = site
         if (here != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The

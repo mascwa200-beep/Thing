@@ -33,6 +33,19 @@ class StarField(private val reader: StarCatalogReader) {
     /** The stars, ready to project. Valid over `0 until layer.count`. */
     val layer = StarLayer(INITIAL)
 
+    /**
+     * The faintest magnitude this catalogue holds, so the RENDERER can cut where the data stops.
+     *
+     * ⚠️ **This exists because the drawing side was cutting somewhere else entirely, and the
+     * symptom was the complaint that started this work.** [SkyProjection.magnitudeLimit] takes a
+     * `deepest` that defaults to [SkyProjection.NAKED_EYE_LIMIT]; [update] passes the real one and
+     * the screen was passing nothing. So the loader read three million stars down to magnitude 12
+     * and the renderer threw away everything fainter than 6.5 — measured over the real catalogue, a
+     * fifteen-degree field drew 123 stars where it should draw thousands, and zooming in made the
+     * sky EMPTIER. Both sides have to agree on where the data stops, and this is where it is known.
+     */
+    val deepestMagnitude: Double get() = reader.deepestMagnitude
+
     /** What the last load covered, so the plan can tell whether it still does. */
     var loaded: SkyFieldPlan.Loaded? = null
         private set

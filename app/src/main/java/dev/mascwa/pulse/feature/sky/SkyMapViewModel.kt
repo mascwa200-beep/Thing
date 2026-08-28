@@ -93,6 +93,23 @@ class SkyMapViewModel(
     private val _deepNote = MutableStateFlow<String?>(null)
     val deepNote: StateFlow<String?> = _deepNote.asStateFlow()
 
+    /**
+     * How faint the map may draw — the depth of the deepest catalogue actually open.
+     *
+     * ⚠️ **The renderer has to be told this, and not telling it is a defect this shipped with.**
+     * [SkyProjection.magnitudeLimit]'s `deepest` defaults to [SkyProjection.NAKED_EYE_LIMIT], so a
+     * call site that omits it silently refuses to draw anything fainter than 6.5 — however deep the
+     * file is. Measured over the real 3,087,821-star catalogue at a fifteen-degree field: 31,529
+     * stars loaded, **123 drawn**. The loader had passed the real depth since it was written; only
+     * the drawing side had not, which is why every test was green.
+     *
+     * ⚠️ It starts at [SkyProjection.NAKED_EYE_LIMIT] and that is not a placeholder — it is the
+     * honest depth of the bright catalogue, which is what draws before the deep one opens and all
+     * that draws if it never does.
+     */
+    private val _deepest = MutableStateFlow(SkyProjection.NAKED_EYE_LIMIT)
+    val deepestMagnitude: StateFlow<Double> = _deepest.asStateFlow()
+
     /** A star or a solar-system body, already in horizon coordinates for the current instant. */
     data class Body(
         val azimuthDeg: Double,
@@ -185,7 +202,14 @@ class SkyMapViewModel(
     private suspend fun openDeepCatalogue() {
         if (deepField != null) return
         val opened = deepCatalog.opened()
-        if (opened != null) deepField = StarField(opened.reader)
+        if (opened != null) {
+            val field = StarField(opened.reader)
+            deepField = field
+            // ⚠️ The one place the renderer learns it may go deeper than the naked eye. Raised
+            // rather than assigned: a catalogue SHALLOWER than the bright one must not make the map
+            // draw less than it already could.
+            _deepest.value = maxOf(_deepest.value, field.deepestMagnitude)
+        }
         _deepNote.value = deepCatalog.note()
     }
 

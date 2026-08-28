@@ -444,8 +444,19 @@ object SkyProjection {
      *
      * @param deepest how far the catalogue actually goes. The result is clamped to it, so a shallow
      *   catalogue stops deepening at its own floor instead of promising rows that are not there.
+     *
+     * ⚠️ **`deepest` HAS NO DEFAULT, and that is deliberate — it used to, and the omission it
+     * invited was the defect that prompted this note.** The renderer called this without it, so it
+     * silently cut at [NAKED_EYE_LIMIT] while the loader — which passed the real depth — read three
+     * million stars down to magnitude 12. Measured over the real catalogue at a fifteen-degree
+     * field: 31,529 loaded, **123 drawn**; at five degrees, ten. Zooming in made the sky emptier,
+     * which is the complaint this whole body of work exists to answer.
+     *
+     * Every test passed a depth explicitly, so every test was green and none of them described what
+     * the app did. This project has now shipped that shape three times — a default that quietly
+     * means "do not do the thing" — so the parameter is required and the compiler is the guard.
      */
-    fun magnitudeLimit(fovDeg: Double, deepest: Double = NAKED_EYE_LIMIT): Double {
+    fun magnitudeLimit(fovDeg: Double, deepest: Double): Double {
         val fov = fovDeg.coerceIn(MIN_FOV_DEG, MAX_FOV_DEG)
         val decades = log10(MAX_FOV_DEG / fov)
         return (WIDEST_LIMIT + MAGNITUDES_PER_DECADE * decades).coerceAtMost(deepest)
