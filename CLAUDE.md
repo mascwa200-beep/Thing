@@ -9694,3 +9694,143 @@ rather than crash). In the nutrition app search **"chicken breast"** — generic
 Type **1.25** into a training load. A weigh-in recorded **yesterday evening** should read "Yesterday"
 this morning. And send a fault report: the logcat section should carry warnings and errors rather than
 keyboard chatter.
+
+### THE POTATO PASS — both apps adapt to the device they are actually on (this session, PR #464)
+
+Owner: *"keep optimizing everything until the entire optimize task is done across every single line of
+code. The whole of every app has to be capable of running on a 'potato' if it ever had to."* Two
+binding AskUserQuestion decisions shaped all of it: **adaptive only, nothing removed** — detect a weak
+device and turn *down*, never delete a feature and never treat install size as the lever (which rules
+out R8 on `:nutrition`, ABI splits and moving the food database, none of which appear below) — and
+**relax the gate so LCARS installs anywhere.** Standing credit directive still in force: **zero
+subagent and zero workflow spend** for the whole arc.
+
+**The finding that justified the work: there was no adaptivity in either app.** Verified counts,
+repo-wide: `isLowRamDevice` **0** call sites, `getMemoryClass`/`getLargeMemoryClass` **0**, every
+thermal API **0**, `isDeviceIdleMode`/`isBackgroundRestricted` **0**, `ANIMATOR_DURATION_SCALE` **0**,
+`ActivityManager.MemoryInfo` twice and **both only to print a string**. The one adaptive mechanism was
+`Sensorium.level()`, which is exactly the right shape and governed 1 of 9 foreground services.
+
+⚠️ **Three of the audit's claims were WRONG and are not acted on**, checked rather than inherited:
+`onTrimMemory` **is** implemented in both applications and both clear the Coil cache; both memory
+caches are already at a measured 6% of heap; `:nutrition` has two `LazyColumn`s, not zero. That was an
+earlier potato pass. The remaining image problem was the decode, not the cache — and then measurement
+killed that too (below).
+
+**Shipped as P1–P8**, each its own commit: the `DeviceClass` capability core + probe; the tier folded
+into the ONE existing ladder rather than a second one beside it; the 18-item background worker learning
+to say no; the main-thread work; frame time; disk; the gate; the sensors.
+
+#### The measurements that changed or cancelled a plan item
+
+- **The animation sweep was 5 sites, not the plan's 19.** `Effects`, the radar and `HudReactor` already
+  read their animation state inside draw lambdas.
+- **Guide diagrams and the reader do NOT decode unbounded.** Disassembling coil 2.7.0 shows
+  `UtilsKt.requestOfWithSizeResolver` installs a `ConstraintsSizeResolver` unless the request defines
+  one or `contentScale == None`. The plan's largest single memory item does not exist.
+- ⚠️ **`android:largeHeap` is NOT "justified by a comment naming Filament AR".** There is no comment at
+  all, and **Filament has zero references in the tree**. What needs the room is the native engine set —
+  whisper's acoustic model, llama's ~1 GB adjudicator, QuickJS. The manifest now says so, with the two
+  consequences worth not rediscovering: the platform **ignores** the flag on a low-RAM device, and it
+  changes which `ActivityManager` number is the right one to ask for.
+- **`BootScreen` was left alone with a written reason**: its `progress` genuinely drives the decrypt
+  log's content, so deferring only `swirl`/`pulse` buys nothing. The real fix is `derivedStateOf` +
+  `graphicsLayer`, a restructure of an 8.8-second cinematic on a screen no build machine can render.
+
+#### What the slices actually found
+
+- **P4/P4b — 22 stores decoded on the caller's thread.** ⚠️ **A `suspend` function runs on whatever
+  dispatcher its caller is on.** DataStore reads the preferences FILE on its own IO scope, but a flow
+  emission is delivered in the COLLECTOR's context, so `first()` resumes on the caller's dispatcher and
+  *our* decode runs there. `SettingsRepository` was the worst: a Keystore AES-GCM round trip plus a
+  ~174-field JSON decode, on 17 collectors, on the main thread. `MainActivity.onStop` then serially
+  `flushNow()`s nineteen of these on `Main.immediate`.
+- **P6 — nothing ever deleted a downloaded APK.** Half a gigabyte between the two applications, held
+  indefinitely. ⚠️ It cannot be deleted at the obvious place: `PackageInstaller.commit()` usually kills
+  the process, so a line after it may never run. Swept at launch instead, **by age**, because a file is
+  named after its release tag rather than its build number.
+- **P6 — a defect I introduced in P1.** `DeviceProbeReader` read `getMemoryClass()` on an app that
+  declares `largeHeap`, so a phone reporting a 192 MB standard class voted MODEST against
+  `HEAP_MODEST_MB` while genuinely having ~512 MB.
+- **P7 — the block was `MainActivity`, not `DeviceGate`.** That object's KDoc says the owner is "never
+  hard-locked" and it is true of the object; what happened is that a non-Pixel phone got
+  `DeviceGateScreen` composed INSTEAD of `PulseApp`, with "Exit" as a first-class choice. `PulseApp`
+  always composes now and the notice is drawn over it, once. ⚠️ The persisted flag keeps the name
+  `deviceGateAcknowledged` — it is a settings-blob field, i.e. a data contract.
+- **P7 — two byte-identical `isDeviceOwner()`.** The duplicated-definition drift this repo has now
+  corrected seven times. One definition on the companion, plus **one** `unavailableReason()` sentence
+  that Settings and the notice both render; Settings' own hand-written version had already drifted.
+  ⚠️ Six `DevicePolicyController` methods have **zero call sites** and their KDocs named callers deleted
+  with the game; `<force-lock/>` is still declared for a power nothing uses.
+- **P8 — a phone with no ambient-light sensor was told how bright its room was.** `Sensorium.distill`
+  mapped a null lux to `LightState.DIM`, the middle of the range, and that reading reached the scanner,
+  `describe()` (the line the Computer is handed every turn) and ORACLE's rules. `LightState.UNKNOWN`
+  now exists; an unknown brightness contributes **nothing** to the spoken line rather than a word for it.
+  ⚠️ The learned baseline folded `log10(0+1)` in on every sample — reported honestly as **latent, not
+  visible**, since a constant leaves mean and deviation at zero and the floor swallows a zero delta.
+- ⚠️ **P8's first remedy reintroduced the defect one layer up.** Making `SensorsPresent` all-false until
+  `start()` ran would have had an unarmed scanner claim the phone has no sensors at all. It is nullable:
+  null is "nobody has asked the hardware yet", and the scanner can be open while sensing is stood down.
+- **Checked and already right, said rather than implied:** the compass carries `hasSensor` and both its
+  consumers honour it; the step counter already has `Habits.StepSilence`'s three states in both apps.
+
+#### ⚠️ THE OPERATIONAL FAILURE OF THIS ARC, and it is the most important line here
+
+**P5, P6, P7 and P8 were pushed on top of a broken build and I did not check CI between them.** One
+unresolved reference — `DeviceClass.Budget` has `decorativeAnimation`, and I wrote `animations` from
+memory in P5 instead of reading the declaration — failed **four consecutive runs**, every one with that
+single error and nothing else. The work in all four is sound; none of it could compile.
+
+⚠️ **No local gate could have caught it as written.** `PulseApplication.kt` pulls in Coil, WorkManager
+and the container, so `android_compile_check.sh` cannot reach it; `android_resolve_check.sh` differences
+unresolved names, and a NEW name has no baseline to cancel against inside the cascade it already reports
+for that file. **What would have caught it in seconds is the typed probe I skipped** — compile the real
+expression against the real core type. Done now over EVERY `Budget` field, and negative-tested by putting
+the wrong name back.
+
+**Check CI after each slice, not after four.** The 13-minute round is not the cost; four wasted rounds is.
+
+#### Verification, and a sixth way a green test proves nothing
+
+92 core tests executed locally (`Sensorium` 31, `SensoriumBaseline` 11, `SensoriumEvents` 8, `Oracle` 42);
+**all five P8 rules negative-tested** against a baseline asserted green first, each perturbation asserted
+to have matched the source and each failing exactly the test that names it; `android_compile_check.sh`
+clean on the security package, on `SensorFusionController`, on `UpdateRepository` + `HttpClient` +
+`UpdatePolicy`, on `FoodDatabase` against real Room, and on **every line of `DeviceNotice.kt`** against
+the real Compose artifacts — each of those invocations negative-tested with a planted unresolved
+reference and each restore verified byte-identical with `cmp`.
+
+⚠️ **The five recorded ways a green test proves nothing gain a sixth: a perturbation harness that can be
+killed must restore in a `finally`.** A timeout left one perturbation in the tree and my residue check
+missed it, because it matched on end-of-line while the perturbed line ends in a comma — the assertion was
+too weak to see the damage. What caught it was the harness's own **baseline-must-be-green** guard, which
+is the only reason this is a note rather than a shipped defect.
+
+⚠️ **The resolve gate's app-module cascade was proven, not shrugged at.** A control that copied a verbatim
+shipping file to a new path — code green in CI today — produced the same class of report, because that
+gate carries no androidx and none of the app's own packages.
+
+**New: `scratchpad/coretest/run.sh`** runs any core test against the WHOLE core in one shot. ⚠️ Two things
+it records because both cost time: the core has taken a kotlinx-serialization dependency, so the compiler
+plugin is required or NOTHING compiles; and **`grep -L` exits 1 when any file MATCHED** — its status tracks
+matches, not output — so under `set -e` a perfectly correct listing of the core's sources killed the script
+silently. (The recipe recorded earlier in this file works only because its `grep` runs at the CALL site,
+where the callee's `set -e` does not apply.)
+
+#### Still unwired, and said plainly
+
+`DeviceClass.Budget` has seven fields and **two have consumers** — `decorativeAnimation` (via
+`LcarsTransitions`) and `work` (via `RefreshWorker`, which reads it at `:49-50`). `imageDecodePx`, `imageCacheShare`,
+`backgroundScale`, `parallelism` and `heavyEngines` are computed and read by nothing, which is this
+repository's oldest recurring defect class sitting in brand-new code. They are recorded here rather than
+left to be rediscovered. ⚠️ Note also that reading `decorativeAnimation` to gate route transitions is
+slightly WIDER than that field's own KDoc says; the call site admits it.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it does not draw, and it has no weak phone to be slow on.**
+The one that matters is whether any of this is *felt*: the app should behave exactly as before on your
+hardware, because FULL/NONE is byte-for-byte today's behaviour and that is what makes the ladder safe to
+ship without a device to test on. Then: install on a stock, non-GrapheneOS phone and confirm it **runs**
+rather than showing a gate; that the first-launch notice names what is unavailable and dismisses for
+good; Settings → Device-owner controls should carry the same sentence; and MENU → Environment Scanner
+should say **"no ambient-light sensor on this phone"** or **"sensing is not running"** rather than a
+blank where a reading would be.
