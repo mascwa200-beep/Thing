@@ -54,3 +54,76 @@ STAR NAMES
     the IAU's 88 constellation names and their genitive forms, and live in
     core/telemetry/.../StarNames.kt. StarCatalogAssetTest checks every one of them
     against this catalogue.
+
+
+================================================================================
+
+
+stars.skycat — where it comes from and what was done to it
+==========================================================
+
+SOURCE
+    Gaia Data Release 3 (Gaia Collaboration et al. 2023, A&A 674, A1)
+    European Space Agency, Gaia mission
+    Obtained from the Gaia Archive: https://gea.esac.esa.int/archive/
+
+    This work has made use of data from the European Space Agency (ESA) mission
+    Gaia (https://www.cosmos.esa.int/gaia), processed by the Gaia Data
+    Processing and Analysis Consortium (DPAC,
+    https://www.cosmos.esa.int/web/gaia/dpac/consortium). Funding for the DPAC
+    has been provided by national institutions, in particular the institutions
+    participating in the Gaia Multilateral Agreement.
+
+    The Gaia data are released under the Creative Commons Attribution-ShareAlike
+    3.0 IGO licence (CC BY-SA 3.0 IGO).
+
+WHAT WAS DONE TO IT
+    tools/sky/build_catalogue.py queries the archive for every source brighter
+    than G = 12 — 3,087,821 of them — and packs them into a binary the app can
+    read a few thousand of at a time without loading the rest.
+
+    Each star keeps five things and nothing else: right ascension, declination,
+    G magnitude, the BP-RP colour, and proper motion in both axes. Everything
+    else Gaia measures — parallax, radial velocity, the error estimates, the
+    astrometric quality flags, the epoch photometry, the source identifier — is
+    dropped, because none of it is used to draw a star.
+
+    Positions are stored relative to the tile they fall in rather than absolutely,
+    which is what makes the record eight bytes instead of twenty-four. That gives
+    about a twentieth of an arcsecond of resolution, uniformly across the sky.
+    Magnitude is stored in fourteenths and colour in steps of about a fortieth,
+    both far finer than a pixel can show. Proper motion is stored on a square law
+    so that the small motions almost every star has keep their precision while
+    the rare fast ones still fit in a byte.
+
+    No position, magnitude, colour or motion has been altered, interpolated or
+    filled in. Where Gaia measured no colour — about one source in three hundred
+    — the file records that fact rather than substituting a value.
+
+    The epoch is 2016.0, Gaia's own. The app carries each star forward by its
+    measured proper motion to whatever date it is drawing.
+
+⚠️ WHAT THIS FILE IS NOT
+    It is not the whole sky, and it must never be treated as a replacement for
+    stars.tsv.
+
+    Gaia saturates on bright stars. Measured against the Bright Star Catalogue
+    bundled beside it, of the fifteen stars brighter than magnitude 1 — Sirius,
+    Canopus, Arcturus, Vega, Capella, Rigel, Procyon, Betelgeuse, Achernar,
+    Altair, Aldebaran, Antares, Spica, Pollux and Fomalhaut — this file contains
+    NONE. At magnitude 1 to 2 it holds 12% of them; at 2 to 3, 71%; at 3 to 4,
+    90%; and it only reaches 96% below fifth magnitude. The brightest source in
+    the whole file is G = 1.71.
+
+    So the two catalogues are complementary, not alternatives. stars.tsv is the
+    bright half of the sky and carries the names; stars.skycat is the faint half
+    and carries the depth. SkyCatalogBundleTest asserts this rather than leaving
+    it as a remark, because a build that quietly dropped stars.tsv would still
+    draw three million stars and would still look like a sky.
+
+TO REBUILD
+    python3 tools/sky/build_catalogue.py app/src/main/assets/sky/stars.skycat
+
+    It fetches from the Gaia archive in tiles, splitting any query that comes
+    back at the archive's undocumented 50,000-row ceiling, and verifies its own
+    output by reading it back before it finishes. Expect it to take some hours.
