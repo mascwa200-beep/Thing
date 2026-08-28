@@ -259,9 +259,51 @@ object Sensorium {
     const val SETTLED_SCREEN_OFF_MIN = 30
 
     /**
+     * Should heavy polling stand down? The one answer, so nothing has to keep its own.
+     *
+     * ⚠️ **This exists because there were two ladders and they had drifted.** `ActiveMatrixService`
+     * had its own `BATTERY_RECOVER_PCT = 25` and its own conserve condition, while
+     * [BATTERY_RECOVER_PCT] here is 30 and its KDoc claimed to "mirror ActiveMatrix". Neither was
+     * mirroring the other. That is the duplicated-definition drift this repository has corrected
+     * repeatedly, and the fix is one function rather than two agreeing constants.
+     *
+     * ⚠️ Unifying moves ActiveMatrix's recovery from 25% to 30%, so it now stays conserving slightly
+     * longer. That is a real behaviour change and it is in the safe direction: the cost of recovering
+     * late is a few minutes of reduced polling, and the cost of recovering early on a phone hovering
+     * at the boundary is flapping.
+     */
+    fun conserveBattery(
+        batteryPct: Int,
+        charging: Boolean,
+        previouslyConserving: Boolean,
+        standDownPct: Int = BATTERY_STANDDOWN_PCT,
+    ): Boolean {
+        if (charging) return false
+        // ⚠️ `DeviceContext.batteryPct` is -1 when the level cannot be read, and an unreadable
+        // battery is not a flat one. Without this the stack conserves for ever on a phone whose
+        // gauge is broken — the same absent-probe rule DeviceClass is built on.
+        if (batteryPct < 0) return previouslyConserving
+        if (batteryPct <= standDownPct.coerceIn(1, BATTERY_CONSERVE_PCT)) return true
+        return previouslyConserving && batteryPct < BATTERY_RECOVER_PCT
+    }
+
+    /**
      * Which level the service should run at. [previous] provides hysteresis — a device hovering at the
      * conserve boundary must not flap between levels; recovery from CONSERVE/STANDDOWN needs
      * [BATTERY_RECOVER_PCT] or a charger.
+     *
+     * ⚠️ **[tier] and [pressure] are a CEILING, never a floor, and only ever downward.** A weak or
+     * hot phone cannot be sampled as hard as a cold flagship, but nothing here may ever *promote* a
+     * device the battery ladder has already throttled. Both default to the strongest reading, so
+     * every existing call site keeps today's behaviour exactly — and a [DeviceClass.Tier.FULL]
+     * phone at [DeviceClass.Pressure.NONE] is byte-for-byte unchanged.
+     *
+     * ⚠️ There is deliberately **one** ladder. Adding a second, parallel device ladder beside this
+     * one is precisely the mistake [conserveBattery] above exists to undo.
+     *
+     * @param standDownPct the battery percentage at which sensing stops entirely. A parameter rather
+     *   than the constant so the user's own `standDownBatteryPct` setting can reach it — that
+     *   setting had been written and read by nothing at all.
      */
     fun level(
         previous: SenseLevel,
@@ -270,18 +312,87 @@ object Sensorium {
         powerSave: Boolean,
         screenOffMinutes: Int,
         movement: Float,
+        tier: DeviceClass.Tier = DeviceClass.Tier.FULL,
+        pressure: DeviceClass.Pressure = DeviceClass.Pressure.NONE,
+        standDownPct: Int = BATTERY_STANDDOWN_PCT,
     ): SenseLevel {
         val throttled = previous == SenseLevel.CONSERVE || previous == SenseLevel.STANDDOWN
-        if (!charging) {
-            if (batteryPct <= BATTERY_STANDDOWN_PCT) return SenseLevel.STANDDOWN
-            if (batteryPct <= BATTERY_CONSERVE_PCT || powerSave) return SenseLevel.CONSERVE
-            if (throttled && batteryPct < BATTERY_RECOVER_PCT) return SenseLevel.CONSERVE
+        val standDown = standDownPct.coerceIn(1, BATTERY_CONSERVE_PCT)
+        val battery = when {
+            charging -> null
+            // ⚠️ **-1 means the level could not be read, and this was a live defect.**
+            // `DeviceContext.batteryPct` documents the sentinel and `isCriticalBattery` guards it
+            // with `in 0..9`; this ladder compared it unguarded, so a phone with an unreadable
+            // gauge stood the entire sensing stack down for ever and the notification blamed the
+            // battery. Unknown holds whatever the hysteresis already decided and asserts nothing.
+            batteryPct < 0 -> if (throttled) previous else null
+            batteryPct <= standDown -> SenseLevel.STANDDOWN
+            batteryPct <= BATTERY_CONSERVE_PCT || powerSave -> SenseLevel.CONSERVE
+            throttled && batteryPct < BATTERY_RECOVER_PCT -> SenseLevel.CONSERVE
+            else -> null
         }
-        return if (screenOffMinutes >= SETTLED_SCREEN_OFF_MIN && movement < HANDLING_THRESHOLD) {
+        val settled = if (screenOffMinutes >= SETTLED_SCREEN_OFF_MIN && movement < HANDLING_THRESHOLD) {
             SenseLevel.SETTLED
         } else {
             SenseLevel.NOMINAL
         }
+        // Higher ordinal is more throttled, so the most throttled opinion wins. `battery` is null
+        // when the battery has nothing to say (charging, or comfortably above every threshold), and
+        // the stillness reading stands in for it then.
+        return listOf(battery ?: settled, ceilingFor(tier), ceilingFor(pressure)).maxBy { it.ordinal }
+    }
+
+    /**
+     * The hardest this device may be sampled, whatever the battery says.
+     *
+     * A cheap phone is not merely short of battery — the mic classifier and the camera burst cost
+     * CPU and memory it does not have. ⚠️ [DeviceClass.Tier.MODEST] gets no ceiling: a 6 GB phone
+     * runs this comfortably, and throttling it would be adapting to a problem it does not have.
+     */
+    fun ceilingFor(tier: DeviceClass.Tier): SenseLevel = when (tier) {
+        DeviceClass.Tier.FULL, DeviceClass.Tier.MODEST -> SenseLevel.NOMINAL
+        DeviceClass.Tier.LEAN -> SenseLevel.SETTLED
+        DeviceClass.Tier.MINIMAL -> SenseLevel.CONSERVE
+    }
+
+    /**
+     * ⚠️ [DeviceClass.Pressure.WARM] gets no ceiling. Warm is what an ordinary busy phone reports,
+     * and standing the sensing down every time somebody watches a video would make the feature
+     * useless on exactly the thin phones it is meant to survive on.
+     */
+    fun ceilingFor(pressure: DeviceClass.Pressure): SenseLevel = when (pressure) {
+        DeviceClass.Pressure.NONE, DeviceClass.Pressure.WARM -> SenseLevel.NOMINAL
+        DeviceClass.Pressure.HOT -> SenseLevel.CONSERVE
+        DeviceClass.Pressure.CRITICAL -> SenseLevel.STANDDOWN
+    }
+
+    /**
+     * Why the service is at this level, for the notification. "Conserving battery" was said whatever
+     * the cause — a degradation the user can see but not account for is barely better than a silent
+     * one.
+     */
+    fun reasonFor(
+        level: SenseLevel,
+        tier: DeviceClass.Tier,
+        pressure: DeviceClass.Pressure,
+        batteryPct: Int,
+        charging: Boolean,
+        powerSave: Boolean,
+    ): String? = when {
+        level == SenseLevel.NOMINAL -> null
+        pressure == DeviceClass.Pressure.CRITICAL -> "the phone is too hot"
+        pressure == DeviceClass.Pressure.HOT -> "the phone is warm"
+        // ⚠️ The bound is the RECOVERY threshold, not the conserve one. A phone climbing back
+        // through 27% is still throttled by the hysteresis above, and a sentence that stopped at 25
+        // would leave that band explaining itself with silence.
+        !charging && batteryPct in 0 until BATTERY_RECOVER_PCT -> "battery is at $batteryPct%"
+        // Holding whatever the hysteresis last decided, because the gauge stopped answering.
+        batteryPct < 0 -> "the battery level cannot be read"
+        powerSave && !charging -> "the battery saver is on"
+        ceilingFor(tier).ordinal >= level.ordinal && tier != DeviceClass.Tier.FULL &&
+            tier != DeviceClass.Tier.MODEST -> "this phone has little to spare"
+        level == SenseLevel.SETTLED -> "nothing has moved for a while"
+        else -> null
     }
 
     fun cadenceFor(level: SenseLevel): Cadence = when (level) {

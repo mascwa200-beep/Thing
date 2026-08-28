@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
+import dev.mascwa.pulse.core.telemetry.DeviceClass
 import dev.mascwa.pulse.core.telemetry.Sensorium
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,20 @@ class SensoriumService : Service() {
     @Volatile private var micArmed = false
     @Volatile private var camArmed = false
     private var lastInteractiveMs = System.currentTimeMillis()
+
+    /**
+     * The last device reading, kept so [statusText] can say WHY the service is throttled.
+     *
+     * ⚠️ Held as fields rather than re-probed in [statusText], because that function runs from the
+     * notification refresh and from `tryStartForeground` — re-reading there would take a second set
+     * of binder calls to answer a question the heartbeat has just answered, and the two could
+     * disagree, which is how a notification comes to contradict the behaviour it describes.
+     */
+    @Volatile private var deviceTier = DeviceClass.Tier.FULL
+    @Volatile private var devicePressure = DeviceClass.Pressure.NONE
+    @Volatile private var lastBatteryPct = 100
+    @Volatile private var lastCharging = false
+    @Volatile private var lastPowerSave = false
 
     private val container get() = (application as? PulseApplication)?.container
 
@@ -138,6 +153,13 @@ class SensoriumService : Service() {
                 if (pm.isInteractive) lastInteractiveMs = System.currentTimeMillis()
                 val screenOffMin = ((System.currentTimeMillis() - lastInteractiveMs) / 60_000L).toInt()
 
+                // ⚠️ The device reading is taken here, per heartbeat, and not cached. The static
+                // half of it IS cached inside the reader; the half that matters at this cadence —
+                // thermal state, heap use, the battery saver — is exactly the half that moves.
+                val probe = runCatching { c.deviceProbe.probe() }.getOrNull()
+                deviceTier = probe?.let { DeviceClass.tierOf(it) } ?: deviceTier
+                devicePressure = probe?.let { DeviceClass.pressureOf(it) } ?: DeviceClass.Pressure.NONE
+
                 level = Sensorium.level(
                     previous = level,
                     batteryPct = device.batteryPct,
@@ -145,7 +167,14 @@ class SensoriumService : Service() {
                     powerSave = pm.isPowerSaveMode,
                     screenOffMinutes = screenOffMin,
                     movement = c.sensorFusion.snapshot.value.movement,
+                    tier = deviceTier,
+                    pressure = devicePressure,
+                    // The user's own floor, which had been stored and read by nothing at all.
+                    standDownPct = settings.sensing.standDownBatteryPct,
                 )
+                lastBatteryPct = device.batteryPct
+                lastCharging = device.isCharging
+                lastPowerSave = pm.isPowerSaveMode
                 engine.level.value = level
                 val cadence = Sensorium.cadenceFor(level)
 
@@ -170,6 +199,14 @@ class SensoriumService : Service() {
         }
     }
 
+    /**
+     * ⚠️ This used to say "Conserving battery" whatever the cause, and "Standing down (battery)"
+     * even when the phone was standing down because it was too hot or because it is a cheap phone
+     * with nothing to spare. A degradation the user can see but cannot account for is barely better
+     * than a silent one, and now that the tier can throttle this service the old text would often
+     * have been simply false. The sentence comes from [Sensorium.reasonFor], so the notification and
+     * the ladder cannot disagree about why.
+     */
     private fun statusText(): String {
         val engine = container?.sensoriumEngine
         val readingLine = engine?.reading?.value?.describe() ?: "warming up"
@@ -178,9 +215,22 @@ class SensoriumService : Service() {
             append(" · ")
             append(if (camArmed) "eyes armed" else "eyes on standby")
         }
-        return when (engine?.level?.value) {
-            Sensorium.SenseLevel.CONSERVE -> "Conserving battery · $readingLine"
-            Sensorium.SenseLevel.STANDDOWN -> "Standing down (battery) · heartbeat only"
+        val current = engine?.level?.value
+        val why = current?.let {
+            Sensorium.reasonFor(
+                level = it,
+                tier = deviceTier,
+                pressure = devicePressure,
+                batteryPct = lastBatteryPct,
+                charging = lastCharging,
+                powerSave = lastPowerSave,
+            )
+        }
+        return when (current) {
+            Sensorium.SenseLevel.CONSERVE ->
+                "Sampling less — ${why ?: "conserving"} · $readingLine"
+            Sensorium.SenseLevel.STANDDOWN ->
+                "Standing down — ${why ?: "conserving"} · heartbeat only"
             else -> "$readingLine · $armed"
         }
     }
