@@ -3,60 +3,35 @@ package dev.mascwa.pulse.sky
 import dev.mascwa.pulse.core.telemetry.SkyFieldPlan
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarCatalogReader
+import dev.mascwa.pulse.core.telemetry.StarNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The stars the view can currently see, held as unit vectors ready to draw.
+ * The deep catalogue's stars for the region the view can currently see.
  *
- * This is where [SkyFieldPlan]'s decision, [StarCatalogReader]'s decoding and
- * [SkyProjection.projectUnit]'s arithmetic meet. Nothing here decides anything: the plan says what
- * to load, the reader gets it, and this converts it once into the form the draw pass wants.
- *
- * ## ⚠️ Why unit vectors and not the two angles
- *
- * Projecting a star from an azimuth and an altitude costs four trigonometric calls; projecting it
- * from a unit vector costs none. Measured over twelve thousand stars — which is what the widest zoom
- * draws — that is the difference between 1.35 ms and 0.05 ms a frame on this machine, and a weak
- * phone is four to six times slower again. The conversion happens once per load, where it is
- * affordable, rather than sixty times a second, where it is not.
+ * This is where [SkyFieldPlan]'s decision, [StarCatalogReader]'s decoding and the renderer's
+ * [StarLayer] meet. Nothing here decides anything: the plan says what to load, the reader gets it,
+ * and this converts it once into the form the draw pass wants.
  *
  * ## ⚠️ What is held is bigger than what is drawn, on purpose
  *
  * [SkyFieldPlan] loads a region wider than the view so an ordinary pan costs no reading. The draw
  * pass therefore sees stars behind it and beyond the screen edges, and drops them — which is far
- * cheaper than reloading. [count] is what is held; how many land on screen is the renderer's answer.
+ * cheaper than reloading. [StarLayer.count] is what is held; how many land on screen is the
+ * renderer's answer.
+ *
+ * ## ⚠️ This is only half the sky
+ *
+ * The deep catalogue is blind to bright stars — see [StarLayer], where the measurement is. The
+ * bright set is a second layer, always resident, drawn through the same renderer.
  *
  * Not thread-safe: one field belongs to one screen, and [update] is the only thing that writes.
  */
 class StarField(private val reader: StarCatalogReader) {
 
-    /** How many stars are currently held. The arrays below are valid over `0 until count`. */
-    var count: Int = 0
-        private set
-
-    /**
-     * EQUATORIAL unit vectors, x/y/z apart so the draw pass reads three primitive arrays.
-     *
-     * ⚠️ Equatorial and not horizon, which is the decision the whole class turns on — see [SkyFrame].
-     * A horizon position changes continuously as the Earth turns, so a held set would go stale in
-     * seconds and, at a narrow field, inside one frame. An equatorial position does not move at all
-     * except by proper motion, which is a matter of decades.
-     */
-    var vx: DoubleArray = DoubleArray(INITIAL)
-        private set
-    var vy: DoubleArray = DoubleArray(INITIAL)
-        private set
-    var vz: DoubleArray = DoubleArray(INITIAL)
-        private set
-
-    /** Gaia G, for the size and the magnitude cut the renderer applies per frame. */
-    var magnitude: FloatArray = FloatArray(INITIAL)
-        private set
-
-    /** Gaia bp_rp, or NaN where none was measured — about one star in three hundred. */
-    var colour: FloatArray = FloatArray(INITIAL)
-        private set
+    /** The stars, ready to project. Valid over `0 until layer.count`. */
+    val layer = StarLayer(INITIAL)
 
     /** What the last load covered, so the plan can tell whether it still does. */
     var loaded: SkyFieldPlan.Loaded? = null
@@ -130,54 +105,50 @@ class StarField(private val reader: StarCatalogReader) {
             sink.clear()
             reader.read(read.tiles, read.magnitudeLimit, sink, yearsFromEpoch)
             fill(sink)
+            // ⚠️ **Inside the block, and that is the whole reason it is written this way.** There is
+            // no suspension point in this body, so once it starts it runs to completion; but
+            // `withContext` itself checks for cancellation on the way out. Assigning these AFTER it
+            // means a cancelled update leaves the arrays holding the NEW region while `loaded` still
+            // describes the OLD one — and the next plan, comparing against a region the field no
+            // longer holds, can answer Reuse and draw the wrong patch of sky. Nothing would throw.
+            loaded = read.becomes
+            forYearsFromEpoch = yearsFromEpoch
         }
-        loaded = read.becomes
-        forYearsFromEpoch = yearsFromEpoch
         return Outcome.RELOADED
     }
 
     /** Forget everything, so the next [update] reloads. */
     fun clear() {
-        count = 0
+        layer.clear()
         loaded = null
         forYearsFromEpoch = Double.NaN
     }
 
     private fun fill(from: StarCatalogReader.Sink) {
-        grow(from.count)
+        layer.ensure(from.count)
         for (i in 0 until from.count) {
             val u = SkyProjection.equatorialVector(
                 from.rightAscensionDeg[i], from.declinationDeg[i],
             )
-            vx[i] = u[0]
-            vy[i] = u[1]
-            vz[i] = u[2]
-            magnitude[i] = from.magnitude[i]
-            colour[i] = from.colourBpRp[i]
+            layer.vx[i] = u[0]
+            layer.vy[i] = u[1]
+            layer.vz[i] = u[2]
+            layer.magnitude[i] = from.magnitude[i]
+            // ⚠️ Resolved HERE rather than per frame. It is a comparison chain against five edges,
+            // and it is the same answer every frame for the life of a load.
+            layer.colourBand[i] = StarNames.bandFromBpRp(from.colourBpRp[i].toDouble())
         }
-        count = from.count
-    }
-
-    private fun grow(needed: Int) {
-        if (needed <= vx.size) return
-        var size = vx.size
-        while (size < needed) size *= 2
-        vx = DoubleArray(size)
-        vy = DoubleArray(size)
-        vz = DoubleArray(size)
-        magnitude = FloatArray(size)
-        colour = FloatArray(size)
+        layer.published(from.count)
     }
 
     private companion object {
         /**
          * Sized for the widest zoom's held count rather than grown into it.
          *
-         * ⚠️ Measured: the plan holds up to about thirty-three thousand stars at its worst zoom, so
-         * starting anywhere near zero means half a dozen reallocations and copies on the very first
-         * load — and the copies are of arrays that are about to be overwritten anyway. `grow` throws
-         * the old ones away rather than copying for exactly that reason: unlike the reader's sink,
-         * nothing here accumulates across calls.
+         * ⚠️ Measured: the plan holds up to about sixty-three thousand stars at its busiest zoom, so
+         * starting anywhere near zero means half a dozen reallocations on the very first load — and
+         * the arrays being thrown away are about to be overwritten anyway, which is why
+         * [StarLayer.ensure] does not copy them.
          */
         const val INITIAL = 16_384
 

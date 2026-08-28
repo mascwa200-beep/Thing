@@ -354,6 +354,10 @@ dependencies {
     implementation(project(":core:feeds"))
     implementation(project(":core:health"))
     implementation(project(":core:update"))
+    // The star renderer. ⚠️ Until this line existed, `:core:sky` was declared in settings.gradle.kts
+    // and depended on by nothing, so no task in any build ever compiled it — a module Gradle knows
+    // about but never builds fails nowhere, which is the same shape as a gate that cannot fire.
+    implementation(project(":core:sky"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

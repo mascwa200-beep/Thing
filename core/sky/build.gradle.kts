@@ -34,4 +34,16 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
+
+    // ⚠️ The graphics artifacts, and deliberately NOT the Compose compiler plugin. Nothing here is
+    // @Composable — the renderer is a DrawScope extension, which is an ordinary function — so this
+    // module needs the TYPES (DrawScope, Brush, Color, Dp) and none of the compiler machinery. A
+    // module that takes the plugin also takes its build cost and its stability rules, for nothing.
+    //
+    // `api` on ui-graphics because the renderer's own signatures name DrawScope and Color: a caller
+    // that could invoke it but not name what it takes would have to declare Compose itself, which
+    // is a dependency in all but name.
+    api(platform(libs.androidx.compose.bom))
+    api(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui)
 }
