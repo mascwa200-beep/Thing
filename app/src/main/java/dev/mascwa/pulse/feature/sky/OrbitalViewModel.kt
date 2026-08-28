@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Astrology
 import dev.mascwa.pulse.core.telemetry.Eclipses
+import dev.mascwa.pulse.core.telemetry.Comets
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.telemetry.Occultations
@@ -40,6 +41,7 @@ class OrbitalViewModel(
     private val tleRepository: TleRepository,
     private val launchRepository: LaunchRepository,
     private val starCatalog: dev.mascwa.pulse.data.sky.StarCatalog,
+    private val cometRepository: dev.mascwa.pulse.data.orbital.CometRepository,
 ) : ViewModel() {
 
     /** Where the observer is. Passes and rise/set times are meaningless without it. */
@@ -153,6 +155,28 @@ class OrbitalViewModel(
     private val _occultations = MutableStateFlow<List<Hiding>>(emptyList())
     val occultations: StateFlow<List<Hiding>> = _occultations.asStateFlow()
 
+    /**
+     * A comet worth pointing at, with where to point.
+     *
+     * ⚠️ [Comets.Sighting.magnitude] is a prediction from a fitted brightness law, not a
+     * measurement, and comets are famously bad at obeying it. The card says so; this type carries
+     * the number without editorialising, and [advice] is where the honesty lives.
+     */
+    data class Comet(
+        val sighting: Comets.Sighting,
+        val horizontal: Ephemeris.Horizontal,
+        val advice: String,
+    ) {
+        /** Above the horizon with a bit of margin, so it is not lost in haze. */
+        val up: Boolean get() = horizontal.altitudeDeg > 10.0
+    }
+
+    private val _comets = MutableStateFlow<List<Comet>>(emptyList())
+    val comets: StateFlow<List<Comet>> = _comets.asStateFlow()
+
+    private val _cometsLoading = MutableStateFlow(false)
+    val cometsLoading: StateFlow<Boolean> = _cometsLoading.asStateFlow()
+
     init { load(force = false) }
 
     fun refresh() = load(force = true)
@@ -170,12 +194,51 @@ class OrbitalViewModel(
                 launch { computeEclipses(loc.latitude, loc.longitude) }
                 launch { computeZodiac(loc.latitude, loc.longitude) }
                 launch { computeOccultations(loc.latitude, loc.longitude) }
+                launch { computeComets(loc.latitude, loc.longitude, force) }
                 launch { loadPasses(loc, force) }
             }
         }
         // Launches do not depend on where you are.
         viewModelScope.launch {
             _launches.value = runCatching { launchRepository.upcoming(force).data }.getOrDefault(emptyList())
+        }
+    }
+
+    /**
+     * Which comets are worth looking for, and where to look.
+     *
+     * ⚠️ **The fetch and the arithmetic are deliberately separated.** The catalogue is 160 kB over
+     * the network and lives for a week; the positions have to be recomputed every time this screen
+     * opens, because a comet moves. Folding the two together would either refetch far too often or
+     * show a stale position, and the second is worse — it looks right.
+     *
+     * ⚠️ **Off the main thread, all of it.** Nine hundred and fifty-seven orbits is nine hundred
+     * and fifty-seven Kepler solves, each with a three-pass light-time iteration on top. It is a
+     * few milliseconds in total, which is fine on a desk and is exactly the sort of thing this
+     * project's potato pass exists to keep off the frame clock.
+     */
+    private suspend fun computeComets(lat: Double, lon: Double, force: Boolean) {
+        _cometsLoading.value = true
+        try {
+            val catalogue = runCatching { cometRepository.elements(force).data }.getOrDefault(emptyList())
+            if (catalogue.isEmpty()) {
+                _comets.value = emptyList()
+                return
+            }
+            val now = System.currentTimeMillis()
+            _comets.value = withContext(Dispatchers.Default) {
+                runCatching {
+                    Comets.visible(catalogue, now, limit = COMET_LIMIT).map { s ->
+                        Comet(
+                            sighting = s,
+                            horizontal = Ephemeris.toHorizontal(s.equatorial, lat, lon, now),
+                            advice = Comets.describe(s),
+                        )
+                    }
+                }.getOrDefault(emptyList())
+            }
+        } finally {
+            _cometsLoading.value = false
         }
     }
 
@@ -442,6 +505,17 @@ class OrbitalViewModel(
      * the list and the asset have to be checkable together.
      */
     internal companion object {
+
+        /**
+         * How many comets the tab lists.
+         *
+         * ⚠️ Not a performance limit — solving all 957 costs a few milliseconds. It is an editorial
+         * one: [Comets.visible] already refuses anything too faint to see or too close to the Sun
+         * to look at, and beyond a dozen the list stops being a thing somebody reads and becomes a
+         * thing they scroll past.
+         */
+        internal const val COMET_LIMIT = 12
+
         /** Below this a pass is behind buildings and trees for most people. */
         const val MIN_ELEVATION_DEG = 15.0
         const val MAX_PASSES_PER_SATELLITE = 8

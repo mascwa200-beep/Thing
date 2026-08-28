@@ -43,9 +43,9 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
                 SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
-                OrbitalViewModel(
-                    c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository,
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository,
                     c.starCatalog,
+                    c.cometRepository,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sky.SkyMapViewModel::class.java) ->
                 dev.mascwa.pulse.feature.sky.SkyMapViewModel(c.starCatalog, c.locationProvider)

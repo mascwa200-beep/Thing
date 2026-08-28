@@ -308,6 +308,9 @@ class AppContainer(private val appContext: Context) {
     }
     val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
     val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
+    val cometRepository: dev.mascwa.pulse.data.orbital.CometRepository by lazy {
+        dev.mascwa.pulse.data.orbital.CometRepository(http, diskCache)
+    }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     /**

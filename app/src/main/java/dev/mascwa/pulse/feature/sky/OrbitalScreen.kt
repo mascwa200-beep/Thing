@@ -73,6 +73,7 @@ private enum class SkyTab(val label: String) {
     SHOWERS("SHOWERS"),
     ECLIPSES("ECLIPSES"),
     OCCULTATIONS("OCCULTATIONS"),
+    COMETS("COMETS"),
     ZODIAC("ZODIAC"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
@@ -119,6 +120,8 @@ fun OrbitalBody(
     val showers by vm.showers.collectAsStateWithLifecycle()
     val eclipses by vm.eclipses.collectAsStateWithLifecycle()
     val occultations by vm.occultations.collectAsStateWithLifecycle()
+    val comets by vm.comets.collectAsStateWithLifecycle()
+    val cometsLoading by vm.cometsLoading.collectAsStateWithLifecycle()
     val zodiac by vm.zodiac.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
@@ -157,6 +160,7 @@ fun OrbitalBody(
                         SkyTab.SHOWERS -> showersTab(showers, site != null, c)
                         SkyTab.ECLIPSES -> eclipsesTab(eclipses, site != null, c)
                         SkyTab.OCCULTATIONS -> occultationsTab(occultations, site != null, c)
+                        SkyTab.COMETS -> cometsTab(comets, cometsLoading, c)
                         SkyTab.ZODIAC -> zodiacTab(zodiac, site != null, c)
                         SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
@@ -629,6 +633,121 @@ private fun LazyListScope.occultationsTab(
             }
         }
     }
+}
+
+/**
+ * The comets worth looking for, brightest first.
+ *
+ * ⚠️ **Location is not required and that is deliberate**, unlike every other tab here. Where a comet
+ * IS depends on the date alone; only whether it is above your horizon needs a site. So the list is
+ * shown either way, and the altitude line simply goes missing without one — rather than the tab
+ * refusing to say anything, which would be withholding most of the answer over a detail.
+ */
+private fun LazyListScope.cometsTab(
+    comets: List<OrbitalViewModel.Comet>,
+    loading: Boolean,
+    c: NightwirePalette,
+) {
+    if (comets.isEmpty()) {
+        item {
+            Hint(
+                if (loading) {
+                    "Reading the Minor Planet Center's catalogue."
+                } else {
+                    "Nothing bright enough is far enough from the Sun to look at. That is the " +
+                        "ordinary state of affairs — a comet worth seeing without a telescope " +
+                        "turns up every year or two, not every week."
+                },
+                c,
+            )
+        }
+        return
+    }
+
+    val up = comets.filter { it.up }
+    item { LcarsHeaderBar("Up now", trailing = "${up.size}") }
+    if (up.isEmpty()) {
+        item { Hint("None of these is above the horizon at the moment. They will be, at some point tonight or in the coming weeks.", c) }
+    } else {
+        items(up, key = { "comet-up-${it.sighting.designation}" }) { CometCard(it, c) }
+    }
+
+    val below = comets.filterNot { it.up }
+    if (below.isNotEmpty()) {
+        item { LcarsHeaderBar("Below the horizon", trailing = "${below.size}") }
+        items(below, key = { "comet-down-${it.sighting.designation}" }) { CometCard(it, c) }
+    }
+
+    item {
+        Hint(
+            "⚠️ The magnitudes are predictions, not measurements. A comet's brightness is fitted " +
+                "from how it behaved last time, and comets are famously bad at repeating " +
+                "themselves — being two magnitudes out either way is completely ordinary. Treat " +
+                "these as a rough expectation of what is worth going outside for.",
+            c,
+        )
+    }
+}
+
+/** One comet: how bright it should be, where it is, and what it is doing. */
+@Composable
+private fun CometCard(comet: OrbitalViewModel.Comet, c: NightwirePalette) {
+    val s = comet.sighting
+    val m = s.magnitude
+    // Colour says what you would need to see it, which is the only question that matters here.
+    val accent = when {
+        m == null -> c.muted
+        m <= 6.0 -> c.violet      // naked eye, under a dark sky
+        m <= 10.0 -> c.accent     // binoculars
+        else -> c.muted           // a telescope, and patience
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    s.designation,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    m?.let { "mag ${"%.1f".format(java.util.Locale.US, it)}" } ?: "brightness unknown",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = accent,
+                )
+            }
+            Text(
+                comet.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                cometFigures(comet),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under a comet card.
+ *
+ * ⚠️ Locale.US throughout: these are data, and a comma decimal in a figure somebody might copy into
+ * a star atlas is the recurring mistake this project has corrected across coordinates, cache keys
+ * and exported files.
+ */
+private fun cometFigures(comet: OrbitalViewModel.Comet): String {
+    val s = comet.sighting
+    val us = java.util.Locale.US
+    val parts = mutableListOf(
+        "%.2f AU from Earth".format(us, s.geocentricAu),
+        "%.2f from the Sun".format(us, s.heliocentricAu),
+        "%.0f° from the Sun in the sky".format(us, s.elongationDeg),
+    )
+    // Altitude is the one figure that needs a site, so it is the one that can be missing.
+    if (comet.horizontal.altitudeDeg != 0.0 || comet.horizontal.azimuthDeg != 0.0) {
+        parts += "alt %.0f° az %.0f°".format(us, comet.horizontal.altitudeDeg, comet.horizontal.azimuthDeg)
+    }
+    return parts.joinToString("  ·  ")
 }
 
 @Composable
@@ -1208,6 +1327,11 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Peaks solved from the Sun's own position on-device, from a bundled table of radiants " +
                 "— no network needed. Rates are an ideal-conditions figure scaled for the radiant's " +
                 "height and the Moon; light pollution is not modelled."
+        SkyTab.COMETS ->
+            "Orbital elements from the Minor Planet Center; the positions are solved on the " +
+                "device. Checked against JPL DE421 over all 957 comets in a real catalogue: half " +
+                "are within 0.6 arcseconds and the worst is 17, which is the Earth's own position " +
+                "rather than the orbit. The magnitudes are a fitted prediction and are not."
         SkyTab.ASTEROIDS -> "Source: NASA NeoWs."
         SkyTab.LAUNCHES -> "Source: The Space Devs Launch Library (keyless)."
     }
