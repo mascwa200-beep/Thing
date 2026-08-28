@@ -347,6 +347,24 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    // ⚠️ Read through the container, not a fresh reader. The probe keeps a
+                    // high-water mark of the core count because `availableProcessors()` reports only
+                    // cores that are currently online, so a throwaway instance can report an
+                    // eight-core phone as a two-core one.
+                    fun readDeviceClass(): String? = runCatching {
+                        (context.applicationContext as dev.mascwa.pulse.PulseApplication)
+                            .container.deviceProbe.describe()
+                    }.getOrNull()
+                    var deviceClass by remember { mutableStateOf(readDeviceClass()) }
+                    PrefClickable(
+                        "Device class",
+                        value = deviceClass?.substringBefore('\n') ?: "unavailable",
+                        subtitle = deviceClass
+                            ?: "This phone would not say what it is made of.",
+                        // Half of this reading is live — thermal state, heap use, power saver — so
+                        // tapping re-reads it rather than doing nothing.
+                        onClick = { deviceClass = readDeviceClass() },
+                    )
                     var sensors by remember { mutableStateOf<String?>(null) }
                     PrefClickable(
                         "Sensors",

@@ -8,6 +8,7 @@ import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.reader.ReaderRepository
+import dev.mascwa.pulse.device.DeviceProbeReader
 import dev.mascwa.pulse.data.food.OpenFoodFactsRepository
 import dev.mascwa.pulse.data.food.db.FoodDatabase
 import dev.mascwa.pulse.data.health.BodyStore
@@ -55,6 +56,16 @@ class NutritionContainer(context: Context) {
         coerceInputValues = true
         encodeDefaults = true
     }
+
+    /**
+     * What this phone can actually be asked to do. The same reader the LCARS application uses, from
+     * `:core:update` — one definition rather than a second copy in each app.
+     *
+     * ⚠️ One instance per process, because the reader keeps a high-water mark of the core count:
+     * `availableProcessors()` reports only cores that are ONLINE, and a fresh instance reading once
+     * during an idle moment can class an eight-core phone as a two-core one.
+     */
+    val deviceProbe: DeviceProbeReader by lazy { DeviceProbeReader(appContext) }
 
     val settings: HealthSettingsStore by lazy { HealthSettingsStore(appContext, json) }
 

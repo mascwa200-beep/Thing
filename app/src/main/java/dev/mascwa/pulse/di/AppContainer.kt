@@ -114,6 +114,21 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * What this phone can actually be asked to do — RAM, heap class, cores, thermal state.
+     *
+     * ⚠️ Held here rather than constructed per call site, and that is not tidiness. The reader keeps
+     * a high-water mark of the core count, because `availableProcessors()` reports cores that are
+     * ONLINE and a big.LITTLE governor parks them when idle: a fresh instance takes one reading and
+     * can class an eight-core flagship as a two-core phone. One instance per process accumulates.
+     *
+     * Placed above [imageLoader] deliberately — the cache sizes below become tier-scaled, and a
+     * `by lazy` that referenced a member declared later would be an initialisation-order trap.
+     */
+    val deviceProbe: dev.mascwa.pulse.device.DeviceProbeReader by lazy {
+        dev.mascwa.pulse.device.DeviceProbeReader(appContext)
+    }
+
+    /**
      * Bounded Coil image loader so thumbnail-heavy screens (news/markets/images/social) can't grow
      * the heap without limit — a key part of stopping the OS low-memory kills. Installed as the app's
      * singleton loader via [PulseApplication.newImageLoader], so every `AsyncImage` uses it.

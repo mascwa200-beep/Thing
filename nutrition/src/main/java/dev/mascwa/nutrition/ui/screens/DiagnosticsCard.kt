@@ -109,6 +109,16 @@ fun DiagnosticsCard(container: NutritionContainer) {
             }
         }
 
+        // What this phone is, and what it would not say about itself. Rendered here rather than
+        // hidden behind a flag because a fault report is worth much less without it: "it was slow"
+        // and "it was slow on a 2 GB phone that was overheating" are different reports.
+        val deviceClass = remember { runCatching { container.deviceProbe.describe() }.getOrNull() }
+        Text(
+            deviceClass ?: "This phone would not say what it is made of.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
