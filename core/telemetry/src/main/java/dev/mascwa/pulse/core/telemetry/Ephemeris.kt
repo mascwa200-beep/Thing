@@ -502,6 +502,48 @@ object Ephemeris {
     }
 
     /**
+     * The observer's horizon back to equatorial — the exact inverse of [toHorizontal].
+     *
+     * ⚠️ **This exists because a star map has to run the transform BACKWARDS to know what to load.**
+     * Every other caller in this project starts from a catalogue position and asks where in the sky
+     * it is. A map drawn from three million stars cannot: converting them all would be gigabytes of
+     * objects and millions of trigonometric calls, so instead it asks which *region of the catalogue*
+     * the current view can see — and the view is a direction in the sky, which has to be turned back
+     * into a right ascension and declination before [SkyGrid.tilesInCone] can answer.
+     *
+     * ⚠️ **Written without a tangent, deliberately.** The textbook form of the hour angle divides by
+     * `cos(altitude)` through a `tan`, which runs away at the zenith — precisely where somebody
+     * looking at a star map points the phone. Multiplying numerator and denominator by `cos(alt)`
+     * removes the singularity and cannot change the quadrant, because altitude is bounded to ±90°
+     * and its cosine is therefore never negative. At the zenith itself azimuth carries no
+     * information and any answer is as good as another.
+     *
+     * The round trip is asserted against [toHorizontal] over a grid of real places and times rather
+     * than against a derivation, because a sign error here is invisible: it produces a perfectly
+     * ordinary position somewhere else in the sky, and the map would simply load the wrong stars.
+     */
+    fun toEquatorial(
+        horizontal: Horizontal,
+        latDeg: Double,
+        lonDeg: Double,
+        epochMs: Long,
+    ): Equatorial {
+        val lst = gmstDeg(julianDate(epochMs)) + lonDeg
+        val lat = latDeg * DEG
+        val alt = horizontal.altitudeDeg.coerceIn(-90.0, 90.0) * DEG
+        // toHorizontal adds 180° on the way out, so take it off on the way in.
+        val a = (horizontal.azimuthDeg - 180.0) * DEG
+
+        val sinDec = sin(lat) * sin(alt) - cos(lat) * cos(alt) * cos(a)
+        val dec = asin(sinDec.coerceIn(-1.0, 1.0))
+        val h = atan2(
+            sin(a) * cos(alt),
+            cos(a) * sin(lat) * cos(alt) + sin(alt) * cos(lat),
+        )
+        return Equatorial(norm360(lst - h / DEG), dec / DEG, horizontal.distanceKm)
+    }
+
+    /**
      * A body's ecliptic longitude — where it sits along the Sun's own path, which is the coordinate
      * the sky's calendar and the zodiac are both kept in.
      *
