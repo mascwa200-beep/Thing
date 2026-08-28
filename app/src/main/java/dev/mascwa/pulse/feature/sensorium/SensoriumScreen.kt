@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,10 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { vm.rearm(ctx) }
+
+    // See refreshModelBytes: the classifiers usually land while this screen is open, so a figure
+    // read once at construction would report zero for the rest of the session.
+    LaunchedEffect(Unit) { vm.refreshModelBytes() }
 
     PulseScaffold(
         title = "Sensorium",

@@ -44,11 +44,18 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
      */
     val modelBytes: StateFlow<Long> = _modelBytes.asStateFlow()
 
-    init {
-        refreshModelBytes()
-    }
-
-    private fun refreshModelBytes() {
+    /**
+     * Re-read what is on disk.
+     *
+     * ⚠️ **Driven from the screen's composition rather than `init`, and the difference is not
+     * cosmetic.** The models are fetched by the samplers on their first sip, which routinely happens
+     * WHILE this screen is open — so a figure taken once when the view model was constructed would
+     * read zero, the card would stay hidden, and the storage would have arrived with nothing said
+     * about it for the rest of the session. That is the same defect the card exists to fix, one
+     * layer up. A pushed destination leaves composition, so a `LaunchedEffect(Unit)` in the screen
+     * re-runs on every return and this stays honest without polling.
+     */
+    fun refreshModelBytes() {
         viewModelScope.launch {
             _modelBytes.value = withContext(Dispatchers.IO) {
                 runCatching {
