@@ -185,15 +185,7 @@ object StarNames {
      * the phone and the companion cannot end up disagreeing about what colour Betelgeuse is — the
      * duplicated-definition drift this project has corrected six times.
      */
-    fun colourArgb(bv: Double?): Int? = when {
-        bv == null -> null
-        bv < BV_EDGES[0] -> BAND_ARGB[0]
-        bv < BV_EDGES[1] -> BAND_ARGB[1]
-        bv < BV_EDGES[2] -> BAND_ARGB[2]
-        bv < BV_EDGES[3] -> BAND_ARGB[3]
-        bv < BV_EDGES[4] -> BAND_ARGB[4]
-        else -> BAND_ARGB[5]
-    }
+    fun colourArgb(bv: Double?): Int? = bandArgb(bandFromBv(bv))
 
     /**
      * The same six colours, from Gaia's `bp_rp` instead of B−V.
@@ -213,14 +205,41 @@ object StarNames {
      * Two colour scales, six colours, one vocabulary: each source keeps the measurement it actually
      * made, and neither is converted into the other behind the reader's back.
      */
-    fun colourArgbFromBpRp(bpRp: Double?): Int? = when {
-        bpRp == null -> null
-        bpRp < BP_RP_EDGES[0] -> BAND_ARGB[0]
-        bpRp < BP_RP_EDGES[1] -> BAND_ARGB[1]
-        bpRp < BP_RP_EDGES[2] -> BAND_ARGB[2]
-        bpRp < BP_RP_EDGES[3] -> BAND_ARGB[3]
-        bpRp < BP_RP_EDGES[4] -> BAND_ARGB[4]
-        else -> BAND_ARGB[5]
+    fun colourArgbFromBpRp(bpRp: Double?): Int? = bandArgb(bandFromBpRp(bpRp))
+
+    // ---- the same six colours, as an index a renderer can bucket by --------------------------
+
+    /**
+     * How many colours the two scales share.
+     *
+     * ⚠️ **A renderer needs the band NUMBER, not the colour, and that is why these exist.** Drawing
+     * a million stars means grouping them so each colour is one draw call rather than a million, and
+     * a group is an array index. Recovering an index by matching the returned ARGB back against the
+     * table would work and would break silently the day two bands are given the same colour.
+     */
+    const val COLOUR_BANDS = 6
+
+    /** What [bandFromBv] and [bandFromBpRp] answer for a star with no measured colour. */
+    const val NO_COLOUR_BAND = -1
+
+    /** Which of the six bands a B−V index falls in, or [NO_COLOUR_BAND]. */
+    fun bandFromBv(bv: Double?): Int = band(bv, BV_EDGES)
+
+    /** Which of the six bands a Gaia `bp_rp` falls in, or [NO_COLOUR_BAND] — see [colourArgbFromBpRp]. */
+    fun bandFromBpRp(bpRp: Double?): Int = band(bpRp, BP_RP_EDGES)
+
+    /**
+     * The colour of a band, or null for [NO_COLOUR_BAND] and for anything out of range.
+     *
+     * Null keeps [colourArgb]'s contract exactly: "no measured colour" stays a fact the drawing
+     * surface answers with its own ink, rather than a guess made here.
+     */
+    fun bandArgb(band: Int): Int? = if (band in 0 until COLOUR_BANDS) BAND_ARGB[band] else null
+
+    private fun band(value: Double?, edges: DoubleArray): Int {
+        if (value == null || value.isNaN()) return NO_COLOUR_BAND
+        for (i in edges.indices) if (value < edges[i]) return i
+        return edges.size
     }
 
     /** Blue-white through to orange: what a star of each temperature actually looks like. */
