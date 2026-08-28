@@ -9933,3 +9933,104 @@ budgets, which is what makes it safe to ship without hardware. The place to look
 measured, and a "So:" line stating exactly what the app is doing differently — animations, decode
 size, cache share, fan-out, background scale, work tier, heavy engines. On the Galaxy A16 that line
 is the whole test.
+
+### THREE FEED DATES, AND A BUNDLE THAT ANSWERED AN EMPTY SHELF (this session cont., PR #464)
+
+The potato plan (P1–P9) is complete, so this run was **found by hunting** rather than worked off a
+list. **Zero subagent and zero workflow spend**, as with every arc since the credit directive.
+
+**The `SimpleDateFormat`-held-as-a-field sweep is now finished, and the last one was the worst.**
+`WeatherFormat` is a process-wide object and held two of them. That type keeps a mutable `Calendar`,
+so concurrent `parse` does not merely throw — it can return a time assembled from two different
+strings. ⚠️ The exposure is **measured, not assumed**: `WeatherScreen` parses from composition on the
+main thread, `OracleEngine` from the background worker AND its own view model, and `DayAheadEngine`
+from `BriefEngine.publish` — and that last one computes **when to leave**, so a scrambled timestamp
+there is a wrong departure time on the ALERT row of the one notification.
+
+⚠️ **Running old and new side by side over 15,600 comparisons (five zones × three locales × every
+hour of a year plus the transition days) found exactly THREE differences, all the same input** — the
+ambiguous fall-back hour, where `SimpleDateFormat` picked GMT and `java.time` picks BST. **The
+rendered label is "01:00" either way**, so nothing on screen moves; only an instant, by an hour, for
+one hour of one night a year. Plus one deliberate change: `2026-13-45T99:99` was read leniently as an
+overflowed date and rendered as a confident wrong time; it is now refused and the caller's existing
+fallback shows the raw text.
+
+⚠️ **The display formatters are cached per (pattern, locale) rather than held as constants, and that
+is correctness rather than tidiness.** `DateTimeFormatter.ofPattern(p)` resolves the locale at
+CONSTRUCTION, so a top-level `val` keeps printing day names in whatever language the process started
+in — and this object outlives the Activity Android recreates on a locale change. The old code dodged
+that by building a `SimpleDateFormat` per call, which was correct and wasteful.
+
+**Then `FeedDate` — one definition where there were three, and three separate wrongs.** The Android
+RSS parser and the desktop one held byte-identical eight-pattern loops and `NewsRepository` a
+narrower two-pattern one. Running the shipped code over real feed strings:
+
+| defect | what it did |
+|---|---|
+| fractional seconds > 3 digits | `SSS` parses greedily, so `14:30:00.123456Z` became **14:32:03.456Z** — two minutes into the story's own future — and nine digits landed **two days** away |
+| a bare local time | matched no offset pattern, fell to the date-only one, became **midnight** — 14½ hours out, on the number articles are sorted by |
+| cost | 200 items cost 8.4 ms for an ISO stamp and 10 ms for an unparseable one, most of it building formatters and filling in stack traces for a `ParseException` used as loop control |
+
+Reachable because a custom feed is any URL the user pastes and the parser advertises itself as
+RSS 2.0 + Atom. ⚠️ This is the **third** place in this repository with the fractional-second defect;
+`SocialRepository` already carries a note about it. After: 1.9× / 2.0× / 2.1× / 23.7× faster on the
+four shapes, one substring allocated where there were eight formatters, and the family is decided on
+the one character that separates them rather than by throwing three exceptions to find out.
+
+⚠️ **Two decisions there look wrong until you measure them.** `RFC_1123_DATE_TIME` is NOT used: it
+refuses `UTC`, `EST` and `PDT` — names RFC 822 defines and real feeds still emit — and it cross-checks
+the weekday against the date, so a feed naming the wrong day is refused where `SimpleDateFormat`
+shrugged. The weekday carries no information the date does not, so it is dropped rather than
+validated. And the obsolete zone names are a **table**, not a library lookup: `SimpleDateFormat` reads
+`EST` as a fixed −05:00 while `java.time` resolves it to America/New_York, which in August is −04:00.
+An hour apart, on a string whose meaning RFC 822 fixes.
+
+`FeedDate` lives in `:core:feeds` under `dev.mascwa.pulse.core.network` — **the same package the app's
+`RssParser` already declares, so that file needed no import at all.** The XML pulling genuinely
+differs by platform (`android.util.Xml` vs `XMLStreamReader`) and that is the honest reason those two
+parsers stay separate; reading a date out of a string is not platform work.
+
+**⚠️ A MEASUREMENT THAT INVERTED MY HYPOTHESIS, recorded so nobody repeats it.**
+`FoodSearch.couldMatch` does `line.lowercase()` per line — 13,186 allocations per query — and the
+obvious fix is `contains(ignoreCase = true)`, which allocates nothing. It is **3× SLOWER** on a real
+query ("chicken": 6.3 ms → 18.7 ms), because case-insensitive `regionMatches` folds case at every
+position while `lowercase()` allocates once and then `contains` uses the vectorised `indexOf`
+intrinsic. **The current code is right.** Do not "optimise" it.
+
+**And the seed-search path was measured and left alone**, which is the other half of an honest pass.
+A single-letter query costs 42 ms and splits 12,448 lines into 50 columns each — but `MIN_QUERY = 2`
+excludes it, the 280 ms debounce cancels the previous search, and the work is on `Dispatchers.IO`.
+The realistic worst case is a 2-character query at 15–25 ms on this machine. Extracting only the
+three fields the scorer reads instead of splitting all fifty was built and measured at **1.0×–1.6×**,
+which is not worth the risk on code carrying that much correctness reasoning. Not shipped.
+
+**The bundled food database stopped reporting an empty shelf (task #330, closed).** Its guard reports
+to the crash console — the right place for a stack trace, the wrong one for somebody in a
+supermarket. Every path still answered `null`, and `null` is also what the bundle says when it does
+not hold that product, so *"Barcode X is not in the packaged-food database"* and *"No bundled product
+has all of those words"* were claims about 4.4 million rows the app never opened. ⚠️ And the failure
+is permanent and silent: Room unpacks 424 MB on the first query, the ordinary way that fails is a
+phone with no room left, and the app then falls back to the network — so **with a connection it
+half-works and the offline half is dead forever**. That is exactly the cheap phone this whole pass is
+about. The store now keeps the FIRST reason (after the first failure every later query fails for its
+own downstream reason) and the repository reads it **after** the queries, because the bundle unpacks
+lazily and asking beforehand always says "fine" on the very run where it is about to fail.
+
+**Two local gates were fixed, both negative-tested.** `tools/android_resolve_check.sh`'s
+broken-extractor guard asserts that a baseline with no Android SDK must produce unresolved
+references — true of a file importing `android.*`, false of one that does not, so **the strongest
+result the gate can produce was reported as a failure**. And JUnit joined its target classpath: it is
+routinely handed `src/test` files, and without it every one reports `unresolved reference 'junit'`
+plus a line per assertion plus a cascade, since a lambda whose body has an error type cannot have its
+parameter inferred. It cannot hide a real defect — Kotlin still requires the import, which is what the
+negative test shows.
+
+⚠️ **The recurring habit cost time again and is now on its eighteenth appearance**: two assertions in
+`WeatherFormatTest` were inventions of mine that looked plausible (an epoch literal five days wrong,
+and `"2"` where the shipped fallback is `takeLast(2)` = `"e2"`). **Compute the expected value from the
+shipped function before writing the assertion.**
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot wait for a clock change or fill a disk.** A
+custom Atom feed's stories should sort by their real times rather than piling at the bottom; the
+weather hours should read the same as before; and if the food bundle ever fails to unpack, the search
+and the scanner should now say so rather than reporting the product unknown.
