@@ -164,6 +164,69 @@ object Occultations {
      */
     private const val MOON_UNCERTAINTY_DEG = 8.0 / 3600.0
 
+    // ---- what to point this at, and how far ahead ----------------------------------------------
+    //
+    // ⚠️ These five values were in the phone's view model and are here now because BOTH consoles run
+    // this search. Five star names, two measured uncertainties and a window, restated in two places,
+    // is the duplicated-definition drift this project has corrected six times — and the uncertainty
+    // pair is the worst possible thing to let drift, since it is what decides whether an occultation
+    // is called or refused. The reasoning for the ninety-fold gap is already written on
+    // [Target.positionUncertaintyDeg]; the numbers belong beside it.
+
+    /**
+     * The four stars bright enough and near enough the ecliptic for the Moon to hide visibly, plus
+     * Alcyone in the Pleiades — an occultation of the cluster is the most striking of the lot.
+     *
+     * These are the only first-magnitude stars the Moon can reach at all: its path is confined to
+     * about five degrees either side of the ecliptic, and nothing else that bright lies inside that
+     * band.
+     *
+     * ⚠️ Named rather than given coordinates, deliberately. The positions come from the bundled
+     * catalogue the sky chart also draws from, so the chart and this list can never disagree about
+     * where a star is — and `StarCatalogTargetsTest` walks the real asset and fails the build if any
+     * of these names stops resolving.
+     */
+    val OCCULTABLE_STARS: List<String> = listOf("Aldebaran", "Regulus", "Spica", "Antares", "Alcyone")
+
+    /**
+     * The planets the Moon can pass in front of — all of them, since every planet stays near the
+     * ecliptic and the Moon's path crosses it twice a month.
+     *
+     * Uranus and Neptune are left out: both are occulted regularly and neither is visible without
+     * optics, so a card telling somebody to go outside for one would be telling them to go outside
+     * for nothing.
+     */
+    val OCCULTABLE_PLANETS: List<String> = listOf("Mercury", "Venus", "Mars", "Jupiter", "Saturn")
+
+    /**
+     * ⚠️ How well each kind of position is known, in degrees, and the two differ by ninety.
+     *
+     * A star precessed out of the bundled catalogue is within 2 arcseconds of DE421, measured. A
+     * planet from the low-precision planetary theory is within 3 arcMINUTES, also measured, across
+     * fifty years — a fifth of the Moon's radius, so near the limb a planetary occultation genuinely
+     * cannot be called and [Local.grazing] says so.
+     */
+    const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
+    const val PLANET_UNCERTAINTY_DEG = 3.0 / 60.0
+
+    /**
+     * Six months, deliberately shorter than the two-year eclipse window.
+     *
+     * ⚠️ **The binding reason is the LENGTH OF THE LIST, not the cost — measured, because the
+     * obvious answer was the wrong one.** Timed over ten targets on a desktop JVM: 9/28/57/118 ms of
+     * scan for one, three, six and twelve months, returning 5/11/23/38 candidates. So two years
+     * would be a few hundred milliseconds, which is affordable; what is not affordable is handing
+     * somebody eighty events. The Moon occults something bright every few weeks, so six months is
+     * already twenty-odd candidates and [local] then rejects most of them for any one place — three
+     * of those twenty-three were actually occulted from London, which is what a parallax four times
+     * the Moon's own diameter does.
+     *
+     * The per-target cost is real and worth knowing: [upcoming] walks the whole window in six-hour
+     * steps computing a Moon position at each, so the scan scales with both the window and the
+     * number of targets.
+     */
+    const val HORIZON_MS = 182L * 86_400_000L
+
     /**
      * Every occultation possible somewhere on Earth between two instants.
      *

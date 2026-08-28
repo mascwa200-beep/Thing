@@ -357,7 +357,7 @@ class OrbitalViewModel(
                     }
                 }
 
-                for (name in listOf("Mercury", "Venus", "Mars", "Jupiter", "Saturn")) {
+                for (name in Occultations.OCCULTABLE_PLANETS) {
                     targets += Occultations.Target(
                         name = name,
                         kind = Occultations.Kind.PLANET,
@@ -525,38 +525,19 @@ class OrbitalViewModel(
         const val ECLIPSE_HORIZON_MS = 2L * 365L * 86_400_000L
 
         /**
-         * Six months of occultations, deliberately shorter than the eclipse window.
+         * ⚠️ **These moved into [Occultations] and these five names are aliases, not copies.**
          *
-         * ⚠️ **The cost is per TARGET, and there are nine of them.** The scan walks the whole window
-         * in six-hour steps computing a Moon position at each, so nine targets over two years would
-         * be nine times the work of the eclipse scan for a list nobody would read to the end. The
-         * Moon occults something bright every few weeks, so six months is already dozens of events.
-         */
-        const val OCCULTATION_HORIZON_MS = 182L * 86_400_000L
-
-        /**
-         * The four stars bright enough and near enough the ecliptic for the Moon to hide visibly,
-         * plus Alcyone in the Pleiades — an occultation of the cluster is the most striking of the
-         * lot. These are the only first-magnitude stars the Moon can reach at all: its path is
-         * confined to about five degrees either side of the ecliptic, and nothing else that bright
-         * lies inside that band.
+         * The companion runs the same search over the same bundled catalogue, so a second statement
+         * of five star names, two measured uncertainties and a window would be free to drift — and
+         * the uncertainty pair is the worst of them to lose, since it is what decides whether an
+         * occultation is called or refused. The reasoning for each is on the core's own declarations.
          *
-         * ⚠️ Named rather than given coordinates. The positions come from the bundled catalogue the
-         * sky chart also draws from, so the two can never disagree about where a star is, and
-         * `StarCatalogTargetsTest` walks the real asset and fails the build if any name stops
-         * resolving.
+         * They stay as names here because `StarCatalogTargetsTest` and this file's own call sites
+         * refer to them, and an alias costs nothing.
          */
-        val OCCULTABLE_STARS = listOf("Aldebaran", "Regulus", "Spica", "Antares", "Alcyone")
-
-        /**
-         * ⚠️ How well each kind of position is known, in degrees, and the two differ by ninety.
-         *
-         * A star precessed out of the catalogue is within 2 arcseconds of DE421, measured. A planet
-         * from [PlanetCalc] is within 3 arcMINUTES, also measured, across fifty years — which is a
-         * fifth of the Moon's radius, so near the limb a planetary occultation genuinely cannot be
-         * called and [Occultations.Local.grazing] says so.
-         */
-        const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
-        const val PLANET_UNCERTAINTY_DEG = 3.0 / 60.0
+        const val OCCULTATION_HORIZON_MS = Occultations.HORIZON_MS
+        val OCCULTABLE_STARS = Occultations.OCCULTABLE_STARS
+        const val STAR_UNCERTAINTY_DEG = Occultations.STAR_UNCERTAINTY_DEG
+        const val PLANET_UNCERTAINTY_DEG = Occultations.PLANET_UNCERTAINTY_DEG
     }
 }

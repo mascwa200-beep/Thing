@@ -25,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.Occultations
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
@@ -32,6 +33,7 @@ import dev.mascwa.pulse.data.orbital.CometRepository
 import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
 import dev.mascwa.pulse.desktop.sky.StarCatalogSource
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
@@ -179,6 +181,71 @@ class ObservatoryViewModel(
         Fetched(data = list, fromCache = false)
     }
 
+    /** One occultation, with what this place gets of it and what to do about it. */
+    data class Hiding(
+        val event: Occultations.Event,
+        val local: Occultations.Local,
+        val advice: String,
+    )
+
+    /**
+     * What the Moon is about to pass in front of, over the next six months.
+     *
+     * ⚠️ **Every constant here comes from [Occultations] rather than being restated.** Both consoles
+     * run this search over the same bundled catalogue, and the two position uncertainties are the
+     * worst pair in the app to let drift — they are what decides whether an occultation is called or
+     * refused near the Moon's edge.
+     *
+     * ⚠️ **The star positions ARE precessed, unlike the sky chart's.** There the drift by 2050 is
+     * smaller than the dot a star is drawn as; here the whole answer turns on arcseconds, because a
+     * graze is decided by how a star sits against a limb half a degree across. That difference is
+     * deliberate and is the reason [Occultations.Target] takes a position FUNCTION rather than a
+     * coordinate.
+     *
+     * ⚠️ A target whose position cannot be had at some instant is skipped rather than guessed at —
+     * which is why the planet lambda returns null instead of a last-known value.
+     */
+    val occultations = WorldFeed<List<Hiding>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val catalogue = stars.all()
+        val list = withContext(Dispatchers.Default) {
+            val targets = ArrayList<Occultations.Target>()
+
+            for (name in Occultations.OCCULTABLE_STARS) {
+                val star = catalogue.firstOrNull { it.name == name } ?: continue
+                targets += Occultations.Target(
+                    name = name,
+                    kind = Occultations.Kind.STAR,
+                    magnitude = star.magnitude,
+                    positionUncertaintyDeg = Occultations.STAR_UNCERTAINTY_DEG,
+                ) { ms ->
+                    Ephemeris.precessFromJ2000(star.rightAscensionDeg, star.declinationDeg, ms)
+                }
+            }
+
+            for (name in Occultations.OCCULTABLE_PLANETS) {
+                targets += Occultations.Target(
+                    name = name,
+                    kind = Occultations.Kind.PLANET,
+                    // A planet's brightness changes through the year and the card reads the live
+                    // one; this field only orders the list, so a placeholder is honest here.
+                    magnitude = 0.0,
+                    positionUncertaintyDeg = Occultations.PLANET_UNCERTAINTY_DEG,
+                ) { ms ->
+                    PlanetCalc.planetsNow(lat, lon, ms).firstOrNull { it.name == name }?.let {
+                        Ephemeris.Equatorial(it.rightAscensionDeg, it.declinationDeg, 1.0)
+                    }
+                }
+            }
+
+            Occultations.upcoming(now, now + Occultations.HORIZON_MS, targets).map { e ->
+                val local = Occultations.local(e, lat, lon)
+                Hiding(e, local, Occultations.advice(e, local))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
     /**
      * ⚠️ **Launches used to go through [WorldFeed] and that was a real defect, not a tidy shortcut.**
      * The comment here said a rocket leaves from where it leaves from and that the lambda simply
@@ -246,6 +313,8 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
     val showers: Async<List<ObservatoryViewModel.ShowerNight>> by vm.showers.state.collectAsState()
     val showersLocated by vm.showers.located.collectAsState()
     val chart: Async<List<ObservatoryViewModel.PlottedStar>> by vm.chart.state.collectAsState()
+    val hidings: Async<List<ObservatoryViewModel.Hiding>> by vm.occultations.state.collectAsState()
+    val hidingsLocated by vm.occultations.located.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
@@ -254,6 +323,7 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
         vm.comets.ensureLoaded()
         vm.eclipses.ensureLoaded()
         vm.chart.ensureLoaded()
+        vm.occultations.ensureLoaded()
     }
 
     // ⚠️ **The one thing on this page with a timer, and only while the page is open.** Whether a
@@ -479,6 +549,22 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        Column(Modifier.padding(top = 16.dp)) {
+            WorldPanel(
+                title = "The Moon gets in the way",
+                feed = vm.occultations,
+                state = hidings,
+                located = hidingsLocated,
+                trailing = "NEXT SIX MONTHS",
+                emptyMessage = "Nothing bright passes behind the Moon in the next six months — " +
+                    "unusual, since it happens every few weeks, so this is likelier to be a fault " +
+                    "than a quiet sky.",
+                isEmpty = { it.isEmpty() },
+            ) { list ->
+                list.take(6).forEach { HidingRow(it) }
+            }
+        }
+
         // Comets and launches both sit outside the coordinate-bound panel above, with their own
         // state, because neither depends on where this machine is.
         LcarsHeaderBar("Comets worth a look", Modifier.padding(top = 16.dp))
@@ -625,6 +711,58 @@ private fun ShowerRow(night: ObservatoryViewModel.ShowerNight) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * One occultation, and whether it is worth being outside for.
+ *
+ * ⚠️ **A graze is drawn differently from a call, because it is a different kind of answer.** When the
+ * closest approach lands inside the ephemeris's own uncertainty the core refuses to say whether the
+ * disc covers the target, and a card that rendered that identically to a confident yes would send
+ * somebody to the wrong side of a line a few kilometres wide.
+ */
+@Composable
+private fun HidingRow(hiding: ObservatoryViewModel.Hiding) {
+    val c = Pulse.colors
+    val local = hiding.local
+    val accent = when {
+        !local.visible -> c.muted
+        local.grazing -> c.amber
+        local.occulted -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                Occultations.describe(hiding.event),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                stamp(local.bestEpochMs),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                hiding.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                listOfNotNull(
+                    // ⚠️ The disappearance and reappearance are the two moments anybody actually
+                    // needs, and both are nullable for real reasons — a target that never goes
+                    // behind the disc has neither, and one already behind it when the window opens
+                    // has only the second.
+                    local.disappearsEpochMs?.let { "hidden ${stamp(it)}" },
+                    local.reappearsEpochMs?.let { "back ${stamp(it)}" },
+                    "Moon ${local.moonAltitudeDeg.toInt()}° up, " +
+                        "${(hiding.event.moonIlluminatedFraction * 100).toInt()}% lit",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
         }
     }
 }
