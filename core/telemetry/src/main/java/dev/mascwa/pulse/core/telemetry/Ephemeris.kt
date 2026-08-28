@@ -91,20 +91,45 @@ object Ephemeris {
 
     // ---- the Sun ---------------------------------------------------------------------------
 
-    /** Geocentric equatorial position of the Sun (Meeus ch. 25, apparent). */
-    fun sunEquatorial(epochMs: Long): Equatorial {
-        val jd = julianDate(epochMs)
-        val t = centuries(jd)
+    /**
+     * The Sun's apparent geocentric ecliptic longitude, degrees — **solar longitude**, the coordinate
+     * the sky's calendar is actually kept in.
+     *
+     * ⚠️ **This was computed inside [sunEquatorial] and thrown away**, which is why anything wanting
+     * to date a recurring event had to fall back on a calendar date. It is the wrong instrument: a
+     * meteor shower peaks when the Earth reaches a fixed point on its orbit, and that point falls on
+     * a date that slides by up to a day across the leap-year cycle. Published shower peaks are given
+     * as a solar longitude for exactly that reason, and so is the equinox. Now they can be solved
+     * for rather than approximated by a day number.
+     *
+     * ⚠️ [sunEquatorial] calls this rather than repeating the series, so the two can never disagree
+     * about where the Sun is — the duplicated-definition mistake this project has corrected seven
+     * times over.
+     */
+    fun sunApparentLongitudeDeg(epochMs: Long): Double {
+        val t = centuries(julianDate(epochMs))
         val l0 = norm360(280.46646 + 36000.76983 * t + 0.0003032 * t * t)
         val m = norm360(357.52911 + 35999.05029 * t - 0.0001537 * t * t)
         val mRad = m * DEG
         val c = (1.914602 - 0.004817 * t - 0.000014 * t * t) * sin(mRad) +
             (0.019993 - 0.000101 * t) * sin(2 * mRad) +
             0.000289 * sin(3 * mRad)
-        val trueLon = l0 + c
         val omega = 125.04 - 1934.136 * t
-        // Apparent longitude: corrected for nutation and aberration.
-        val lambda = trueLon - 0.00569 - 0.00478 * sin(omega * DEG)
+        // Apparent longitude: the true longitude corrected for nutation and aberration.
+        return norm360(l0 + c - 0.00569 - 0.00478 * sin(omega * DEG))
+    }
+
+    /** Geocentric equatorial position of the Sun (Meeus ch. 25, apparent). */
+    fun sunEquatorial(epochMs: Long): Equatorial {
+        val jd = julianDate(epochMs)
+        val t = centuries(jd)
+        val m = norm360(357.52911 + 35999.05029 * t - 0.0001537 * t * t)
+        val mRad = m * DEG
+        val c = (1.914602 - 0.004817 * t - 0.000014 * t * t) * sin(mRad) +
+            (0.019993 - 0.000101 * t) * sin(2 * mRad) +
+            0.000289 * sin(3 * mRad)
+        val omega = 125.04 - 1934.136 * t
+        val lambda = sunApparentLongitudeDeg(epochMs)
         val eps = obliquityDeg(t) + 0.00256 * cos(omega * DEG)
         val lambdaRad = lambda * DEG
         val epsRad = eps * DEG
