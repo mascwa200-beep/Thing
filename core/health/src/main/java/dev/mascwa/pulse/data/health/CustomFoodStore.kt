@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -70,11 +71,22 @@ class CustomFoodStore(
     /** Newest first, which is the order somebody wants to see their own list in. */
     val foods: StateFlow<List<Food>> = _foods.asStateFlow()
 
+    /**
+     * ⚠️ **`withContext`, not merely `suspend`.** A `suspend` function runs on whatever dispatcher its
+     * caller is on, and `HealthViewModel.refresh()` — which runs on every foreground — calls into here
+     * from `viewModelScope`, which is `Dispatchers.Main.immediate`. `DataStore` reads the preferences
+     * FILE on its own IO scope, and a note in this repository once took that to mean the whole read was
+     * off the frame thread; it is not. A flow emission is delivered in the COLLECTOR's context, so
+     * `first()` resumes on the caller's dispatcher and the `kotlinx.serialization` decode below it — the
+     * expensive half, over a record that grows for as long as somebody uses this — ran between two
+     * frames. Invisible on a fast phone, a dropped frame every launch on a slow one.
+     */
     private suspend fun loadLocked(): Stored = loaded ?: run {
-        val raw = context.customFoodDataStore.data.first()[prefsKey]
-        val s = raw
-            ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
-            ?: Stored()
+        val s = withContext(Dispatchers.IO) {
+            val raw = context.customFoodDataStore.data.first()[prefsKey]
+            raw?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
+                ?: Stored()
+        }
         loaded = s
         _foods.value = s.foods.reversed()
         s
@@ -212,8 +224,14 @@ class CustomFoodStore(
         }
     }
 
-    private suspend fun flush() {
-        val snapshot = mutex.withLock { loaded } ?: return
+    /**
+     * ⚠️ On IO for the same reason [loadLocked] is: the debounced path already launches on this store's
+     * own IO scope, but [flushNow] is called from `onStop` through the container's flush-everything, and
+     * that runs in an activity scope on the main thread. Encoding a whole store to JSON there is the
+     * worst moment to do it — the system is timing how quickly the app backgrounds.
+     */
+    private suspend fun flush(): Unit = withContext(Dispatchers.IO) {
+        val snapshot = mutex.withLock { loaded } ?: return@withContext
         lastWrite = runCatching {
             context.customFoodDataStore.edit {
                 it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot)

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -236,12 +237,22 @@ class TrainingStore(
 
     // -------------------------------------------------------------------------------- internals
 
+    /**
+     * ⚠️ **`withContext`, not merely `suspend`.** A `suspend` function runs on whatever dispatcher its
+     * caller is on, and `HealthViewModel.refresh()` — which runs on every foreground — calls into here
+     * from `viewModelScope`, which is `Dispatchers.Main.immediate`. `DataStore` reads the preferences
+     * FILE on its own IO scope, and a note in this repository once took that to mean the whole read was
+     * off the frame thread; it is not. A flow emission is delivered in the COLLECTOR's context, so
+     * `first()` resumes on the caller's dispatcher and the `kotlinx.serialization` decode below it — the
+     * expensive half, over a record that grows for as long as somebody uses this — ran between two
+     * frames. Invisible on a fast phone, a dropped frame every launch on a slow one.
+     */
     private suspend fun logLocked(): Log {
         log?.let { return it }
-        val raw = context.trainingDataStore.data.first()[logKey]
-        val loaded = raw
-            ?.let { runCatching { json.decodeFromString(Log.serializer(), it) }.getOrNull() }
-            ?: Log()
+        val loaded = withContext(Dispatchers.IO) {
+            val raw = context.trainingDataStore.data.first()[logKey]
+            raw?.let { runCatching { json.decodeFromString(Log.serializer(), it) }.getOrNull() } ?: Log()
+        }
         log = loaded
         publishLocked(loaded)
         return loaded
@@ -295,10 +306,16 @@ class TrainingStore(
         }
     }
 
-    private suspend fun flush() {
+    /**
+     * ⚠️ On IO for the same reason [logLocked] is: the debounced path already launches on this store's
+     * own IO scope, but [flushNow] is called from `onStop` through the container's flush-everything, and
+     * that runs in an activity scope on the main thread. Encoding a whole store to JSON there is the
+     * worst moment to do it — the system is timing how quickly the app backgrounds.
+     */
+    private suspend fun flush(): Unit = withContext(Dispatchers.IO) {
         val payload = mutex.withLock {
-            if (!dirty) return
-            val l = log ?: return
+            if (!dirty) return@withContext
+            val l = log ?: return@withContext
             // ⚠️ Cleared after the snapshot, not after the write. A failed write is retried by the
             // next change; a flag cleared before it would lose that change silently.
             dirty = false

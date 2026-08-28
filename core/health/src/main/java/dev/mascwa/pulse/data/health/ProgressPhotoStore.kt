@@ -8,12 +8,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -46,6 +48,17 @@ private val Context.photoDataStore: DataStore<Preferences> by
  * ⚠️ Nothing is capped, exactly as [BodyStore] is not. A JPEG is a megabyte or two and a weekly
  * photograph for a year is around a hundred; silently deleting the oldest is silently deleting the
  * only "before" the whole feature exists to keep.
+ *
+ * ## And a third: every suspending entry point does its filesystem work on IO
+ *
+ * ⚠️ This store had no `withContext` anywhere, unlike the six health stores beside it. That is worse
+ * here than in most of them, because the work is not a preference read: [loadLocked] stats every
+ * photograph on record and then calls [sweepOrphansLocked], which lists a directory that may hold a
+ * hundred JPEGs and unlinks each stray one. `suspend` does not move anything off a thread on its own,
+ * so all of that ran wherever the caller happened to be — and the caller is a view model collecting in
+ * `viewModelScope`, which is the frame thread. A `withContext` at each entry point rather than one
+ * around the private helpers, so a future call site cannot reach the filesystem by a path that has not
+ * been moved.
  */
 class ProgressPhotoStore(
     private val context: Context,
@@ -132,7 +145,7 @@ class ProgressPhotoStore(
     }
 
     suspend fun load() {
-        mutex.withLock { loadLocked() }
+        withContext(Dispatchers.IO) { mutex.withLock { loadLocked() } }
     }
 
     // ------------------------------------------------------------------------------------ writing
@@ -161,31 +174,40 @@ class ProgressPhotoStore(
      * takes the id out of [inFlight] so the sweep is allowed to.
      */
     fun discard(id: String) {
+        // ⚠️ Deliberately NOT moved to IO, and not merely for the signature's sake. Taking the id out of
+        // [inFlight] is what permits the sweep to collect this file; posting the pair to a background
+        // scope would let a sweep observe the removal before the unlink and race for the same path. One
+        // `unlink` on the calling thread is a syscall, next to nothing beside the directory listing this
+        // is protecting.
         inFlight -= id
         runCatching { fileFor(id).delete() }
     }
 
     /** Record a capture that actually happened. Refuses an empty file, which is a failed capture. */
-    suspend fun confirm(id: String, atMs: Long): Boolean {
+    suspend fun confirm(id: String, atMs: Long): Boolean = withContext(Dispatchers.IO) {
+        // ⚠️ Cleared before the early return as well as on the happy path. A capture that produced an
+        // empty file must leave nothing in [inFlight], or the sweep is barred from collecting it for the
+        // life of the process.
         inFlight -= id
         val f = fileFor(id)
         if (!f.exists() || f.length() <= 0L) {
             runCatching { f.delete() }
-            return false
+            return@withContext false
         }
         mutex.withLock {
             val s = loadLocked()
-            if (s.photos.any { it.id == id }) return@withLock
-            val next = Stored(s.photos + Photo(id, atMs))
-            loaded = next
-            _photos.value = next.photos.sortedByDescending { it.atMs }
-            writeLocked(next)
+            if (s.photos.none { it.id == id }) {
+                val next = Stored(s.photos + Photo(id, atMs))
+                loaded = next
+                _photos.value = next.photos.sortedByDescending { it.atMs }
+                writeLocked(next)
+            }
         }
-        return true
+        true
     }
 
     /** Forget a photograph, and delete the file — a "delete" that leaves the bytes is not one. */
-    suspend fun remove(id: String) {
+    suspend fun remove(id: String): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             val s = loadLocked()
             val next = Stored(s.photos.filterNot { it.id == id })
@@ -196,7 +218,7 @@ class ProgressPhotoStore(
         runCatching { fileFor(id).delete() }
     }
 
-    suspend fun clear() {
+    suspend fun clear(): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             loaded = Stored()
             _photos.value = emptyList()
@@ -206,8 +228,10 @@ class ProgressPhotoStore(
     }
 
     /** How much disk the photographs are using, so the screen can say rather than imply. */
-    suspend fun bytesOnDisk(): Long = mutex.withLock {
-        loadLocked().photos.sumOf { runCatching { fileFor(it.id).length() }.getOrDefault(0L) }
+    suspend fun bytesOnDisk(): Long = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            loadLocked().photos.sumOf { runCatching { fileFor(it.id).length() }.getOrDefault(0L) }
+        }
     }
 
     /**

@@ -25,7 +25,16 @@ class DiskCache(
     root: File,
     private val json: Json,
 ) {
-    private val dir: File = File(root, "pulse_cache").apply { mkdirs() }
+    /**
+     * ⚠️ **Lazy, so constructing a cache touches no disk.** As an initialiser the `mkdirs()` ran on
+     * whoever built the object, and on the phone that is the dependency graph being forced from an
+     * activity's `onStart` — a filesystem call on the frame thread for a cache nothing has asked to
+     * read yet. Every real use of this goes through `fileFor`, which is only ever reached inside a
+     * `withContext(Dispatchers.IO)` below, so deferring it moves the syscall to a thread that is
+     * already doing file work. `by lazy` is synchronized, which costs an uncontended monitor next to
+     * a file read.
+     */
+    private val dir: File by lazy { File(root, "pulse_cache").apply { mkdirs() } }
     private val mutex = Mutex()
 
     @Serializable

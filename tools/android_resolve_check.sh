@@ -129,6 +129,23 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # `tools/check_changed.sh` now runs that automatically whenever a `core/health` file changes. When
 # this gate blames a health symbol, that compile is the instrument to reach for — not a shrug.
 #
+# ⚠️ **A NEW EXPRESSION OVER AN UNRESOLVABLE APP TYPE REPORTS A TYPE-INFERENCE FAILURE OR A
+# RECEIVER MISMATCH, NOT AN UNRESOLVED NAME — so the differencing does not cancel it.** Adding a
+# `Pair<String, AppSettings>` field to `SettingsRepository`, plus `raw to it` and `x?.also { }` over
+# an `AppSettings?`, produced two brand-new complaints ("not enough information to infer type
+# argument for 'B'" and "receiver type mismatch") in a file whose every other mention of
+# `AppSettings` was already at HEAD and therefore already cancelling. `AppSettings` is an app class,
+# so it has an error type here; a NEW generic instantiation or a NEW call on an error-typed receiver
+# is a message KIND that did not exist at HEAD. Nothing is wrong with the code.
+#
+# Two ways to settle it, cheapest first:
+#   - retype the same expression over a resolvable type (`Pair<String, String>`) and re-run; the
+#     inference complaint disappears while any unrelated one stays — that is the tell.
+#   - better, because it is positive rather than negative: compile the file properly with
+#     `tools/android_compile_check.sh -s <target.kt> <the-file-declaring-the-type> ...`. Here that
+#     reported ZERO errors attributed to the target and left only the declaring file's own missing
+#     transitive deps, which is proof the target is fine rather than an argument that it might be.
+#
 # ⚠️ **DO NOT PASS A TEST FILE. This is for main sources, and a test file poisons the whole run.**
 # JUnit is not on the classpath, so `Test`, `assertEquals` and `assertTrue` come back unresolved —
 # which is obvious enough — but the damage does not stop there. Adding a file full of unresolved

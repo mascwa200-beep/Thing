@@ -42,11 +42,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -293,10 +293,23 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
 
     private val recompute = MutableStateFlow(0)
 
+    /**
+     * ⚠️ **`flowOn` moves the arithmetic off the frame thread; it does NOT touch the sharing
+     * strategy, and the distinction is the whole point.** `stateIn(viewModelScope, ...)` collects the
+     * upstream in `Dispatchers.Main.immediate`, so every one of [build]'s trend estimates, expenditure
+     * fits and macro derivations ran between two frames — on a phone with four slow cores that is a
+     * visible stall on every logged food. `Eagerly` stays exactly as it is for the reasons written on
+     * [PANEL_SHARING]: this flow is read synchronously through `.value`, and demoting it risks a screen
+     * publishing targets built from `State()` defaults. Moving where the work happens changes none of
+     * that — the flow is still started at construction and still always warm.
+     *
+     * `Default` rather than `IO`: this is arithmetic over data the stores have already read, so it
+     * wants the CPU-bound pool rather than one sized for blocking calls.
+     */
     val state: StateFlow<State> =
         combine(profile, weighins, _entries, c.bodyStore.stepHistory, recompute) { p, w, todayEntries, walked, _ ->
             build(p, w, todayEntries, walked)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, State())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, State())
 
     /**
      * How the last week went, or null while there is no plan to have gone against.
@@ -318,7 +331,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
     val week: StateFlow<IntakeWeek.Week?> =
         combine(c.foodLogStore.days, state) { byDay, s ->
             IntakeWeek.score(byDay, s.targets?.kcal, dayGrid(IntakeWeek.DEFAULT_WINDOW_DAYS))
-        }.stateIn(viewModelScope, PANEL_SHARING, null)
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, PANEL_SHARING, null)
 
     /**
      * ⚠️ Delegates to [composeHealthReading], which is a TOP-LEVEL function rather than a method
@@ -1585,7 +1598,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
             }
 
             listOfNotNull(weight) + tape
-        }.stateIn(viewModelScope, PANEL_SHARING, emptyList())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, PANEL_SHARING, emptyList())
 
     // ------------------------------------------------------------------------ reading it back
 
@@ -1624,7 +1637,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     PeriodCompare.Grain.MONTH -> HealthDays.monthStart(d)
                 }
             }
-        }.stateIn(viewModelScope, PANEL_SHARING, emptyList())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, PANEL_SHARING, emptyList())
 
     // ---------------------------------------------------------------------------------- habits
 
@@ -1670,7 +1683,7 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 Habits.Habit.HIT_PROTEIN to Habits.streak(protein, today, ::dayBefore),
                 Habits.Habit.STAY_IN_BAND to Habits.streak(inBand, today, ::dayBefore),
             )
-        }.stateIn(viewModelScope, PANEL_SHARING, emptyMap())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, PANEL_SHARING, emptyMap())
 
     /**
      * Fold a raw pedometer reading in.
