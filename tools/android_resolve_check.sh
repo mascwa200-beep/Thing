@@ -190,7 +190,13 @@ fi
 # the complaint was this.
 # (`:core:telemetry` is passed as SOURCES, so it never has this problem — only feeds does.)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar"
+# ⚠️ JUnit is here because this gate is routinely handed `src/test` files alongside the source they
+# cover, and without it EVERY test file reports `unresolved reference 'junit'` plus one line per
+# assertion — and then a cascade, because a lambda whose body has an error type cannot have its
+# parameter inferred either. Six lines of pure noise on a file that compiles perfectly in CI.
+# It cannot hide a real defect: Kotlin still requires the import, so an unimported `assertEquals`
+# is unresolved whether or not the jar is on the classpath.
+TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar:$G/junit-4.13.2.jar:$G/hamcrest-core-1.3.jar"
 
 # The whole pure core, so its types DO resolve — exactly one file in it imports android.*.
 mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')
@@ -243,6 +249,14 @@ complaints() {
   # zero lines here, and reported "no new complaints" for every possible edit. A check that cannot
   # fail is worse than no check, and it passed its own smoke test by looking clean. Both forms are
   # handled; the count assertion below is what would catch a third.
+  # ⚠️ Distinguish "the compiler found nothing wrong" from "my pattern found nothing". Only the
+  # SECOND is a broken check, and the guard below could not tell them apart until a file with no
+  # `android.*` import at all was passed to it, at which point a genuinely clean compile — the
+  # strongest result this script can produce — was reported as a failure.
+  if ! grep -qE '(^|[[:space:]])error:|^e: ' <<<"$out"; then
+    echo "!!NO-ERRORS-AT-ALL"
+    return
+  fi
   grep -E '^([^ ]+\.kt:[0-9]+:[0-9]+: error: |e: )' <<<"$out" \
     | sed -E 's|^[^ ]+\.kt:[0-9]+:[0-9]+: error: ||; s|^e: file://[^ ]*:[0-9]+:[0-9]+ ||; s|^e: ||' \
     | sed -E 's/[[:space:]]+$//' \
@@ -272,12 +286,28 @@ fi
 
 then_=$(complaints "${baseline[@]}")
 
-# ⚠️ **THE EXTRACTOR MUST HAVE FOUND SOMETHING.** These are Android files compiled with no Android
-# SDK on the classpath, so the baseline ALWAYS produces unresolved-reference errors — every
-# `android.*` and `androidx.*` import is missing. Zero means the message pattern above stopped
-# matching, not that the code is clean, and the difference would then be empty for any edit whatsoever.
-# That exact failure shipped in a first cut of this widening, so it is asserted rather than trusted.
-if [ -z "$then_" ]; then
+# The whole set compiles with nothing but the shared cores — no Android SDK needed. That is not a
+# gap in this gate, it is the best answer it has: there is nothing left for the SDK to resolve.
+baseline_clean=0
+grep -q '!!NO-ERRORS-AT-ALL' <<<"$then_" && baseline_clean=1
+if [ "$baseline_clean" = 1 ] && grep -q '!!NO-ERRORS-AT-ALL' <<<"$now"; then
+  echo "these files need nothing from the Android SDK — they compile clean against the shared cores"
+  exit 0
+fi
+then_=$(grep -v '!!NO-ERRORS-AT-ALL' <<<"$then_")
+now=$(grep -v '!!NO-ERRORS-AT-ALL' <<<"$now")
+
+# ⚠️ **THE EXTRACTOR MUST HAVE FOUND SOMETHING — unless the compiler genuinely found nothing.**
+# These are usually Android files compiled with no Android SDK on the classpath, so the baseline
+# normally produces unresolved-reference errors for every `android.*` and `androidx.*` import. Zero
+# extracted lines would then mean the message pattern above stopped matching, not that the code is
+# clean, and the difference would be empty for any edit whatsoever. That exact failure shipped in a
+# first cut of this widening, so it is asserted rather than trusted.
+# ⚠️ `baseline_clean` is what keeps the assertion honest: a file with no Android imports at all
+# compiles clean here, so its empty extraction is a FACT rather than a broken pattern. Without that
+# distinction this guard fired on the strongest result the script can produce — which is how it
+# reported a failure for a file that had just been migrated off `SimpleDateFormat` onto `java.time`.
+if [ -z "$then_" ] && [ "$baseline_clean" = 0 ]; then
   echo "EXTRACTOR MATCHED NOTHING — the compiler's message format changed. This is NOT a pass."
   echo "  An Android file with no SDK must produce unresolved-reference errors; zero means the"
   echo "  grep/sed in complaints() no longer matches. Print the raw output and fix the pattern."
