@@ -181,7 +181,7 @@ class DeviceProbeReader(context: Context) {
     }
 
     /**
-     * The budget from the HARDWARE ALONE — thermal state and doze deliberately excluded.
+     * The budget with the MOMENTARY inputs excluded — thermal state, doze, background restriction.
      *
      * ⚠️ **For structures that are sized once and then kept for the life of the process**, of which
      * the image memory cache is the one that matters. Folding a momentary reading into a durable
@@ -190,11 +190,18 @@ class DeviceProbeReader(context: Context) {
      * covered — both applications clear the cache from `onTrimMemory`, which is the mechanism for
      * pressure that arrives after construction.
      *
+     * ⚠️ **It is not "the hardware alone", which is what this said and what the code did.** It
+     * called the bare `budgetFor(tier, NONE)`, picking up the defaulted `animationsAllowed = true`,
+     * so a phone with `ANIMATOR_DURATION_SCALE` set to zero got LCARS panel transitions anyway — on
+     * exactly the cheap phones whose owners turn animations off in developer options to make them
+     * feel faster. A persistent user setting is every bit as durable as the RAM. The rule lives in
+     * [DeviceClass.durableBudgetFor] now, with the probe passed whole, so no caller can honour some
+     * of it and forget the rest.
+     *
      * A per-request decision — a decode size, a poll interval — should read [budgetCached] instead,
      * because there pressure genuinely is the right input.
      */
-    fun durableBudget(): DeviceClass.Budget =
-        DeviceClass.budgetFor(tier(), DeviceClass.Pressure.NONE)
+    fun durableBudget(): DeviceClass.Budget = DeviceClass.durableBudgetFor(probe())
 
     /** One block of text for a diagnostic screen, naming what could not be measured as well as what could. */
     fun describe(): String = DeviceClass.describe(probe())

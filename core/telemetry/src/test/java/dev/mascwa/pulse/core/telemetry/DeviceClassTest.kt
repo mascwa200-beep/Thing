@@ -411,4 +411,62 @@ class DeviceClassTest {
             last = n
         }
     }
+
+    // ---- The durable budget: momentary inputs out, persistent ones IN ----
+
+    @Test
+    fun `the durable budget still obeys a system-wide animation setting`() {
+        // ⚠️ This is the regression that motivated `durableBudgetFor`. The caller that decides
+        // whether panels animate is a once-per-process one, so it moved off `budgetFor(p)` — and
+        // onto the bare `budgetFor(tier, NONE)`, whose `animationsAllowed` DEFAULTS TO TRUE. A
+        // flagship, and more to the point a cheap phone, with animations turned off in developer
+        // options got LCARS panel transitions anyway. Every existing test here passed throughout,
+        // because the core was right and the caller had taken a different door.
+        val off = Probe(totalRamBytes = gb(16.0), memoryClassMb = 512, animatorScale = 0f)
+        assertFalse(
+            "a durable budget that ignores ANIMATOR_DURATION_SCALE is the defect this exists to stop",
+            DeviceClass.durableBudgetFor(off).decorativeAnimation,
+        )
+
+        val on = Probe(totalRamBytes = gb(16.0), memoryClassMb = 512, animatorScale = 1f)
+        assertTrue(DeviceClass.durableBudgetFor(on).decorativeAnimation)
+
+        // Unknown never demotes — the same rule the live budget follows.
+        val unknown = Probe(totalRamBytes = gb(16.0), memoryClassMb = 512, animatorScale = null)
+        assertTrue(DeviceClass.durableBudgetFor(unknown).decorativeAnimation)
+    }
+
+    @Test
+    fun `the two budgets never disagree about animation`() {
+        // The property whose violation WAS the defect, stated directly: whichever door a caller
+        // takes, the answer to "may this animate" has to be the same. Thermal is deliberately
+        // excluded below, because that is the one input the durable budget is supposed to drop.
+        for (scale in listOf(0f, 1f, 0.5f, null)) {
+            for (ram in listOf(gb(1.5), gb(3.0), gb(6.0), gb(16.0))) {
+                val p = Probe(totalRamBytes = ram, memoryClassMb = 256, animatorScale = scale)
+                assertEquals(
+                    "scale=$scale ram=$ram: the durable and live budgets disagree about animation",
+                    DeviceClass.budgetFor(p).decorativeAnimation,
+                    DeviceClass.durableBudgetFor(p).decorativeAnimation,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the durable budget drops thermal state, which is the whole reason it exists`() {
+        // A phone that happens to be hot at launch must not be held back for the life of the
+        // process — `onTrimMemory` and the live budget cover pressure that arrives later.
+        val hot = Probe(
+            totalRamBytes = gb(16.0), memoryClassMb = 512, animatorScale = 1f,
+            thermalStatus = 4, heapUsedFraction = 0.9f,
+        )
+        assertTrue(
+            "the live budget should read this phone as under pressure, or the fixture proves nothing",
+            DeviceClass.pressureOf(hot) != Pressure.NONE,
+        )
+        val durable = DeviceClass.durableBudgetFor(hot)
+        assertEquals(DeviceClass.budgetFor(Tier.FULL, Pressure.NONE).imageDecodePx, durable.imageDecodePx)
+        assertTrue("thermal state must not reach a once-per-process decision", durable.decorativeAnimation)
+    }
 }

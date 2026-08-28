@@ -311,6 +311,29 @@ object DeviceClass {
     }
 
     /**
+     * The reading for something sized ONCE and kept for the life of the process.
+     *
+     * ⚠️ **The distinction is momentary versus persistent, NOT hardware versus everything else**, and
+     * getting that wrong is how this function came to exist. A structure decided once — the image
+     * memory cache, the flag that says whether panels animate — must not carry a thermal reading,
+     * because a phone that merely happened to be warm at launch would then be held back all day,
+     * long after it cooled; pressure arriving later is covered by `onTrimMemory` and by [budgetFor]
+     * at each use. But a persistent USER SETTING is exactly as durable as the hardware, and dropping
+     * it is a regression rather than a simplification.
+     *
+     * ⚠️ That is not hypothetical: a caller that reached for a bare `budgetFor(tier, NONE)` picked up
+     * the defaulted `animationsAllowed = true` and stopped honouring a system-wide
+     * `ANIMATOR_DURATION_SCALE` of zero — on precisely the cheap phones whose owners turn animations
+     * off to make them feel faster. One function that takes the whole [Probe] is what stops the next
+     * caller making the same trade, which is the same reasoning [budgetFor] gives for itself.
+     *
+     * Doze and background restriction are deliberately absent for the same reason as thermal: they
+     * are states. Anything that wants those wants [budgetFor].
+     */
+    fun durableBudgetFor(p: Probe): Budget =
+        budgetFor(tierOf(p), Pressure.NONE, animationsAllowed = p.animatorScale != 0f)
+
+    /**
      * ⚠️ The FULL/NONE row is today's behaviour exactly: animations on, no decode cap worth the name,
      * the measured 0.06 cache share both applications already use, unscaled intervals. If this row
      * ever changes, a flagship has been made worse by a change meant for a cheap phone.
