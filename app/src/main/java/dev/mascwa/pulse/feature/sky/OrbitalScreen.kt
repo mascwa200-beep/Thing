@@ -33,6 +33,7 @@ import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.Occultations
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
@@ -71,6 +72,7 @@ private enum class SkyTab(val label: String) {
     SATELLITES("SATELLITES"),
     SHOWERS("SHOWERS"),
     ECLIPSES("ECLIPSES"),
+    OCCULTATIONS("OCCULTATIONS"),
     ZODIAC("ZODIAC"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
@@ -116,6 +118,7 @@ fun OrbitalBody(
     val launches by vm.launches.collectAsStateWithLifecycle()
     val showers by vm.showers.collectAsStateWithLifecycle()
     val eclipses by vm.eclipses.collectAsStateWithLifecycle()
+    val occultations by vm.occultations.collectAsStateWithLifecycle()
     val zodiac by vm.zodiac.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
@@ -153,6 +156,7 @@ fun OrbitalBody(
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
                         SkyTab.SHOWERS -> showersTab(showers, site != null, c)
                         SkyTab.ECLIPSES -> eclipsesTab(eclipses, site != null, c)
+                        SkyTab.OCCULTATIONS -> occultationsTab(occultations, site != null, c)
                         SkyTab.ZODIAC -> zodiacTab(zodiac, site != null, c)
                         SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
@@ -543,6 +547,149 @@ private fun countdown(epochMs: Long, nowMs: Long = System.currentTimeMillis()): 
         days == 1L -> "TOMORROW"
         days < 60L -> "IN ${days}D"
         else -> "IN ${days / 30}MO"
+    }
+}
+
+// ---- OCCULTATIONS ------------------------------------------------------------------------------
+
+/**
+ * When the Moon covers something, and whether it does so over your head.
+ *
+ * ⚠️ **Split by whether it happens HERE, not by how good the event is somewhere else**, because the
+ * two are barely related: the Moon's parallax is four times its own diameter, so a conjunction that
+ * looks like a direct hit from the centre of the Earth routinely misses a given place by half a
+ * degree, and one that looks like a wide miss can be a clean occultation. A list ordered by
+ * geocentric closeness would put the events you cannot see at the top.
+ */
+private fun LazyListScope.occultationsTab(
+    hidings: List<OrbitalViewModel.Hiding>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (hidings.isEmpty()) {
+        item {
+            Hint(
+                "Nothing in the next six months. That is unusual rather than impossible — the Moon " +
+                    "passes something bright every few weeks — so if this stays empty, suspect the " +
+                    "clock or a missing star catalogue.",
+                c,
+            )
+        }
+        return
+    }
+
+    val here = hidings.filter { it.local.occulted || it.local.grazing }
+    item { LcarsHeaderBar("Covered from here", trailing = "${here.size}") }
+    if (here.isEmpty()) {
+        item {
+            Hint(
+                "None of these passes in front of anything from where you are standing. That is " +
+                    "ordinary: the Moon's parallax is about a degree, four times its own width, so " +
+                    "which places see an occultation and which see a near miss changes with every " +
+                    "event.",
+                c,
+            )
+        }
+    } else {
+        items(here, key = { "occ-${it.event.target.name}-${it.event.greatestEpochMs}" }) {
+            OccultationCard(it, c)
+        }
+    }
+
+    val misses = hidings.filterNot { it.local.occulted || it.local.grazing }
+    if (misses.isNotEmpty()) {
+        item { LcarsHeaderBar("Close passes and elsewhere", trailing = "${misses.size}") }
+        items(misses, key = { "miss-${it.event.target.name}-${it.event.greatestEpochMs}" }) {
+            OccultationCard(it, c)
+        }
+    }
+
+    item {
+        LcarsFrame(Modifier.fillMaxWidth(), accent = c.muted) {
+            Column {
+                Text(
+                    "Why the same event is different two hundred miles away",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    "The Moon is close enough that where it appears against the stars depends on " +
+                        "where you are standing — by up to a degree, which is four times its own " +
+                        "width. So an occultation is a strip across the Earth rather than an event " +
+                        "everyone shares, and near the edge of that strip the star winks in and out " +
+                        "behind lunar mountains. Those edges are marked as undecided here rather " +
+                        "than guessed at.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OccultationCard(hiding: OrbitalViewModel.Hiding, c: NightwirePalette) {
+    val e = hiding.event
+    val l = hiding.local
+    // Same rule as the eclipse cards: colour says what YOU get. Amber is "cannot tell", which is a
+    // different thing from a poor view.
+    val accent = when {
+        l.grazing -> c.amber
+        l.occulted && l.visible -> c.violet
+        l.occulted -> c.accent
+        else -> c.muted
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    Occultations.describe(e),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    countdown(e.greatestEpochMs),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent,
+                )
+            }
+            Text(
+                hiding.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                occultationFigures(hiding),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under the sentence.
+ *
+ * ⚠️ **Contact times are printed only when there ARE contacts**, and a miss quotes how far the
+ * Moon's edge passed instead. Printing a disappearance time for an event that does not happen here
+ * would be the single most misleading thing this card could do — somebody would set an alarm.
+ */
+private fun occultationFigures(hiding: OrbitalViewModel.Hiding): String {
+    val e = hiding.event
+    val l = hiding.local
+    val lit = "${(e.moonIlluminatedFraction * 100).roundToInt()}% lit"
+    if (!l.minSeparationDeg.isFinite()) return "${dateOrDash(e.greatestEpochMs)} · $lit"
+    return if (l.occulted && l.disappearsEpochMs != null && l.reappearsEpochMs != null) {
+        val mins = ((l.reappearsEpochMs!! - l.disappearsEpochMs!!) / 60_000L)
+        "${dateOrDash(l.bestEpochMs)} · hidden ${clockOrDash(l.disappearsEpochMs)}–" +
+            "${clockOrDash(l.reappearsEpochMs)} (${mins}m) · Moon ${l.moonAltitudeDeg.roundToInt()}° up · $lit"
+    } else {
+        val gap = ((l.minSeparationDeg - l.moonSemiDeg) * 60).roundToInt()
+        "${dateOrDash(l.bestEpochMs)} ${clockOrDash(l.bestEpochMs)} · edge passes $gap′ away · " +
+            "Moon ${l.moonAltitudeDeg.roundToInt()}° up · $lit"
     }
 }
 
@@ -1053,6 +1200,10 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Computed on-device from the shipped ephemeris — no network needed. Checked against " +
                 "JPL DE421: every eclipse of 2025-2028 agrees in kind, greatest eclipse within 30 " +
                 "seconds and magnitude within 0.004."
+        SkyTab.OCCULTATIONS ->
+            "Computed on-device from the shipped ephemeris and the bundled star catalogue — no " +
+                "network needed. Checked against JPL DE421 at five sites: whether it happens agrees " +
+                "everywhere, and disappearance and reappearance land within a minute."
         SkyTab.SHOWERS ->
             "Peaks solved from the Sun's own position on-device, from a bundled table of radiants " +
                 "— no network needed. Rates are an ideal-conditions figure scaled for the radiant's " +

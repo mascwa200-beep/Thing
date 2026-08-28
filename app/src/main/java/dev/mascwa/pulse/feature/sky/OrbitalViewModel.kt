@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.Astrology
 import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.Occultations
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
@@ -38,6 +39,7 @@ class OrbitalViewModel(
     private val locationProvider: LocationProvider,
     private val tleRepository: TleRepository,
     private val launchRepository: LaunchRepository,
+    private val starCatalog: dev.mascwa.pulse.data.sky.StarCatalog,
 ) : ViewModel() {
 
     /** Where the observer is. Passes and rise/set times are meaningless without it. */
@@ -141,6 +143,16 @@ class OrbitalViewModel(
     private val _zodiac = MutableStateFlow<Zodiac?>(null)
     val zodiac: StateFlow<Zodiac?> = _zodiac.asStateFlow()
 
+    /** One occultation, with what this place gets of it and what to do about it. */
+    data class Hiding(
+        val event: Occultations.Event,
+        val local: Occultations.Local,
+        val advice: String,
+    )
+
+    private val _occultations = MutableStateFlow<List<Hiding>>(emptyList())
+    val occultations: StateFlow<List<Hiding>> = _occultations.asStateFlow()
+
     init { load(force = false) }
 
     fun refresh() = load(force = true)
@@ -157,6 +169,7 @@ class OrbitalViewModel(
                 launch { computeShowers(loc.latitude, loc.longitude) }
                 launch { computeEclipses(loc.latitude, loc.longitude) }
                 launch { computeZodiac(loc.latitude, loc.longitude) }
+                launch { computeOccultations(loc.latitude, loc.longitude) }
                 launch { loadPasses(loc, force) }
             }
         }
@@ -237,6 +250,67 @@ class OrbitalViewModel(
                 Eclipses.upcoming(now, now + ECLIPSE_HORIZON_MS).map { e ->
                     val local = Eclipses.local(e, lat, lon)
                     EclipseNight(e, local, Eclipses.advice(e, local))
+                }
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    /**
+     * When the Moon passes in front of something, and whether it does so over this place.
+     *
+     * ⚠️ **Star positions come from the bundled catalogue, precessed** — not from coordinates typed
+     * in here. A J2000 catalogue position is twenty-two arcminutes from where the star is now, most
+     * of the Moon's radius, so [Ephemeris.precessFromJ2000] is not optional; and taking them from
+     * the same asset the sky chart draws from is what stops two features disagreeing about where
+     * Aldebaran is. A star the catalogue does not name is simply absent rather than guessed at.
+     *
+     * ⚠️ **Planets are handed [PlanetCalc]'s own answer and its own error budget.** Its positions
+     * are within three arcminutes of JPL across fifty years, measured — good enough to say an
+     * occultation happens, not good enough to call one at the limb, which is exactly what
+     * [Occultations.Local.grazing] is for.
+     *
+     * ⚠️ **The observer's latitude is passed to [PlanetCalc] only because it insists on one.** What
+     * is read back is right ascension and declination, which do not depend on it — a
+     * `:core:feeds` test asserts that two sites give bit-identical values.
+     *
+     * No network at any point, like the eclipses beside it.
+     */
+    private suspend fun computeOccultations(lat: Double, lon: Double) {
+        val now = System.currentTimeMillis()
+        val stars = runCatching { starCatalog.all() }.getOrDefault(emptyList())
+        _occultations.value = withContext(Dispatchers.Default) {
+            runCatching {
+                val targets = ArrayList<Occultations.Target>()
+
+                for (name in OCCULTABLE_STARS) {
+                    val s = stars.firstOrNull { it.name == name } ?: continue
+                    targets += Occultations.Target(
+                        name = name,
+                        kind = Occultations.Kind.STAR,
+                        magnitude = s.magnitude,
+                        positionUncertaintyDeg = STAR_UNCERTAINTY_DEG,
+                    ) { ms ->
+                        Ephemeris.precessFromJ2000(s.rightAscensionDeg, s.declinationDeg, ms)
+                    }
+                }
+
+                for (name in listOf("Mercury", "Venus", "Mars", "Jupiter", "Saturn")) {
+                    targets += Occultations.Target(
+                        name = name,
+                        kind = Occultations.Kind.PLANET,
+                        // The magnitude changes through the year; the card reads the live one.
+                        magnitude = 0.0,
+                        positionUncertaintyDeg = PLANET_UNCERTAINTY_DEG,
+                    ) { ms ->
+                        PlanetCalc.planetsNow(lat, lon, ms).firstOrNull { it.name == name }?.let {
+                            Ephemeris.Equatorial(it.rightAscensionDeg, it.declinationDeg, 1.0)
+                        }
+                    }
+                }
+
+                Occultations.upcoming(now, now + OCCULTATION_HORIZON_MS, targets).map { e ->
+                    val local = Occultations.local(e, lat, lon)
+                    Hiding(e, local, Occultations.advice(e, local))
                 }
             }.getOrDefault(emptyList())
         }
@@ -361,7 +435,13 @@ class OrbitalViewModel(
         }
     }
 
-    private companion object {
+    /**
+     * ⚠️ `internal` rather than `private` so `OccultationTargetsTest` can read [OCCULTABLE_STARS]
+     * and check every name against the real bundled catalogue. A star name that stops resolving
+     * produces no error and no crash — just a tab that quietly never mentions that star again — so
+     * the list and the asset have to be checkable together.
+     */
+    internal companion object {
         /** Below this a pass is behind buildings and trees for most people. */
         const val MIN_ELEVATION_DEG = 15.0
         const val MAX_PASSES_PER_SATELLITE = 8
@@ -369,5 +449,40 @@ class OrbitalViewModel(
 
         /** Two years of eclipses — see [computeEclipses] for why that number and not three. */
         const val ECLIPSE_HORIZON_MS = 2L * 365L * 86_400_000L
+
+        /**
+         * Six months of occultations, deliberately shorter than the eclipse window.
+         *
+         * ⚠️ **The cost is per TARGET, and there are nine of them.** The scan walks the whole window
+         * in six-hour steps computing a Moon position at each, so nine targets over two years would
+         * be nine times the work of the eclipse scan for a list nobody would read to the end. The
+         * Moon occults something bright every few weeks, so six months is already dozens of events.
+         */
+        const val OCCULTATION_HORIZON_MS = 182L * 86_400_000L
+
+        /**
+         * The four stars bright enough and near enough the ecliptic for the Moon to hide visibly,
+         * plus Alcyone in the Pleiades — an occultation of the cluster is the most striking of the
+         * lot. These are the only first-magnitude stars the Moon can reach at all: its path is
+         * confined to about five degrees either side of the ecliptic, and nothing else that bright
+         * lies inside that band.
+         *
+         * ⚠️ Named rather than given coordinates. The positions come from the bundled catalogue the
+         * sky chart also draws from, so the two can never disagree about where a star is, and
+         * `StarCatalogTargetsTest` walks the real asset and fails the build if any name stops
+         * resolving.
+         */
+        val OCCULTABLE_STARS = listOf("Aldebaran", "Regulus", "Spica", "Antares", "Alcyone")
+
+        /**
+         * ⚠️ How well each kind of position is known, in degrees, and the two differ by ninety.
+         *
+         * A star precessed out of the catalogue is within 2 arcseconds of DE421, measured. A planet
+         * from [PlanetCalc] is within 3 arcMINUTES, also measured, across fifty years — which is a
+         * fifth of the Moon's radius, so near the limb a planetary occultation genuinely cannot be
+         * called and [Occultations.Local.grazing] says so.
+         */
+        const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
+        const val PLANET_UNCERTAINTY_DEG = 3.0 / 60.0
     }
 }
