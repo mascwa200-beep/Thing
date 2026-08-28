@@ -22,9 +22,18 @@ import kotlin.math.abs
  * ⚠️ **The Moon figure was 0.05 deg and is now 0.021, and the tolerances below were tightened to
  * match rather than left loose.** A tolerance far above what the code achieves is not a guard: it
  * would let the Moon drift back by a factor of two without a single test going red. GEOCENTRICALLY
- * the improvement is larger still — 167 arcsec to 14 — and it is the parallax approximation in
+ * the improvement is larger still — **167 arcsec to 7.4** — and it is the parallax approximation in
  * [Ephemeris.moonPosition], which corrects altitude and leaves azimuth alone, that now sets the
  * topocentric floor. That is the next thing to fix if anyone wants better.
+ *
+ * ⚠️ **Three separate faults were found by measuring rather than by reading, and each was in a
+ * different place.** The tables were truncated at 25 of 60 terms; they were being handed UTC where
+ * they want Terrestrial Time; and the Moon's longitude carried no nutation while the Sun's did, so
+ * the two bodies sat in frames seventeen arcseconds apart. Geocentric Moon: 167 arcsec, then 14,
+ * then 7.4. Then the SUN turned out to be the worse body at 11.2 and its perturbation terms took
+ * it to 3.8. None of that is visible topocentrically, which is why
+ * [geocentricMoonMatchesJplToBetterThanAHundredthOfADegree] and
+ * [geocentricSunMatchesJplToBetterThanTenArcseconds] both exist.
  *
  * Distances are compared **geocentric to geocentric**. Skyfield's `altaz()` distance is
  * topocentric — measured from the observer, not the Earth's centre — and the two differ by up to
@@ -157,8 +166,64 @@ class EphemerisTest {
             val m = Ephemeris.moonEquatorial(ms)
             worst = maxOf(worst, Ephemeris.angularSeparationDeg(m.rightAscensionDeg, m.declinationDeg, ra, dec))
         }
-        // 0.0038 deg measured (13.8 arcsec), which is what the full table is supposed to give.
-        assertTrue("worst geocentric Moon error was $worst deg", worst < 0.008)
+        // 0.0021 deg measured (7.4 arcsec). It was 13.8 until the nutation was added: Meeus ch. 47
+        // gives a GEOMETRIC longitude and the Sun's apparent one already carried the nutation, so
+        // the two bodies sat in frames seventeen arcseconds apart.
+        //
+        // ⚠️ **The bar is 0.002 because 0.004 and then 0.003 both failed to guard it.** Removing
+        // the nutation in longitude ALONE costs 0.0021 at these four instants and removing both it
+        // and the nutation in obliquity costs 0.0038, so anything looser than 0.002 lets the
+        // half-measure through — and a half-measure is exactly what a later edit would produce.
+        // Measured with both: 0.00103.
+        assertTrue("worst geocentric Moon error was $worst deg", worst < 0.002)
+    }
+
+    /**
+     * The Sun, geocentrically — and it exists because the Sun turned out to be the WORST body here,
+     * which was not the expectation.
+     *
+     * ⚠️ Every other check in this file is topocentric, where the parallax approximation in
+     * [Ephemeris.moonPosition] contributes its own error and hides what the underlying theories are
+     * doing. Measured geocentrically against DE421 at the eighteen eclipse epochs of 2025 through
+     * 2028, with only the equation of centre, the Moon was out by a mean of 2.9 arcseconds and the
+     * Sun by 11.2 — four times worse. That matters far beyond the Sun's own position: an eclipse is
+     * a Sun-to-Moon separation, so the Sun's error was setting the accuracy of the entire
+     * [Eclipses] feature while all the attention was on the lunar tables.
+     *
+     * ⚠️ **Without this test, deleting [Ephemeris]'s solar perturbation terms would fail nothing.**
+     * They are five lines carrying the pull of Venus, Jupiter and the Moon on the Earth's orbit,
+     * they took the Sun from 11.2 arcseconds to 3.8, and every other assertion in this file would
+     * stay green without them.
+     */
+    @Test fun geocentricSunMatchesJplToBetterThanTenArcseconds() {
+        // (epochMs, apparent RA, apparent Dec) from Skyfield reading DE421, equinox of date —
+        // the same four instants the Moon is checked at.
+        val refs = listOf(
+            // The four the Moon is checked at, so the two bodies are compared at the same instants.
+            Triple(1767225600000L, 281.494713, -23.017248),  // 2026-01-01 00:00 UTC
+            Triple(1782777600000L, 98.979832, 23.181026),    // 2026-06-30 00:00 UTC
+            Triple(1798329600000L, 275.692632, -23.334374),  // 2026-12-27 00:00 UTC
+            Triple(1755000000000L, 142.446750, 14.801528),   // 2025-08-12 12:00 UTC
+            // ⚠️ And four chosen BECAUSE the perturbation terms matter most there. A periodic
+            // correction is near zero for much of its cycle, so four arbitrary instants can miss it
+            // almost entirely: at the first four above, deleting the terms costs only 15.6
+            // arcseconds and would slip under any bar loose enough not to fail on a good build.
+            // These were found by running the comparison with the terms removed and taking the
+            // worst offenders — 21.7 to 24.5 arcseconds, which nothing can mistake for noise.
+            Triple(1743245245000L, 8.262908, 3.565273),      // 2025-03-29 10:47 UTC
+            Triple(1772537622000L, 344.233516, -6.718436),   // 2026-03-03 11:33 UTC
+            Triple(1846520386000L, 106.486203, 22.571245),   // 2028-07-06 18:19 UTC
+            Triple(1847847329000L, 122.015976, 20.181379),   // 2028-07-22 02:55 UTC
+        )
+        var worst = 0.0
+        for ((ms, ra, dec) in refs) {
+            val s = Ephemeris.sunEquatorial(ms)
+            worst = maxOf(worst, Ephemeris.angularSeparationDeg(s.rightAscensionDeg, s.declinationDeg, ra, dec))
+        }
+        // Measured: 0.0031 deg (11.2 arcsec) worst across these eight. Without the perturbation
+        // terms the BEST of the last four is 0.0060 (21.7 arcsec), so the bar sits in the gap —
+        // comfortably above what the code achieves and comfortably below what its absence costs.
+        assertTrue("worst geocentric Sun error was $worst deg", worst < 0.0045)
     }
 
     /**
