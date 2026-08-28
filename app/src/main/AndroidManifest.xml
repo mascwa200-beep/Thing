@@ -131,6 +131,21 @@
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+    <!--
+      `android:largeHeap="true"` below is load-bearing, and NOT for the reason long assumed. There is
+      no Filament renderer in this tree (zero references, checked) — what needs the room is the
+      native engine set the interrogator carries: whisper.cpp holds its acoustic model in memory,
+      llama.cpp's adjudicator is a ~1 GB quantised model, and QuickJS runs beside them. The
+      standalone nutrition app declares none of this and correctly does not set the flag.
+
+      Two consequences worth knowing rather than rediscovering:
+      - The platform IGNORES it on a device where `isLowRamDevice` is true, so it is not a way to
+        make a weak phone behave like a strong one.
+      - It changes which number `ActivityManager` should be asked for. `getMemoryClass()` is what an
+        ordinary app gets; a large-heap app gets `getLargeMemoryClass()`, routinely two to three
+        times larger on the same hardware. `DeviceProbeReader.heapCeilingMb` reads FLAG_LARGE_HEAP
+        and picks accordingly — reading the standard class here classed a capable phone as MODEST.
+    -->
     <application
         android:name=".PulseApplication"
         android:allowBackup="true"

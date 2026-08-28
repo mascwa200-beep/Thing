@@ -165,6 +165,7 @@ class UpdateRepository(
      *  token + octet-stream Accept (GitHub redirects to the signed blob); public: the browser URL. */
     suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
         val dir = File(appContext.cacheDir, "apk").apply { mkdirs() }
+        pruneCache(appContext)
         // ⚠️ Named after the tag, because LCARS now runs TWO of these — its own update and the
         // companion app's. One shared `update.apk` would have the second download overwrite the
         // first mid-install, and the failure would read as a corrupt APK rather than a collision.
@@ -203,6 +204,50 @@ class UpdateRepository(
     }
 
     companion object {
+        /**
+         * Delete downloaded APKs nothing is waiting on any more.
+         *
+         * ⚠️ **Nothing deleted these, and between the two applications that is half a gigabyte held
+         * for nothing.** The LCARS APK is 329 MB and the companion is 180; both are streamed into
+         * `cacheDir/apk` and then handed to `PackageInstaller`, which takes its own copy into the
+         * session — so the file is redundant the moment the write into that session finishes. It
+         * could not be deleted at the obvious place: `commit()` usually kills this process on a
+         * successful self-update, so any line written after it may simply never run. Sweeping on
+         * the next launch is the only point that is reliably reached, and after a successful
+         * install there always IS a next launch.
+         *
+         * ⚠️ **By AGE, and not by cross-referencing a pending install.** A file is named after its
+         * release tag rather than its build number, so "is this the one still waiting to be
+         * installed" cannot be answered from the name; and a marker that could be consulted is
+         * exactly the state a killed process loses. A day is far longer than the gap between
+         * downloading and installing, and anything older has either landed or been abandoned —
+         * either way the newest build is one fetch away. This cannot delete a file that is about
+         * to be used.
+         *
+         * ⚠️ **On the companion object, so a caller does not have to build a repository to sweep.**
+         * The directory is per-application and shared by every tag that app downloads, so ONE call
+         * at launch clears both LCARS's own APK and the companion's. Constructing an
+         * [UpdateRepository] to reach an instance method would build an `OkHttpClient` on the
+         * startup path for the sake of deleting files.
+         *
+         * `cacheDir` means Android MAY reclaim these on its own, but only under pressure and
+         * possibly in the seconds between the download and the install, which is the one moment it
+         * would hurt. This gives the space back on a schedule instead of hoping.
+         */
+        fun pruneCache(context: Context, nowMs: Long = System.currentTimeMillis()) {
+            runCatching {
+                val dir = File(context.applicationContext.cacheDir, "apk")
+                dir.listFiles()?.forEach { f ->
+                    if (f.isFile && f.name.endsWith(".apk", true) && nowMs - f.lastModified() > STALE_APK_MS) {
+                        runCatching { f.delete() }
+                    }
+                }
+            }
+        }
+
+        /** How long a downloaded APK may sit before it is assumed spent. See [pruneCache]. */
+        const val STALE_APK_MS = 24L * 60 * 60 * 1000
+
         const val API = "https://api.github.com/repos/mascwa200-beep/Thing"
 
         /** The LCARS application's own rolling release and the workflow that publishes it. */

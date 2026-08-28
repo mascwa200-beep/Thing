@@ -54,6 +54,12 @@ class NutritionApplication : Application(), ImageLoaderFactory {
         // Anything recorded before this launch goes now — never at fault time, when the JVM is
         // unstable and the process is about to be killed. A no-op without a token, and it says so.
         scope.launch { container.crashUploader.uploadPending() }
+
+        // Give back the disk the last self-update borrowed. ⚠️ Here rather than after the install,
+        // because `PackageInstaller.commit()` usually kills this process on a successful update, so
+        // any line written after it may never run. Launch is the point that is always reached, and
+        // after a successful install there always IS one. 180 MB on a phone that may not have it.
+        scope.launch { dev.mascwa.pulse.data.update.UpdateRepository.pruneCache(this@NutritionApplication) }
     }
 
     /**

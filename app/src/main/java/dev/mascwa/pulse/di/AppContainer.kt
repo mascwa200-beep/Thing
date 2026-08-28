@@ -455,7 +455,19 @@ class AppContainer(private val appContext: Context) {
      * so a local developer build genuinely has none — see `FoodDatabase.open`.
      */
     val offlineFoodStore: dev.mascwa.pulse.data.health.OfflineFoodStore? by lazy {
-        dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
+        val opened = dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
+        if (opened == null) {
+            // ⚠️ Null used to mean one thing — the asset never arrived — and now means two. A phone
+            // that refused to unpack for want of room is a different situation entirely, and this
+            // report is the only place either becomes visible.
+            crashReporter.reportNonFatal(
+                "food.db.open",
+                note = "The bundled barcode database did not open — every scan falls back to the " +
+                    "network. Reason: " +
+                    (dev.mascwa.pulse.data.food.db.FoodDatabase.lastOpenNote ?: "not stated"),
+            )
+        }
+        opened
             ?.let {
                 dev.mascwa.pulse.data.health.OfflineFoodStore(it) { op, t ->
                     // ⚠️ A query that THREW is not a query that found nothing, and until now both

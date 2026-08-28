@@ -157,7 +157,8 @@ class NutritionContainer(context: Context) {
             // without this the app is simply "not working" with no evidence at all.
             crashReporter.reportNonFatal(
                 "food.db.open",
-                note = "The bundled barcode database did not open — every scan falls back to the network.",
+                note = "The bundled barcode database did not open — every scan falls back to the " +
+                    "network. Reason: " + (FoodDatabase.lastOpenNote ?: "not stated"),
             )
         }
         db?.let {

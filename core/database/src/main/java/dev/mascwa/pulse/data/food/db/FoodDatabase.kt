@@ -283,6 +283,36 @@ abstract class FoodDatabase : RoomDatabase() {
         /** The asset CI drops into place before packaging. */
         const val ASSET = "food/food.db"
 
+        /** The file Room unpacks the asset into. Named here so the space guard and Room agree. */
+        private const val DB_NAME = "food.db"
+
+        /**
+         * What the first open needs on disk, in bytes.
+         *
+         * ⚠️ **Measured, not guessed: CI prints `food database packaged: 424 MB uncompressed` on
+         * every build.** The asset ships deflated to roughly a quarter of that and Room's
+         * `createFromAsset` writes the whole uncompressed file out on the first query, through a
+         * temporary that is then renamed — so the peak requirement is the full size plus room to
+         * move. The margin here is deliberately generous: a phone that unpacks this with twenty
+         * megabytes to spare has not been helped.
+         *
+         * If the corpus grows past this the guard becomes slightly optimistic, which fails the way it
+         * always did — mid-copy, reported by the store's own error path. It cannot fail the other way.
+         */
+        private const val FIRST_OPEN_BYTES = 460L * 1024L * 1024L
+
+        /**
+         * Why the last [open] returned null, or null if it did not.
+         *
+         * ⚠️ Exists because null had exactly one meaning to callers — "the asset is not there" — and
+         * now has two. A phone that refused to unpack for want of room is a completely different
+         * situation from a build where CI never fetched the database, and the report that reaches me
+         * is the only place either becomes visible.
+         */
+        @Volatile
+        var lastOpenNote: String? = null
+            private set
+
         @Volatile
         private var instance: FoodDatabase? = null
 
@@ -303,9 +333,25 @@ abstract class FoodDatabase : RoomDatabase() {
                 val present = runCatching {
                     app.assets.open(ASSET).use { it.read() >= 0 }
                 }.getOrDefault(false)
-                if (!present) return null
+                if (!present) {
+                    lastOpenNote = "the database asset is not in this build"
+                    return null
+                }
+                // ⚠️ Only the FIRST open needs the room: once the file exists Room opens it in place
+                // and copies nothing. Checking unconditionally would refuse to open a database that is
+                // already sitting on the disk, on a phone that is merely full — which would take the
+                // feature away at exactly the wrong moment.
+                val dbFile = runCatching { app.getDatabasePath(DB_NAME) }.getOrNull()
+                if (dbFile != null && !dbFile.exists()) {
+                    val free = runCatching { (dbFile.parentFile ?: app.filesDir).usableSpace }.getOrDefault(-1L)
+                    if (free in 0 until FIRST_OPEN_BYTES) {
+                        lastOpenNote = "unpacking it needs about ${FIRST_OPEN_BYTES / (1024 * 1024)} MB " +
+                            "and this phone has ${free / (1024 * 1024)} MB free"
+                        return null
+                    }
+                }
                 val db = runCatching {
-                    Room.databaseBuilder(app, FoodDatabase::class.java, "food.db")
+                    Room.databaseBuilder(app, FoodDatabase::class.java, DB_NAME)
                         .createFromAsset(ASSET)
                         // ⚠️ **This is what makes a version bump WORK, and without it the bump
                         // crashes every phone that already unpacked the asset.** Read out of the
@@ -330,7 +376,12 @@ abstract class FoodDatabase : RoomDatabase() {
                         .fallbackToDestructiveMigration()
                         .setJournalMode(JournalMode.TRUNCATE)
                         .build()
-                }.getOrNull() ?: return null
+                }.getOrNull()
+                if (db == null) {
+                    lastOpenNote = "the database would not open"
+                    return null
+                }
+                lastOpenNote = null
                 instance = db
                 return db
             }

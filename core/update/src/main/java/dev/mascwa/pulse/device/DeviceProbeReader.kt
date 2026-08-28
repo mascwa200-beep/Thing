@@ -2,6 +2,7 @@ package dev.mascwa.pulse.device
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -60,6 +61,27 @@ class DeviceProbeReader(context: Context) {
     @Volatile
     private var coresSeen: Int = 0
 
+    /**
+     * The heap ceiling this app actually gets, in MB.
+     *
+     * ⚠️ **`getMemoryClass()` is the WRONG number for an app that declares `android:largeHeap`, and
+     * the LCARS application does.** The standard class is what an ordinary app is given; a large-heap
+     * app is given `getLargeMemoryClass()`, which on the same phone is routinely two to three times
+     * larger. Reading the standard one meant the tier was computed from a ceiling this process never
+     * has — and in the direction that hurts, because a device reporting a 192 MB standard class votes
+     * MODEST against `HEAP_MODEST_MB` while genuinely having 512 MB to spend.
+     *
+     * The flag is read from this app's own `ApplicationInfo` rather than assumed, so the standalone
+     * nutrition app — which does not declare it — keeps getting the number that is true for it.
+     */
+    private fun heapCeilingMb(am: ActivityManager?): Int? {
+        am ?: return null
+        val large = runCatching {
+            (app.applicationInfo.flags and ApplicationInfo.FLAG_LARGE_HEAP) != 0
+        }.getOrDefault(false)
+        return if (large) am.largeMemoryClass else am.memoryClass
+    }
+
     private fun readStatic(): DeviceClass.Probe {
         val am = activityManager
         val info = runCatching {
@@ -69,7 +91,7 @@ class DeviceProbeReader(context: Context) {
         return DeviceClass.Probe(
             totalRamBytes = info?.totalMem,
             lowRamFlagged = runCatching { am?.isLowRamDevice }.getOrNull(),
-            memoryClassMb = runCatching { am?.memoryClass }.getOrNull(),
+            memoryClassMb = runCatching { heapCeilingMb(am) }.getOrNull(),
             apiLevel = Build.VERSION.SDK_INT,
         )
     }

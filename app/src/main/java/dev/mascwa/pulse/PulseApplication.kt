@@ -47,6 +47,13 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         runCatching {
             dev.mascwa.pulse.ui.LcarsTransitions.animate = container.deviceProbe.budget().animations
         }
+        // Give back the disk the last self-update borrowed. ⚠️ Here rather than after the install,
+        // because `PackageInstaller.commit()` usually kills this process on a successful update, so
+        // any line written after it may never run. Launch is the point that is always reached. The
+        // companion object form means no `OkHttpClient` is built on the startup path just to delete
+        // files, and one call clears both this app's APK and the companion's — they share the
+        // directory. On appScope because it touches the filesystem.
+        appScope.launch { dev.mascwa.pulse.data.update.UpdateRepository.pruneCache(this@PulseApplication) }
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
         // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).
