@@ -363,4 +363,52 @@ class DeviceClassTest {
             java.util.Locale.setDefault(before)
         }
     }
+
+    // ── scaleFanOut ───────────────────────────────────────────────────────────────────────────
+    //
+    // The invariant that matters is that a full-strength phone is untouched. Everything else in
+    // this file exists to make a weak phone work; a limit that came out lower on a flagship would
+    // be this whole mechanism making the good case worse.
+
+    @Test
+    fun `a full-strength phone keeps the limit it was given`() {
+        assertEquals(64, DeviceClass.scaleFanOut(64, DeviceClass.FULL_PARALLELISM))
+        assertEquals(12, DeviceClass.scaleFanOut(12, DeviceClass.FULL_PARALLELISM))
+    }
+
+    @Test
+    fun `an overpowered phone is never given MORE than the limit`() {
+        // The limits in this codebase were chosen against what a server tolerates, and scaling one
+        // up would risk exactly the ban this repository has already earned once.
+        assertEquals(64, DeviceClass.scaleFanOut(64, DeviceClass.FULL_PARALLELISM + 6))
+    }
+
+    @Test
+    fun `a weaker phone is given proportionally less`() {
+        // FULL_PARALLELISM is 6, so a MINIMAL phone's 2 is a third: 64 * 2 / 6 = 21, 12 * 2 / 6 = 4.
+        assertEquals(2, DeviceClass.budgetFor(Tier.MINIMAL, Pressure.NONE).parallelism)
+        assertEquals(21, DeviceClass.scaleFanOut(64, 2))
+        assertEquals(4, DeviceClass.scaleFanOut(12, 2))
+    }
+
+    @Test
+    fun `the floor is one, never zero`() {
+        // CRITICAL pressure asks for a parallelism of 1, and 2 * 1 / 6 truncates to 0. A fan-out of
+        // zero is not a slow app, it is one that fetches nothing.
+        assertEquals(1, DeviceClass.budgetFor(Tier.MINIMAL, Pressure.CRITICAL).parallelism)
+        assertEquals(1, DeviceClass.scaleFanOut(2, 1))
+        assertEquals(1, DeviceClass.scaleFanOut(64, 0))
+        assertEquals(1, DeviceClass.scaleFanOut(0, DeviceClass.FULL_PARALLELISM))
+    }
+
+    @Test
+    fun `every tier scales monotonically and stays inside the limit`() {
+        var last = Int.MAX_VALUE
+        for (tier in Tier.entries) {
+            val n = DeviceClass.scaleFanOut(64, DeviceClass.budgetFor(tier, Pressure.NONE).parallelism)
+            assertTrue("$tier gave $n, above the limit it was handed", n <= 64)
+            assertTrue("$tier gave $n, which is not below the stronger tier's $last", n <= last)
+            last = n
+        }
+    }
 }

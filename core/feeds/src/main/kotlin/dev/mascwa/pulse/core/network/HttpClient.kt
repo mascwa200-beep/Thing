@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import dev.mascwa.pulse.core.telemetry.DeviceClass
 import okhttp3.Cache
 import okhttp3.Dispatcher
 import okhttp3.Headers.Companion.toHeaders
@@ -253,12 +254,29 @@ class HttpClient(
          * they would simply refetch everything, forever. A caller that draws tiles builds its own
          * client with its own bounded cache instead.
          */
-        fun create(json: Json, cacheDir: File? = null, cacheBytes: Long = 16L * 1024 * 1024): HttpClient {
+        fun create(
+            json: Json,
+            cacheDir: File? = null,
+            cacheBytes: Long = 16L * 1024 * 1024,
+            parallelism: Int = DeviceClass.FULL_PARALLELISM,
+        ): HttpClient {
             // Allow more concurrent requests per host so parallel fan-outs
             // (e.g. Hacker News item fetches) aren't throttled to 5 at a time.
+            //
+            // ⚠️ These two numbers were chosen against what a SERVER tolerates, and that reason does
+            // not stop being true on a cheap phone — so [DeviceClass.scaleFanOut] only ever scales
+            // them DOWN, and at full strength returns them unchanged. A phone that cannot afford 64
+            // concurrent calls does not merely run them slowly: each one is a thread, a socket and a
+            // read buffer, and sixty-four of those on a 2 GB device is a low-memory kill rather than
+            // a slow screen.
+            //
+            // ⚠️ Sized once, from the DURABLE budget — hardware only. A `Dispatcher` is built with
+            // the client and kept for the process, so folding a momentary thermal reading into it
+            // would leave a phone that happened to be warm at launch throttled all day, and nothing
+            // here has a driver that could re-tune it as the phone cooled.
             val dispatcher = Dispatcher().apply {
-                maxRequests = 64
-                maxRequestsPerHost = 12
+                maxRequests = DeviceClass.scaleFanOut(64, parallelism)
+                maxRequestsPerHost = DeviceClass.scaleFanOut(12, parallelism)
             }
             val builder = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)

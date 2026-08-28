@@ -217,7 +217,20 @@ object DeviceClass {
         val backgroundScale: Float,
         /** Concurrent network/IO fan-out. */
         val parallelism: Int,
-        /** Run the optional heavy engines — the local model, transcription, the interrogator. */
+        /**
+         * Whether this phone should be given an optional heavy engine it does not already have.
+         *
+         * ⚠️ **This governs ACQUIRING one, not running one, and the distinction is deliberate.** The
+         * consumer is the background provisioner, which decides on its own to fetch a gigabyte of
+         * model weights; a phone that cannot run them should not spend a gigabyte of somebody's
+         * storage and data finding that out.
+         *
+         * ⚠️ Two things it deliberately does NOT gate. A person tapping the download button is not
+         * overruled — they asked, and refusing a foreground request the app could honour is the kind
+         * of silent decision this codebase keeps correcting. And a model already ON the device is
+         * still loaded, because it is there only if somebody put it there on purpose; if the load
+         * then fails, `Rebuttal.Provenance` already models "nothing read the argument" and says so.
+         */
         val heavyEngines: Boolean,
         /** How much of the background worker's discretionary work may run. */
         val work: WorkTier,
@@ -343,6 +356,36 @@ object DeviceClass {
                 heavyEngines = false,
             )
         }
+    }
+
+    /**
+     * [Budget.parallelism] at full strength.
+     *
+     * ⚠️ **Derived from [budgetFor] rather than written down, so the two cannot drift.** A constant
+     * restating a number that already exists one screen away is how the palette drifted five times
+     * in this repository; a `val` computed from the source of truth needs no test to keep it honest
+     * because there is only one number.
+     */
+    val FULL_PARALLELISM: Int = budgetFor(Tier.FULL, Pressure.NONE).parallelism
+
+    /**
+     * Take a fan-out limit that was chosen for a full-strength phone and scale it to this device.
+     *
+     * The existing limits in this codebase were all picked against what a SERVER tolerates — the
+     * per-host gates, OkHttp's dispatcher — and those reasons do not stop being true on a cheap
+     * phone. So this only ever scales DOWN: at [FULL_PARALLELISM] it returns [fullStrengthLimit]
+     * exactly, which is what keeps a flagship byte-for-byte on today's behaviour, and below that it
+     * returns a proportionally smaller number.
+     *
+     * ⚠️ Never below one. A fan-out of zero is not a slow app, it is an app that fetches nothing,
+     * and the point of this whole file is that a bad phone still WORKS.
+     */
+    fun scaleFanOut(fullStrengthLimit: Int, parallelism: Int): Int {
+        if (fullStrengthLimit <= 0 || parallelism <= 0) return 1
+        if (parallelism >= FULL_PARALLELISM) return fullStrengthLimit
+        return ((fullStrengthLimit.toLong() * parallelism) / FULL_PARALLELISM)
+            .toInt()
+            .coerceAtLeast(1)
     }
 
     /**

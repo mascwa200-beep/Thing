@@ -61,7 +61,18 @@ class AppContainer(private val appContext: Context) {
     val appForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     val json: Json by lazy { HttpClient.defaultJson() }
-    val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
+    /**
+     * The one HTTP client every feed shares.
+     *
+     * ⚠️ The fan-out is scaled to the phone. Sixty-four concurrent calls on a 2 GB device is
+     * sixty-four threads, sockets and read buffers — a low-memory kill, not a slow screen — so a
+     * MINIMAL phone gets twenty-one. `durableBudget()` rather than the live one because a
+     * `Dispatcher` is built once with the client and nothing here could re-tune it as the phone
+     * cooled; see the reasoning at the call it makes.
+     */
+    val http: HttpClient by lazy {
+        HttpClient.create(json, appContext.cacheDir, parallelism = deviceProbe.durableBudget().parallelism)
+    }
     // ⚠️ `filesDir`, not the `Context` itself. The cache is shared with the desktop companion now,
     // and reading a directory was the only thing it ever wanted a `Context` for.
     val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
@@ -378,7 +389,7 @@ class AppContainer(private val appContext: Context) {
      */
     val payloadProvisioner: dev.mascwa.pulse.data.provision.PayloadProvisioner by lazy {
         dev.mascwa.pulse.data.provision.PayloadProvisioner(
-            appContext, packRepository, llamaEngine, usageRepository,
+            appContext, packRepository, llamaEngine, usageRepository, deviceProbe,
         )
     }
 
@@ -1075,7 +1086,9 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sensors.TelemetryController(appContext)
 
     val notifier: Notifier by lazy { Notifier(appContext) }
-    val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
+    val notificationScheduler: NotificationScheduler by lazy {
+        NotificationScheduler(appContext, deviceProbe)
+    }
 
     // --- On-device security auditor (read-only, local-only defender's tool) ---
     val securityAuditor: dev.mascwa.pulse.data.security.SecurityAuditor by lazy {
