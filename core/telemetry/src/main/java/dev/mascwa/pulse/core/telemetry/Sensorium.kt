@@ -45,7 +45,16 @@ enum class EnvSetting { INDOOR, OUTDOOR, VEHICLE, UNKNOWN }
 enum class MotionState { STILL, HANDLING, WALKING, DRIVING }
 enum class SocialDensity { ALONE, FEW, CROWD }
 enum class NoiseProfile { SILENT, QUIET, CALM, LIVELY, LOUD }
-enum class LightState { DARK, DIM, LIT, BRIGHT, SUNLIGHT }
+/**
+ * How bright it is around the phone.
+ *
+ * ⚠️ [UNKNOWN] is not a shade, it is the absence of a measurement — **many phones ship no
+ * ambient-light sensor at all**, and before this existed a phone without one reported [DIM] forever.
+ * That is a fabricated reading, and it did not stay in one place: it went onto the scanner, into the
+ * one-line environment read the Computer is given every turn, and into ORACLE's rules. A person on a
+ * phone with no light sensor was being told, in a confident sentence, how bright their room was.
+ */
+enum class LightState { DARK, DIM, LIT, BRIGHT, SUNLIGHT, UNKNOWN }
 enum class PressureTrend { PLUNGING, FALLING, STEADY, RISING }
 
 /** The fused environmental read — what the scanner shows, Computer knows, and ORACLE reasons over. */
@@ -54,7 +63,7 @@ data class EnvReading(
     val motion: MotionState = MotionState.STILL,
     val social: SocialDensity = SocialDensity.ALONE,
     val noise: NoiseProfile = NoiseProfile.QUIET,
-    val light: LightState = LightState.DIM,
+    val light: LightState = LightState.UNKNOWN,
     val pressureTrend: PressureTrend? = null,
     val sceneTags: List<String> = emptyList(),
     val soundTags: List<String> = emptyList(),
@@ -79,12 +88,16 @@ data class EnvReading(
             MotionState.DRIVING -> "moving fast"
         }
         parts += noise.name.lowercase()
-        parts += when (light) {
-            LightState.DARK -> "dark"
-            LightState.DIM -> "dim"
-            LightState.LIT -> "lit"
-            LightState.BRIGHT -> "bright"
-            LightState.SUNLIGHT -> "sunlight"
+        // ⚠️ An unknown brightness contributes NOTHING to this line rather than a word for it.
+        // "Indoors · still · quiet · alone" is honest on a phone with no light sensor; "· unknown ·"
+        // in the middle of it reads as a fault, and "dim" — what this used to say — is a lie.
+        when (light) {
+            LightState.DARK -> parts += "dark"
+            LightState.DIM -> parts += "dim"
+            LightState.LIT -> parts += "lit"
+            LightState.BRIGHT -> parts += "bright"
+            LightState.SUNLIGHT -> parts += "sunlight"
+            LightState.UNKNOWN -> {}
         }
         parts += when (social) {
             SocialDensity.ALONE -> "alone"
@@ -207,7 +220,9 @@ object Sensorium {
         }
 
         val light = when {
-            f.lightLux == null -> LightState.DIM
+            // ⚠️ Not DIM. A null lux means nothing measured it — no sensor, or no event yet — and
+            // guessing the middle of the range is how a phone comes to report a room it cannot see.
+            f.lightLux == null -> LightState.UNKNOWN
             f.lightLux < LUX_DARK -> LightState.DARK
             f.lightLux < LUX_DIM -> LightState.DIM
             f.lightLux < LUX_LIT -> LightState.LIT

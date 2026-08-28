@@ -420,4 +420,39 @@ class SensoriumTest {
         )
     }
 
+    // --- a phone with no ambient-light sensor -------------------------------------------------
+    //
+    // ⚠️ Many phones ship without one, and this used to be reported as DIM: a fabricated reading
+    // that reached the scanner, the Computer's per-turn environment line and ORACLE's rules.
+
+    @Test
+    fun noLightReadingIsUnknownAndNotDim() {
+        assertEquals(LightState.UNKNOWN, Sensorium.distill(SenseFrame()).light)
+    }
+
+    @Test
+    fun anUnknownBrightnessIsLeftOutOfTheSpokenLineEntirely() {
+        val line = Sensorium.distill(SenseFrame(movement = 0.01f)).describe()
+        // Not "dim" (the old lie), not "unknown" (reads as a fault) — simply absent.
+        assertFalse(line.contains("dim"))
+        assertFalse(line.lowercase().contains("unknown"))
+        // The facets that WERE measured still speak.
+        assertTrue(line.contains("still"))
+        assertTrue(line.contains("alone"))
+    }
+
+    @Test
+    fun aRealLuxReadingStillNamesEveryBand() {
+        // The bands either side of each threshold, so UNKNOWN cannot have displaced one of them.
+        assertEquals(LightState.DARK, Sensorium.distill(SenseFrame(lightLux = 0.5f)).light)
+        assertEquals(LightState.DIM, Sensorium.distill(SenseFrame(lightLux = 20f)).light)
+        assertEquals(LightState.LIT, Sensorium.distill(SenseFrame(lightLux = 120f)).light)
+        assertEquals(LightState.BRIGHT, Sensorium.distill(SenseFrame(lightLux = 2000f)).light)
+        assertEquals(LightState.SUNLIGHT, Sensorium.distill(SenseFrame(lightLux = 20000f)).light)
+    }
+
+    @Test
+    fun aDefaultReadingClaimsNoBrightnessItNeverMeasured() {
+        assertEquals(LightState.UNKNOWN, EnvReading().light)
+    }
 }

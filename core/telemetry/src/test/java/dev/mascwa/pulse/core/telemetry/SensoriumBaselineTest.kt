@@ -93,4 +93,41 @@ class SensoriumBaselineTest {
         assertTrue(anomalies.size >= 2)
         assertTrue(anomalies[0].strength >= anomalies[1].strength)
     }
+
+    // --- a phone with no ambient-light sensor -------------------------------------------------
+
+    @Test
+    fun anUnmeasuredLightIsNotLearnedAsZero() {
+        // A room that is reliably lit at 15:00, then the same hour on a phone that cannot see it.
+        val lit = EnvMetrics(noise = 2f, light = 2.1f, motion = 0.02f, crowd = 0f)
+        val blind = lit.copy(light = null)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, lit, 15, false) }
+        val learned = s.cells[SensoriumBaseline.bucket(15, false)]!!.lightMean
+        repeat(40) { s = SensoriumBaseline.update(s, blind, 15, false) }
+        val after = s.cells[SensoriumBaseline.bucket(15, false)]!!
+        // Untouched — not dragged toward log10(0 + 1) = 0, which is what `lux ?: 0f` used to do.
+        assertEquals(learned, after.lightMean, 1e-6f)
+        // And the observations still count: the cell keeps maturing on what it CAN measure.
+        assertEquals(80, after.samples)
+    }
+
+    @Test
+    fun aPhoneThatCannotSeeIsNeverToldItsRoomIsUnusuallyDark() {
+        val lit = EnvMetrics(noise = 2f, light = 2.1f, motion = 0.02f, crowd = 0f)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, lit, 15, false) }
+        val found = SensoriumBaseline.anomalies(s, lit.copy(light = null), 15, false)
+        assertTrue(found.none { it.metric == "light" })
+    }
+
+    @Test
+    fun aRealDarknessAgainstALitNormalIsStillFlagged() {
+        // The guard above must not have silenced the metric itself.
+        val lit = EnvMetrics(noise = 2f, light = 2.1f, motion = 0.02f, crowd = 0f)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, lit, 15, false) }
+        val found = SensoriumBaseline.anomalies(s, lit.copy(light = 0.0f), 15, false)
+        assertTrue(found.any { it.metric == "light" && it.text.contains("unusually dark") })
+    }
 }
