@@ -323,6 +323,17 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sky.StarCatalog(appContext)
     }
 
+    /**
+     * The deep catalogue — three million stars, memory-mapped rather than read.
+     *
+     * ⚠️ Lazy for a different reason from [starCatalog]: opening this costs almost nothing (a
+     * mapping, not a parse), but it holds a file descriptor for the life of the process, and a phone
+     * that never opens the sky map should not hold one.
+     */
+    val deepStarCatalog: dev.mascwa.pulse.data.sky.DeepStarCatalog by lazy {
+        dev.mascwa.pulse.data.sky.DeepStarCatalog(appContext)
+    }
+
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
     }

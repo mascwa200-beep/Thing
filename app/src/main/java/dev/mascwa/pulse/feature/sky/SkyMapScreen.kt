@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -25,21 +28,28 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.SkyProjection
-import dev.mascwa.pulse.core.telemetry.StarNames
+import dev.mascwa.pulse.core.telemetry.StarGlyph
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.sky.SkyFrame
+import dev.mascwa.pulse.sky.SkyRenderer
+import dev.mascwa.pulse.sky.StarBatches
+import dev.mascwa.pulse.sky.collectStars
+import dev.mascwa.pulse.sky.drawStarBatches
+import dev.mascwa.pulse.sky.drawStarGlow
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -117,10 +127,35 @@ private fun SkyCanvas(
 ) {
     val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT } }
     val cardinalPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
+    // ⚠️ One Paint and two bucket sets, kept across frames. The renderer is built so that drawing a
+    // sky allocates nothing at all; making these per frame would put the allocation back.
+    val starPaint = remember { Paint() }
+    val above = remember { StarBatches() }
+    val below = remember { StarBatches() }
+
+    val site by vm.site.collectAsStateWithLifecycle()
+    val hours by vm.hourOffset.collectAsStateWithLifecycle()
+    val deepRevision = vm.revision.collectAsStateWithLifecycle()
+
+    // ⚠️ Held rather than read in the draw pass, so the sky does not creep while somebody pans. The
+    // instant only moves when the scrubber does, which is what the existing map has always done.
+    val at = remember(hours, site) { System.currentTimeMillis() + hours * 3_600_000L }
+    var surface by remember { mutableStateOf(IntSize.Zero) }
+
+    // Bring the deep catalogue up to date for wherever the view has got to. Cheap when the region
+    // already held still covers the view, which is most pans — see StarField.update.
+    LaunchedEffect(view, site, at, surface) {
+        if (surface.width > 0 && surface.height > 0) {
+            vm.refreshDeep(
+                SkyProjection.viewportOf(surface.width.toDouble(), surface.height.toDouble()), at,
+            )
+        }
+    }
 
     Canvas(
         Modifier
             .fillMaxSize()
+            .onSizeChanged { surface = it }
             // ⚠️ Two separate pointer handlers, because a transform gesture consumes everything it
             // sees. Combining them into one would make a tap read as a zero-distance drag and the
             // identify card would never open.
@@ -156,61 +191,108 @@ private fun SkyCanvas(
         // which is what this did until it was reported, produced a literal circle with dead black
         // bands. The question a renderer asks is whether a point is on the SURFACE.
         val viewport = SkyProjection.viewportOf(size.width.toDouble(), size.height.toDouble())
-        fun place(az: Double, alt: Double) = SkyProjection.project(az, alt, view).let {
-            it to Offset(cx + (it.x * half).toFloat(), cy + (it.y * half).toFloat())
-        }
 
         drawHorizon(view, c, half, cx, cy, viewport, cardinalPaint)
 
         val limit = SkyProjection.magnitudeLimit(view.fovDeg)
-        bodies.forEach { b ->
-            if (b.kind == SkyMapViewModel.Kind.STAR && b.magnitude > limit) return@forEach
-            val (p, at) = place(b.azimuthDeg, b.altitudeDeg)
-            // A margin, so a star whose centre has just left the screen keeps the half of its disc
-            // that has not, rather than blinking out mid-drag.
-            if (!p.onScreen(viewport, EDGE_MARGIN)) return@forEach
-            val below = b.altitudeDeg < 0
+        val here = site
+        if (here != null) {
+            // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
+            // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
+            // means Compose has no way to know a reload happened. Reading the revision inside the
+            // draw lambda makes this draw depend on it, so new stars appear the moment they land
+            // rather than on whatever pan happens next.
+            deepRevision.value
 
-            when (b.kind) {
-                SkyMapViewModel.Kind.STAR -> {
-                    val r = starRadiusPx(b.magnitude, limit) * density
-                    drawCircle(
-                        color = starColour(b.colourIndex, c).let { if (below) it.copy(alpha = 0.25f) else it },
-                        radius = r,
-                        center = at,
-                    )
-                    // Only the ones with room to be read, or the chart turns into a wall of text.
-                    if (b.label != null && b.magnitude <= limit - LABEL_HEADROOM) {
-                        labelPaint.color = c.muted.toArgb()
-                        labelPaint.textSize = 9f * density
-                        drawContext.canvas.nativeCanvas.drawText(
-                            b.label, at.x + r + 3f * density, at.y + 3f * density, labelPaint,
-                        )
-                    }
-                }
-                else -> {
-                    val r = when (b.kind) {
-                        SkyMapViewModel.Kind.SUN -> 9f
-                        SkyMapViewModel.Kind.MOON -> 8f
-                        else -> 5f
-                    } * density
-                    val colour = when (b.kind) {
-                        SkyMapViewModel.Kind.SUN -> c.amber
-                        SkyMapViewModel.Kind.MOON -> c.ink
-                        else -> c.sky
-                    }
-                    drawCircle(if (below) colour.copy(alpha = 0.3f) else colour, r, at)
-                    drawCircle(c.void, r * 0.35f, at, style = Stroke(width = 1f))
-                    b.label?.let {
-                        labelPaint.color = colour.toArgb()
-                        labelPaint.textSize = 11f * density
-                        drawContext.canvas.nativeCanvas.drawText(
-                            it, at.x + r + 4f * density, at.y + 4f * density, labelPaint,
-                        )
-                    }
-                }
+            // Two vectors rebuilt per frame; the stars themselves never move. See SkyFrame.
+            val frame = SkyFrame.of(view, here.latitude, here.longitude, at)
+            above.reset()
+            below.reset()
+            val deep = vm.deepField?.layer
+            collectStars(vm.brightStars, frame, viewport, limit, half, cx, cy, above, below)
+            if (deep != null) collectStars(deep, frame, viewport, limit, half, cx, cy, above, below)
+
+            // ⚠️ Below the horizon FIRST, so a star that is up is never painted over by one that is
+            // not. Both catalogues share the two bucket sets, so this is a few dozen calls for the
+            // whole sky however many stars it holds — see SkyRenderer.
+            drawStarBatches(below, starPaint, c.ink, SkyRenderer.BELOW_HORIZON_ALPHA)
+            drawStarBatches(above, starPaint, c.ink)
+
+            drawStarGlow(vm.brightStars, frame, viewport, limit, half, cx, cy, c.ink)
+            if (deep != null) drawStarGlow(deep, frame, viewport, limit, half, cx, cy, c.ink)
+
+            // ⚠️ The bright layer only, because the deep one has no names at all — it is Gaia source
+            // identifiers, which nobody has ever called anything.
+            drawStarLabels(vm, frame, viewport, limit, half, cx, cy, c, labelPaint)
+        }
+
+        // The Sun, the Moon and the planets: eight things, still in horizon coordinates because
+        // that is what the ephemeris answers and eight conversions a rebuild costs nothing.
+        bodies.forEach { b ->
+            val p = SkyProjection.project(b.azimuthDeg, b.altitudeDeg, view)
+            if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach
+            val screen = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
+            val isBelow = b.altitudeDeg < 0
+            val r = when (b.kind) {
+                SkyMapViewModel.Kind.SUN -> 9f
+                SkyMapViewModel.Kind.MOON -> 8f
+                else -> 5f
+            } * density
+            val colour = when (b.kind) {
+                SkyMapViewModel.Kind.SUN -> c.amber
+                SkyMapViewModel.Kind.MOON -> c.ink
+                else -> c.sky
+            }
+            drawCircle(if (isBelow) colour.copy(alpha = 0.3f) else colour, r, screen)
+            drawCircle(c.void, r * 0.35f, screen, style = Stroke(width = 1f))
+            b.label?.let {
+                labelPaint.color = colour.toArgb()
+                labelPaint.textSize = 11f * density
+                drawContext.canvas.nativeCanvas.drawText(
+                    it, screen.x + r + 4f * density, screen.y + 4f * density, labelPaint,
+                )
             }
         }
+    }
+}
+
+/**
+ * The names, for the handful of stars with room for one.
+ *
+ * ⚠️ **A third pass over the layer rather than a branch inside the collect loop, and it is cheap for
+ * a reason worth knowing.** [StarGlyph.labels] is a comparison against a float already in a
+ * contiguous array, so the loop rejects eight thousand stars in the time it takes to walk the array
+ * once — and what survives is at most about seventeen, measured. Folding it into `collectStars`
+ * would put a name lookup and a text draw inside the one loop that has to stay tight, and would drag
+ * a catalogue of strings into a module that holds only numbers.
+ */
+private fun DrawScope.drawStarLabels(
+    vm: SkyMapViewModel,
+    frame: SkyFrame,
+    viewport: SkyProjection.Viewport,
+    limit: Double,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    c: NightwirePalette,
+    paint: Paint,
+) {
+    val layer = vm.brightStars
+    paint.color = c.muted.toArgb()
+    paint.textSize = 9f * density
+    for (i in 0 until layer.count) {
+        val m = layer.magnitude[i].toDouble()
+        if (!StarGlyph.labels(m, limit)) continue
+        val name = vm.brightLabel(i) ?: continue
+        val p = SkyProjection.projectUnit(layer.vx[i], layer.vy[i], layer.vz[i], frame.basis)
+        if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
+        val r = StarGlyph.bandRadiusDp(StarGlyph.sizeBand(m, limit)).dp.toPx()
+        drawContext.canvas.nativeCanvas.drawText(
+            name,
+            centreX + (p.x * halfPx).toFloat() + r + 3f * density,
+            centreY + (p.y * halfPx).toFloat() + 3f * density,
+            paint,
+        )
     }
 }
 
@@ -268,37 +350,6 @@ private fun DrawScope.drawHorizon(
         )
     }
 }
-
-/**
- * How big to draw a star.
- *
- * ⚠️ Magnitude is a logarithmic scale running BACKWARDS — smaller is brighter, and each step of one
- * is about two and a half times the light. Drawing radius proportional to magnitude would make
- * Sirius a speck and the faintest stars enormous. This is an exponential in the other direction,
- * measured against the current cut-off so the faintest thing on screen is always about a pixel and
- * the brightest always stands out.
- */
-private fun starRadiusPx(magnitude: Double, limit: Double): Float {
-    val steps = (limit - magnitude).coerceAtLeast(0.0)
-    return (0.7 + 0.55 * steps.pow(1.15)).toFloat().coerceAtMost(7f)
-}
-
-/**
- * Star colour from its B-V index.
- *
- * ⚠️ Real, not decorative: B-V is a measurement of how much bluer a star is in one filter than
- * another, and it maps almost directly onto what the eye sees. Rigel at −0.03 is blue-white,
- * Betelgeuse at +1.85 is visibly orange, and the sky looks wrong without it. A star with no measured
- * colour is drawn white rather than guessed at.
- *
- * ⚠️ **The table moved to [StarNames.colourArgb] and this is now a two-line adapter.** The companion
- * draws the same bundled catalogue, so a second copy of six colour bands would be the drifted
- * duplicate this project has corrected six times. The null case stays here on purpose: "no measured
- * colour" resolves to the drawing surface's own ink, which is a palette fact and belongs to the
- * platform rather than to a module with no UI dependency.
- */
-private fun starColour(bv: Double?, c: NightwirePalette): Color =
-    StarNames.colourArgb(bv)?.let { Color(it) } ?: c.ink
 
 // ---- chrome ------------------------------------------------------------------------------------
 
@@ -396,20 +447,10 @@ private fun cardinal(azimuthDeg: Double): String {
     return CARDINALS[((d + 22.5) / 45.0).toInt() % 8]
 }
 
-/** A star this much brighter than the cut-off gets its name drawn beside it. */
-private const val LABEL_HEADROOM = 2.2
-
 /**
- * How far past the screen edge something is still worth drawing, as a fraction of the half-field.
- *
- * A star is a disc and a label hangs off its side, so both are partly visible while their anchor
- * point is not. Clipping hard at the edge makes them blink in and out as you drag.
- */
-private const val EDGE_MARGIN = 0.06
-
-/**
- * The horizon gets a far wider one: it is a line, so the canvas can clip it for us, and carrying it
- * well past the edge is what stops it stopping short of the screen.
+ * The horizon's own edge margin, far wider than [SkyRenderer.EDGE_MARGIN]: it is a line, so the
+ * canvas can clip it for us, and carrying it well past the edge is what stops it stopping short of
+ * the screen.
  */
 private const val HORIZON_MARGIN = 1.0
 
