@@ -10034,3 +10034,102 @@ shipped function before writing the assertion.**
 custom Atom feed's stories should sort by their real times rather than piling at the bottom; the
 weather hours should read the same as before; and if the food bundle ever fails to unpack, the search
 and the scanner should now say so rather than reporting the product unknown.
+
+### THE DISK VEIN, CLOSED — and four models where the notes said two (this session, PR #464)
+
+Owner's standing directive is unchanged: **every app has to run on a potato**, adaptive only, nothing
+removed, install size is not the lever. The plan (`robust-baking-dewdrop.md`, P1–P9) is **complete**,
+so everything here was found by hunting. **Zero subagent and zero workflow spend**, as with every arc
+since the credit directive — local kotlinc, the four gates, `javap`, and CI.
+
+**The vein worked was disk, and it is now genuinely closed for `:app`.** Feed cache bounded; camera
+captures swept; APKs pruned; interrogator models discardable; **Sensorium models discardable (new)**;
+harvested media deletable; progress photos store-managed; packs self-clearing staging; Coil and OkHttp
+self-bounded; transcript database capped with a purge. Settings reports and clears the rebuildable set.
+
+**The find: `ModelFile` described two models and there were four.** The Sensorium fetches YAMNet
+(~4 MB, sound labels) and EfficientNet (~4 MB, scene labels) into `filesDir` by the **identical**
+`<name>` + `<name>.part` contract that file was written for, and nothing reported or freed either —
+`bytesOnDisk`/`discardModel` existed only on the two interrogator engines.
+
+⚠️ **Only one of the four was ever asked for.** The adjudicator follows a tap; whisper, YAMNet and
+EfficientNet all arrive on first use, and **`SensingSettings.enabled` defaults on** — so the two
+classifiers land on an ordinary install whose owner never opened the scanner. That makes reporting
+them the *more* important half: storage taken by something you chose is at least explicable.
+
+⚠️ **An interrupted fetch holds far more than the finished 8 MB**, because each download is capped at
+**24 MB** and the `.part` it leaves is invisible to any `exists()` check. `ModelFile.bytes` counts
+both halves, which is exactly why the pairing lives in one definition.
+
+`ModelFile` moved out of `data/interrogator` into `data/model`: with four models across two unrelated
+subsystems, leaving it filed under one of its callers meant a sensing sampler importing from
+`data.interrogator`, a dependency it does not have and should not appear to. Both samplers already had
+a `close()`, so the release-before-delete discipline came free.
+
+⚠️ **`discardModels` stands ambient sensing down first, and that is not politeness.** A sampler still
+armed re-downloads on its very next sip, so discarding underneath a running service spends the user's
+data and leaves the disk where it started — a control that appears to work and does nothing. It uses
+`sensing.enabled`, the same lever the notification's Stop action uses, so `RefreshWorker` cannot
+restart the service behind it.
+
+**A defect of my own, found by re-reading the path rather than by a gate.** `modelBytes` was read once
+in the view model's `init` — but the models are fetched on the samplers' first sip, which routinely
+happens *while the scanner is open*, so the figure would read zero, the card would stay hidden, and
+8 MB would arrive with nothing said for the rest of the session. **That is the exact defect the card
+exists to fix, one layer up.** Driven from `LaunchedEffect(Unit)` in the screen now, which re-runs on
+every return — the shape the MENU recents strip needed for the same reason.
+
+**Two smaller corrections, bundled deliberately** so they did not cost their own 329 MB republish:
+`DeviceContextProvider.gb()` formatted with the default locale ("5,7 GB" across most of Europe) on a
+figure every consumer reads as *data* — the `device` tool hands it to the model, the dossier draws it,
+the persona carries it. And `AppCaches`'s KDoc gave only the benefit of rooting the feed store at
+`filesDir`; ⚠️ **the cost is that Android's own Settings ▸ Apps ▸ Storage ▸ Clear cache empties
+`cacheDir` and cannot reach `filesDir`** — which is precisely why that class had to be written.
+
+⚠️ **So the nutrition app's opposite choice is RIGHT, not an oversight to converge.** It roots the same
+`DiskCache` at `cacheDir` because it caches product lookups on top of a 4.4-million-row bundled
+database, ships no cache screen, and thereby keeps the platform's own button working. The note now
+says so, so nobody "fixes" one app to match the other and takes that button away for nothing.
+
+**⚠️ AN ALARM OF MINE THAT WAS WRONG, AND CHECKING IS THE ONLY REASON I KNOW.** Seeing `:app` root
+`DiskCache` at `filesDir` and the desktop at `dataDir`, I concluded my new 8 MB prune — which deletes
+oldest-first with no filter — would eat the downloaded models, the settings, the ledger and the study
+deck. It cannot: `DiskCache` owns a **`pulse_cache` subdirectory** inside the root it is given
+(`private val dir = File(root, "pulse_cache")`), so the prune, `clear()` and `sizeBytes()` all stay
+inside it and everything else is a sibling. I had misremembered `dir` as `root`. **Read the field
+before acting on the alarm.**
+
+**Negative results, recorded so nobody re-chases them.** The nutrition app has no `onTrimMemory`
+defect (its loader is `.diskCache(null)` and its trim clears only memory); `pruneCache` is wired in
+both applications; `FoodDatabase` already guards the 424 MB unpack with a `usableSpace` check; the
+standalone `onStart` is clean; and a repo-wide sweep for default-locale numeric formatting across
+`:nutrition`, `:core:health`, `:core:update` and `:app` found **exactly one** hit, the `gb()` above.
+
+⚠️ **Two things left alone on purpose, with the reasoning, because they look like the same class and
+are not.** The Sensorium's `"%.1f hPa"` and movement readouts are default-locale *deliberately* — a
+human eyeballing an instrument wants their own separator, which is what locale formatting is for; the
+project's Locale.US rule is for numbers that are **data** (SOS coordinates, cache keys, CSV fields),
+and `gb()` qualifies because a parser reads it. And the interrogator's per-call `SimpleDateFormat` is
+the known allocation-not-a-race shape this file already records for `LaunchRepository` and `SkyDigest`.
+
+**⚠️ THE RESOLVE GATE'S CASCADE, PROVEN FOUR TIMES RATHER THAN SHRUGGED AT.** Every complaint this arc
+was settled by planting a symbol that unquestionably compiles in CI today and confirming it reports
+identically: `usageRepository` (the `AppContainer` chain), `LcarsFrame` (the app's own Compose kit),
+and `remember` (androidx.compose.runtime, used in several hundred files). ⚠️ Also worth knowing: the
+tool is **count-sensitive**, so a name already present at HEAD is reported when a new usage is added —
+`collectAsStateWithLifecycle` appeared despite being imported and used eight times already.
+
+**Verification:** the four-gate chain per slice; `ModelFile` compiles clean against the real platform
+classes via `android_compile_check.sh`, **with that gate negative-tested** (a planted `filesDirTypo` is
+caught); every perturbation restored and confirmed byte-identical with `cmp`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a card, it never draws one or downloads a model.** Open
+MENU ▸ Environment Scanner: once the watch has run, an **ON THIS DEVICE** card should say how much the
+two classifiers hold and offer to free it; pressing it should stand sensing down and make the card
+vanish, with ARM bringing everything back. Before the watch has ever run there should be **no card at
+all** — a row reading 0 MB beside a button that frees nothing invites the tap and then looks broken.
+
+**Open / steerable:** nothing outstanding on the potato plan. `DeviceClass.Budget` was re-swept and all
+seven fields have consumers, so P9's wiring holds. The remaining owner-verify items from the arc are
+unchanged: whether the tiering *feels* right on the Galaxy A16, thermal behaviour under load, and the
+first-run unpack on slow flash — all device-only, and the owner's hardware is the only instrument.
