@@ -180,7 +180,7 @@ class SkyProjectionTest {
     fun `the magnitude limit deepens as the field narrows`() {
         val wide = SkyProjection.magnitudeLimit(SkyProjection.MAX_FOV_DEG)
         val tight = SkyProjection.magnitudeLimit(SkyProjection.MIN_FOV_DEG)
-        assertTrue("wide should be shallow, was $wide", wide < 4.0)
+        assertEquals("the widest field is the shallowest", SkyProjection.WIDEST_LIMIT, wide, 1e-9)
         assertEquals("tight should reach the catalogue's floor", 6.5, tight, 1e-9)
         assertTrue(SkyProjection.magnitudeLimit(60.0) in wide..tight)
         // Monotonic, so zooming never makes a star that was drawn disappear.
@@ -192,6 +192,46 @@ class SkyProjectionTest {
             assertTrue("limit went backwards at $fov", here >= previous - 1e-12)
             previous = here
         }
+    }
+
+    /**
+     * The property the whole renderer is sized against: **however deep the catalogue goes, the
+     * number of stars actually drawn stays in the same band at every zoom.**
+     *
+     * The model is two measured facts and one exact one. Star counts rise by a factor of 2.63 per
+     * magnitude — Gaia DR3 holds 9,100 brighter than 6.5 and 1,247,240 brighter than 11.0, which is
+     * 137× over 4.5 magnitudes, and 137^(1/4.5) = 2.63. The solid angle of a field of full angle
+     * `fov` is exactly 2π(1 − cos(fov/2)). Their product is proportional to what gets drawn.
+     *
+     * ⚠️ Only the **unclamped** range is checked, and that is not a convenience. Past the point where
+     * the limit hits the catalogue's floor the count genuinely falls, because there are no more rows
+     * — which is correct behaviour and would fail an assertion that demanded a flat count.
+     */
+    @Test
+    fun `the drawn count stays in the same band at every zoom`() {
+        val deepest = 14.0
+        // 150 / 10^((14 - 6) / 4.2) = 1.87°, so everything above two degrees is unclamped.
+        val fields = listOf(150.0, 100.0, 60.0, 30.0, 10.0, 3.0, 2.0)
+        val counts = fields.map { fov ->
+            val m = SkyProjection.magnitudeLimit(fov, deepest)
+            assertTrue("$fov° should still be unclamped, was $m", m < deepest - 1e-9)
+            val solidAngle = 2.0 * Math.PI * (1.0 - Math.cos(Math.toRadians(fov / 2.0)))
+            solidAngle * Math.pow(2.63, m)
+        }
+        val spread = counts.max() / counts.min()
+        assertTrue("the drawn count varies by ${spread}x across the zoom range", spread < 3.0)
+    }
+
+    /**
+     * ⚠️ The floor exists so the Sun can be looked at rather than merely located. At the old 4° it
+     * spanned an eighth of the half-field; here its radius alone is more than the whole half-field,
+     * so the disc overflows the screen and the limb is what you are looking at.
+     */
+    @Test
+    fun `the narrowest field is narrower than the Sun`() {
+        val halfField = SkyProjection.degreesPerUnit(SkyProjection.View(0.0, 0.0, SkyProjection.MIN_FOV_DEG))
+        val solarRadiusDeg = 0.2665
+        assertTrue("half-field $halfField° must be under the Sun's radius", halfField < solarRadiusDeg)
     }
 
     @Test
@@ -219,6 +259,113 @@ class SkyProjectionTest {
             }
             val ratio = radii.max() / radii.min()
             assertTrue("shape distorted by ${ratio}x at ($az, $alt)", abs(ratio - 1.0) < 0.02)
+        }
+    }
+
+    // ---- the circle -----------------------------------------------------------------------------
+
+    /**
+     * ⚠️ **The regression test for the fault that prompted this work.** The map decided what to draw
+     * with [SkyProjection.Screen.inField], which is a radius against the *declared field*, and the
+     * caller scaled that radius by half the *narrow* screen dimension — so the sky came out as a
+     * disc inscribed in a black rectangle. On a portrait phone that is a circle the width of the
+     * screen with dead bands above and below, which is exactly what was reported.
+     *
+     * The two predicates have to disagree, in both directions, or one of them is pointless:
+     * a star well above the view centre is off the declared circle and squarely on the screen, and
+     * a star the same angular distance to the *side* is off both. Anything that clips radially
+     * cannot tell those two apart.
+     */
+    @Test
+    fun `a portrait screen draws sky the declared field does not cover`() {
+        val portrait = SkyProjection.viewportOf(1080.0, 2400.0)
+        assertEquals(1.0, portrait.halfWidth, 1e-12)
+        assertEquals(2400.0 / 1080.0, portrait.halfHeight, 1e-12)
+
+        // 40° above the centre of a 60° field: 2·tan(20°) / 2·tan(15°) = 0.7279 / 0.5359 = 1.358.
+        val level = SkyProjection.View(azimuthDeg = 180.0, altitudeDeg = 0.0, fovDeg = 60.0)
+        val above = SkyProjection.project(180.0, 40.0, level)
+        assertEquals("directly above, so no sideways offset", 0.0, above.x, 1e-9)
+        assertEquals(1.358, above.radius, 0.002)
+        assertFalse("outside the declared field, which is the whole point", above.inField)
+        assertTrue("but plainly on a tall screen", above.onScreen(portrait))
+
+        // The same 40° measured sideways is off a portrait screen, so this is not a predicate that
+        // simply says yes.
+        val beside = SkyProjection.project(220.0, 0.0, level)
+        assertEquals(1.358, beside.radius, 0.002)
+        assertFalse(beside.inField)
+        assertFalse("off the narrow axis", beside.onScreen(portrait))
+
+        // Turn the handset and the answers swap, because the field is normalised to the short side.
+        val landscape = SkyProjection.viewportOf(2400.0, 1080.0)
+        assertFalse(above.onScreen(landscape))
+        assertTrue(beside.onScreen(landscape))
+    }
+
+    @Test
+    fun `the margin is what stops things popping in and out at the edge`() {
+        val square = SkyProjection.viewportOf(1000.0, 1000.0)
+        val level = SkyProjection.View(azimuthDeg = 0.0, altitudeDeg = 0.0, fovDeg = 60.0)
+        // Just past the right-hand edge: its centre is off, half of its disc is not.
+        val edge = SkyProjection.project(31.0, 0.0, level)
+        assertTrue("fixture should sit just outside, was ${edge.x}", edge.x > 1.0 && edge.x < 1.1)
+        assertFalse(edge.onScreen(square))
+        assertTrue(edge.onScreen(square, marginUnits = 0.15))
+    }
+
+    @Test
+    fun `a viewport that has not been measured yet answers a unit square`() {
+        // Composition genuinely hands a Canvas a zero size on its first pass, and dividing by it
+        // would put NaN into every comparison — which reads as "nothing is on screen", i.e. a blank
+        // map, rather than as a crash.
+        listOf(
+            SkyProjection.viewportOf(0.0, 0.0),
+            SkyProjection.viewportOf(100.0, 0.0),
+            SkyProjection.viewportOf(Double.NaN, 100.0),
+        ).forEach {
+            assertEquals(1.0, it.halfWidth, 1e-12)
+            assertEquals(1.0, it.halfHeight, 1e-12)
+        }
+    }
+
+    // ---- roll -----------------------------------------------------------------------------------
+
+    @Test
+    fun `roll turns the picture clockwise and leaves the middle alone`() {
+        val flat = SkyProjection.View(azimuthDeg = 180.0, altitudeDeg = 20.0, fovDeg = 60.0)
+        val tipped = flat.copy(rollDeg = 90.0)
+
+        // The look direction is the axis it turns about, so it cannot move.
+        val centre = SkyProjection.project(180.0, 20.0, tipped)
+        assertEquals(0.0, centre.x, 1e-12)
+        assertEquals(0.0, centre.y, 1e-12)
+
+        // Screen y points down, so a quarter turn takes twelve o'clock to three o'clock.
+        val up = SkyProjection.project(180.0, 40.0, flat)
+        val rolled = SkyProjection.project(180.0, 40.0, tipped)
+        assertTrue("fixture must start above the centre", up.y < -0.1 && abs(up.x) < 1e-9)
+        assertEquals(-up.y, rolled.x, 1e-9)
+        assertEquals(0.0, rolled.y, 1e-9)
+        assertEquals("a rotation cannot change how far out it is", up.radius, rolled.radius, 1e-12)
+    }
+
+    @Test
+    fun `a tap still lands on what it was pointed at when the phone is tipped`() {
+        // ⚠️ The error a missed inverse rotation produces is exactly zero at the centre of the
+        // screen, so a grid is the only fixture that would catch it.
+        listOf(0.0, 17.0, 90.0, -125.0, 359.0).forEach { roll ->
+            val view = SkyProjection.View(azimuthDeg = 95.0, altitudeDeg = 15.0, fovDeg = 70.0, rollDeg = roll)
+            for (dAz in -25..25 step 10) {
+                for (dAlt in -25..25 step 10) {
+                    val az = 95.0 + dAz
+                    val alt = 15.0 + dAlt
+                    val p = SkyProjection.project(az, alt, view)
+                    val (az2, alt2) = SkyProjection.unproject(p.x, p.y, view)
+                    val sep = SkyProjection.separationDeg(az, alt, az2, alt2)
+                    assertTrue("round trip off by $sep° at roll $roll, ($az, $alt)", sep < 1e-9)
+                }
+            }
         }
     }
 }

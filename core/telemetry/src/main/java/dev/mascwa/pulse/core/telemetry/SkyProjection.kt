@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.log10
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -36,8 +37,22 @@ import kotlin.math.tan
  *   your right moves the sky left, so a star at a larger azimuth than the view centre sits to the
  *   right — which is what "looking at it" means, and the opposite of a paper star chart held over
  *   your head.
- * - A radius of 1.0 is the edge of the field of view. The caller multiplies by half the smaller
- *   screen dimension.
+ * - A radius of 1.0 is the edge of the **declared** field of view, and the caller multiplies by half
+ *   the smaller screen dimension. That guarantees the declared field is always fully on screen at
+ *   any orientation — but see the warning below, because it is emphatically NOT a clip.
+ *
+ * ## ⚠️ The declared field is a circle; the screen is not
+ *
+ * ⚠️ **[Screen.inField] is a hit-testing predicate and using it to decide what to draw produces a
+ * literal circle in a black rectangle.** That is exactly what this map did until it was reported:
+ * the drawn sky was a disc inscribed in the narrow screen dimension with dead bands above and below.
+ * A star at radius 1.4 directly above the view centre on a portrait phone is perfectly valid, on
+ * screen, and was being thrown away.
+ *
+ * Ask [Screen.onScreen] with the real viewport instead — [viewportOf] turns a pixel size into the
+ * half-extents it wants. `inField` keeps its meaning for "is this inside the field the user asked
+ * for", which is what a tap tolerance is measured against; conflating the two is how the circle
+ * happened, so they are deliberately two functions with two names.
  */
 object SkyProjection {
 
@@ -48,12 +63,40 @@ object SkyProjection {
      *
      * @param altitudeDeg clamped away from the poles by [MAX_ALTITUDE_DEG]; see [pan].
      * @param fovDeg the FULL field across the smaller screen dimension, not the half-angle.
+     * @param rollDeg how far the sky is turned in the plane of the screen, clockwise positive.
+     *   Zero for a chart you drag with a finger; in pointing mode it follows the phone, so tipping
+     *   the handset sideways tips the sky with it. **Defaulted**, so every existing construction
+     *   compiles and behaves exactly as before.
      */
     data class View(
         val azimuthDeg: Double,
         val altitudeDeg: Double,
         val fovDeg: Double,
+        val rollDeg: Double = 0.0,
     )
+
+    /**
+     * The half-extents of the drawing surface, in the same units [Screen.x] and [Screen.y] use.
+     *
+     * ⚠️ **One of these is always exactly 1.0** — whichever axis is the smaller screen dimension,
+     * because that is the axis the field of view is normalised against. The other is the aspect
+     * ratio, and it is the half that the old circle-shaped clip was throwing away.
+     */
+    data class Viewport(val halfWidth: Double, val halfHeight: Double)
+
+    /**
+     * The viewport for a drawing surface of this pixel size.
+     *
+     * Takes pixels rather than an aspect ratio because the caller has the size to hand and the ratio
+     * alone cannot say which axis is the smaller one. A degenerate size (a surface not yet measured,
+     * which composition genuinely hands you on the first frame) answers a unit square rather than
+     * dividing by zero.
+     */
+    fun viewportOf(widthPx: Double, heightPx: Double): Viewport {
+        val minor = minOf(widthPx, heightPx)
+        if (!(minor > 0.0) || !widthPx.isFinite() || !heightPx.isFinite()) return Viewport(1.0, 1.0)
+        return Viewport(widthPx / minor, heightPx / minor)
+    }
 
     /**
      * Where something landed.
@@ -66,8 +109,26 @@ object SkyProjection {
     data class Screen(val x: Double, val y: Double, val visible: Boolean) {
         val radius: Double get() = sqrt(x * x + y * y)
 
-        /** Inside the field of view as declared, which is what [radius] is normalised against. */
+        /**
+         * Inside the field of view as declared, which is what [radius] is normalised against.
+         *
+         * ⚠️ **This is a question about the FIELD, not about the screen, and drawing decisions must
+         * not be made with it** — see the warning on [SkyProjection]. Use it where "within the field
+         * the user asked for" is the actual question: a tap tolerance, or a whole-sky summary.
+         */
         val inField: Boolean get() = visible && radius <= 1.0
+
+        /**
+         * Inside the drawing surface, which is the question a renderer is asking.
+         *
+         * @param marginUnits how far past the edge still counts. A star drawn as a disc, or a label
+         *   hanging off its right-hand side, is partly on screen while its centre is not; clipping
+         *   hard at the edge makes things pop in and out as you drag.
+         */
+        fun onScreen(viewport: Viewport, marginUnits: Double = 0.0): Boolean =
+            visible &&
+                abs(x) <= viewport.halfWidth + marginUnits &&
+                abs(y) <= viewport.halfHeight + marginUnits
     }
 
     /** Nothing may be drawn closer than this to the point opposite the view — it projects to infinity. */
@@ -83,8 +144,17 @@ object SkyProjection {
      */
     const val MAX_ALTITUDE_DEG = 89.5
 
-    /** Wide enough to sweep, narrow enough to separate a double star. */
-    const val MIN_FOV_DEG = 4.0
+    /**
+     * Wide enough to sweep, narrow enough to see a planet as a disc rather than a dot.
+     *
+     * ⚠️ **The floor is a quarter of a degree because the Sun and Moon are about half of one.** At
+     * the old 4° floor the Sun could never be more than a speck however far you zoomed — the reason
+     * "zoom in and actually see the Sun" was impossible rather than merely unimplemented. At 0.25°
+     * the solar disc spans twice the screen, so the limb and its darkening are what you are looking
+     * at. Saturn is 20 arcseconds at its best, so it is still a small feature at this floor; that is
+     * the honest limit of pointing a phone, not of the arithmetic.
+     */
+    const val MIN_FOV_DEG = 0.25
     const val MAX_FOV_DEG = 150.0
 
     /** Project a horizon position into the view. */
@@ -108,7 +178,15 @@ object SkyProjection {
         val k = 2.0 / (1.0 + z)
         val scale = edgeRadius(view.fovDeg)
         // Screen y grows downward, so the sign flips here and nowhere else.
-        return Screen(x * k / scale, -y * k / scale, visible = true)
+        val sx = x * k / scale
+        val sy = -y * k / scale
+        if (view.rollDeg == 0.0) return Screen(sx, sy, visible = true)
+        // Roll turns the whole picture in the plane of the screen, so it is applied last and to the
+        // flat result — it has nothing to do with the sky and everything to do with the handset.
+        val a = view.rollDeg * DEG
+        val ca = cos(a)
+        val sa = sin(a)
+        return Screen(sx * ca - sy * sa, sx * sa + sy * ca, visible = true)
     }
 
     /**
@@ -120,9 +198,17 @@ object SkyProjection {
      * covers a fixed number of degrees regardless of the zoom.
      */
     fun unproject(x: Double, y: Double, view: View): Pair<Double, Double> {
+        // ⚠️ Undo the roll FIRST and with the opposite sign. `project` applies it last, so an inverse
+        // that skipped it would answer a tap with whatever the sky held before the phone was tipped —
+        // and the error is zero at the centre of the screen, which is exactly where a person testing
+        // it would tap. Unrolled rather than branched, unlike `project`: cos(0) and sin(0) are exactly
+        // 1 and 0 so the no-roll case is bit-identical, and this runs once per tap rather than once
+        // per star per frame.
         val scale = edgeRadius(view.fovDeg)
-        val bigX = x * scale
-        val bigY = -y * scale
+        val ca = cos(-view.rollDeg * DEG)
+        val sa = sin(-view.rollDeg * DEG)
+        val bigX = (x * ca - y * sa) * scale
+        val bigY = -(x * sa + y * ca) * scale
         val s = bigX * bigX + bigY * bigY
         val z = (4.0 - s) / (4.0 + s)
         val k = (4.0 + s) / 4.0
@@ -178,18 +264,49 @@ object SkyProjection {
     /**
      * How faint a star is worth drawing at this zoom.
      *
-     * ⚠️ **A fixed limit is wrong at both ends.** Show everything down to magnitude 6.5 across a
-     * 150° field and the bright stars vanish into eight thousand identical dots — the shapes people
-     * actually navigate by stop being visible. Show only the bright ones at a 5° field and the
-     * window is nearly empty. This tracks what a real eyepiece does: the narrower the field, the
-     * deeper you can usefully go.
+     * ⚠️ **This is what makes a catalogue of any size drawable.** However many stars are on disk,
+     * the number actually drawn stays in the low thousands at every zoom — so a renderer sized for
+     * a few thousand points is sized for all of them, and the work per frame does not depend on how
+     * deep the catalogue goes. Nothing else in the map has to know how big the file is.
+     *
+     * ## The law, and the arithmetic behind the two constants
+     *
+     * Star counts rise by a **measured factor of 2.63 per magnitude** at these depths — Gaia DR3
+     * holds 9,100 stars brighter than 6.5 and 1,247,240 brighter than 11.0, which is 137× over 4.5
+     * magnitudes. The area of the field falls as roughly the square of the angle. So keeping the
+     * drawn count level while zooming means deepening the limit **linearly in the logarithm of the
+     * field**, at 2 / log₁₀(2.63) ≈ 4.8 magnitudes per decade.
+     *
+     * [MAGNITUDES_PER_DECADE] is deliberately a little shallower than that. At 4.2 the implied count
+     * drifts from about 1,540 at the widest field to about 710 at three degrees — a factor of two
+     * over the whole range, which nobody will notice — and in exchange the limit keeps deepening
+     * down to a field of under two degrees instead of exhausting a magnitude-14 catalogue at two and
+     * a half. At the deepest zoom you want the faintest stars more than you want the most.
+     *
+     * ⚠️ **[WIDEST_LIMIT] was raised from 3.6, and it is a deliberate reversal of an earlier
+     * judgement.** That number was chosen when the bundled catalogue held 8,404 stars drawn as flat
+     * identical dots, on the reasoning that a full naked-eye sky would bury the shapes people
+     * navigate by. The complaint that prompted this work was that the map is too sparse, and a real
+     * dark sky *is* about magnitude 6. Drawing size by brightness is what keeps the constellations
+     * legible now, rather than drawing fewer stars. It is one constant if it proves wrong on a phone.
+     *
+     * @param deepest how far the catalogue actually goes. The result is clamped to it, so a shallow
+     *   catalogue stops deepening at its own floor instead of promising rows that are not there.
      */
-    fun magnitudeLimit(fovDeg: Double, deepest: Double = 6.5): Double {
-        val wide = 3.6
-        val narrow = deepest
-        val t = ((MAX_FOV_DEG - fovDeg) / (MAX_FOV_DEG - MIN_FOV_DEG)).coerceIn(0.0, 1.0)
-        return wide + (narrow - wide) * t
+    fun magnitudeLimit(fovDeg: Double, deepest: Double = NAKED_EYE_LIMIT): Double {
+        val fov = fovDeg.coerceIn(MIN_FOV_DEG, MAX_FOV_DEG)
+        val decades = log10(MAX_FOV_DEG / fov)
+        return (WIDEST_LIMIT + MAGNITUDES_PER_DECADE * decades).coerceAtMost(deepest)
     }
+
+    /** What the map draws at the widest field: roughly what a dark sky shows the naked eye. */
+    const val WIDEST_LIMIT = 6.0
+
+    /** See [magnitudeLimit] — 4.8 holds the drawn count level, 4.2 trades a little of that for depth. */
+    const val MAGNITUDES_PER_DECADE = 4.2
+
+    /** About as faint as an unaided eye reaches on a good night, and where the original bundle stops. */
+    const val NAKED_EYE_LIMIT = 6.5
 
     /**
      * Angular separation between two horizon positions, degrees.

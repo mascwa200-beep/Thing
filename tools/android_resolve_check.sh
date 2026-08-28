@@ -122,6 +122,21 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 #     git show HEAD:<the-declaring-file.kt> | grep -oE '^    (val|fun) [A-Za-z0-9_]+' | awk '{print $2}' \
 #       | sort -u | while read -r m; do grep -q "vm\.$m\b" /tmp/head.kt || echo "$m"; done
 #
+# ⚠️ **AND THE CONTROL HAS TO GO AT THE CALL SITE THAT IS COMPLAINING, not merely in the same file.**
+# A local helper whose INFERRED return type mentions an unresolvable type has an error type itself,
+# and then every member call on its result is reported — while the identical call on a cleanly typed
+# receiver a hundred lines away resolves perfectly. So one file can hold a poisoned site and a clean
+# one, and a control planted in the clean one comes back quiet and tells you nothing:
+#
+#     fun place(az: Double, alt: Double) = SkyProjection.project(az, alt, view).let {
+#         it to Offset(...)          // androidx: unresolved here, so `place` returns an error type
+#     }
+#     val (p, at) = place(...)
+#     p.onScreen(viewport)           // reported — and so is p.radius, which has shipped for months
+#
+# Planting `p.radius` AT THAT LINE is what settles it: `radius` unquestionably compiles in CI, so a
+# report for it is proof the receiver is poisoned. Planted anywhere else in the file it resolves.
+#
 # ⚠️ And note `:core:health` is on NEITHER path here — not as sources, not as classes — so every
 # member of anything it declares cascades. That is a whole module's worth of false positives, and it
 # is the commonest one this repo hits. It does NOT follow that the module is beyond checking: the

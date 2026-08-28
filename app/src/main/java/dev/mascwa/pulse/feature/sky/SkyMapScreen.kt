@@ -51,8 +51,16 @@ import kotlin.math.roundToInt
  * only a projection per visible star and no recomposition of anything else.
  *
  * ⚠️ **What is drawn is decided by the zoom, not by a fixed list.** [SkyProjection.magnitudeLimit]
- * deepens as the field narrows, so a wide view shows the shapes people navigate by and a narrow one
- * fills in. Nothing outside the field is drawn at all.
+ * deepens as the field narrows, so a wide view shows a full naked-eye sky and a narrow one fills in
+ * as far as the catalogue goes. That is also what bounds the work: the number of stars actually
+ * drawn stays in the low thousands however deep the file is.
+ *
+ * ⚠️ **The sky fills the screen, and getting that wrong is what this screen shipped with.** The
+ * field of view is normalised to the *short* dimension, and the draw loop asked
+ * [SkyProjection.Screen.inField] — a radius against that circle — what to draw. On a portrait phone
+ * the result was a disc the width of the screen with dead black bands above and below, which is
+ * exactly how it was reported. [SkyProjection.Screen.onScreen] is the predicate a renderer wants;
+ * `inField` is for tap tolerances.
  */
 @Composable
 fun SkyMapScreen(vm: SkyMapViewModel, onBack: (() -> Unit)? = null) {
@@ -142,17 +150,25 @@ private fun SkyCanvas(
         val half = size.minDimension / 2f
         val cx = size.width / 2f
         val cy = size.height / 2f
+        // ⚠️ **The sky fills the rectangle; it is not a disc inside one.** The declared field is
+        // normalised to the SHORT screen dimension, so on a portrait phone everything above and
+        // below the middle third of the screen lies outside it — and asking `inField` what to draw,
+        // which is what this did until it was reported, produced a literal circle with dead black
+        // bands. The question a renderer asks is whether a point is on the SURFACE.
+        val viewport = SkyProjection.viewportOf(size.width.toDouble(), size.height.toDouble())
         fun place(az: Double, alt: Double) = SkyProjection.project(az, alt, view).let {
             it to Offset(cx + (it.x * half).toFloat(), cy + (it.y * half).toFloat())
         }
 
-        drawHorizon(view, c, half, cx, cy, cardinalPaint)
+        drawHorizon(view, c, half, cx, cy, viewport, cardinalPaint)
 
         val limit = SkyProjection.magnitudeLimit(view.fovDeg)
         bodies.forEach { b ->
             if (b.kind == SkyMapViewModel.Kind.STAR && b.magnitude > limit) return@forEach
             val (p, at) = place(b.azimuthDeg, b.altitudeDeg)
-            if (!p.inField) return@forEach
+            // A margin, so a star whose centre has just left the screen keeps the half of its disc
+            // that has not, rather than blinking out mid-drag.
+            if (!p.onScreen(viewport, EDGE_MARGIN)) return@forEach
             val below = b.altitudeDeg < 0
 
             when (b.kind) {
@@ -212,26 +228,37 @@ private fun DrawScope.drawHorizon(
     half: Float,
     cx: Float,
     cy: Float,
+    viewport: SkyProjection.Viewport,
     paint: Paint,
 ) {
     var previous: Offset? = null
     var az = view.azimuthDeg - 180.0
     while (az <= view.azimuthDeg + 180.0) {
         val p = SkyProjection.project(az, 0.0, view)
-        val here = if (p.visible) Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat()) else null
-        // ⚠️ Only join points that are BOTH in the field. Without the check a segment leaving the
-        // view is drawn to a point far off screen and the horizon gains a spike across the chart.
-        if (previous != null && here != null && p.radius < HORIZON_CLIP) {
+        // ⚠️ Only join points that are BOTH drawable. Without the check a segment leaving the view
+        // is drawn to a point far off screen and the horizon gains a spike across the chart.
+        //
+        // ⚠️ The bound is the viewport with a **generous** margin, not the old fixed radius. A line
+        // is the one thing worth carrying past the edge — the canvas clips it, and dropping the
+        // segment instead leaves the horizon stopping short of the screen edge with a visible gap.
+        // What the bound is really guarding against is the far side of the sky, where a stereographic
+        // projection runs away to infinity.
+        val here = if (p.onScreen(viewport, HORIZON_MARGIN)) {
+            Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
+        } else {
+            null
+        }
+        if (previous != null && here != null) {
             drawLine(c.line, previous, here, strokeWidth = 1.5f * density)
         }
-        previous = if (p.visible && p.radius < HORIZON_CLIP) here else null
+        previous = here
         az += HORIZON_STEP_DEG
     }
 
     paint.textSize = 12f * density
     listOf("N" to 0.0, "E" to 90.0, "S" to 180.0, "W" to 270.0).forEach { (name, azimuth) ->
         val p = SkyProjection.project(azimuth, 0.0, view)
-        if (!p.inField) return@forEach
+        if (!p.onScreen(viewport)) return@forEach
         paint.color = (if (name == "N") c.accent else c.muted).toArgb()
         drawContext.canvas.nativeCanvas.drawText(
             name,
@@ -372,8 +399,19 @@ private fun cardinal(azimuthDeg: Double): String {
 /** A star this much brighter than the cut-off gets its name drawn beside it. */
 private const val LABEL_HEADROOM = 2.2
 
-/** Beyond this radius the horizon polyline is leaving the view and its segments are dropped. */
-private const val HORIZON_CLIP = 2.0
+/**
+ * How far past the screen edge something is still worth drawing, as a fraction of the half-field.
+ *
+ * A star is a disc and a label hangs off its side, so both are partly visible while their anchor
+ * point is not. Clipping hard at the edge makes them blink in and out as you drag.
+ */
+private const val EDGE_MARGIN = 0.06
+
+/**
+ * The horizon gets a far wider one: it is a line, so the canvas can clip it for us, and carrying it
+ * well past the edge is what stops it stopping short of the screen.
+ */
+private const val HORIZON_MARGIN = 1.0
 
 /** Fine enough that the horizon reads as a smooth curve at any tilt. */
 private const val HORIZON_STEP_DEG = 2.0
