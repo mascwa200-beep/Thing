@@ -7,6 +7,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.State
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -613,17 +615,19 @@ private fun AlertStrip() {
     val tint = if (red) c.accent else c.amber
     // Only red pulses. A yellow alert that throbbed would be a distraction proportional to nothing,
     // and this animates on every screen for as long as the condition lasts.
-    val alpha = if (red) {
-        val t = rememberInfiniteTransition(label = "alert")
-        val a by t.animateFloat(
+    // ⚠️ The animated value is kept as a `State` and read in the DRAW lambda below, never here.
+    // Reading it in composition would invalidate this strip — and the two Texts inside it — on every
+    // frame of the pulse, on whatever screen the reader happens to be on, for as long as the alert
+    // stands. `drawBehind` paints the same rectangle without recomposing anything.
+    val pulse: State<Float>? = if (red) {
+        rememberInfiniteTransition(label = "alert").animateFloat(
             initialValue = 0.42f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(760), RepeatMode.Reverse),
             label = "alertAlpha",
         )
-        a
     } else {
-        1f
+        null
     }
 
     Row(
@@ -631,7 +635,7 @@ private fun AlertStrip() {
             .fillMaxWidth()
             .padding(top = RailGutter)
             .height(20.dp)
-            .background(tint.copy(alpha = alpha))
+            .drawBehind { drawRect(pulse?.let { tint.copy(alpha = it.value) } ?: tint) }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

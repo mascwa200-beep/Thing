@@ -174,22 +174,31 @@ fun PulseApp(
                 val vm: HomeViewModel = viewModel(factory = factory)
                 HomeScreen(
                     vm,
-                    HomeNav(
-                        openNews = { navigateTopLevel(Routes.NEWS) },
-                        openMarkets = { navigateTopLevel(Routes.MARKETS) },
-                        openWeather = { navigateTopLevel(Routes.WEATHER) },
-                        openEconomy = { openApp(Routes.ECONOMY) },
-                        openFuel = { openApp(Routes.FUEL) },
-                        // Settings is PUSHED (it is not a tab; back returns to where you were) —
-                        // it used to be top-leveled here but pushed from MENU, two different
-                        // back-stack semantics for one screen depending on the door you came in.
-                        openSettings = { openApp(Routes.SETTINGS) },
-                        // JARVIS IS a tab; the plain push here skipped its saved state on the way in.
-                        openAssistant = { openApp(Routes.JARVIS) },
-                        openRadar = { openApp(Routes.RADAR) },
-                        openSpaceWeather = { openApp(Routes.SPACE_WX) },
-                        openRoute = { route -> openApp(route) },
-                    ),
+                    // ⚠️ **Remembered, and that is what makes `HomeScreen` skippable at all.** Built
+                    // inline it was a fresh instance on every recomposition of this entry, so the
+                    // parameter always compared unequal and the whole home screen recomposed with it,
+                    // however stable its own state was. Every lambda below captures only
+                    // `navController`, which is remembered for the life of the composition, so there is
+                    // nothing here that can go stale — which is the condition a keyless `remember` has
+                    // to meet.
+                    remember {
+                        HomeNav(
+                            openNews = { navigateTopLevel(Routes.NEWS) },
+                            openMarkets = { navigateTopLevel(Routes.MARKETS) },
+                            openWeather = { navigateTopLevel(Routes.WEATHER) },
+                            openEconomy = { openApp(Routes.ECONOMY) },
+                            openFuel = { openApp(Routes.FUEL) },
+                            // Settings is PUSHED (it is not a tab; back returns to where you were) —
+                            // it used to be top-leveled here but pushed from MENU, two different
+                            // back-stack semantics for one screen depending on the door you came in.
+                            openSettings = { openApp(Routes.SETTINGS) },
+                            // JARVIS IS a tab; the plain push here skipped its saved state on the way in.
+                            openAssistant = { openApp(Routes.JARVIS) },
+                            openRadar = { openApp(Routes.RADAR) },
+                            openSpaceWeather = { openApp(Routes.SPACE_WX) },
+                            openRoute = { route -> openApp(route) },
+                        )
+                    },
                 )
             }
             composable(Routes.NEWS) {

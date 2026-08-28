@@ -42,6 +42,11 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         container.crashReporter.install()
         dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "process started")
         NotificationChannels.ensure(this)
+        // What this phone can afford, decided once. The probe is cheap and the answer is a property
+        // of the hardware, so there is nothing to keep in sync afterwards.
+        runCatching {
+            dev.mascwa.pulse.ui.LcarsTransitions.animate = container.deviceProbe.budget().animations
+        }
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
         // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).
