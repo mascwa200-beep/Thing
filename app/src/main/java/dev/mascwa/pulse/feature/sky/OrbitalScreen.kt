@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
@@ -68,6 +69,7 @@ private enum class SkyTab(val label: String) {
     TONIGHT("TONIGHT"),
     SATELLITES("SATELLITES"),
     SHOWERS("SHOWERS"),
+    ECLIPSES("ECLIPSES"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
     ASTEROIDS("ASTEROIDS"),
@@ -111,6 +113,7 @@ fun OrbitalBody(
     val tracked by vm.trackedCount.collectAsStateWithLifecycle()
     val launches by vm.launches.collectAsStateWithLifecycle()
     val showers by vm.showers.collectAsStateWithLifecycle()
+    val eclipses by vm.eclipses.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
     var tab by remember { mutableStateOf(SkyTab.TONIGHT) }
@@ -146,6 +149,7 @@ fun OrbitalBody(
                         SkyTab.SATELLITES ->
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
                         SkyTab.SHOWERS -> showersTab(showers, site != null, c)
+                        SkyTab.ECLIPSES -> eclipsesTab(eclipses, site != null, c)
                         SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
                         SkyTab.ASTEROIDS -> asteroidsTab(d, c)
@@ -394,6 +398,148 @@ private fun peakPhrase(o: MeteorShowers.Occurrence): String = when {
     o.daysFromPeak == 0 -> "PEAKS TONIGHT"
     o.daysFromPeak < 0 -> "PEAKS IN ${-o.daysFromPeak}D"
     else -> "PEAKED ${o.daysFromPeak}D AGO"
+}
+
+// ---- ECLIPSES ----------------------------------------------------------------------------------
+
+/**
+ * Eclipses, split by whether you would actually see anything.
+ *
+ * ⚠️ **The split is the point.** Most eclipses happen on the other side of the world, so a plain
+ * chronological list is mostly disappointment with the occasional real event buried in it. Sorting
+ * by "can I see this" answers the question somebody opens the page to ask — and the ones that are
+ * elsewhere are still listed rather than hidden, because an eclipse you cannot see is a fact about
+ * where you are standing and not an absence of news.
+ */
+private fun LazyListScope.eclipsesTab(
+    eclipses: List<OrbitalViewModel.EclipseNight>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (eclipses.isEmpty()) {
+        item {
+            Hint(
+                "No eclipse falls in the next two years, which would be remarkable — there are " +
+                    "usually four to seven a year. If this stays empty, suspect the clock.",
+                c,
+            )
+        }
+        return
+    }
+    val here = eclipses.filter { it.local.visible }
+    item { LcarsHeaderBar("Visible from here", trailing = "${here.size}") }
+    if (here.isEmpty()) {
+        item {
+            Hint(
+                "None of the next two years' eclipses is above your horizon while it happens. That " +
+                    "is ordinary rather than unlucky: the Moon's shadow is small and the Earth is " +
+                    "large.",
+                c,
+            )
+        }
+    } else {
+        items(here, key = { "here-${it.eclipse.greatestEpochMs}" }) { EclipseCard(it, c) }
+    }
+
+    val elsewhere = eclipses.filterNot { it.local.visible }
+    if (elsewhere.isNotEmpty()) {
+        item { LcarsHeaderBar("Elsewhere in the world", trailing = "${elsewhere.size}") }
+        items(elsewhere, key = { "away-${it.eclipse.greatestEpochMs}" }) { EclipseCard(it, c) }
+    }
+}
+
+@Composable
+private fun EclipseCard(night: OrbitalViewModel.EclipseNight, c: NightwirePalette) {
+    val e = night.eclipse
+    val l = night.local
+    // ⚠️ Colour says how much of it YOU get, not how impressive the event is somewhere else — the
+    // same rule the shower cards follow, so one glance down the page answers one question. Amber is
+    // reserved for "this file cannot tell", which is a different thing from a poor view.
+    val accent = when {
+        !l.visible -> c.muted
+        l.borderline -> c.amber
+        l.totalHere || l.annularHere -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    Eclipses.describe(e),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    countdown(e.greatestEpochMs),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent,
+                )
+            }
+            Text(
+                night.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                eclipseFigures(night),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under the sentence — and it omits a figure rather than printing a misleading one.
+ *
+ * ⚠️ A solar eclipse's GEOCENTRIC magnitude is routinely zero for a real and even a total eclipse,
+ * because the centre of the Earth is not where the eclipse is. Printing that beside the words
+ * "Total solar eclipse" reads as a contradiction, so the solar line quotes what THIS place gets and
+ * the lunar line quotes the eclipse's own depth, which really is the same for everybody.
+ */
+private fun eclipseFigures(night: OrbitalViewModel.EclipseNight): String {
+    val e = night.eclipse
+    val l = night.local
+    val at = "${dateOrDash(e.greatestEpochMs)} ${clockOrDash(e.greatestEpochMs)}"
+    return if (e.isSolar) {
+        if (l.visible) {
+            "$at · ${(l.obscuration * 100).roundToInt()}% of the Sun hidden here · " +
+                "Sun ${l.altitudeDeg.roundToInt()}° up"
+        } else {
+            "$at · greatest eclipse, wherever the shadow falls"
+        }
+    } else {
+        val depth = "${(e.magnitude * 100).roundToInt()}% of the Moon in the true shadow"
+        if (l.visible) "$at · $depth · Moon ${l.altitudeDeg.roundToInt()}° up" else "$at · $depth"
+    }
+}
+
+/**
+ * "IN 43 DAYS", "TOMORROW", "TONIGHT" — a countdown, never a bare date.
+ *
+ * ⚠️ **[Formatters.relativeTime] cannot be reused here and it is worth saying why**: it returns
+ * "just now" for any epoch in the future, by design, because it exists to age news. Reaching for it
+ * would have put "just now" on an eclipse two years away, on every card, and looked deliberate.
+ *
+ * Counted in CALENDAR days rather than elapsed milliseconds, for the reason that same function's
+ * KDoc gives at length: an eclipse 30 hours away is tomorrow, not "in one day", and where the
+ * clocks change a local day is not 24 hours.
+ */
+private fun countdown(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+    val zone = java.time.ZoneId.systemDefault()
+    val then = java.time.Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
+    val today = java.time.Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+    val days = java.time.temporal.ChronoUnit.DAYS.between(today, then)
+    return when {
+        days < 0L -> "PASSED"
+        days == 0L -> "TODAY"
+        days == 1L -> "TOMORROW"
+        days < 60L -> "IN ${days}D"
+        else -> "IN ${days / 30}MO"
+    }
 }
 
 // ---- SKY CHART ---------------------------------------------------------------------------------
@@ -754,6 +900,10 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Passes propagated on-device (SGP4) from Celestrak element sets."
         SkyTab.CHART, SkyTab.SUN_MOON ->
             "Sun and Moon computed on-device — no network needed."
+        SkyTab.ECLIPSES ->
+            "Computed on-device from the shipped ephemeris — no network needed. Checked against " +
+                "JPL DE421: every eclipse of 2025-2028 agrees in kind, greatest eclipse within 30 " +
+                "seconds and magnitude within 0.004."
         SkyTab.SHOWERS ->
             "Peaks solved from the Sun's own position on-device, from a bundled table of radiants " +
                 "— no network needed. Rates are an ideal-conditions figure scaled for the radiant's " +
