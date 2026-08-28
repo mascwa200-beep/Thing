@@ -392,6 +392,12 @@ fun SettingsScreen(
             if (vis(SettingsCategory.DEVICE, "owner usb camera wipe")) item {
                 val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
                 val isOwner = remember { dpc.isDeviceOwner() }
+                // ⚠️ The explanation comes from the controller, not from here. This screen used to
+                // carry its own hand-written version, so the sentence could drift from the check that
+                // produces it — and it did: it pointed at a "Device owner" row above rather than
+                // saying what provisioning actually requires. One definition now, shared with the
+                // first-launch device notice.
+                val ownerReason = remember { dpc.unavailableReason() }
                 val usbSupported = remember { dpc.usbDataControlSupported() }
                 var usbDataOn by remember { mutableStateOf(dpc.isUsbDataEnabled()) }
                 var camDisabled by remember { mutableStateOf(dpc.isCameraDisabled()) }
@@ -399,10 +405,9 @@ fun SettingsScreen(
                 var pendingWipe by remember { mutableStateOf<Int?>(null) }
                 var wipeError by remember { mutableStateOf(false) }
                 PrefSection("Device-owner controls") {
-                    if (!isOwner) {
+                    ownerReason?.let { reason ->
                         Text(
-                            "These hardware-backed protections need LCARS provisioned as Device Owner (see " +
-                                "“Device owner” above). Until then they're inert.",
+                            reason,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

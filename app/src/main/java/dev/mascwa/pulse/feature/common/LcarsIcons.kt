@@ -233,7 +233,7 @@ object LcarsIcons {
     }
 
     /** Two crossing diagonal bars forming an X — replaces `Icons.Filled.Close` (3 call sites:
-     *  DeviceGateScreen, NavScreen, NewsScreen). */
+     *  DeviceNotice, NavScreen, NewsScreen). */
     val Close: ImageVector by lazy {
         ImageVector.Builder(name = "LcarsClose", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
             .apply {

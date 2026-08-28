@@ -27,7 +27,7 @@ import dev.mascwa.pulse.core.device.DeviceGate
 import dev.mascwa.pulse.core.telemetry.HardwareAttestation
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.di.PulseViewModelFactory
-import dev.mascwa.pulse.ui.DeviceGateScreen
+import dev.mascwa.pulse.ui.DeviceNotice
 import dev.mascwa.pulse.ui.PulseApp
 import dev.mascwa.pulse.ui.theme.NightwireTheme
 import kotlinx.coroutines.Dispatchers
@@ -206,7 +206,18 @@ class MainActivity : ComponentActivity() {
                         null // attestation unavailable on this device → defer to the heuristic
                     }
                 }
-                val gated = !(attestationTrusted ?: heuristicOk) &&
+                // ⚠️ **A NOTICE, NOT A GATE — and this used to replace the whole application.**
+                // Until now a phone that was not a Pixel 10 Pro XL running GrapheneOS got
+                // `DeviceGateScreen` in front of everything, with "Exit" offered as a first-class
+                // choice. That is a block however politely it is worded, and it withheld every feed,
+                // the library, the assistant and the map — none of which depend on the hardware — for
+                // the sake of a handful of device-owner capabilities that were never load-bearing to
+                // any of it. `PulseApp` now always composes and the notice is drawn OVER it, once.
+                //
+                // ⚠️ The persisted flag keeps its old name. `deviceGateAcknowledged` is a field in the
+                // settings blob, i.e. a data contract — renaming it would silently reset the
+                // acknowledgement for everyone who has already dismissed this.
+                val showNotice = !(attestationTrusted ?: heuristicOk) &&
                     !acknowledged && !settings.deviceGateAcknowledged
 
                 // Ask for notification permission once on Android 13+.
@@ -261,44 +272,49 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    if (gated) {
-                        DeviceGateScreen(
+                    PulseApp(
+                        factory = factory,
+                        startRoute = pendingRouteState.value,
+                        isOnline = online,
+                        navigationRequests = app.container.navigationBus,
+                        onRouteVisit = { route ->
+                            // ⚠️ The BASE route, not the pattern. currentRoute hands over the
+                            // route PATTERN — "survival?guide={guide}" — and recording that
+                            // verbatim mints junk usage keys that never match FeatureCatalog,
+                            // so those features could never be counted or recommended.
+                            val base = route.substringBefore('?')
+                            app.container.usageRepository.record(base)
+                            app.container.usageRepository.log("nav", base)
+                        },
+                        onStartRouteConsumed = { pendingRouteState.value = null },
+                    )
+                    if (showNotice) {
+                        DeviceNotice(
                             result = gateResult,
                             grapheneOk = graphene.isGraphene,
                             osDetail = graphene.summary,
                             attestationOk = attestation?.verdict?.grapheneVerified,
                             attestationDetail = attestation?.verdict?.summary
                                 ?: attestation?.error,
-                            onContinue = {
+                            // The one sentence, from the one place that decides it — Settings renders
+                            // the same string beside the controls it disables.
+                            privilegeDetail = androidx.compose.runtime.remember {
+                                dev.mascwa.pulse.security.DevicePolicyController
+                                    .unavailableReason(this@MainActivity)
+                            },
+                            onDismiss = {
                                 acknowledged = true
                                 lifecycleScope.launch {
                                     app.container.settingsRepository.update { it.copy(deviceGateAcknowledged = true) }
                                 }
                             },
-                            onExit = { finish() },
-                        )
-                    } else {
-                        PulseApp(
-                            factory = factory,
-                            startRoute = pendingRouteState.value,
-                            isOnline = online,
-                            navigationRequests = app.container.navigationBus,
-                            onRouteVisit = { route ->
-                                // ⚠️ The BASE route, not the pattern. currentRoute hands over the
-                                // route PATTERN — "survival?guide={guide}" — and recording that
-                                // verbatim mints junk usage keys that never match FeatureCatalog,
-                                // so those features could never be counted or recommended.
-                                val base = route.substringBefore('?')
-                                app.container.usageRepository.record(base)
-                                app.container.usageRepository.log("nav", base)
-                            },
-                            onStartRouteConsumed = { pendingRouteState.value = null },
                         )
                     }
                     // (The visual "always watching" overlay was removed — J.A.R.V.I.S.'s awareness is
                     // non-visual now; the presence surfaces as a professional status feed instead.)
                     // Cold-open: opt-in (off by default to save startup RAM — the ~800-mote animation).
-                    // When on, it draws topmost and masks everything (app, gate, overlays) until it fades.
+                    // When on, it draws topmost and masks everything (the app, the device
+                    // notice, every overlay) until it fades.
                     // Toggle in Settings → Appearance ("Boot sequence").
                     if (settings.bootAnimation && !booted) {
                         BootScreen(onFinished = { booted = true })
