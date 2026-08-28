@@ -606,7 +606,19 @@ object Ephemeris {
     /** Equatorial radius, the unit the topocentric vectors are carried in. */
     private const val EARTH_RADIUS_KM = 6378.14
 
-    /** Great-circle angle between two equatorial positions, degrees. */
+    /**
+     * Great-circle angle between two equatorial positions, degrees.
+     *
+     * ⚠️ **Its resolution floor is about three milliarcseconds, and for two IDENTICAL positions it
+     * can return that rather than zero.** This is the standard cosine formula, so for a small angle
+     * it takes `acos` of a value within one ulp of 1, where `cos` has thrown the information away:
+     * `sin²d + cos²d` lands a bit either side of one and `acos` of that is up to 1.5e-8 radians.
+     * Everything in this project that reads a separation — eclipses, occultations, conjunctions —
+     * works in arcseconds, four orders of magnitude above the floor, so it is left alone rather
+     * than churned. A caller that ever wants sub-arcsecond separations needs the haversine form.
+     * Found the hard way: a test comparing a coordinate with itself through this reported three
+     * milliarcseconds of drift, and passed or failed depending on the last bit of the declination.
+     */
     fun angularSeparationDeg(ra1: Double, dec1: Double, ra2: Double, dec2: Double): Double {
         val d1 = dec1 * DEG
         val d2 = dec2 * DEG

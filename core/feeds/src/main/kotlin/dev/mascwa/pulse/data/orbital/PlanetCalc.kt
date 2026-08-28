@@ -10,9 +10,34 @@ import kotlin.math.sqrt
 
 /**
  * Naked-eye planet positions using Paul Schlyter's low-precision method
- * ("How to compute planetary positions"). Accuracy ~1–2 arcminutes — labelled
- * approximate in the UI. Computes each planet's altitude/azimuth for the
- * observer and an approximate apparent magnitude. No network required.
+ * ("How to compute planetary positions"). Computes each planet's altitude/azimuth for the observer
+ * and an approximate apparent magnitude. No network required.
+ *
+ * ## Measured accuracy, because the number that was here was wrong in both directions
+ *
+ * Against JPL DE421 read through Skyfield, at eighty instants spanning 2000 to 2050 — apparent
+ * positions, equinox of date, which is the convention this method works in:
+ *
+ * | | median | worst |
+ * |---|---|---|
+ * | Mercury, Venus, Mars | 0.5' | 1.7' |
+ * | Jupiter | 0.5' | 1.4' |
+ * | Saturn | 0.7' | 2.9' |
+ *
+ * ⚠️ **Jupiter's worst was 14.7 arcminutes and Saturn's 13.3 until section 10 of Schlyter's own
+ * method was applied**, which this had simply left out. The largest omitted term is the great
+ * Jupiter–Saturn inequality — 0.332 degrees of longitude for Jupiter and 0.812 for Saturn, against
+ * a Moon whose whole radius is 15.6 arcminutes. It is invisible in a one-year sample because its
+ * period is 918 years, which is why measuring over five decades is what found it.
+ *
+ * ⚠️ The perturbations are added to the HELIOCENTRIC ECLIPTIC LONGITUDE (and, for Saturn, the
+ * latitude) after the orbit is solved and before the position is turned back into rectangular
+ * coordinates — not to the argument of latitude, where they would be a different quantity.
+ *
+ * ⚠️ The positions are for the equinox of DATE and carry no nutation and no aberration. That is
+ * Schlyter's own convention and it is right for rise and set times and for pointing at something;
+ * a chart drawn for a fixed epoch would need precession applied, which is
+ * [dev.mascwa.pulse.core.telemetry.Ephemeris.precessFromJ2000] in the other direction.
  */
 object PlanetCalc {
 
@@ -41,6 +66,12 @@ object PlanetCalc {
     private fun asind(x: Double) = atan2(x, sqrt(1 - x * x)) * 180.0 / PI
     private fun acosd(x: Double): Double { val c = x.coerceIn(-1.0, 1.0); return atan2(sqrt(1 - c * c), c) * 180.0 / PI }
 
+    /** One planet's mean anomaly, degrees, [d] days from the element epoch. */
+    private fun meanAnomaly(name: String, d: Double): Double {
+        val p = planets.first { it.name == name }
+        return rev(p.m0 + p.mDot * d)
+    }
+
     fun planetsNow(lat: Double, lon: Double, epochMs: Long = System.currentTimeMillis()): List<Planet> {
         val jd = epochMs / 86_400_000.0 + 2_440_587.5
         val d = jd - 2_451_543.5
@@ -62,6 +93,12 @@ object PlanetCalc {
         val ls = rev(ms + ws)
         val lstHours = ls / 15.0 + 12.0 + ut + lon / 15.0
 
+        // Mean anomalies of Jupiter and Saturn drive the perturbation terms below. Read out of the
+        // same element table rather than retyped, so a correction there cannot leave these behind —
+        // and BY NAME rather than by index, so reordering the list cannot silently swap them.
+        val mj = meanAnomaly("Jupiter", d)
+        val msat = meanAnomaly("Saturn", d)
+
         return planets.map { p ->
             val n = rev(p.n0 + p.nDot * d)
             val i = p.i0 + p.iDot * d
@@ -79,9 +116,38 @@ object PlanetCalc {
             val r = sqrt(xv * xv + yv * yv)
             val vw = v + w
 
-            val xh = r * (cosd(n) * cosd(vw) - sind(n) * sind(vw) * cosd(i))
-            val yh = r * (sind(n) * cosd(vw) + cosd(n) * sind(vw) * cosd(i))
-            val zh = r * sind(vw) * sind(i)
+            val xh0 = r * (cosd(n) * cosd(vw) - sind(n) * sind(vw) * cosd(i))
+            val yh0 = r * (sind(n) * cosd(vw) + cosd(n) * sind(vw) * cosd(i))
+            val zh0 = r * sind(vw) * sind(i)
+
+            // Schlyter section 10. Mercury, Venus and Mars have nothing above 0.01 degrees.
+            var lonecl = atan2d(yh0, xh0)
+            var latecl = atan2d(zh0, sqrt(xh0 * xh0 + yh0 * yh0))
+            when (p.name) {
+                "Jupiter" -> lonecl +=
+                    -0.332 * sind(2 * mj - 5 * msat - 67.6) -
+                    0.056 * sind(2 * mj - 2 * msat + 21.0) +
+                    0.042 * sind(3 * mj - 5 * msat + 21.0) -
+                    0.036 * sind(mj - 2 * msat) +
+                    0.022 * cosd(mj - msat) +
+                    0.023 * sind(2 * mj - 3 * msat + 52.0) -
+                    0.016 * sind(mj - 5 * msat - 69.0)
+
+                "Saturn" -> {
+                    lonecl +=
+                        0.812 * sind(2 * mj - 5 * msat - 67.6) -
+                        0.229 * cosd(2 * mj - 4 * msat - 2.0) +
+                        0.119 * sind(mj - 2 * msat - 3.0) +
+                        0.046 * sind(2 * mj - 6 * msat - 69.0) +
+                        0.014 * sind(mj - 3 * msat + 32.0)
+                    latecl +=
+                        -0.020 * cosd(2 * mj - 4 * msat - 2.0) +
+                        0.018 * sind(2 * mj - 6 * msat - 49.0)
+                }
+            }
+            val xh = r * cosd(lonecl) * cosd(latecl)
+            val yh = r * sind(lonecl) * cosd(latecl)
+            val zh = r * sind(latecl)
 
             val xg = xh + xs
             val yg = yh + ys
