@@ -10,8 +10,10 @@ import dev.mascwa.pulse.di.AppContainer
 import dev.mascwa.pulse.feature.media.MicFloor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The interrogator screen's state.
@@ -67,12 +69,51 @@ class InterrogatorViewModel(private val c: AppContainer) : ViewModel() {
     val adjudicatorReady: Boolean get() = c.llamaEngine.loaded
     val adjudicatorPresent: Boolean get() = c.llamaEngine.modelPresent()
 
+    /**
+     * How much disk the two downloaded models are holding, so the screen can offer it back.
+     *
+     * ⚠️ A flow rather than a getter, because the number CHANGES from this screen — a download or a
+     * discard both move it — and a `get()` read during composition would only be re-read when
+     * something else happened to recompose.
+     */
+    private val _modelBytes = MutableStateFlow(0L)
+    val modelBytes: StateFlow<Long> = _modelBytes.asStateFlow()
+
     fun refresh() {
         viewModelScope.launch {
             _busy.value = true
             runCatching { c.transcriptStore.prune() }
             _lines.value = runCatching { c.transcriptStore.recent() }.getOrDefault(emptyList())
             _kept.value = runCatching { c.transcriptStore.count() }.getOrDefault(0)
+            _modelBytes.value = modelBytesNow()
+            _busy.value = false
+        }
+    }
+
+    private suspend fun modelBytesNow(): Long = withContext(Dispatchers.IO) {
+        runCatching { c.whisperEngine.bytesOnDisk() + c.llamaEngine.bytesOnDisk() }.getOrDefault(0L)
+    }
+
+    /**
+     * Give the storage back.
+     *
+     * ⚠️ **Only offered while the feature is off, and it stands it down first anyway.** The service
+     * calls `whisperEngine.prepare()`, so discarding underneath it would leave it holding a handle
+     * to weights that are no longer there and the next start would silently re-fetch a gigabyte.
+     * Belt and braces: the screen hides the control while listening, and this stops the service
+     * regardless, because a control that quietly does the wrong thing when reached another way is
+     * worse than one that is a little more forceful than it looks.
+     */
+    fun discardModels(context: Context) {
+        viewModelScope.launch {
+            _busy.value = true
+            runCatching {
+                c.settingsRepository.update { it.copy(sensing = it.sensing.copy(interrogator = false)) }
+            }
+            runCatching { AcousticInterrogatorService.stop(context) }
+            runCatching { c.whisperEngine.discardModel() }
+            runCatching { c.llamaEngine.discardModel() }
+            _modelBytes.value = modelBytesNow()
             _busy.value = false
         }
     }
@@ -103,6 +144,7 @@ class InterrogatorViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch {
             _busy.value = true
             runCatching { c.llamaEngine.prepare(allowDownload = true) }
+            _modelBytes.value = modelBytesNow()
             _busy.value = false
         }
     }

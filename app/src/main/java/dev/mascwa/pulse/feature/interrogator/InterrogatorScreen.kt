@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Rebuttal
 import dev.mascwa.pulse.data.interrogator.InterrogatorCascade
 import dev.mascwa.pulse.data.interrogator.TranscriptStore
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsIcons
@@ -64,6 +65,7 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
     val c = Pulse.colors
     val ctx = LocalContext.current
     val listening by vm.listening.collectAsStateWithLifecycle()
+    val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
     val lines by vm.lines.collectAsStateWithLifecycle()
     val kept by vm.kept.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
@@ -110,6 +112,8 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
                         },
                         onStop = { vm.stop(ctx) },
                         onFetch = { vm.fetchAdjudicator() },
+                        modelBytes = modelBytes,
+                        onDiscard = { vm.discardModels(ctx) },
                     )
                 }
                 item { FindingCard(finding, InterrogatorViewModel.quietLine(trace), trace?.heard) }
@@ -175,9 +179,11 @@ private fun StateCard(
     modelReady: Boolean,
     adjudicator: String,
     busy: Boolean,
+    modelBytes: Long,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onFetch: () -> Unit,
+    onDiscard: () -> Unit,
 ) {
     val c = Pulse.colors
     Column(
@@ -201,11 +207,27 @@ private fun StateCard(
                 "   ·   Adjudicator: " + adjudicator,
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
         )
+        // ⚠️ What the models are costing, said rather than left to be discovered in the system's
+        // own storage screen. Between them they are about 1.1 GB, and until now there was no way at
+        // all to hand that back short of clearing the app's data — which also destroys the food log,
+        // the study deck and every setting.
+        if (modelBytes > 0L) {
+            Text(
+                "Models on this device: ${Formatters.megabytes(modelBytes)}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LcarsButton(text = if (listening) "STOP" else "LISTEN", onClick = { if (listening) onStop() else onStart() })
             // The weights are about a gigabyte, so the download is a deliberate tap and says so.
             if (adjudicator == "Not downloaded" && !busy) {
                 LcarsButton(text = "GET ADJUDICATOR (~1 GB)", onClick = onFetch)
+            }
+            // ⚠️ Hidden while listening. Deleting weights the service has mapped would leave it
+            // holding a handle to a file that is gone; the view model stops it regardless, and this
+            // keeps the control from reading as something harmless to press mid-sentence.
+            if (!listening && !busy && modelBytes > 0L) {
+                LcarsButton(text = "FREE ${Formatters.megabytes(modelBytes)}", onClick = onDiscard)
             }
         }
     }
