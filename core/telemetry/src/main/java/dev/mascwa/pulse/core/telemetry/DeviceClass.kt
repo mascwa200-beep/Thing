@@ -200,9 +200,11 @@ object DeviceClass {
      * places an opinion about the same decision, which is the duplicated-definition drift this
      * repository has corrected six times.
      *
-     * ⚠️ Every field here is rendered by the Settings diagnostic from the day it exists. A value
-     * computed and never read is this project's oldest recurring defect, and a budget field with no
-     * consumer would be a fresh instance of it.
+     * ⚠️ Every field here is rendered by [describe], and so by the Settings diagnostic in both
+     * applications, from the day it exists. A value computed and never read is this project's oldest
+     * recurring defect, and a budget field with no consumer would be a fresh instance of it. (The
+     * first version of this comment claimed the readout already did that when it rendered only the
+     * probe — an overstated comment, which in this tree is a defect of its own.)
      */
     data class Budget(
         /** Run the purely decorative infinite animations (glows, sweeps, pulses). */
@@ -217,15 +219,77 @@ object DeviceClass {
         val parallelism: Int,
         /** Run the optional heavy engines — the local model, transcription, the interrogator. */
         val heavyEngines: Boolean,
+        /** How much of the background worker's discretionary work may run. */
+        val work: WorkTier,
     )
+
+    /**
+     * How much discretionary background work this device should be asked to do.
+     *
+     * ⚠️ The name matters: **discretionary**. Some of what the background worker does is not — the
+     * two service self-heals, the widget refresh and the app update sit ABOVE the notification gates
+     * with written reasoning, and a device tier above them would be the same mistake in a new coat.
+     * A phone being cheap is not a reason to stop keeping a life-safety service alive.
+     */
+    enum class WorkTier {
+        /** Everything, exactly as before. */
+        ALL,
+
+        /** Skip what is expensive and can wait: the cloud reasoning passes, the network anchor. */
+        ESSENTIAL,
+
+        /** Also skip the local heavy probes, and take warm caches rather than forcing fetches. */
+        MINIMAL,
+    }
+
+    /**
+     * ⚠️ **`backgroundRestricted` is honoured hardest, and it is not a performance signal.** The
+     * person has told the operating system this app may not run in the background. Spending the one
+     * tick the OS still allows on a cloud reasoning loop is the opposite of honouring that, whatever
+     * the hardware is capable of.
+     */
+    fun workTier(
+        tier: Tier,
+        pressure: Pressure,
+        backgroundRestricted: Boolean? = null,
+        deviceIdle: Boolean? = null,
+    ): WorkTier = when {
+        backgroundRestricted == true -> WorkTier.MINIMAL
+        tier == Tier.MINIMAL || pressure == Pressure.CRITICAL -> WorkTier.MINIMAL
+        tier == Tier.LEAN || pressure == Pressure.HOT || deviceIdle == true -> WorkTier.ESSENTIAL
+        else -> WorkTier.ALL
+    }
+
+    /** Why the worker trimmed a pass, for the board's ops row. Null when nothing was trimmed. */
+    fun workNotice(
+        work: WorkTier,
+        tier: Tier,
+        pressure: Pressure,
+        backgroundRestricted: Boolean? = null,
+        deviceIdle: Boolean? = null,
+    ): String? = when {
+        work == WorkTier.ALL -> null
+        backgroundRestricted == true -> "Trimmed this refresh: background activity is restricted for this app"
+        pressure == Pressure.CRITICAL -> "Trimmed this refresh: the phone is too hot"
+        pressure == Pressure.HOT -> "Trimmed this refresh: the phone is warm"
+        tier == Tier.MINIMAL || tier == Tier.LEAN -> "Trimmed this refresh: this phone has little to spare"
+        deviceIdle == true -> "Trimmed this refresh: the phone is dozing"
+        else -> "Trimmed this refresh"
+    }
 
     /**
      * The whole reading in one call. **This is the entry point every consumer should use** — it is
      * the only place that combines the three inputs, so no caller can honour two of them and forget
      * the third.
      */
-    fun budgetFor(p: Probe): Budget =
-        budgetFor(tierOf(p), pressureOf(p), animationsAllowed = p.animatorScale != 0f)
+    fun budgetFor(p: Probe): Budget {
+        val tier = tierOf(p)
+        val pressure = pressureOf(p)
+        return budgetFor(tier, pressure, animationsAllowed = p.animatorScale != 0f)
+            // Doze and a background restriction are states, not hardware, so they belong here rather
+            // than in the tier — a flagship the user has restricted must still be held back.
+            .copy(work = workTier(tier, pressure, p.backgroundRestricted, p.deviceIdle))
+    }
 
     /**
      * ⚠️ The FULL/NONE row is today's behaviour exactly: animations on, no decode cap worth the name,
@@ -242,10 +306,10 @@ object DeviceClass {
      */
     fun budgetFor(tier: Tier, pressure: Pressure, animationsAllowed: Boolean = true): Budget {
         var base = when (tier) {
-            Tier.FULL -> Budget(true, 2048, 0.06, 1.0f, 6, true)
-            Tier.MODEST -> Budget(true, 1440, 0.05, 1.5f, 4, true)
-            Tier.LEAN -> Budget(false, 1080, 0.04, 2.5f, 3, true)
-            Tier.MINIMAL -> Budget(false, 720, 0.03, 4.0f, 2, false)
+            Tier.FULL -> Budget(true, 2048, 0.06, 1.0f, 6, true, WorkTier.ALL)
+            Tier.MODEST -> Budget(true, 1440, 0.05, 1.5f, 4, true, WorkTier.ALL)
+            Tier.LEAN -> Budget(false, 1080, 0.04, 2.5f, 3, true, WorkTier.ESSENTIAL)
+            Tier.MINIMAL -> Budget(false, 720, 0.03, 4.0f, 2, false, WorkTier.MINIMAL)
         }
         // Applied to the base before pressure, so no branch below can hand animation back.
         if (!animationsAllowed) base = base.copy(decorativeAnimation = false)
@@ -257,6 +321,9 @@ object DeviceClass {
                 parallelism = maxOf(2, base.parallelism - 1),
             )
             Pressure.HOT -> base.copy(
+                // maxOf, not minOf: the HIGHER ordinal is the more restrictive tier, so `minOf`
+                // would have LOOSENED a MINIMAL device the moment it got warm.
+                work = maxOf(base.work, WorkTier.ESSENTIAL),
                 decorativeAnimation = false,
                 imageDecodePx = minOf(base.imageDecodePx, 1080),
                 imageCacheShare = minOf(base.imageCacheShare, 0.04),
@@ -267,6 +334,7 @@ object DeviceClass {
             // path and anything the user is looking at still has to run — a phone that goes silent
             // because it is warm is a worse failure than a phone that is warm.
             Pressure.CRITICAL -> base.copy(
+                work = WorkTier.MINIMAL,
                 decorativeAnimation = false,
                 imageDecodePx = minOf(base.imageDecodePx, 720),
                 imageCacheShare = minOf(base.imageCacheShare, 0.03),
@@ -304,10 +372,22 @@ object DeviceClass {
         p.backgroundRestricted?.let { if (it) known += "background restricted" }
         p.animatorScale?.let { if (it == 0f) known += "animations off system-wide" }
 
+        val b = budgetFor(p)
         return buildString {
             append(tier.name).append(" · ").append(pressure.name).append('\n')
             append(known.joinToString(", "))
             if (unknown.isNotEmpty()) append("\nNot measurable here: ").append(unknown.joinToString(", "))
+            // What the app is actually DOING differently, which is the half worth reading.
+            append("\nSo: ").append(if (b.decorativeAnimation) "animations on" else "animations off")
+            append(", images to ").append(b.imageDecodePx).append("px")
+            append(", ").append((b.imageCacheShare * 100).toInt()).append("% of heap for pictures")
+            append(", ").append(b.parallelism).append(" at a time")
+            if (b.backgroundScale != 1.0f) {
+                append(", background ").append("%.1f".format(java.util.Locale.US, b.backgroundScale))
+                    .append("x slower")
+            }
+            append(", background work ").append(b.work.name.lowercase())
+            if (!b.heavyEngines) append(", heavy engines off")
         }
     }
 }

@@ -191,6 +191,92 @@ class DeviceClassTest {
         assertTrue("intervals are stretched, not stopped", worst.backgroundScale.isFinite())
     }
 
+    // ---- how much background work this phone should be asked to do ------------------------------
+
+    @Test
+    fun `a background restriction is honoured hardest, whatever the hardware`() {
+        // The person told the OS this app may not run in the background. Spending the one tick it
+        // still gets on a cloud reasoning loop is the opposite of honouring that.
+        assertEquals(
+            DeviceClass.WorkTier.MINIMAL,
+            DeviceClass.workTier(Tier.FULL, Pressure.NONE, backgroundRestricted = true),
+        )
+        assertEquals(
+            DeviceClass.WorkTier.MINIMAL,
+            DeviceClass.budgetFor(
+                Probe(totalRamBytes = gb(16.0), memoryClassMb = 512, backgroundRestricted = true),
+            ).work,
+        )
+    }
+
+    @Test
+    fun `an unrestricted flagship does all of it`() {
+        assertEquals(DeviceClass.WorkTier.ALL, DeviceClass.workTier(Tier.FULL, Pressure.NONE))
+        assertEquals(
+            DeviceClass.WorkTier.ALL,
+            DeviceClass.workTier(Tier.FULL, Pressure.NONE, backgroundRestricted = false, deviceIdle = false),
+        )
+    }
+
+    @Test
+    fun `heat and weakness trim the discretionary work`() {
+        assertEquals(DeviceClass.WorkTier.ESSENTIAL, DeviceClass.workTier(Tier.LEAN, Pressure.NONE))
+        assertEquals(DeviceClass.WorkTier.ESSENTIAL, DeviceClass.workTier(Tier.FULL, Pressure.HOT))
+        assertEquals(DeviceClass.WorkTier.ESSENTIAL, DeviceClass.workTier(Tier.FULL, Pressure.NONE, deviceIdle = true))
+        assertEquals(DeviceClass.WorkTier.MINIMAL, DeviceClass.workTier(Tier.MINIMAL, Pressure.NONE))
+        assertEquals(DeviceClass.WorkTier.MINIMAL, DeviceClass.workTier(Tier.FULL, Pressure.CRITICAL))
+    }
+
+    @Test
+    fun `getting warm never LOOSENS a weak phone's budget`() {
+        // ⚠️ The first version used `minOf` on the enum, and because the higher ordinal is the more
+        // restrictive tier that RELAXED a MINIMAL device the moment it got warm.
+        for (tier in Tier.entries) {
+            val calm = DeviceClass.budgetFor(tier, Pressure.NONE).work
+            for (pressure in listOf(Pressure.WARM, Pressure.HOT, Pressure.CRITICAL)) {
+                assertTrue(
+                    "$tier/$pressure",
+                    DeviceClass.budgetFor(tier, pressure).work.ordinal >= calm.ordinal,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a trimmed pass always says why, and an untrimmed one says nothing`() {
+        assertEquals(null, DeviceClass.workNotice(DeviceClass.WorkTier.ALL, Tier.FULL, Pressure.NONE))
+        for (tier in Tier.entries) {
+            for (pressure in Pressure.entries) {
+                for (restricted in listOf(null, false, true)) {
+                    for (idle in listOf(null, false, true)) {
+                        val work = DeviceClass.workTier(tier, pressure, restricted, idle)
+                        val why = DeviceClass.workNotice(work, tier, pressure, restricted, idle)
+                        if (work == DeviceClass.WorkTier.ALL) {
+                            assertEquals("$tier/$pressure/$restricted/$idle", null, why)
+                        } else {
+                            // ⚠️ Not merely non-empty. The first version of this assertion checked
+                            // only that, so deleting a whole branch left the generic
+                            // "Trimmed this refresh" fallback satisfying it — the guard was asleep
+                            // because the assertion was too weak to see the damage. What matters is
+                            // that the sentence NAMES the cause.
+                            val expected = when {
+                                restricted == true -> "restricted"
+                                pressure == Pressure.CRITICAL -> "too hot"
+                                pressure == Pressure.HOT -> "warm"
+                                tier == Tier.MINIMAL || tier == Tier.LEAN -> "little to spare"
+                                else -> "dozing"
+                            }
+                            assertTrue(
+                                "$tier/$pressure/$restricted/$idle said: $why",
+                                why != null && why.contains(expected),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ---- the readout says what it could not measure ---------------------------------------------
 
     @Test
@@ -210,6 +296,13 @@ class DeviceClassTest {
             thermalStatus = 0, heapUsedFraction = 0.25f,
         )
         assertFalse(DeviceClass.describe(whole).contains("Not measurable here"))
+        // ⚠️ The Budget KDoc claims every field reaches the readout. Hold it to that.
+        val text = DeviceClass.describe(whole)
+        assertTrue("animations", text.contains("animations on"))
+        assertTrue("decode cap", text.contains("2048px"))
+        assertTrue("cache share", text.contains("6% of heap"))
+        assertTrue("parallelism", text.contains("6 at a time"))
+        assertTrue("work tier", text.contains("background work all"))
     }
 
     @Test

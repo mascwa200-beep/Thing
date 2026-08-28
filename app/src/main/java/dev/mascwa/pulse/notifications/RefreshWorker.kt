@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.DeviceClass
 import dev.mascwa.pulse.core.telemetry.QuietHours
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -31,6 +32,25 @@ class RefreshWorker(
     override suspend fun doWork(): Result {
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
+
+        // ⚠️ **How much of this pass the phone can afford.** Before this, all eighteen items ran on
+        // every tick with no battery, thermal, memory or doze check anywhere in the file — including
+        // two cloud reasoning loops, a StrongBox keypair generation and a network round-trip to a
+        // timestamping authority. A phone that is hot, restricted, dozing or simply cheap now does
+        // less, and says so.
+        //
+        // ⚠️ Read here and used ONLY below the notification gates. Everything above them — the two
+        // service self-heals, the widget refresh, the app update — is not discretionary, and a device
+        // tier placed above them would be the same mistake those comments already argue against.
+        val probe = runCatching { container.deviceProbe.probe() }.getOrNull()
+        val devTier = probe?.let { DeviceClass.tierOf(it) } ?: DeviceClass.Tier.FULL
+        val devPressure = probe?.let { DeviceClass.pressureOf(it) } ?: DeviceClass.Pressure.NONE
+        val work = DeviceClass.workTier(devTier, devPressure, probe?.backgroundRestricted, probe?.deviceIdle)
+        val fullWork = work == DeviceClass.WorkTier.ALL
+        val anyWork = work != DeviceClass.WorkTier.MINIMAL
+        // Warm caches instead of forced fetches once the phone is struggling: the board still
+        // publishes, it just stops paying for six live requests to do it.
+        val forceFetch = anyWork
 
         // Sensorium self-heal — BEFORE the notification gates (service liveness isn't a notification
         // preference). A background FGS start can be refused by the OS; then the next app-open arms
@@ -85,7 +105,11 @@ class RefreshWorker(
 
         // The board's overlay signals, gathered across the passes below and rendered by BriefEngine as the
         // single LCARS notification's ALERT row.
-        var opsNotice: String? = null
+        // Seeded from the device budget so a trimmed pass accounts for itself on the board's ALERT
+        // row. Set first on purpose: a real event below (a new build, a shipped change, a finding)
+        // is more worth saying than "this refresh was trimmed", and should overwrite it.
+        var opsNotice: String? =
+            DeviceClass.workNotice(work, devTier, devPressure, probe?.backgroundRestricted, probe?.deviceIdle)
         var securityNotice: String? = null
         var securityCritical = false
         var safetyNotice: Pair<String, String>? = null
@@ -120,7 +144,7 @@ class RefreshWorker(
 
         // --- Computer autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
         // interest or the device itself, record ONE finding via the agent's `finding` tool, then notify. ---
-        if (jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
+        if (fullWork && jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
             runCatching {
                 val now = System.currentTimeMillis()
                 run {
@@ -152,13 +176,13 @@ class RefreshWorker(
         // --- Mnemosyne reflection: synthesise recent episodic observations into higher-level REFLECTION
         // memories (cloud-gated; silent — surfaces in the Memory screen). No cooldown — `since` inside the
         // engine is a bookmark of what's already been reflected on, not a suppression timer. ---
-        if (jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
+        if (fullWork && jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
             runCatching { container.reflectionEngine.reflectIfDue() }
         }
 
         // --- Blackbox ledger: periodic RFC-3161 anchor (opt-in, throttled ~daily, best-effort) so the head
         // is independently timestamped between manual anchors. Sends only a hash to a public TSA. ---
-        if (settings.autoAnchorLedger) {
+        if (fullWork && settings.autoAnchorLedger) {
             runCatching {
                 val now = System.currentTimeMillis()
                 val head = container.auditLedgerStore.headHash()
@@ -179,7 +203,13 @@ class RefreshWorker(
         // change — bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost — is a real security
         // event; identical verdicts are deduped so the append-only log isn't spammed). Local-only probe, no
         // network — no time throttle, so a posture change is caught as soon as the next tick runs. ---
-        runCatching {
+        //
+        // ⚠️ Skipped at MINIMAL, and it is the most expensive local pass here: `DeviceAttestation.run`
+        // GENERATES A STRONGBOX EC KEYPAIR to read the attestation extension out of it, every tick.
+        // A posture change is a real security event, so this is the last of the three local passes
+        // to go — but on a phone that is too hot or has been restricted, minting a hardware key on a
+        // timer is exactly the discretionary work that should wait for the next pass.
+        if (anyWork) runCatching {
             val now = System.currentTimeMillis()
             val report = container.deviceAttestation.run()
             val v = report.verdict
@@ -208,7 +238,11 @@ class RefreshWorker(
         }
 
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
-        runCatching {
+        //
+        // ⚠️ Skipped at MINIMAL. It enumerates every installed package, which on the main thread once
+        // froze the Security Audit screen outright (see `hasUsageAccess`); it is cheap enough here
+        // because it is off the main thread, and it is still the second-heaviest local pass.
+        if (anyWork) runCatching {
             container.securityAuditStore.load()
             val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
             if (lastScan > 0) {
@@ -241,7 +275,7 @@ class RefreshWorker(
         // --- Cache warm-ups for the board's rows (fresh data; BriefEngine reads warm caches). Each is
         // gated on its row toggle so a hidden row costs no network. ---
         if (prefs.showMarketsRow) {
-            runCatching { container.marketsRepository.fetchAll(force = true) }
+            runCatching { container.marketsRepository.fetchAll(force = forceFetch) }
         }
         if (prefs.showWeatherRow) {
             runCatching { resolveWeather(settings) }
@@ -249,14 +283,14 @@ class RefreshWorker(
             // products are ~546 KB of a ~596 KB refresh and nothing in the background path reads
             // them, so fetching them every 15 minutes was ~57 MB a day for one number. The console
             // still gets the full set; a light pass carries the cached heavy values forward.
-            runCatching { container.spaceWeatherRepository.fetch(force = true, heavy = false) }
+            runCatching { container.spaceWeatherRepository.fetch(force = forceFetch, heavy = false) }
         }
 
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---
         runCatching {
             val loc = container.locationProvider.current()
             if (loc != null) {
-                val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = true).data
+                val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = forceFetch).data
                 val radiusM = settings.safetyRadiusKm * 1000.0
                 val already = state.safetyAlertedIds.toMutableSet()
                 val severe = safety.incidents.filter {
