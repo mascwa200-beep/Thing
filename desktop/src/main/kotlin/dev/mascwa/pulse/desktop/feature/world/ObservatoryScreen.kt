@@ -18,8 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.Comets
+import dev.mascwa.pulse.core.telemetry.Eclipses
+import dev.mascwa.pulse.core.telemetry.LaunchWindow
+import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.orbital.CometRepository
@@ -40,6 +42,9 @@ import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
 import dev.mascwa.pulse.desktop.theme.Pulse
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -53,6 +58,71 @@ class ObservatoryViewModel(
 ) {
     val sky = WorldFeed<OrbitalData>(scope, settings) { lat, lon, force ->
         orbital.fetch(lat, lon, force)
+    }
+
+    /** One eclipse and what this place would see of it. */
+    data class EclipseNight(
+        val eclipse: Eclipses.Eclipse,
+        val local: Eclipses.Local,
+        val advice: String,
+    )
+
+    /**
+     * Every eclipse of the next two years, and what this place would see of each.
+     *
+     * ⚠️ **No network at any point.** This is closed-form astronomy over the machine's own clock, so
+     * it is the one thing on this page that works with the cable out. It goes through [WorldFeed]
+     * rather than [OpenFeed] because unlike a comet's position, WHAT YOU SEE of an eclipse is
+     * entirely a fact about where you are standing — a total eclipse and a fifteen-per-cent bite out
+     * of the Sun are the same event, and only the coordinate tells them apart.
+     *
+     * ⚠️ Two years, not three, and that is a measured trade rather than a round number: the phone's
+     * copy of this timed the search at 26/51/74 ms for one, two and three years, returning 4/9/13
+     * eclipses. Two years buys a list worth reading for two thirds of the cost of three.
+     *
+     * ⚠️ [Dispatchers.Default] explicitly, even though the scope this is given already runs there.
+     * A guarantee that depends on a declaration in another file is a guarantee somebody can move
+     * without noticing — and what moves it is a several-hundred-millisecond freeze of the window.
+     */
+    val eclipses = WorldFeed<List<EclipseNight>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            Eclipses.upcoming(now, now + ECLIPSE_HORIZON_MS).map { e ->
+                val local = Eclipses.local(e, lat, lon)
+                EclipseNight(e, local, Eclipses.advice(e, local))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /** A shower's next maximum, and whether anything can be seen of it from here right now. */
+    data class ShowerNight(
+        val occurrence: MeteorShowers.Occurrence,
+        val viewing: MeteorShowers.Viewing,
+        val advice: String,
+    )
+
+    /**
+     * The meteor showers due, and what the sky here is doing about them.
+     *
+     * ⚠️ **This one goes stale in a way nothing else on the page does, and the screen refreshes it
+     * for that reason.** The peak dates are stable over months; whether the radiant is above the
+     * horizon and whether the sky is dark enough are true only for the minute they were computed.
+     * A console left on this page overnight would otherwise still be reading "too bright, come back
+     * once the Sun is well down" at two in the morning — advice that was correct when the window
+     * opened and is now the exact opposite of the truth.
+     *
+     * Also entirely offline: the shower table is compiled in.
+     */
+    val showers = WorldFeed<List<ShowerNight>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            MeteorShowers.upcoming(now).map { occurrence ->
+                val viewing = MeteorShowers.viewing(occurrence.shower, lat, lon, now)
+                ShowerNight(occurrence, viewing, MeteorShowers.advice(occurrence, viewing))
+            }
+        }
+        Fetched(data = list, fromCache = false)
     }
 
     /**
@@ -88,6 +158,9 @@ class ObservatoryViewModel(
     private companion object {
         /** Enough to be worth reading; [Comets.visible] has already dropped what cannot be seen. */
         const val COMET_LIMIT = 10
+
+        /** See [eclipses] — measured, not rounded. */
+        const val ECLIPSE_HORIZON_MS = 2L * 365L * 86_400_000L
     }
 }
 
@@ -101,12 +174,32 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
     val located by vm.sky.located.collectAsState()
     val launches: Async<List<UpcomingLaunch>> by vm.launches.state.collectAsState()
     val comets: Async<List<Comets.Sighting>> by vm.comets.state.collectAsState()
+    val eclipses: Async<List<ObservatoryViewModel.EclipseNight>> by vm.eclipses.state.collectAsState()
+    val eclipsesLocated by vm.eclipses.located.collectAsState()
+    val showers: Async<List<ObservatoryViewModel.ShowerNight>> by vm.showers.state.collectAsState()
+    val showersLocated by vm.showers.located.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
         vm.sky.ensureLoaded()
         vm.launches.ensureLoaded()
         vm.comets.ensureLoaded()
+        vm.eclipses.ensureLoaded()
+    }
+
+    // ⚠️ **The one thing on this page with a timer, and only while the page is open.** Whether a
+    // radiant is above the horizon and whether the sky is dark are true for a moment, not for a
+    // session; everything else here is stable over hours. So this recomputes, and a console sitting
+    // on any other screen runs no timer whatsoever — the same shape the news feed settled on, and
+    // the reason it is a loop here rather than a background job.
+    //
+    // Five minutes moves a radiant about a degree and a quarter, which is far finer than the several
+    // degrees of scatter in where the meteors themselves appear.
+    LaunchedEffect(Unit) {
+        while (true) {
+            vm.showers.refresh()
+            delay(SHOWER_REFRESH_MS)
+        }
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
@@ -261,6 +354,37 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        // Eclipses and showers keep their own panels rather than joining the one above: they are
+        // computed here rather than fetched, so their loading and their emptiness are separate facts
+        // from the orbital feed's, and folding them in would make one failure look like three.
+        Column(Modifier.padding(top = 16.dp)) {
+        WorldPanel(
+            title = "Eclipses",
+            feed = vm.eclipses,
+            state = eclipses,
+            located = eclipsesLocated,
+            trailing = "NEXT TWO YEARS",
+            emptyMessage = "No eclipse falls in the next two years, which would be unusual — if this " +
+                "says so, something is wrong rather than quiet.",
+            isEmpty = { it.isEmpty() },
+        ) { list ->
+            list.take(6).forEach { EclipseRow(it) }
+        }
+        }
+
+        Column(Modifier.padding(top = 16.dp)) {
+            WorldPanel(
+                title = "Meteor showers",
+                feed = vm.showers,
+                state = showers,
+                located = showersLocated,
+                emptyMessage = "No shower is due in the next six weeks.",
+                isEmpty = { it.isEmpty() },
+            ) { list ->
+                list.take(4).forEach { ShowerRow(it) }
+            }
+        }
+
         // Comets and launches both sit outside the coordinate-bound panel above, with their own
         // state, because neither depends on where this machine is.
         LcarsHeaderBar("Comets worth a look", Modifier.padding(top = 16.dp))
@@ -304,6 +428,110 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
             modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
         )
+    }
+}
+
+/**
+ * One eclipse, and what this place gets of it.
+ *
+ * ⚠️ The colour says whether it is worth standing outside for, and an eclipse that misses this
+ * place entirely is drawn in the muted tone rather than left off the list. "Nothing happens here"
+ * is the commonest answer by a wide margin, and a page that silently omits those reads as though
+ * eclipses were rare.
+ */
+@Composable
+private fun EclipseRow(night: ObservatoryViewModel.EclipseNight) {
+    val c = Pulse.colors
+    val e = night.eclipse
+    val local = night.local
+    val accent = when {
+        !local.visible -> c.muted
+        local.totalHere || e.kind == Eclipses.Kind.TOTAL_LUNAR -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                Eclipses.describe(e),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                stamp(if (local.visible) local.bestEpochMs else e.greatestEpochMs),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                night.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            if (local.visible) {
+                Text(
+                    listOfNotNull(
+                        // ⚠️ Two different measures, and the labels have to keep them apart. The
+                        // magnitude is the fraction of the DIAMETER covered; the obscuration is the
+                        // fraction of AREA, which is the number people mean by "an 80% eclipse" and
+                        // is always the smaller of the two.
+                        "${(local.magnitude * 100).toInt()}% of its width covered",
+                        if (e.isSolar) "${(local.obscuration * 100).toInt()}% of the Sun's area" else null,
+                        "${local.altitudeDeg.toInt()}° above the horizon",
+                    ).joinToString(" · "),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+        }
+    }
+}
+
+/** One meteor shower: when it peaks, and whether there is any point looking up now. */
+@Composable
+private fun ShowerRow(night: ObservatoryViewModel.ShowerNight) {
+    val c = Pulse.colors
+    val s = night.occurrence.shower
+    val v = night.viewing
+    // ⚠️ Hoisted, because `perHour` is a public property of another module and Kotlin will not
+    // smart-cast one — the trap this project has now hit four times, and the first time a local
+    // build caught it before CI did.
+    val perHour = v.perHour
+    // Amber for something happening tonight that can actually be seen; otherwise the ordinary tone.
+    val accent = if (night.occurrence.active && perHour != null && perHour > 0) c.amber else c.accent
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                s.name,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                "Peaks ${stamp(night.occurrence.peakEpochMs)}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                night.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                listOfNotNull(
+                    // ⚠️ A rate of null and a rate of zero are different answers — the core keeps
+                    // them apart deliberately, and so does this line. "Nothing is falling" and "you
+                    // cannot see it from here at this hour" send a reader to different places.
+                    perHour?.let { "about $it an hour from here" },
+                    "${s.zhr} an hour under a perfect sky",
+                    "${s.pace} meteors, from ${s.parent}",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            if (s.caveat.isNotEmpty()) {
+                Text(
+                    s.caveat,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.amber,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
 }
 
@@ -411,6 +639,9 @@ private fun compass(deg: Double): String {
     val points = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
     return points[(((deg % 360.0) + 360.0) % 360.0 / 45.0).toInt() % 8]
 }
+
+/** See the loop in [ObservatoryScreen] — five minutes, for a reason stated there. */
+private const val SHOWER_REFRESH_MS = 5L * 60_000L
 
 /** Square, because a polar plot that is not square is an ellipse and lies about the sky. */
 private val SKY_PLOT = 168.dp
