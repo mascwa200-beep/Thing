@@ -23,6 +23,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Reads a [DeviceContext] from system services.
@@ -212,8 +213,19 @@ class DeviceContextProvider(context: Context) {
             return listOf(maker, model).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "this device" }
         }
 
+    /**
+     * ⚠️ **[Locale.US], because this is a number rather than prose.** The default locale renders
+     * "5,7 GB" on most of Europe, and every consumer of this reads it as data: the `device` tool
+     * hands it to the model, the dossier puts it on a screen, and the persona carries it as
+     * context. A comma decimal there is at best confusing and at worst parsed as a thousands
+     * separator by whatever reads it next.
+     *
+     * Not promoted to `Formatters` alongside `megabytes`, deliberately: this is its only caller, and
+     * the unit is a judgement about what this particular readout is describing — RAM and storage in
+     * the gigabyte range, where `megabytes` would render "7629.4 MB" and be worse.
+     */
     private fun gb(bytes: Long): String =
-        if (bytes <= 0) "?" else String.format("%.1f GB", bytes / 1_073_741_824.0)
+        if (bytes <= 0) "?" else String.format(Locale.US, "%.1f GB", bytes / 1_073_741_824.0)
 
     /** Emits the current context immediately, then on every power / connectivity change. */
     val updates: Flow<DeviceContext> = callbackFlow {

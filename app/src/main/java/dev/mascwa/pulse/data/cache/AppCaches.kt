@@ -26,6 +26,20 @@ import java.io.File
  * models, photographs and harvested media live in `filesDir` too and are none of this feature's
  * business.
  *
+ * ⚠️ **That choice has a cost, and this file used to state only the benefit.** Android's own
+ * Settings ▸ Apps ▸ Storage ▸ Clear cache empties `cacheDir` and cannot reach `filesDir` — so
+ * putting the feed store there takes it out of reach of the one control every user already knows,
+ * which is precisely why THIS class had to exist. The trade is worth making here, where the store
+ * holds the offline copy of news, weather, markets and every other screen; it is not obviously
+ * worth making everywhere.
+ *
+ * ⚠️ **So the standalone nutrition app roots the same `DiskCache` at `cacheDir`, and that is right
+ * rather than an oversight to converge.** What it caches is Open Food Facts lookups sitting on top
+ * of a 4.4-million-row bundled database, so losing them costs a refetch of a handful of products
+ * rather than the world; it ships no cache screen; and leaving them in `cacheDir` means the
+ * platform's button works. Do not "fix" one app to match the other — the correct root depends on
+ * what the cache is for and whether the app offers a control of its own.
+ *
  * ⚠️ Reporting and clearing are deliberately asymmetric, and the asymmetry is the interesting part:
  *
  * - **[bytes] reads the filesystem.** Safe from anywhere and needs no instances, so the figure is
