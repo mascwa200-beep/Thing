@@ -14,10 +14,17 @@ import kotlin.math.abs
  * planetary data professional astronomy uses — at four sites spanning the equator, both
  * hemispheres and the near-Arctic, at four instants across the year.
  *
- * Measured agreement: **Sun within 0.007 deg, Moon within 0.05 deg, sunrise/sunset within two
+ * Measured agreement: **Sun within 0.008 deg, Moon within 0.021 deg, sunrise/sunset within two
  * seconds, illuminated fraction within 0.0001.** For scale, the code this replaces claimed about
  * a degree for the Sun and "a couple of degrees" for the Moon, and could not produce an altitude
  * or a rise time at all.
+ *
+ * ⚠️ **The Moon figure was 0.05 deg and is now 0.021, and the tolerances below were tightened to
+ * match rather than left loose.** A tolerance far above what the code achieves is not a guard: it
+ * would let the Moon drift back by a factor of two without a single test going red. GEOCENTRICALLY
+ * the improvement is larger still — 167 arcsec to 14 — and it is the parallax approximation in
+ * [Ephemeris.moonPosition], which corrects altitude and leaves azimuth alone, that now sets the
+ * topocentric floor. That is the next thing to fix if anyone wants better.
  *
  * Distances are compared **geocentric to geocentric**. Skyfield's `altaz()` distance is
  * topocentric — measured from the observer, not the Earth's centre — and the two differ by up to
@@ -91,8 +98,9 @@ class EphemerisTest {
             val p = Ephemeris.moonPosition(r.lat, r.lon, r.ms)
             worst = maxOf(worst, abs(p.altitudeDeg - r.moonAlt), angleDiff(p.azimuthDeg, r.moonAz))
         }
-        // The Moon is the harder body — a truncated series, plus the observer-offset correction.
-        assertTrue("worst Moon error was $worst deg", worst < 0.1)
+        // ⚠️ 0.021 measured, so the bar sits just above it. It was 0.1 against a code that
+        // achieved 0.046 — twice the slack it needed, which is how a regression hides.
+        assertTrue("worst Moon error was $worst deg", worst < 0.03)
     }
 
     @Test fun moonDistanceIsGeocentricAndAccurateToAboutFiftyKilometres() {
@@ -101,7 +109,8 @@ class EphemerisTest {
             val d = Ephemeris.moonEquatorial(r.ms).distanceKm
             worst = maxOf(worst, abs(d - r.moonDistKm))
         }
-        assertTrue("worst Moon distance error was $worst km", worst < 200.0)
+        // 25 km measured, down from 45 before the full table landed.
+        assertTrue("worst Moon distance error was $worst km", worst < 50.0)
         // And it stays inside the real perigee-apogee envelope.
         for (r in positions) {
             val d = Ephemeris.moonEquatorial(r.ms).distanceKm
@@ -122,6 +131,68 @@ class EphemerisTest {
             )
         }
         assertTrue("worst rise/set error was $worst s", worst < 60)
+    }
+
+    /**
+     * The Moon where it really is, before any observer is involved.
+     *
+     * ⚠️ **This is the test that would have caught the timescale bug, and none existed.** Every
+     * other Moon check here is topocentric, where the parallax approximation adds its own error and
+     * masks the underlying one. Geocentrically there is nowhere for a fault to hide: these are
+     * Skyfield/DE421 apparent positions for the equinox of date, and the shipped series was out by
+     * up to 167 arcseconds against them — nearly a tenth of the Moon's diameter, five minutes of
+     * its motion — because Meeus's tables were truncated at 25 of 60 terms AND were being handed
+     * UTC where they want Terrestrial Time.
+     */
+    @Test fun geocentricMoonMatchesJplToBetterThanAHundredthOfADegree() {
+        // (epochMs, apparent RA, apparent Dec) from Skyfield reading DE421.
+        val refs = listOf(
+            Triple(1767225600000L, 63.9203, 26.4037),    // 2026-01-01 00:00 UTC
+            Triple(1782777600000L, 279.2909, -27.2263),  // 2026-06-30 00:00 UTC
+            Triple(1798329600000L, 139.1957, 16.2721),   // 2026-12-27 00:00 UTC
+            Triple(1755000000000L, 0.3353, 1.3668),      // 2025-08-12 12:00 UTC
+        )
+        var worst = 0.0
+        for ((ms, ra, dec) in refs) {
+            val m = Ephemeris.moonEquatorial(ms)
+            worst = maxOf(worst, Ephemeris.angularSeparationDeg(m.rightAscensionDeg, m.declinationDeg, ra, dec))
+        }
+        // 0.0038 deg measured (13.8 arcsec), which is what the full table is supposed to give.
+        assertTrue("worst geocentric Moon error was $worst deg", worst < 0.008)
+    }
+
+    /**
+     * ⚠️ **Sidereal time must stay on UT, and this is the guard that says so.**
+     *
+     * The fix above moved three theory call sites onto Terrestrial Time. [Ephemeris.gmstDeg]
+     * deliberately did NOT move: it answers how far the Earth has turned, which is a question about
+     * the rotating Earth and not about dynamics. Feeding it TT would shift every hour angle by 69
+     * seconds of rotation — about 0.29 degrees, or a thousand arcseconds, which is twenty times
+     * worse than the bug being fixed and would show up as everything in the sky being in the wrong
+     * place rather than the Moon being slightly off.
+     */
+    @Test fun siderealTimeStaysOnUniversalTimeAndIsNotOffsetByDeltaT() {
+        // Greenwich mean sidereal time in degrees, from Skyfield.
+        val refs = listOf(
+            1767225600000L to 100.6612,
+            1782777600000L to 278.0776,
+        )
+        for ((ms, expected) in refs) {
+            val got = Ephemeris.gmstDeg(Ephemeris.julianDate(ms))
+            assertEquals("GMST at $ms", expected, got, 0.01)
+        }
+        // And the TT date is genuinely ahead, by exactly the constant and no more.
+        //
+        // ⚠️ The tolerance is a millisecond, not a microsecond, and that is a fact about Double
+        // rather than about the code. A Julian date is around 2.46 million, where one unit in the
+        // last place is 4.7e-10 days — about fourteen microseconds. A tighter bar than that asks
+        // the representation for digits it does not have; my first attempt used 1e-6 s and failed
+        // on 69.18401420116425, which is the correct answer rendered as closely as a Double can.
+        // A millisecond of clock is 0.0006 arcseconds of Moon, so this is still far below anything
+        // that could matter.
+        val ms = 1767225600000L
+        val gap = (Ephemeris.julianDateTT(ms) - Ephemeris.julianDate(ms)) * 86_400.0
+        assertEquals(Ephemeris.DELTA_T_SECONDS, gap, 1e-3)
     }
 
     @Test fun illuminatedFractionMatchesJpl() {
