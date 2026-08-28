@@ -44,8 +44,18 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         NotificationChannels.ensure(this)
         // What this phone can afford, decided once. The probe is cheap and the answer is a property
         // of the hardware, so there is nothing to keep in sync afterwards.
+        // ⚠️ `decorativeAnimation`, and I got this wrong once by writing the name from memory —
+        // `animations` does not exist, and that one unresolved reference kept four commits from
+        // compiling. Read the declaration.
+        //
+        // ⚠️ It is also a slightly WIDER reading than the field's own KDoc, which says "purely
+        // decorative infinite animations". A route transition is finite and cheap per navigation —
+        // but it holds two screens composed while it runs, which on the tier this gates is the part
+        // that costs. There is no narrower field and inventing one for a single consumer would be
+        // worse; saying so here beats letting the next reader assume the field means only glows.
         runCatching {
-            dev.mascwa.pulse.ui.LcarsTransitions.animate = container.deviceProbe.budget().animations
+            dev.mascwa.pulse.ui.LcarsTransitions.animate =
+                container.deviceProbe.budget().decorativeAnimation
         }
         // Give back the disk the last self-update borrowed. ⚠️ Here rather than after the install,
         // because `PackageInstaller.commit()` usually kills this process on a successful update, so
