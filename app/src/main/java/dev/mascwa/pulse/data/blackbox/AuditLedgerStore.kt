@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -147,7 +148,7 @@ class AuditLedgerStore(
         }
 
     private suspend fun ensureLoaded(): HashChain = mutex.withLock {
-        chain ?: run {
+        chain ?: withContext(Dispatchers.IO) {
             val raw = context.blackboxDataStore.data.first()[prefsKey]
             val loaded = if (raw == null) {
                 HashChain() // no prior ledger — start fresh
@@ -352,12 +353,12 @@ class AuditLedgerStore(
      */
     private suspend fun recoverIfPossible(): Boolean = mutex.withLock {
         if (!corrupt) return@withLock true
-        val raw = context.blackboxDataStore.data.first()[prefsKey] ?: run {
+        val raw = withContext(Dispatchers.IO) { context.blackboxDataStore.data.first()[prefsKey] } ?: run {
             // The blob is gone (cleared elsewhere): there is nothing left to protect.
             corrupt = false
             return@withLock true
         }
-        val parsed = decode(raw) ?: return@withLock false
+        val parsed = withContext(Dispatchers.IO) { decode(raw) } ?: return@withLock false
         val pending = chain?.entries().orEmpty()
         val recovered = adopt(parsed)
         for (e in pending) recovered.append(e.timeMs, e.type, e.label, e.detail)
@@ -378,7 +379,9 @@ class AuditLedgerStore(
             }
         } ?: return
         val head = snap.head
-        val sig = signer?.sign(LedgerSignature.headBytes(head))
+        // ⚠️ On IO because it is a secure-element round trip, which is what the comment above the
+        // snapshot already says about it — it was simply never on a thread that suited it.
+        val sig = withContext(Dispatchers.IO) { signer?.sign(LedgerSignature.headBytes(head)) }
         val spki = sig?.let { signer?.publicKeySpki() } // only emit a key when we actually produced a signature
         val snapshot = Stored(
             entries = snap.entries,
@@ -388,14 +391,16 @@ class AuditLedgerStore(
             anchorGenTimeMs = snap.anchorGenTimeMs,
             anchorHeadHash = snap.anchorHeadHash,
         )
-        lastWrite = runCatching {
-            val plain = json.encodeToString(Stored.serializer(), snapshot)
-            val blob = SecretCrypto.encrypt(plain) ?: plain // plaintext fallback if no secure element
-            context.blackboxDataStore.edit { it[prefsKey] = blob }
-            // Track what's now sealed on disk so headSignatureValid() reflects the latest flush this session.
-            loadedHeadHash = head
-            loadedHeadSig = sig
-            loadedSpki = spki
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                val plain = json.encodeToString(Stored.serializer(), snapshot)
+                val blob = SecretCrypto.encrypt(plain) ?: plain // plaintext fallback if no secure element
+                context.blackboxDataStore.edit { it[prefsKey] = blob }
+                // Track what's now sealed on disk so headSignatureValid() reflects the latest flush this session.
+                loadedHeadHash = head
+                loadedHeadSig = sig
+                loadedSpki = spki
+            }
         }
     }
 

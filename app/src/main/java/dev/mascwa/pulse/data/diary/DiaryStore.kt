@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -58,7 +59,7 @@ class DiaryStore(
     val entriesFlow: StateFlow<List<DiaryEntry>> = _entriesFlow.asStateFlow()
 
     private suspend fun ensureLoaded(): List<DiaryEntry> = mutex.withLock {
-        entries ?: run {
+        entries ?: withContext(Dispatchers.IO) {
             val raw = context.diaryDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -172,8 +173,10 @@ class DiaryStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { entries?.let { Stored(it) } } ?: return
-        lastWrite = runCatching {
-            context.diaryDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.diaryDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

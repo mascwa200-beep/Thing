@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -67,7 +68,7 @@ class TrackStore(
     val recording: StateFlow<Boolean> = _recording.asStateFlow()
 
     private suspend fun ensureLoaded(): List<TrackLog.TrackPoint> = mutex.withLock {
-        points ?: run {
+        points ?: withContext(Dispatchers.IO) {
             val prefs = context.trackDataStore.data.first()
             val loaded = prefs[pointsKey]
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -166,13 +167,19 @@ class TrackStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { points } ?: return
-        val blob = runCatching {
-            json.encodeToString(
-                Stored.serializer(),
-                Stored(snapshot.map { StoredPoint(it.latitudeDeg, it.longitudeDeg, it.epochMs, it.altitudeM) }),
-            )
-        }.getOrNull() ?: return
-        lastWrite = runCatching { context.trackDataStore.edit { it[pointsKey] = blob } }
+        // ⚠️ Both halves on IO, and the FIRST one is the reason: a track is thousands of points, so
+        // encoding it is the expensive part and it sits outside the write.
+        val blob = withContext(Dispatchers.IO) {
+            runCatching {
+                json.encodeToString(
+                    Stored.serializer(),
+                    Stored(snapshot.map { StoredPoint(it.latitudeDeg, it.longitudeDeg, it.epochMs, it.altitudeM) }),
+                )
+            }.getOrNull()
+        } ?: return
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching { context.trackDataStore.edit { it[pointsKey] = blob } }
+        }
     }
 
     private companion object {

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -66,7 +67,7 @@ class FindingStore(
     val findingsFlow: StateFlow<List<Finding>> = _flow.asStateFlow()
 
     private suspend fun ensureLoaded(): List<Finding> = mutex.withLock {
-        findings ?: run {
+        findings ?: withContext(Dispatchers.IO) {
             val raw = context.findingsDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -175,8 +176,10 @@ class FindingStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { findings?.let { Stored(it) } } ?: return
-        lastWrite = runCatching {
-            context.findingsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.findingsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

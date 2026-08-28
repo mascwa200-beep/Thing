@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -78,7 +79,7 @@ class MemoryStreamStore(
     )
 
     private suspend fun ensureLoaded(): List<Memory> = mutex.withLock {
-        memories ?: run {
+        memories ?: withContext(Dispatchers.IO) {
             val raw = context.memoryDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -226,8 +227,10 @@ class MemoryStreamStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { memories?.let { list -> Stored(list.map { it.stored() }) } } ?: return
-        lastWrite = runCatching {
-            context.memoryDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.memoryDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

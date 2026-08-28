@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.Calendar
@@ -73,7 +74,7 @@ class UsageRepository(
     private var flushJob: Job? = null
 
     private suspend fun ensureLoaded(): MutableMap<String, Feature> = mutex.withLock {
-        cache ?: run {
+        cache ?: withContext(Dispatchers.IO) {
             val raw = context.usageDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it).features }.getOrNull() }
@@ -106,7 +107,7 @@ class UsageRepository(
     }
 
     private suspend fun ensureLogLoaded(): ArrayDeque<LogEntry> = mutex.withLock {
-        logCache ?: run {
+        logCache ?: withContext(Dispatchers.IO) {
             val raw = context.usageDataStore.data.first()[logKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(StoredLog.serializer(), it).entries }.getOrNull() }
@@ -199,10 +200,12 @@ class UsageRepository(
         val aggregate = mutex.withLock { cache?.let { Stored(HashMap(it)) } }
         val log = mutex.withLock { logCache?.let { StoredLog(it.toList()) } }
         if (aggregate == null && log == null) return
-        lastWrite = runCatching {
-            context.usageDataStore.edit { prefs ->
-                if (aggregate != null) prefs[prefsKey] = json.encodeToString(Stored.serializer(), aggregate)
-                if (log != null) prefs[logKey] = json.encodeToString(StoredLog.serializer(), log)
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.usageDataStore.edit { prefs ->
+                    if (aggregate != null) prefs[prefsKey] = json.encodeToString(Stored.serializer(), aggregate)
+                    if (log != null) prefs[logKey] = json.encodeToString(StoredLog.serializer(), log)
+                }
             }
         }
     }

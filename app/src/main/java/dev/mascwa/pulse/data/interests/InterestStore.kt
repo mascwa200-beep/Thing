@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -59,7 +60,7 @@ class InterestStore(
     val interestsFlow: StateFlow<List<Interest>> = _flow.asStateFlow()
 
     private suspend fun ensureLoaded(): List<Interest> = mutex.withLock {
-        interests ?: run {
+        interests ?: withContext(Dispatchers.IO) {
             val raw = context.interestsDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -167,8 +168,10 @@ class InterestStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { interests?.let { Stored(it) } } ?: return
-        lastWrite = runCatching {
-            context.interestsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.interestsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

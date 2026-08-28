@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -172,7 +173,7 @@ class StudyStore(
     private suspend fun ensureLoaded(): Stored = mutex.withLock { loadLocked() }
 
     /** Caller must hold [mutex]. */
-    private suspend fun loadLocked(): Stored = state ?: run {
+    private suspend fun loadLocked(): Stored = state ?: withContext(Dispatchers.IO) {
         val raw = context.studyDataStore.data.first()[prefsKey]
         val loaded = raw
             ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -804,8 +805,10 @@ class StudyStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { state } ?: return
-        lastWrite = runCatching {
-            context.studyDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.studyDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

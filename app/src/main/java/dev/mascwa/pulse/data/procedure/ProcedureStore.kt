@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -69,7 +70,7 @@ class ProcedureStore(
         StoredProcedure(name, cueKeywords, steps, timesApplied, timesSucceeded, createdMs, lastUsedMs)
 
     private suspend fun ensureLoaded(): List<Procedure> = mutex.withLock {
-        procedures ?: run {
+        procedures ?: withContext(Dispatchers.IO) {
             val raw = context.procedureDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -163,8 +164,10 @@ class ProcedureStore(
         val snapshot = mutex.withLock {
             procedures?.let { ps -> Stored(ps.map { it.stored() }) }
         } ?: return
-        lastWrite = runCatching {
-            context.procedureDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.procedureDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

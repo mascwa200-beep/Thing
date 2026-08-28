@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -62,7 +63,7 @@ class CerebellumStore(
     private var flushJob: Job? = null
 
     private suspend fun ensureLoaded(): CerebellumState = mutex.withLock {
-        state ?: run {
+        state ?: withContext(Dispatchers.IO) {
             val raw = context.cerebellumDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -162,8 +163,10 @@ class CerebellumStore(
         val snapshot = mutex.withLock {
             state?.let { st -> Stored(st.skills.map { StoredSkill(it.cue, it.action, it.attempts, it.successes, it.reliability, it.lastEpochMs) }) }
         } ?: return
-        lastWrite = runCatching {
-            context.cerebellumDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.cerebellumDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

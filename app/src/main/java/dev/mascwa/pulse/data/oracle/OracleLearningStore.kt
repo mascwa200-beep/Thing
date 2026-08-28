@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -69,7 +70,7 @@ class OracleLearningStore(
     private var flushJob: Job? = null
 
     private suspend fun ensureLoaded(): OracleMemory.Learning = mutex.withLock {
-        state ?: run {
+        state ?: withContext(Dispatchers.IO) {
             val raw = context.oracleDataStore.data.first()[prefsKey]
             val stored = raw?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
             pending = stored?.pending.orEmpty()
@@ -182,9 +183,11 @@ class OracleLearningStore(
                 pendingAtMs = pendingAtMs,
             )
         } ?: return
-        lastWrite = runCatching {
-            val encoded = json.encodeToString(Stored.serializer(), snapshot)
-            context.oracleDataStore.edit { it[prefsKey] = encoded }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                val encoded = json.encodeToString(Stored.serializer(), snapshot)
+                context.oracleDataStore.edit { it[prefsKey] = encoded }
+            }
         }
     }
 
