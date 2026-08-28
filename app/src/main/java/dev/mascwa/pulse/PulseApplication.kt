@@ -53,9 +53,15 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         // but it holds two screens composed while it runs, which on the tier this gates is the part
         // that costs. There is no narrower field and inventing one for a single consumer would be
         // worse; saying so here beats letting the next reader assume the field means only glows.
+        //
+        // ⚠️ `durableBudget()`, not the live one, and that distinction is the whole reason it
+        // exists. This is set ONCE for the process, so folding in a momentary thermal reading means
+        // a phone that merely happened to be warm at launch has its animations off all day, long
+        // after it cooled — while a phone that goes hot later is not covered either way. Hardware
+        // alone is the right input for anything decided once and then kept.
         runCatching {
             dev.mascwa.pulse.ui.LcarsTransitions.animate =
-                container.deviceProbe.budget().decorativeAnimation
+                container.deviceProbe.durableBudget().decorativeAnimation
         }
         // Give back the disk the last self-update borrowed. ⚠️ Here rather than after the install,
         // because `PackageInstaller.commit()` usually kills this process on a successful update, so
@@ -96,23 +102,35 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
     override fun newImageLoader(): ImageLoader = container.imageLoader
 
     /**
-     * React to OS memory pressure so the process is trimmed instead of silently killed. We drop the
-     * in-memory image cache always, and the disk caches when backgrounded. We deliberately do NOT
-     * unload the on-device LLM here: it lives in a separate, OS-reclaimable process, and tearing it
-     * down mid-conversation is exactly what caused "inference fault: process lost". If the OS reclaims
-     * that process, the next message reloads it via ensureReady().
+     * React to OS memory pressure so the process is trimmed instead of silently killed.
+     *
+     * ⚠️ **The in-memory image cache and nothing else — this used to wipe the FEED DISK CACHE too,
+     * and that was a defect in the direction this app can least afford.** `diskCache` is the small
+     * JSON store every screen falls back to when the network is gone: it is what makes the offline
+     * takeover, the "last received" banner and the whole freshness vocabulary mean anything. It is a
+     * few megabytes of DISK, and deleting disk cannot relieve a shortage of RAM — so the trade was
+     * to spend the expensive resources (network, battery, time, and on a metered connection money)
+     * to free the cheap one, in response to a signal about a third resource entirely.
+     *
+     * ⚠️ And the guard read as though it only fired in an emergency, which on a modern platform it
+     * does not. Of the seven levels, `TRIM_MEMORY_RUNNING_*`, `MODERATE` and `COMPLETE` are all
+     * deprecated as of API 34 — checked against the real android.jar, not recalled — leaving
+     * `UI_HIDDEN` (20) and `BACKGROUND` (40) as the only two that arrive. So `>= BACKGROUND` meant
+     * "every time the app is backgrounded", and the app was throwing away its offline copy of the
+     * world each time somebody pressed home.
+     *
+     * We deliberately do NOT unload the on-device LLM here either: it lives in a separate,
+     * OS-reclaimable process, and tearing it down mid-conversation is exactly what caused
+     * "inference fault: process lost". If the OS reclaims that process, the next message reloads it
+     * via ensureReady().
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         runCatching { container.imageLoader.memoryCache?.clear() }
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
-            appScope.launch { runCatching { container.diskCache.clear() } }
-        }
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
         runCatching { container.imageLoader.memoryCache?.clear() }
-        appScope.launch { runCatching { container.diskCache.clear() } }
     }
 }

@@ -146,7 +146,14 @@ class DeviceProbeReader(context: Context) {
     /** Which class of phone this is. See [durableBudget], its only caller — and [budget] otherwise. */
     fun tier(): DeviceClass.Tier = DeviceClass.tierOf(probe())
 
-    /** What the rest of the app may spend. The single entry point — see [DeviceClass.budgetFor]. */
+    /**
+     * The live budget, pressure included, with no caching at all — see [DeviceClass.budgetFor].
+     *
+     * ⚠️ **Not the entry point, which its own comment used to claim.** [budgetCached] is what a hot
+     * path should read and [durableBudget] what a once-per-process structure should; this is the
+     * uncached core both are built on. The one caller outside this class was setting a value kept
+     * for the life of the process, which is precisely the case [durableBudget] exists for.
+     */
     fun budget(): DeviceClass.Budget = DeviceClass.budgetFor(probe())
 
     /**
