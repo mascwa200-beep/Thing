@@ -4,9 +4,6 @@ import dev.mascwa.pulse.core.telemetry.NewsSummary
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 /** One normalized feed entry, source-agnostic across RSS 2.0 and Atom. */
 data class RssItem(
@@ -143,29 +140,13 @@ object RssParser {
         return sb.toString()
     }
 
-    private val DATE_PATTERNS = listOf(
-        "EEE, dd MMM yyyy HH:mm:ss zzz",
-        "EEE, dd MMM yyyy HH:mm:ss Z",
-        "EEE, dd MMM yyyy HH:mm zzz",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        "yyyy-MM-dd'T'HH:mm:ss'Z'",
-        "yyyy-MM-dd'T'HH:mm:ssZ",
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        "yyyy-MM-dd",
-    )
-
-    private fun parseDate(raw: String): Long {
-        val s = raw.trim()
-        if (s.isEmpty()) return 0L
-        for (p in DATE_PATTERNS) {
-            try {
-                val fmt = SimpleDateFormat(p, Locale.ENGLISH)
-                if (p.endsWith("'Z'") || p == "yyyy-MM-dd") fmt.timeZone = TimeZone.getTimeZone("UTC")
-                return fmt.parse(s)?.time ?: continue
-            } catch (_: Exception) { /* try next */ }
-        }
-        return 0L
-    }
+    /**
+     * ⚠️ [FeedDate] rather than a pattern list here — it is the same package, a module down, and the
+     * desktop parser and `NewsRepository` now read through it too. Three copies of this had drifted;
+     * the one it replaced read six fractional digits as whole milliseconds, stamping a story two
+     * minutes into its own future, and built up to eight `SimpleDateFormat`s per item to do it.
+     */
+    private fun parseDate(raw: String): Long = FeedDate.parse(raw)
 
     private fun looksLikeImage(url: String): Boolean {
         val u = url.lowercase()
