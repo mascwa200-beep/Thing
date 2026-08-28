@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.interrogator
 
 import android.content.Context
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.model.ModelFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

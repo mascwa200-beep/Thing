@@ -17,6 +17,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifier
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.data.model.ModelFile
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.Executors
@@ -134,6 +135,18 @@ class AmbientCameraSampler(
     suspend fun close() = mutex.withLock {
         runCatching { classifier?.close() }
         classifier = null
+    }
+
+    /** How much of the disk this model is holding — see [ModelFile], including a half-fetched one. */
+    fun bytesOnDisk(): Long = ModelFile.bytes(context, MODEL_FILE)
+
+    /**
+     * Give the storage back. Closes the classifier first and re-opens lazily — see
+     * [AmbientAudioSampler.discardModel], which this mirrors exactly, for why both halves matter.
+     */
+    suspend fun discardModel(): Boolean {
+        close()
+        return withContext(Dispatchers.IO) { ModelFile.discard(context, MODEL_FILE) }
     }
 
     private suspend fun awaitProvider(): ProcessCameraProvider? = suspendCancellableCoroutine { cont ->

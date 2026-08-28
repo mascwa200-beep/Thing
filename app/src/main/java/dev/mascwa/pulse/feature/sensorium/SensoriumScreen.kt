@@ -38,9 +38,11 @@ import dev.mascwa.pulse.core.telemetry.EventSeverity
 import dev.mascwa.pulse.core.telemetry.LightState
 import dev.mascwa.pulse.core.telemetry.PressureTrend
 import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.sensing.FusionSnapshot
 import dev.mascwa.pulse.data.sensing.SensorsPresent
 import dev.mascwa.pulse.data.sensing.SensoriumStore
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -68,6 +70,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val level by vm.level.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val fusion by vm.fusion.collectAsStateWithLifecycle()
+    val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -103,6 +106,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
                 item { InstrumentsCard(fusion) }
+                item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
                 item {
                     Text(
                         "SENSED EVENTS · LAST 48H",
@@ -273,6 +277,42 @@ private fun FacetRow(label: String, value: String, note: String?) {
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * What the two classifiers are holding on disk, and a way to hand it back.
+ *
+ * ⚠️ **Silent when nothing is held, which is the ordinary state before the watch has ever run.** A
+ * row reading "0 MB" beside a button that would free nothing is worse than no row: it invites the
+ * tap and then appears broken. Once the models are down it says so, because until now they arrived
+ * with nothing asked and nothing said, and 8 MB you cannot account for is more irritating than
+ * 8 MB you can.
+ */
+@Composable
+private fun StorageCard(modelBytes: Long, onDiscard: () -> Unit) {
+    if (modelBytes <= 0L) return
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Text(
+            "ON THIS DEVICE",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.accent,
+        )
+        Text(
+            "Sound and scene classifiers: ${Formatters.megabytes(modelBytes)}. Fetched once, the " +
+                "first time the watch ran, and kept so it works with no network.",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        LcarsButton(
+            text = "STAND DOWN AND FREE ${Formatters.megabytes(modelBytes)}",
+            onClick = onDiscard,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
