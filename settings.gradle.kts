@@ -32,6 +32,7 @@ include(":core:health")
 // green gate, and the PackageInstaller ladder. Two copies of either would be two chances to
 // disagree about when a build is safe to install.
 include(":core:update")
+include(":core:sky")
 
 // The standalone nutrition app: the health half of :app with none of its novelty, its device gate
 // or its native code, so one universal APK runs on any phone. Shares :core:telemetry and
