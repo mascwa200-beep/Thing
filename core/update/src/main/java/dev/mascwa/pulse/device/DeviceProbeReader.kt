@@ -61,6 +61,13 @@ class DeviceProbeReader(context: Context) {
     @Volatile
     private var coresSeen: Int = 0
 
+    /** See [budgetCached]. Null until something asks. */
+    @Volatile
+    private var cachedBudget: DeviceClass.Budget? = null
+
+    @Volatile
+    private var cachedAtMs: Long = 0L
+
     /**
      * The heap ceiling this app actually gets, in MB.
      *
@@ -143,6 +150,51 @@ class DeviceProbeReader(context: Context) {
     /** What the rest of the app may spend. The single entry point — see [DeviceClass.budgetFor]. */
     fun budget(): DeviceClass.Budget = DeviceClass.budgetFor(probe())
 
+    /**
+     * The same budget, re-read at most every [BUDGET_TTL_MS].
+     *
+     * ⚠️ **[probe] is not free and [budget] must not be called per item.** It makes five binder
+     * calls and one content-provider query, which is nothing once and ruinous inside a scrolling
+     * list of thumbnails — [probe]'s own note says to hoist it out of anything running per frame,
+     * and a per-image decode cap is exactly that. Anything on a hot path reads this instead.
+     *
+     * ⚠️ Deliberately unlocked. Two threads racing recompute the same thing and one wins; the cost
+     * is one extra probe, where a lock on a path that exists to be cheap would be the worse trade.
+     *
+     * Thirty seconds because thermal state moves over minutes: a shorter window would pay the probe
+     * repeatedly to watch a number that has not changed, and a longer one would keep spending a hot
+     * phone's budget after it cooled.
+     */
+    fun budgetCached(nowMs: Long = System.currentTimeMillis()): DeviceClass.Budget {
+        val held = cachedBudget
+        if (held != null && nowMs - cachedAtMs in 0 until BUDGET_TTL_MS) return held
+        val fresh = budget()
+        cachedBudget = fresh
+        cachedAtMs = nowMs
+        return fresh
+    }
+
+    /**
+     * The budget from the HARDWARE ALONE — thermal state and doze deliberately excluded.
+     *
+     * ⚠️ **For structures that are sized once and then kept for the life of the process**, of which
+     * the image memory cache is the one that matters. Folding a momentary reading into a durable
+     * structure gets the asymmetry backwards: a phone that happened to be warm at launch would hold
+     * a small cache all day, long after it cooled, while a phone that goes hot later is already
+     * covered — both applications clear the cache from `onTrimMemory`, which is the mechanism for
+     * pressure that arrives after construction.
+     *
+     * A per-request decision — a decode size, a poll interval — should read [budgetCached] instead,
+     * because there pressure genuinely is the right input.
+     */
+    fun durableBudget(): DeviceClass.Budget =
+        DeviceClass.budgetFor(DeviceClass.tierOf(probe()), DeviceClass.Pressure.NONE)
+
     /** One block of text for a diagnostic screen, naming what could not be measured as well as what could. */
     fun describe(): String = DeviceClass.describe(probe())
+
+    companion object {
+        /** See [budgetCached]. */
+        const val BUDGET_TTL_MS = 30_000L
+    }
 }

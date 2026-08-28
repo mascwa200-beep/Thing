@@ -129,6 +129,14 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # `tools/check_changed.sh` now runs that automatically whenever a `core/health` file changes. When
 # this gate blames a health symbol, that compile is the instrument to reach for — not a shrug.
 #
+# ⚠️ `:core:update` is on neither path either, and it now carries `DeviceProbeReader` and
+# `DecodeCapInterceptor` as well as the updater and the crash reporter — so every member of those
+# cascades exactly the same way, and a member ADDED to one of them has no baseline complaint to
+# cancel against and reads as a brand-new defect. The cheap control is to plant a symbol from that
+# same module that unquestionably compiles in CI (`deviceProbe.budget()` has shipped since the
+# device probe landed) and re-run: if it reports identically, the complaint is this classpath and
+# not your change. That control is one command and it beats reasoning about it.
+#
 # ⚠️ **A NEW EXPRESSION OVER AN UNRESOLVABLE APP TYPE REPORTS A TYPE-INFERENCE FAILURE OR A
 # RECEIVER MISMATCH, NOT AN UNRESOLVED NAME — so the differencing does not cancel it.** Adding a
 # `Pair<String, AppSettings>` field to `SettingsRepository`, plus `raw to it` and `x?.also { }` over

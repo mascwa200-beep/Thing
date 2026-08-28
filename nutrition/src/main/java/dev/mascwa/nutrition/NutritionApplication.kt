@@ -4,6 +4,7 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.memory.MemoryCache
+import dev.mascwa.pulse.device.DecodeCapInterceptor
 import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.pulse.crash.Breadcrumbs
 import kotlinx.coroutines.CoroutineScope
@@ -74,8 +75,10 @@ class NutritionApplication : Application(), ImageLoaderFactory {
      *
      * A 96 dp thumbnail at 3× is 288×288 in ARGB_8888, which is 331 kB. Six per cent of the same
      * heap is about eleven megabytes, so roughly thirty-five of them — comfortably more than a row
-     * can show, and a quarter of what was reserved. The number matches the LCARS application, which
-     * arrived at it for the same reason with far more image surfaces than this.
+     * can show, and a quarter of what was reserved. The number is no longer written here: it is
+     * `DeviceClass.Budget.imageCacheShare`, which is 0.06 down to MODEST and lower below that, so
+     * both applications read one definition and a weaker phone gets a smaller share without either
+     * of them deciding it separately.
      *
      * ⚠️ **No disk cache at all, and that costs nothing.** Coil's disk cache exists to avoid
      * re-fetching over the network; every image here is a local file this app wrote itself, so the
@@ -86,7 +89,25 @@ class NutritionApplication : Application(), ImageLoaderFactory {
      * startup — which is the other half of what this class is for.
      */
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .memoryCache { MemoryCache.Builder(this).maxSizePercent(THUMBNAIL_HEAP_SHARE).build() }
+        // ⚠️ The share is the DURABLE budget — hardware only, thermal deliberately excluded. A cache
+        // sized once and kept for the life of the process must not carry a momentary reading, or a
+        // phone that happened to be warm at launch holds a small cache all day. Pressure arriving
+        // later is already handled: onTrimMemory below clears this.
+        //
+        // At every tier down to MODEST that is the measured 0.06 documented above; a LEAN phone gets
+        // 0.04 and a MINIMAL one 0.03. On the 2 GB phone this app exists for, that is the difference
+        // between holding a row of thumbnails and being killed for holding them.
+        .memoryCache {
+            MemoryCache.Builder(this)
+                .maxSizePercent(container.deviceProbe.durableBudget().imageCacheShare)
+                .build()
+        }
+        // Bound the decode itself, re-read per request so a phone that gets hot decodes smaller from
+        // the next thumbnail on. One rule, shared with the LCARS application — see
+        // DecodeCapInterceptor for what Coil's own size resolver already covers and what it cannot.
+        .components {
+            add(DecodeCapInterceptor { container.deviceProbe.budgetCached().imageDecodePx })
+        }
         .diskCache(null)
         .build()
         .also { loader = it }
@@ -126,10 +147,5 @@ class NutritionApplication : Application(), ImageLoaderFactory {
     override fun onLowMemory() {
         super.onLowMemory()
         runCatching { loader?.memoryCache?.clear() }
-    }
-
-    private companion object {
-        /** See [newImageLoader] — measured against Coil's own 0.20 default and the one call site. */
-        const val THUMBNAIL_HEAP_SHARE = 0.06
     }
 }

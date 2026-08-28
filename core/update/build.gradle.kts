@@ -36,6 +36,11 @@ dependencies {
     api(project(":core:feeds"))
     api(project(":core:telemetry"))
 
+    // ⚠️ `api`, not `implementation`: `DecodeCapInterceptor` IS a `coil.intercept.Interceptor`, and
+    // that supertype is what both applications name when they hand it to `ImageLoader.Builder`. No
+    // new artifact reaches either graph — both already carry coil-base through coil-compose.
+    api(libs.coil.base)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)

@@ -136,8 +136,27 @@ class AppContainer(private val appContext: Context) {
     val imageLoader: coil.ImageLoader by lazy {
         coil.ImageLoader.Builder(appContext)
             // Decode bundled .svg survival diagrams (crisp at any size) alongside the default raster fetchers.
-            .components { add(coil.decode.SvgDecoder.Factory()) }
-            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.06).build() }
+            .components {
+                add(coil.decode.SvgDecoder.Factory())
+                // Bound every decode to what this phone can afford, re-read per request through the
+                // cached accessor so a phone that gets hot decodes smaller from the next image on.
+                // See DecodeCapInterceptor: the case it exists for is a dimension the layout left
+                // open, which Coil's own size resolver cannot bound.
+                add(dev.mascwa.pulse.device.DecodeCapInterceptor { deviceProbe.budgetCached().imageDecodePx })
+            }
+            // ⚠️ The share is the DURABLE budget — hardware only, thermal excluded. The cache is
+            // sized once and kept for the life of the process, so folding a momentary reading into
+            // it would leave a phone that happened to be warm at launch holding a small cache all
+            // day. Pressure arriving later is already covered: onTrimMemory clears this.
+            //
+            // 0.06 was measured, and it is what this returns at every tier down to MODEST; a LEAN
+            // phone gets 0.04 and a MINIMAL one 0.03, which on a 2 GB phone is the difference
+            // between a thumbnail cache and a low-memory kill.
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(appContext)
+                    .maxSizePercent(deviceProbe.durableBudget().imageCacheShare)
+                    .build()
+            }
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(java.io.File(appContext.cacheDir, "image_cache"))
