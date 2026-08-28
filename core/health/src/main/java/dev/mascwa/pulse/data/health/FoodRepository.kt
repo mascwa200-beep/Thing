@@ -54,6 +54,16 @@ class FoodRepository(
          */
         val onlineFailure: String? = null,
         val onlineConsulted: Boolean = false,
+        /**
+         * Why the bundled 4.4-million-product database did not get a say, when it did not.
+         *
+         * ⚠️ The same distinction [onlineFailure] draws, for the half that is supposed to work with
+         * no network at all — and the more consequential one on a cheap phone, because that is where
+         * it fails. A bundle that will not open answers every query with the same nothing an
+         * absent product does, so without this the screen reports a genuinely empty result and the
+         * offline half is dead permanently with nothing anywhere saying so.
+         */
+        val bundleFailure: String? = null,
     )
 
     // ------------------------------------------------------------------------------ the seed
@@ -133,16 +143,25 @@ class FoodRepository(
         val bundled = offline?.searchByName(query).orEmpty()
         val seen = (mine + seed).mapTo(HashSet()) { it.id }
         val local = mine + seed + bundled.filterNot { it.id in seen }
-        if (!online) return Results(query, local)
+        // ⚠️ Read AFTER the queries, not before: the bundle is unpacked lazily on its first query,
+        // so asking beforehand always says "fine" on the very run where it is about to fail.
+        val bundleFailure = offline?.unavailable
+        if (!online) return Results(query, local, bundleFailure = bundleFailure)
         return try {
             val page = off.search(query, limit = OFF_LIMIT)
             // ⚠️ De-duplicated by id, not by name. Two records can legitimately share a name and
             // differ in their numbers, and collapsing those hides the choice rather than tidying it.
             val ids = local.mapTo(HashSet()) { it.id }
-            Results(query, local + page.foods.filterNot { it.id in ids }, onlineConsulted = true)
+            Results(
+                query, local + page.foods.filterNot { it.id in ids },
+                onlineConsulted = true, bundleFailure = bundleFailure,
+            )
         } catch (e: Exception) {
-            Results(query, local, onlineFailure = e.message ?: "could not reach the food database",
-                onlineConsulted = true)
+            Results(
+                query, local,
+                onlineFailure = e.message ?: "could not reach the food database",
+                onlineConsulted = true, bundleFailure = bundleFailure,
+            )
         }
     }
 
@@ -226,8 +245,15 @@ class FoodRepository(
         val online = off.byBarcode(barcode)
         if (online is FoodLookup.Found) return online
 
+        if (local != null) return FoodLookup.NoNutrition(local)
+        // ⚠️ `NotInDatabase` on its own claims the bundle was searched. When the bundle could not be
+        // opened it was not, so the reason travels with the answer — the network's verdict still
+        // stands (retrying it will not help), and the offline half's silence gets named rather than
+        // passed off as an absent product.
+        val bundleFailure = offline?.unavailable
         return when {
-            local != null -> FoodLookup.NoNutrition(local)
+            bundleFailure != null && online is FoodLookup.NotInDatabase ->
+                online.copy(offlineUnavailable = bundleFailure)
             else -> online
         }
     }

@@ -69,9 +69,33 @@ class OfflineFoodStore(
         } catch (cancel: kotlin.coroutines.cancellation.CancellationException) {
             throw cancel
         } catch (t: Throwable) {
+            if (broken == null) broken = t.message?.takeIf { it.isNotBlank() } ?: t::class.java.simpleName
             onFailure(op, t)
             fallback
         }
+
+    /**
+     * Why the bundle could not be read, once it has failed once.
+     *
+     * ⚠️ **[guard] made the failure visible to ME and to nobody using the app.** It reports to the
+     * crash console, which is the right place for a stack trace and the wrong place for somebody
+     * standing in a supermarket: every path here still answers `null`, and `null` is what the bundle
+     * says when it simply does not hold that product. So a database that will not open and a barcode
+     * nobody has ever added render identically — "not in the packaged-food database" — and that
+     * sentence is a claim about 4.4 million rows the app did not in fact look at.
+     *
+     * ⚠️ The FIRST reason is kept rather than the latest. What matters is why it stopped working,
+     * and after the first failure every later query fails for its own downstream reason; keeping the
+     * newest would overwrite "no space left on device" with whatever the next call happened to say.
+     *
+     * ⚠️ `@Volatile` and unlocked: written from whichever coroutine failed first, read by the
+     * repository on another. A race costs one duplicate assignment of two equally true reasons.
+     */
+    @Volatile
+    private var broken: String? = null
+
+    /** The reason the bundle is unusable, or null while it is answering. */
+    val unavailable: String? get() = broken
 
     /**
      * The product with this barcode, or null if the bundle has never heard of it.
@@ -211,7 +235,7 @@ class OfflineFoodStore(
                             "AND ${sqlFor(terms)} LIMIT $SCAN_CAP",
                     ),
                 )
-            } ?: return@withContext Scan(emptyList(), false)
+            } ?: return@withContext Scan(emptyList(), false, unavailable = broken)
 
             val scored = hits.mapNotNull { row ->
                 val name = row.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -234,7 +258,18 @@ class OfflineFoodStore(
      * first few thousand rows that matched" are different claims, and only one of them is true when a
      * one-word query matches a tenth of a supermarket.
      */
-    data class Scan(val foods: List<Food>, val truncated: Boolean)
+    data class Scan(
+        val foods: List<Food>,
+        val truncated: Boolean,
+        /**
+         * Why the scan did not happen, when it did not.
+         *
+         * ⚠️ Defaulted to null so nothing that already builds a [Scan] moved. Without it an empty
+         * result reads as "no bundled product has all of those words", which is a statement about
+         * 4.4 million rows that a database refusing to open never looked at.
+         */
+        val unavailable: String? = null,
+    )
 
     /**
      * ⚠️ **Built here rather than passed as a bind list, because the NUMBER of terms varies and SQLite

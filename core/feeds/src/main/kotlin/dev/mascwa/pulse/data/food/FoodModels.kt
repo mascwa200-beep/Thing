@@ -167,8 +167,20 @@ data class Food(
 sealed interface FoodLookup {
     data class Found(val food: Food) : FoodLookup
 
-    /** The source answered, and has no such product. Retrying will not help. */
-    data class NotInDatabase(val barcode: String) : FoodLookup
+    /**
+     * The source answered, and has no such product. Retrying will not help.
+     *
+     * ⚠️ [offlineUnavailable] is why the BUNDLED database did not get a say, and it is defaulted to
+     * null because the ordinary case is that it did. Without it this state claims 4.4 million
+     * bundled rows were searched — the sentence a reader gets is "not in the packaged-food
+     * database" — when a bundle that would not open answers every query with the same null a
+     * genuinely absent product does. On a cheap phone the likely cause is no space left, which is
+     * worth saying out loud rather than reporting a product as unknown.
+     */
+    data class NotInDatabase(
+        val barcode: String,
+        val offlineUnavailable: String? = null,
+    ) : FoodLookup
 
     /**
      * The record exists but carries no usable nutrition.

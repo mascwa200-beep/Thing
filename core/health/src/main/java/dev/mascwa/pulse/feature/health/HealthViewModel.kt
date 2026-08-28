@@ -675,7 +675,14 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 query = query,
                 results = r.foods,
                 busy = false,
+                // ⚠️ The bundle's failure is said FIRST when there is one, because it is the more
+                // consequential of the two: no network is a temporary state anybody understands,
+                // while a bundled database that will not open is permanent, silent, and the reason
+                // the offline half somebody chose this app for has stopped working.
                 note = when {
+                    r.bundleFailure != null ->
+                        "The bundled product database could not be read — ${r.bundleFailure}. " +
+                            "Only your own foods and the generic ones are in this list."
                     r.onlineFailure != null ->
                         "Offline foods only — the packaged-food database could not be reached."
                     !r.onlineConsulted ->
@@ -723,6 +730,9 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                 searchingAll = false,
                 allTruncated = scan.truncated,
                 note = when {
+                    // ⚠️ A scan that could not run has not established that nothing matched.
+                    scan.unavailable != null ->
+                        "The bundled product database could not be read — ${scan.unavailable}."
                     scan.foods.isEmpty() ->
                         "No bundled product has all of those words in its name."
                     else -> _search.value.note
@@ -759,10 +769,18 @@ class HealthViewModel(private val c: HealthDeps) : ViewModel() {
                     note = "${r.food.display} is in the database, but nobody has filled in its " +
                         "nutrition. Typing the numbers off the label works.",
                 )
+                // ⚠️ The bundled half is named only when it genuinely did not answer. Saying
+                // "not in the packaged-food database" when 4.4 million bundled rows were never
+                // opened is a claim about a search that did not happen.
                 is FoodLookup.NotInDatabase -> _search.value = Search(
                     query = code,
-                    note = "Barcode $code is not in the packaged-food database. Typing the numbers " +
-                        "off the label works.",
+                    note = if (r.offlineUnavailable != null) {
+                        "The online database has no barcode $code, and the bundled one could not " +
+                            "be read — ${r.offlineUnavailable}. Typing the numbers off the label works."
+                    } else {
+                        "Barcode $code is not in the packaged-food database. Typing the numbers " +
+                            "off the label works."
+                    },
                 )
                 is FoodLookup.Unreachable -> _search.value = Search(
                     query = code,
