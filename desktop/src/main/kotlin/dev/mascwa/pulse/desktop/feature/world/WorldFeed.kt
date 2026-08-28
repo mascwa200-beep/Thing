@@ -45,11 +45,48 @@ suspend fun DesktopSettingsStore.here(): Pair<Double, Double>? {
 }
 
 /**
+ * The same shape as [WorldFeed], for the things on these screens that genuinely do not need to know
+ * where this machine is.
+ *
+ * ⚠️ **This exists because routing such a feed through [WorldFeed] silently never loads it.** That
+ * class resolves a coordinate first and RETURNS EARLY when there is none — correctly, since every
+ * feed it was written for is meaningless without one. Launches were nonetheless put through it, with
+ * a comment at the call site and another on the field both saying that a rocket leaves from where it
+ * leaves from regardless of the observer; and the consequence, on a machine where nobody has typed a
+ * location and the IP guess did not resolve, is a permanently empty launch list. Code that
+ * contradicts its own stated intent is the shape this project keeps finding, and the fix is a type
+ * that means what those comments say.
+ */
+class OpenFeed<T>(
+    private val scope: CoroutineScope,
+    private val fetch: suspend (force: Boolean) -> Fetched<T>,
+) {
+    private val _state = MutableStateFlow(Async<T>())
+    val state: StateFlow<Async<T>> = _state.asStateFlow()
+
+    private var job: Job? = null
+
+    /** Load once, unless something is already there. Safe to call on every visit to the screen. */
+    fun ensureLoaded() {
+        if (_state.value.hasData || job?.isActive == true) return
+        refresh(force = false)
+    }
+
+    fun refresh(force: Boolean = true) {
+        job?.cancel()
+        job = scope.launch { _state.load(force) { f -> fetch(f) } }
+    }
+}
+
+/**
  * The shape every screen in this package shares: fetch one thing for one coordinate, keep what was
  * last fetched while refreshing, and never wipe a readable page because a refresh failed.
  *
  * Built on the SHARED [Async]/[load] pair rather than a desktop copy — the same folding the phone's
  * view models do, including the part that makes a failed refresh visible instead of silent.
+ *
+ * ⚠️ Use [OpenFeed] instead for anything that does not depend on where this machine is: this class
+ * returns early without a coordinate, so such a feed would silently never load.
  */
 class WorldFeed<T>(
     private val scope: CoroutineScope,

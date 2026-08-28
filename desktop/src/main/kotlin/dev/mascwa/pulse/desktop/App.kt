@@ -103,6 +103,7 @@ import dev.mascwa.pulse.data.economy.EconomyRepository
 import dev.mascwa.pulse.data.fuel.FuelRepository
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.markets.MarketsRepository
+import dev.mascwa.pulse.data.orbital.CometRepository
 import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.TleRepository
@@ -315,6 +316,7 @@ fun PulseDesktopApp(
                 // when the close-approach list starts returning nothing.
                 OrbitalRepository(http, cache) { "DEMO_KEY" },
                 LaunchRepository(http, cache),
+                CometRepository(http, cache),
                 settings,
             )
         }

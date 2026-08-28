@@ -19,8 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
+import dev.mascwa.pulse.core.telemetry.Comets
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
+import dev.mascwa.pulse.data.orbital.CometRepository
 import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
@@ -46,6 +48,7 @@ class ObservatoryViewModel(
     scope: CoroutineScope,
     orbital: OrbitalRepository,
     launches: LaunchRepository,
+    comets: CometRepository,
     settings: DesktopSettingsStore,
 ) {
     val sky = WorldFeed<OrbitalData>(scope, settings) { lat, lon, force ->
@@ -53,12 +56,38 @@ class ObservatoryViewModel(
     }
 
     /**
-     * ⚠️ Launches ignore the coordinate entirely — a rocket leaves from where it leaves from — but they
-     * still go through [WorldFeed] so the screen has one shape rather than two. The lambda simply does
-     * not use what it is handed, which is honest and costs nothing.
+     * ⚠️ **Launches used to go through [WorldFeed] and that was a real defect, not a tidy shortcut.**
+     * The comment here said a rocket leaves from where it leaves from and that the lambda simply
+     * ignores the coordinate it is handed — true of the lambda, and false of the class around it,
+     * which resolves a location first and returns early without one. So on a machine where nobody
+     * had typed a place the launch list never loaded at all, exactly contradicting the sentence
+     * explaining why it was safe. [OpenFeed] is what those two comments always described.
      */
-    val launches = WorldFeed<List<UpcomingLaunch>>(scope, settings) { _, _, force ->
-        launches.upcoming(force)
+    val launches = OpenFeed(scope) { force -> launches.upcoming(force) }
+
+    /**
+     * Comets, for the same reason and with a sharper one behind it.
+     *
+     * Where a comet is depends on the date alone — only whether it clears your horizon needs a site,
+     * and this machine has no horizon it can measure anyway. The phone's tab makes the same choice
+     * deliberately: withholding the whole list over a detail is withholding most of the answer.
+     *
+     * ⚠️ The catalogue is fetched and the orbits are solved in the same step, so the positions are
+     * computed when the page loads rather than when the file was last downloaded — that file lives
+     * for a week, and a week-old comet position would be badly wrong while looking perfectly fine.
+     */
+    val comets = OpenFeed(scope) { force ->
+        val fetched = comets.elements(force)
+        Fetched(
+            data = Comets.visible(fetched.data, System.currentTimeMillis(), limit = COMET_LIMIT),
+            fromCache = fetched.fromCache,
+            timestampEpochMs = fetched.timestampEpochMs,
+        )
+    }
+
+    private companion object {
+        /** Enough to be worth reading; [Comets.visible] has already dropped what cannot be seen. */
+        const val COMET_LIMIT = 10
     }
 }
 
@@ -71,11 +100,13 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
     val sky: Async<OrbitalData> by vm.sky.state.collectAsState()
     val located by vm.sky.located.collectAsState()
     val launches: Async<List<UpcomingLaunch>> by vm.launches.state.collectAsState()
+    val comets: Async<List<Comets.Sighting>> by vm.comets.state.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
         vm.sky.ensureLoaded()
         vm.launches.ensureLoaded()
+        vm.comets.ensureLoaded()
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
@@ -230,8 +261,32 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // Launches sit outside the coordinate-bound panel above, with their own state, because they are
-        // the one thing on this page that does not depend on where you are.
+        // Comets and launches both sit outside the coordinate-bound panel above, with their own
+        // state, because neither depends on where this machine is.
+        LcarsHeaderBar("Comets worth a look", Modifier.padding(top = 16.dp))
+        val visibleComets = comets.data.orEmpty()
+        if (visibleComets.isEmpty()) {
+            LcarsFrame(Modifier.fillMaxWidth()) {
+                Text(
+                    if (comets.loading) {
+                        "Reading the Minor Planet Center's catalogue…"
+                    } else {
+                        "Nothing bright enough is far enough from the Sun to look at. That is the " +
+                            "ordinary state of affairs rather than a fault."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
+                )
+            }
+        } else {
+            visibleComets.forEach { CometRow(it) }
+            Text(
+                "Magnitudes are predictions from a fitted brightness law, not measurements — a comet " +
+                    "two magnitudes off its own forecast is completely ordinary.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+
         LcarsHeaderBar("Next off the pad", Modifier.padding(top = 16.dp))
         val upcoming = launches.data.orEmpty()
         if (upcoming.isEmpty()) {
@@ -249,6 +304,43 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
             modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
         )
+    }
+}
+
+/** One comet: what it should look like, and where it is in the solar system. */
+@Composable
+private fun CometRow(sighting: Comets.Sighting) {
+    val c = Pulse.colors
+    val m = sighting.magnitude
+    // Colour says what you would need to see it, which is the question the list answers.
+    val accent = when {
+        m == null -> c.muted
+        m <= 6.0 -> c.violet
+        m <= 10.0 -> c.accent
+        else -> c.muted
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                sighting.designation,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                Comets.describe(sighting),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                listOf(
+                    m?.let { "magnitude ${String.format(java.util.Locale.US, "%.1f", it)}" }
+                        ?: "brightness not stated",
+                    "${String.format(java.util.Locale.US, "%.2f", sighting.heliocentricAu)} AU from the Sun",
+                    "${sighting.elongationDeg.toInt()}° from it in the sky",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
     }
 }
 
