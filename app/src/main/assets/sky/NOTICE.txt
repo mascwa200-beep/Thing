@@ -1,0 +1,56 @@
+stars.tsv — where it comes from and what was done to it
+========================================================
+
+SOURCE
+    Bright Star Catalogue, 5th Revised Edition (Preliminary Version)
+    Hoffleit D., Warren Jr W.H., 1991
+    Astronomical Data Center, NSSDC/ADC
+    Bibcodes: 1964BS....C......0H, 1991bsc..book.....H
+
+    Obtained as catalogue V/50 from the Centre de Données astronomiques de
+    Strasbourg (CDS): https://cdsarc.cds.unistra.fr/ftp/V/50/
+
+    This research has made use of the VizieR catalogue access tool and the SIMBAD
+    database, CDS, Strasbourg, France. The original description of the VizieR
+    service was published in A&AS 143, 23.
+
+WHAT WAS DONE TO IT
+    The catalogue is a fixed-width text file of 9,110 records carrying more than
+    thirty fields each. tools/sky/build_star_catalog.py reads it and writes out
+    seven of them, for the 8,404 stars brighter than visual magnitude 6.5:
+
+        right ascension and declination   converted from sexagesimal to degrees
+                                          (J2000, unchanged otherwise)
+        visual magnitude                  unchanged
+        B-V colour                        unchanged
+        Bayer letter                      three-letter abbreviation expanded to
+                                          the Greek character, with the component
+                                          index as a superscript
+        Flamsteed number                  unchanged
+        constellation                     unchanged, IAU three-letter form
+
+    Rows are ordered brightest first. No position, magnitude or colour has been
+    altered, interpolated or filled in. Nothing has been added that was not in
+    the source.
+
+    Everything else the catalogue holds — the Durchmusterung, HD, SAO and FK5
+    cross-references, B1900 positions, galactic coordinates, U-B and R-I colours,
+    spectral types, proper motions, parallaxes, radial and rotational velocities,
+    and the multiple-star details — is dropped. The builder explains why for the
+    one field where dropping it has a visible consequence.
+
+    The builder re-derives Sirius from its own output on every run and refuses to
+    finish if the position, magnitude or designation does not match. That is the
+    guard against a column offset, which in a fixed-width format produces a file
+    that parses perfectly and describes the wrong sky.
+
+TO REBUILD
+    curl -o bsc5.gz https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz
+    python3 tools/sky/build_star_catalog.py bsc5.gz app/src/main/assets/sky/stars.tsv
+
+STAR NAMES
+    The proper names shown for the brightest stars are not from this file. They
+    are the IAU Working Group on Star Names' approved designations, together with
+    the IAU's 88 constellation names and their genitive forms, and live in
+    core/telemetry/.../StarNames.kt. StarCatalogAssetTest checks every one of them
+    against this catalogue.
