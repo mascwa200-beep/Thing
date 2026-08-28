@@ -104,11 +104,17 @@ class AppContainer(private val appContext: Context) {
      * The same checker pointed at the standalone nutrition app's own release, so this app can put
      * the companion on the phone in the first place — there is otherwise no way to obtain it.
      *
-     * ⚠️ **`currentVersionCode = 0` is a statement, not a placeholder**: this app cannot read the
-     * version of a package it does not own, so it treats every published build as newer than
-     * nothing and offers the newest. Installing over an equal or older build is harmless — the
-     * platform refuses a downgrade itself — whereas guessing a version here would mean silently
-     * refusing to offer an update the owner asked for.
+     * ⚠️ **`currentVersionCode = 0` is a statement, not a placeholder**: it treats every published
+     * build as newer than nothing and offers the newest, which is what the manual control wants —
+     * somebody who taps GET THE NUTRITION APP is asking for the app, and installing over an equal
+     * or older build is harmless because the platform refuses a downgrade itself.
+     *
+     * ⚠️ **It is NOT because the version cannot be read, which this note used to claim.** This app
+     * holds `QUERY_ALL_PACKAGES`, so `getPackageInfo` answers for the companion perfectly well —
+     * and that wrong sentence is exactly what made keeping the companion updated automatically look
+     * impossible. `RefreshWorker.updateCompanion` reads the installed version and compares against
+     * it there, which is why this instance can stay deliberately permissive without that pass ever
+     * re-installing a build the phone already has.
      */
     val nutritionUpdateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
         dev.mascwa.pulse.data.update.UpdateRepository(

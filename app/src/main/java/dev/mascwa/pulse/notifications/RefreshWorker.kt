@@ -83,6 +83,11 @@ class RefreshWorker(
         // and the check that does sit below these gates only ever posted a note about it.
         val buildWaiting = installNewestBuild(settings)
 
+        // ⚠️ And the companion, for the same reason and one more: the standalone nutrition app
+        // CANNOT keep itself current without the owner's help, and this app can. See
+        // [updateCompanion].
+        updateCompanion()
+
         // ⚠️ Above the notification gates for the same reason as everything else up here, and AFTER
         // the app update on purpose: both want the same Wi-Fi, and being on the newest build matters
         // more than having one more optional payload. The provisioner takes at most one item per
@@ -443,6 +448,71 @@ class RefreshWorker(
      * press a button for work already done.
      */
     private data class PendingBuild(val versionCode: Int, val waitingBecause: String)
+
+    /**
+     * Keep the standalone nutrition app current, with nothing asked of the owner.
+     *
+     * ⚠️ **The companion cannot do this for itself, and that is not a gap in it.** Its releases are
+     * in the same private repository, so its own updater needs a GitHub token pasted into it; and it
+     * is not a device owner and not the installer of record, so its first install would show the
+     * system's confirmation. Both are input. THIS app has the token already, is provisioned as a
+     * device owner, and installs the companion through the same [dev.mascwa.pulse.core.util.installApk]
+     * path the Settings control uses — so a commit made from here is not confirmed at all. The
+     * capability was entirely present; the only thing missing was anything that ran it without a tap.
+     *
+     * ⚠️ **The installed version IS the loop-breaker, and this is the one place that gets to be
+     * simple.** [installNewestBuild] needs a persisted `unconfirmedUpdateCode` because it replaces
+     * the very process asking the question, so "did it land?" cannot be read directly. Here the
+     * target is a different package and the platform will simply say what version of it is
+     * installed. No stored state, nothing to get out of step, and an install that fails leaves the
+     * old version reported — so the next pass retries rather than being blocked, which is the right
+     * direction for a package whose failure cannot take this app down with it.
+     *
+     * ⚠️ **A package that is not installed is left alone.** `getPackageInfo` throwing is the answer
+     * "the owner does not have this app", and putting it on their phone because a release exists
+     * would be installing software nobody asked for. Getting the companion in the first place stays
+     * a deliberate act — Settings ▸ System ▸ GET THE NUTRITION APP — and this only ever maintains
+     * what that act already put there.
+     *
+     * ⚠️ **Ordered cheapest-first with the network last**, exactly as the self-update pass is: the
+     * local package query and the Wi-Fi check both sit in front of a request, so a phone on mobile
+     * data never pays for a check it could not act on. The APK is about 180 MB.
+     *
+     * ⚠️ **Known trade, stated rather than guarded:** replacing a package kills its process, so if
+     * the owner happens to be logging a meal at the moment this commits, the nutrition app restarts.
+     * Detecting that would mean querying `UsageStatsManager` for another package's foreground state,
+     * which rests on a permission the owner may never have granted — so it would be machinery that
+     * usually cannot answer, guarding a window of a few seconds that opens a handful of times a day.
+     * An update that never happens is the worse failure, and it is the one the owner asked me to fix.
+     */
+    private suspend fun updateCompanion() {
+        val pkg = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_PACKAGE
+        val installed = installedVersionCode(pkg) ?: return
+        if (!container.connectivityObserver.isUnmetered.value) return
+        runCatching {
+            // The green gate lives in `check()` — it reports only a build whose CI run passed.
+            // ⚠️ Its own `available` cannot be the test here: that repository is built with
+            // `currentVersionCode = 0` so the manual control can always offer the newest, which
+            // means every published build reads as "available". The comparison that matters is
+            // against what is actually on the phone, and it is made here.
+            val info = container.nutritionUpdateRepository.check().available ?: return@runCatching
+            if (info.versionCode.toLong() <= installed) return@runCatching
+            val file = container.nutritionUpdateRepository.download(info) { }
+            dev.mascwa.pulse.core.util.installApk(applicationContext, file, pkg)
+        }
+    }
+
+    /**
+     * The version of another installed package, or null if it is not installed.
+     *
+     * ⚠️ This app holds `QUERY_ALL_PACKAGES`, so it can genuinely see the companion — a note on
+     * `AppContainer.nutritionUpdateRepository` used to claim the opposite, and that claim is what
+     * made the whole of [updateCompanion] look impossible. `longVersionCode` is API 28 and this
+     * module's floor is 31, so there is no branch to write.
+     */
+    private fun installedVersionCode(pkg: String): Long? = runCatching {
+        applicationContext.packageManager.getPackageInfo(pkg, 0).longVersionCode
+    }.getOrNull()
 
     /**
      * Push the widget, so it is not left waiting on the OS's thirty-minute floor.

@@ -73,6 +73,20 @@
     -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <!--
+          ⚠️ **The LCARS application, and without this entry this app cannot tell that LCARS is the
+          thing keeping it updated.** `getInstallSourceInfo` reports the installing package only
+          when the caller can see it; package visibility filters it to null otherwise, which is
+          indistinguishable from having been sideloaded by hand. That distinction is the whole
+          point — it decides whether the update card asks for a GitHub token or explains that
+          nothing is needed.
+
+          ⚠️ `.debug` is part of the name: that module's RELEASE build carries the suffix so a
+          sideload updates in place. See UpdateRepository.LCARS_PACKAGE, which is where this string
+          is defined for the code; this manifest cannot reference a Kotlin constant, so the two are
+          a pair that has to be kept in step by hand.
+        -->
+        <package android:name="dev.mascwa.pulse.debug" />
     </queries>
 
     <!--

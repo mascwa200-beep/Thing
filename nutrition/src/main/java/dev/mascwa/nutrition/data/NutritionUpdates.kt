@@ -1,14 +1,17 @@
 package dev.mascwa.nutrition.data
 
 import android.content.Context
+import android.os.Build
 import dev.mascwa.nutrition.BuildConfig
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.update.ApkInstaller
 import dev.mascwa.pulse.data.update.UpdateInfo
 import dev.mascwa.pulse.data.update.UpdateRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -31,6 +34,15 @@ import java.io.File
  * do not apply. The rung that does apply arms the next one: once this app has committed one session
  * it becomes the installer of record, and later updates can complete with no dialog at all. So the
  * honest description is "one tap the first time, none after", not "silent".
+ *
+ * ## Unless the companion is here, in which case neither applies
+ *
+ * ⚠️ **Both paragraphs above describe this app updating ITSELF.** On a phone that also carries the
+ * LCARS application, none of it is the route that actually runs: that app is provisioned as a device
+ * owner, already holds a token, and reinstalls this one whenever a newer build is published — so the
+ * token is not needed and no confirmation is shown, because rung one applies to the installer rather
+ * than to the installed. [maintainedByCompanion] is how the screen tells which world it is in, and
+ * everything here stays as the fallback for when LCARS is removed.
  */
 class NutritionUpdates(
     context: Context,
@@ -99,6 +111,41 @@ class NutritionUpdates(
 
     /** The stored token, so the screen can show whether one is set without holding it. */
     suspend fun hasToken(): Boolean = settings.currentUpdateToken() != null
+
+    /**
+     * Whether the LCARS application put this app here, and therefore keeps it current.
+     *
+     * ⚠️ **The installer of record, not merely "is LCARS installed".** Presence would be an
+     * inference; this is a fact about how this copy arrived. LCARS is provisioned as a device owner
+     * on the owner's phone, holds the GitHub token already, and now runs a pass that reinstalls the
+     * companion whenever a newer build is published — so when this returns true, both things this
+     * card would otherwise ask for are already handled and asking for them again is noise.
+     *
+     * ⚠️ **It reports what is true, and never disables anything.** The token field stays: LCARS can
+     * be uninstalled, and this app's own updater is then the only route left. What changes is the
+     * copy, which stops insisting on a token that is not needed today.
+     *
+     * ⚠️ Needs the `<queries>` entry in this module's manifest. Without it package visibility
+     * filters the installing package to null and this silently answers false on a phone where it is
+     * true — the same trap the Health Connect check has, one line above it in the same block.
+     *
+     * ⚠️ `suspend` with the dispatcher chosen HERE rather than at the call site, mirroring
+     * [hasToken]. `getInstallSourceInfo` is a binder call into the package manager, and a caller
+     * that forgot to move it would put one on the main thread — a decision that belongs beside the
+     * work rather than repeated by every reader of it.
+     */
+    suspend fun maintainedByCompanion(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val pm = appContext.packageManager
+            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                pm.getInstallSourceInfo(appContext.packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstallerPackageName(appContext.packageName)
+            }
+            installer == UpdateRepository.LCARS_PACKAGE
+        }.getOrDefault(false)
+    }
 
     /** Save a pasted token; a blank one clears it. */
     suspend fun saveToken(value: String) = settings.setUpdateToken(value)

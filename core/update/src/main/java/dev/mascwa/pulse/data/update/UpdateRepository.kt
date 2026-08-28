@@ -267,5 +267,21 @@ class UpdateRepository(
 
         /** The standalone app's applicationId, which the release build carries with no suffix. */
         const val NUTRITION_PACKAGE = "dev.mascwa.nutrition"
+
+        /**
+         * The LCARS application's applicationId.
+         *
+         * ⚠️ **`.debug` is part of it, and leaving the suffix off would be a package that does not
+         * exist.** That module's release build carries `applicationIdSuffix = ".debug"` on purpose —
+         * it keeps the identity and signing key of the previously-installed build so a sideload
+         * updates in place — so the shipped package really is this. The nutrition module's release
+         * build applies no suffix, which is why the two constants here look inconsistent and are
+         * each correct.
+         *
+         * Named in this shared module because both applications need it and neither owns it: LCARS
+         * to state which package it is installing on the companion's behalf, and the companion to
+         * recognise LCARS as the thing that installed it.
+         */
+        const val LCARS_PACKAGE = "dev.mascwa.pulse.debug"
     }
 }
