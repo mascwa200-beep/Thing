@@ -334,6 +334,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sky.DeepStarCatalog(appContext)
     }
 
+    /** The constellation figures, asterisms and IAU borders. Lazy for [starCatalog]'s reason. */
+    val constellationCatalog: dev.mascwa.pulse.data.sky.ConstellationCatalog by lazy {
+        dev.mascwa.pulse.data.sky.ConstellationCatalog(appContext)
+    }
+
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
     }

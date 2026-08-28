@@ -6,9 +6,11 @@ import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.data.orbital.PlanetCalc
+import dev.mascwa.pulse.data.sky.ConstellationCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.weather.LocationProvider
+import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,7 @@ import kotlin.math.roundToInt
 class SkyMapViewModel(
     private val catalog: StarCatalog,
     private val deepCatalog: DeepStarCatalog,
+    private val constellationCatalog: ConstellationCatalog,
     private val locationProvider: LocationProvider,
 ) : ViewModel() {
 
@@ -77,6 +80,39 @@ class SkyMapViewModel(
     /** The deep catalogue's stars for the region in view, or null until the asset opens. */
     var deepField: StarField? = null
         private set
+
+    /**
+     * The constellations, cut for the field currently in view, or null until the asset is read.
+     *
+     * Mutable arrays like [deepField] and for the same reason, so a rebuild is announced through
+     * [revision] rather than by handing Compose a new object.
+     */
+    var constellations: ConstellationField? = null
+        private set
+
+    /** What the map draws over the stars. */
+    enum class LinesMode {
+        /** Stars alone. */
+        NONE,
+
+        /** The 88 stick figures, and the popular asterisms behind them. */
+        FIGURES,
+
+        /** The figures, and the IAU borders that divide the whole sky between them. */
+        FIGURES_AND_BORDERS,
+        ;
+
+        /** The next mode a tap on the one control moves to. */
+        val next: LinesMode get() = entries[(ordinal + 1) % entries.size]
+    }
+
+    private val _linesMode = MutableStateFlow(LinesMode.FIGURES)
+    val linesMode: StateFlow<LinesMode> = _linesMode.asStateFlow()
+
+    /** Move to the next thing to draw over the stars. */
+    fun cycleLines() {
+        _linesMode.value = _linesMode.value.next
+    }
 
     /**
      * Bumped whenever the drawn contents change under the canvas.
@@ -165,6 +201,7 @@ class SkyMapViewModel(
                 if (here != null) _site.value = here
                 fillBrightStars()
                 openDeepCatalogue()
+                openConstellations()
                 rebuild()
             } finally {
                 _loading.value = false
@@ -211,6 +248,32 @@ class SkyMapViewModel(
             _deepest.value = maxOf(_deepest.value, field.deepestMagnitude)
         }
         _deepNote.value = deepCatalog.note()
+    }
+
+    /**
+     * Read the constellation asset, once for the life of the screen.
+     *
+     * ⚠️ No first cut here. The subdivision depends on the field of view and the view is not
+     * settled until the canvas has been measured, so cutting now would build one set at whatever
+     * field the screen happened to start at and immediately throw it away — see [refreshLines].
+     */
+    private suspend fun openConstellations() {
+        if (constellations != null) return
+        constellations = constellationCatalog.data()?.let { ConstellationField(it) }
+    }
+
+    /**
+     * Re-cut the constellations for the field now in view.
+     *
+     * ⚠️ Called from the screen on every view change, and cheap to call: [ConstellationField]
+     * answers UNCHANGED unless the field has moved far enough to want a different subdivision,
+     * which a pan never does and a pinch does a handful of times.
+     */
+    suspend fun refreshLines() {
+        if (_linesMode.value == LinesMode.NONE) return
+        val field = constellations ?: return
+        val outcome = runCatching { field.update(_view.value.fovDeg) }.getOrNull()
+        if (outcome == ConstellationField.Outcome.REBUILT) _revision.value++
     }
 
     /**

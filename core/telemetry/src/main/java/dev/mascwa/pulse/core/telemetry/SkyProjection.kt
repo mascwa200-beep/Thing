@@ -414,6 +414,28 @@ object SkyProjection {
     fun degreesPerUnit(view: View): Double = view.fovDeg / 2.0
 
     /**
+     * The angle from the middle of the screen to its furthest CORNER.
+     *
+     * This is what a renderer needs to throw away whole objects without projecting them: anything
+     * further from the view direction than this cannot land on screen, whatever its shape.
+     *
+     * ⚠️ **Not `fovDeg / 2`, and the difference is the whole point.** The declared field is measured
+     * across the smaller screen dimension, so the corner of a portrait phone is well outside it —
+     * culling on the half-field would drop constellation lines that are plainly visible at the top
+     * and bottom of the screen, which is the same mistake in a different place as drawing the sky
+     * as a circle.
+     *
+     * Inverts the stereographic radius: a direction `θ` from the centre lands at `2·tan(θ/2)` before
+     * scaling, so a corner at normalised radius `r` is at `θ = 2·atan(r · tan(fov/4))`.
+     */
+    fun coneRadiusDeg(fovDeg: Double, viewport: Viewport): Double {
+        val r = sqrt(
+            viewport.halfWidth * viewport.halfWidth + viewport.halfHeight * viewport.halfHeight,
+        )
+        return 2.0 * Math.toDegrees(Math.atan(r * edgeRadius(fovDeg) / 2.0))
+    }
+
+    /**
      * How faint a star is worth drawing at this zoom.
      *
      * ⚠️ **This is what makes a catalogue of any size drawable.** However many stars are on disk,

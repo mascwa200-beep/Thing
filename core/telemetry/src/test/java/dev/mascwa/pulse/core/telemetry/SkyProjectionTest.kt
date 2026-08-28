@@ -372,4 +372,21 @@ class SkyProjectionTest {
             }
         }
     }
+
+    @Test
+    fun `the culling cone reaches the screen corner, not the edge of the declared field`() {
+        // ⚠️ This is the rule, and getting it wrong erases lines that are plainly on screen. The
+        // field is declared across the SMALLER screen dimension, so half of it is 30 degrees at a
+        // 60-degree field — and the corner is much further out than that.
+        val square = SkyProjection.coneRadiusDeg(60.0, SkyProjection.Viewport(1.0, 1.0))
+        val portrait = SkyProjection.coneRadiusDeg(60.0, SkyProjection.Viewport(1.0, 2.0))
+        assertTrue("a square screen's corner is past the half-field, got $square", square > 30.0)
+        assertTrue("a tall screen reaches further still, got $portrait", portrait > square)
+        // 2*atan(sqrt(2)*tan(15 deg)) and 2*atan(sqrt(5)*tan(15 deg)), computed independently.
+        assertEquals(41.503, square, 0.01)
+        assertEquals(61.854, portrait, 0.01)
+
+        // Narrower field, same shape: the cone shrinks with it rather than staying fixed.
+        assertTrue(SkyProjection.coneRadiusDeg(5.0, SkyProjection.Viewport(1.0, 2.0)) < 12.0)
+    }
 }

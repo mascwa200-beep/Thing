@@ -40,17 +40,23 @@ import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.sky.LineBatch
 import dev.mascwa.pulse.sky.SkyFrame
+import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.SkyRenderer
 import dev.mascwa.pulse.sky.StarBatches
+import dev.mascwa.pulse.sky.collectLines
 import dev.mascwa.pulse.sky.collectStars
+import dev.mascwa.pulse.sky.drawLineBatch
 import dev.mascwa.pulse.sky.drawStarBatches
 import dev.mascwa.pulse.sky.drawStarGlow
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * The sky as a map you can move around in.
@@ -89,6 +95,7 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
     val hours by vm.hourOffset.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val missing by vm.catalogueMissing.collectAsStateWithLifecycle()
+    val lines by vm.linesMode.collectAsStateWithLifecycle()
 
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -112,7 +119,7 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
                 IdentifyCard(body, c, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
-        Controls(view, hours, c, vm)
+        Controls(view, hours, lines, c, vm)
     }
 }
 
@@ -132,8 +139,13 @@ private fun SkyCanvas(
     val starPaint = remember { Paint() }
     val above = remember { StarBatches() }
     val below = remember { StarBatches() }
+    // ⚠️ One segment buffer, refilled per frame and reused, for the same reason. A busy sky is tens
+    // of thousands of floats; allocating that sixty times a second is the frame.
+    val linePaint = remember { Paint() }
+    val lineBatch = remember { LineBatch() }
 
     val site by vm.site.collectAsStateWithLifecycle()
+    val linesMode by vm.linesMode.collectAsStateWithLifecycle()
     val hours by vm.hourOffset.collectAsStateWithLifecycle()
     val deepRevision = vm.revision.collectAsStateWithLifecycle()
     // ⚠️ How faint the catalogue actually goes. Omitting it is not a default, it is a cut at the
@@ -147,12 +159,15 @@ private fun SkyCanvas(
 
     // Bring the deep catalogue up to date for wherever the view has got to. Cheap when the region
     // already held still covers the view, which is most pans — see StarField.update.
-    LaunchedEffect(view, site, at, surface) {
+    LaunchedEffect(view, site, at, surface, linesMode) {
         if (surface.width > 0 && surface.height > 0) {
             vm.refreshDeep(
                 SkyProjection.viewportOf(surface.width.toDouble(), surface.height.toDouble()), at,
             )
         }
+        // ⚠️ Unconditional on the surface, unlike the deep catalogue: the constellation cut depends
+        // on the field of view alone, which is known before the canvas has been measured.
+        vm.refreshLines()
     }
 
     Canvas(
@@ -209,6 +224,33 @@ private fun SkyCanvas(
 
             // Two vectors rebuilt per frame; the stars themselves never move. See SkyFrame.
             val frame = SkyFrame.of(view, here.latitude, here.longitude, at)
+
+            // ⚠️ Under the stars, on purpose. A constellation line is a note about the stars, so a
+            // line drawn over one puts a stroke through the thing it is pointing at.
+            val shapes = vm.constellations
+            if (shapes != null && linesMode != SkyMapViewModel.LinesMode.NONE) {
+                // ⚠️ The angle to the screen CORNER, not the half-field — culling on the half-field
+                // would throw away lines that are plainly visible at the top and bottom of a
+                // portrait phone. See SkyProjection.coneRadiusDeg.
+                val cone = Math.toRadians(SkyProjection.coneRadiusDeg(view.fovDeg, viewport))
+                val coneCos = cos(cone)
+                val coneSin = sin(cone)
+                if (linesMode == SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS) {
+                    drawSkyLineSet(
+                        shapes.boundaries, frame, viewport, coneCos, coneSin, half, cx, cy,
+                        lineBatch, linePaint, c.muted, BORDER_WIDTH_DP, BORDER_ALPHA,
+                    )
+                }
+                drawSkyLineSet(
+                    shapes.asterisms, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, c.violet, ASTERISM_WIDTH_DP, ASTERISM_ALPHA,
+                )
+                drawSkyLineSet(
+                    shapes.figures, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, c.sky, FIGURE_WIDTH_DP, FIGURE_ALPHA,
+                )
+            }
+
             above.reset()
             below.reset()
             val deep = vm.deepField?.layer
@@ -269,6 +311,28 @@ private fun SkyCanvas(
  * would put a name lookup and a text draw inside the one loop that has to stay tight, and would drag
  * a catalogue of strings into a module that holds only numbers.
  */
+private fun DrawScope.drawSkyLineSet(
+    lines: SkyLines,
+    frame: SkyFrame,
+    viewport: SkyProjection.Viewport,
+    coneCos: Double,
+    coneSin: Double,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    batch: LineBatch,
+    paint: Paint,
+    colour: Color,
+    widthDp: Float,
+    alpha: Float,
+) {
+    // ⚠️ One shared buffer refilled between sets rather than three. They are drawn one after another
+    // and each `drawLines` copies what it needs, so the buffer is free the moment the call returns.
+    batch.reset()
+    collectLines(lines, frame, viewport, coneCos, coneSin, halfPx, centreX, centreY, batch)
+    drawLineBatch(batch, paint, colour, widthDp.dp.toPx(), alpha)
+}
+
 private fun DrawScope.drawStarLabels(
     vm: SkyMapViewModel,
     frame: SkyFrame,
@@ -360,6 +424,7 @@ private fun DrawScope.drawHorizon(
 private fun Controls(
     view: SkyProjection.View,
     hours: Int,
+    lines: SkyMapViewModel.LinesMode,
     c: NightwirePalette,
     vm: SkyMapViewModel,
 ) {
@@ -377,6 +442,14 @@ private fun Controls(
                 LcarsChip(name, selected = false, onClick = { vm.lookAt(az) })
             }
             LcarsChip("ZENITH", selected = false, onClick = { vm.lookAt(view.azimuthDeg, 85.0) })
+            LcarsChip(
+                linesLabel(lines),
+                // Selected whenever anything is drawn, so the chip shows the state as well as the
+                // next step — a control that only says what it will do leaves you guessing at what
+                // is on when the sky is empty enough that you cannot tell by looking.
+                selected = lines != SkyMapViewModel.LinesMode.NONE,
+                onClick = vm::cycleLines,
+            )
             LcarsChip("−", selected = false, onClick = { vm.zoom(1.0 / ZOOM_STEP) })
             LcarsChip("+", selected = false, onClick = { vm.zoom(ZOOM_STEP) })
         }
@@ -436,6 +509,18 @@ private fun Text(
     fontWeight = if (bold) FontWeight.Bold else null,
 )
 
+/**
+ * What the one lines control says.
+ *
+ * ⚠️ Names what is DRAWN, not what the tap will do. A chip reading "BORDERS" while showing figures
+ * is the shape of control that has to be pressed to find out what it means.
+ */
+private fun linesLabel(mode: SkyMapViewModel.LinesMode): String = when (mode) {
+    SkyMapViewModel.LinesMode.NONE -> "NO LINES"
+    SkyMapViewModel.LinesMode.FIGURES -> "FIGURES"
+    SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS -> "+ BORDERS"
+}
+
 private fun whenLabel(hours: Int): String = when {
     hours == 0 -> "now"
     hours > 0 -> "+${hours}h"
@@ -461,3 +546,21 @@ private const val HORIZON_MARGIN = 1.0
 private const val HORIZON_STEP_DEG = 2.0
 
 private const val ZOOM_STEP = 1.4
+
+/**
+ * How the three kinds of line are told apart.
+ *
+ * ⚠️ **By hue and weight rather than by dashes**, and the reason is the same one the radar screen
+ * gives for glyph-and-brightness: a dashed line is drawn as many short segments, which multiplies
+ * the count of an already large batch, and at a phone's line widths it reads as a rendering fault
+ * rather than as a style.
+ *
+ * The figures are the point of the display, so they are the brightest; the borders are reference
+ * furniture over the whole sky at once and would drown everything at the same weight.
+ */
+private const val FIGURE_WIDTH_DP = 1.1f
+private const val FIGURE_ALPHA = 0.55f
+private const val ASTERISM_WIDTH_DP = 1.0f
+private const val ASTERISM_ALPHA = 0.34f
+private const val BORDER_WIDTH_DP = 0.9f
+private const val BORDER_ALPHA = 0.22f

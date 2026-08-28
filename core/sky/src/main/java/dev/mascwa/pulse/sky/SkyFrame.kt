@@ -24,6 +24,16 @@ class SkyFrame private constructor(
     val zenithX: Double,
     val zenithY: Double,
     val zenithZ: Double,
+    /**
+     * Where the middle of the screen points, as an equatorial unit vector.
+     *
+     * ⚠️ Held here because [SkyProjection.Basis] keeps its own copy `internal`, and `internal` is
+     * module-scoped — this module cannot read it. Culling whole objects against the view needs the
+     * look direction, so it is published once rather than recomputed per object.
+     */
+    val forwardX: Double,
+    val forwardY: Double,
+    val forwardZ: Double,
 ) {
 
     /**
@@ -65,6 +75,7 @@ class SkyFrame private constructor(
             return SkyFrame(
                 basis = SkyProjection.basisOf(forward, z[0], z[1], z[2], view.fovDeg, view.rollDeg),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
+                forwardX = forward[0], forwardY = forward[1], forwardZ = forward[2],
             )
         }
 

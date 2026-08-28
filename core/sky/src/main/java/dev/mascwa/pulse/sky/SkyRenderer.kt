@@ -175,3 +175,100 @@ fun DrawScope.drawStarGlow(
 
 /** How far the halo reaches, as a multiple of the star's own drawn radius. */
 private const val GLOW_RADIUS = 4.5f
+
+/**
+ * Project a set of polylines into a batch of screen-space segments.
+ *
+ * ⚠️ **The per-run cap test comes first and is the reason this is affordable.** The constellation
+ * set is about ninety thousand vertices at the finest subdivision; at a narrow field almost every
+ * run is off screen, and one dot product throws each of those away before any of its vertices is
+ * touched. Without it a quarter-degree field would spend its whole frame projecting points to
+ * discard them.
+ *
+ * ⚠️ **A segment with both ends off screen is KEPT when it straddles.** The rejection is four
+ * half-plane tests, which fire only when both endpoints are outside the SAME side — so a line that
+ * crosses the view with neither end on it survives. That case is the common one when zoomed in, and
+ * an axis-aligned box test would have quietly erased every long line on the screen.
+ *
+ * @param coneCos cosine of [SkyProjection.coneRadiusDeg] for this view — the angle to the screen
+ *   CORNER, not the half-field.
+ * @return how many segments were emitted.
+ */
+fun collectLines(
+    lines: SkyLines,
+    frame: SkyFrame,
+    viewport: SkyProjection.Viewport,
+    coneCos: Double,
+    coneSin: Double,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    into: LineBatch,
+): Int {
+    val basis = frame.basis
+    val marginW = viewport.halfWidth + SkyRenderer.EDGE_MARGIN
+    val marginH = viewport.halfHeight + SkyRenderer.EDGE_MARGIN
+    var drawn = 0
+    for (run in 0 until lines.lines) {
+        if (!lines.visible(run, frame.forwardX, frame.forwardY, frame.forwardZ, coneCos, coneSin)) {
+            continue
+        }
+        val from = lines.start[run]
+        val to = from + lines.length[run]
+        var haveLast = false
+        var lastX = 0.0
+        var lastY = 0.0
+        for (i in from until to) {
+            val p = SkyProjection.projectUnit(lines.vx[i], lines.vy[i], lines.vz[i], basis)
+            if (!p.visible) {
+                // ⚠️ A vertex behind the viewer has no finite screen position, so the run is BROKEN
+                // here rather than joined across the gap. Joining would draw a line from one edge of
+                // the sky to the other — the classic wraparound streak.
+                haveLast = false
+                continue
+            }
+            if (haveLast) {
+                val outside =
+                    (lastX > marginW && p.x > marginW) || (lastX < -marginW && p.x < -marginW) ||
+                        (lastY > marginH && p.y > marginH) || (lastY < -marginH && p.y < -marginH)
+                if (!outside) {
+                    into.add(
+                        centreX + (lastX * halfPx).toFloat(),
+                        centreY + (lastY * halfPx).toFloat(),
+                        centreX + (p.x * halfPx).toFloat(),
+                        centreY + (p.y * halfPx).toFloat(),
+                    )
+                    drawn++
+                }
+            }
+            lastX = p.x
+            lastY = p.y
+            haveLast = true
+        }
+    }
+    return drawn
+}
+
+/**
+ * Draw a collected batch of segments in one call.
+ *
+ * @param paint remembered by the caller, as [drawStarBatches]'s is and for the same reason.
+ */
+fun DrawScope.drawLineBatch(
+    batch: LineBatch,
+    paint: Paint,
+    colour: Color,
+    widthPx: Float,
+    alpha: Float,
+) {
+    if (batch.values == 0) return
+    paint.isAntiAlias = true
+    paint.style = Paint.Style.STROKE
+    // ⚠️ BUTT rather than ROUND, unlike the star paint: a polyline is drawn as many short segments
+    // and a round cap puts a blob at every joint, which at these widths reads as a beaded line.
+    paint.strokeCap = Paint.Cap.BUTT
+    paint.color = colour.toArgb()
+    paint.alpha = (alpha * 255f).toInt().coerceIn(0, 255)
+    paint.strokeWidth = widthPx
+    drawContext.canvas.nativeCanvas.drawLines(batch.points, 0, batch.values, paint)
+}
