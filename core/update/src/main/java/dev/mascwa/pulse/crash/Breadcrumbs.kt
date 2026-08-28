@@ -1,7 +1,5 @@
 package dev.mascwa.pulse.crash
 
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /** One thing that happened, shortly before something went wrong. */
@@ -80,9 +78,4 @@ object Breadcrumbs {
             }
         }
     }
-
-    /** Absolute stamp, used only where a crumb is shown on its own rather than beside a fault. */
-    fun stampOf(crumb: Crumb): String = STAMP.format(Date(crumb.atMs))
-
-    private val STAMP = SimpleDateFormat("HH:mm:ss", Locale.US)
 }
