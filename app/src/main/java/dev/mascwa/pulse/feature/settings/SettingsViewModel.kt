@@ -5,7 +5,6 @@ import android.net.Uri
 import android.text.format.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.settings.SettingsBackup
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -28,7 +27,7 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     private val repo: SettingsRepository,
     private val scheduler: NotificationScheduler,
-    private val diskCache: DiskCache,
+    private val caches: dev.mascwa.pulse.data.cache.AppCaches,
     private val notifier: Notifier,
     private val updates: UpdateRepository,
     /** The same checker pointed at the standalone nutrition app's own release. */
@@ -357,6 +356,10 @@ class SettingsViewModel(
     private val _cacheSize = MutableStateFlow(0L)
     val cacheSize: StateFlow<Long> = _cacheSize
 
+    /** How much the last clear actually gave back. Null until one has run. See [clearCache]. */
+    private val _cacheFreed = MutableStateFlow<Long?>(null)
+    val cacheFreed: StateFlow<Long?> = _cacheFreed
+
     init {
         refreshCacheSize()
         // Keep the background worker in sync with notification/refresh prefs.
@@ -413,12 +416,21 @@ class SettingsViewModel(
     }
 
     fun refreshCacheSize() {
-        viewModelScope.launch { _cacheSize.value = diskCache.sizeBytes() }
+        viewModelScope.launch { _cacheSize.value = caches.bytes() }
     }
 
+    /**
+     * Free what can be freed and say how much that was.
+     *
+     * ⚠️ The freed figure is reported rather than left implied, because [AppCaches.clear] cannot
+     * empty the directory: a download in progress and whatever the platform keeps there on its own
+     * account are deliberately left alone. Without the number, a reading that fell from 300 MB to
+     * 40 MB would read as the button half-working.
+     */
     fun clearCache() {
         viewModelScope.launch {
-            diskCache.clear()
+            val freed = caches.clear()
+            _cacheFreed.value = freed
             refreshCacheSize()
         }
     }

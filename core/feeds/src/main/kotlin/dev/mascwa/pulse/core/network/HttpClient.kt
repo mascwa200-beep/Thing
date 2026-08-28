@@ -27,6 +27,26 @@ class HttpClient(
     private val client: OkHttpClient,
     val json: Json,
 ) {
+    /**
+     * Throw away the HTTP response cache, if this client was built with one.
+     *
+     * ⚠️ **Through OkHttp's own `evictAll`, never by deleting the directory.** A `Cache` holds a
+     * `DiskLruCache` open with a journal; removing files underneath it leaves that journal
+     * describing entries that are no longer there, and the failure surfaces later as reads that
+     * miss or throw rather than as anything connected to the button that was pressed. The same rule
+     * applies to Coil's disk cache, which has its own `clear()` for the same reason.
+     *
+     * Returns how many bytes it was holding, so a caller can say what it freed rather than imply it.
+     */
+    suspend fun evictCache(): Long = withContext(Dispatchers.IO) {
+        val cache = client.cache ?: return@withContext 0L
+        runCatching {
+            val before = cache.size()
+            cache.evictAll()
+            before
+        }.getOrDefault(0L)
+    }
+
     suspend fun getString(
         url: String,
         headers: Map<String, String> = emptyMap(),

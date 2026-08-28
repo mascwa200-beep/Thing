@@ -115,11 +115,16 @@ class NutritionApplication : Application(), ImageLoaderFactory {
     /**
      * The loader Coil actually built, or null if it never asked for one.
      *
-     * ⚠️ **Held here so [onTrimMemory] can clear a cache that EXISTS without creating one that does
+     * ⚠️ **Held here so [onTrimMemory] can clear a loader that EXISTS without building one that does
      * not.** `Coil.imageLoader(context)` builds on demand, so reaching for it under memory pressure
-     * would allocate a fresh memory cache in response to being told memory is short — precisely
-     * backwards. Somebody who has never opened the photographs screen has no loader and should be
-     * left with none.
+     * would construct the whole loader graph in response to being told memory is short — in a
+     * process that, by the very fact of having no loader, has never drawn a picture.
+     *
+     * ⚠️ It is a smaller saving than it first appears, and the earlier wording here overstated it:
+     * `ImageLoader.Builder.memoryCache {}` and `diskCache {}` both wrap their lambda in `LazyKt.lazy`
+     * — read out of the shipped coil-base 2.7.0 bytecode — and `SystemCallbacks`' constructor only
+     * takes a `WeakReference`. So building a loader allocates NO cache and registers nothing; what
+     * this avoids is the object graph, not a cache appearing under pressure.
      */
     @Volatile
     private var loader: ImageLoader? = null

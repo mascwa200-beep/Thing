@@ -1232,9 +1232,24 @@ fun SettingsScreen(
                 val pythonTest by vm.pythonTestResult.collectAsStateWithLifecycle()
                 val pythonTestRunning by vm.pythonTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
-                    PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
-                        onClick = { vm.refreshCacheSize() })
-                    PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    // ⚠️ `megabytes`, not `compact` — that produced "8.4M B", which reads as a unit
+                    // nobody uses. Mebibytes, so the figure matches what a file manager says about
+                    // the same app.
+                    val freed by vm.cacheFreed.collectAsStateWithLifecycle()
+                    PrefClickable(
+                        "Cached data",
+                        value = Formatters.megabytes(cacheSize),
+                        subtitle = "Feeds, images, web responses and downloaded installers. All of " +
+                            "it can be fetched again.",
+                        onClick = { vm.refreshCacheSize() },
+                    )
+                    PrefClickable(
+                        "Clear cache",
+                        // Says what it gave back rather than implying the directory is now empty:
+                        // a download in progress and whatever the platform keeps here are left alone.
+                        subtitle = freed?.let { "Freed ${Formatters.megabytes(it)}." },
+                        onClick = { vm.clearCache() },
+                    )
                     PrefSwitch(
                         "Detailed activity log",
                         "Log full content — your messages and the assistant's tool-call inputs — to the " +

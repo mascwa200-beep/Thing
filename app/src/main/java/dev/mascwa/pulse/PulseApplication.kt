@@ -70,6 +70,10 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         // files, and one call clears both this app's APK and the companion's — they share the
         // directory. On appScope because it touches the filesystem.
         appScope.launch { dev.mascwa.pulse.data.update.UpdateRepository.pruneCache(this@PulseApplication) }
+        // And the photographs the camera left behind. Same reasoning, same launch-time answer: both
+        // callers of `createCameraImageUri` read the file once and abandon it, and a cancelled
+        // capture belongs to no call site at all. See `pruneCameraCaptures` for why an hour.
+        appScope.launch { dev.mascwa.pulse.core.util.pruneCameraCaptures(this@PulseApplication) }
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
         // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).

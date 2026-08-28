@@ -76,6 +76,17 @@ class AppContainer(private val appContext: Context) {
     // ⚠️ `filesDir`, not the `Context` itself. The cache is shared with the desktop companion now,
     // and reading a directory was the only thing it ever wanted a `Context` for.
     val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
+
+    /**
+     * Every rebuildable cache, so Settings can report and clear all of them rather than one.
+     *
+     * ⚠️ The image loader and the HTTP client are passed as lambdas, not instances. Building this
+     * eagerly forces both, and [imageLoader] in particular has no business existing in a process
+     * that never draws a picture — a background worker among them.
+     */
+    val appCaches: dev.mascwa.pulse.data.cache.AppCaches by lazy {
+        dev.mascwa.pulse.data.cache.AppCaches(appContext, diskCache, { imageLoader }, { http })
+    }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
         dev.mascwa.pulse.data.update.UpdateRepository(
