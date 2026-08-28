@@ -344,4 +344,133 @@ class EphemerisTest {
             if (sep > 160) assertTrue("sep $sep should be near-full", p.illuminatedFraction > 0.95)
         }
     }
+
+    // ---- precession -------------------------------------------------------------------------
+
+    private data class Prec(
+        val ms: Long,
+        val raJ2000: Double,
+        val decJ2000: Double,
+        val ra: Double,
+        val dec: Double,
+    )
+
+    /**
+     * Five stars at three epochs, against DE421 read through Skyfield.
+     *
+     * ⚠️ **The expected values are the TRUE equinox of date — precession AND nutation** — because
+     * that is the frame [Ephemeris.sunEquatorial] and [Ephemeris.moonEquatorial] are in, and the
+     * only reason to precess a star here is to compare it with the Moon. Skyfield's
+     * `radec(epoch='date')` gives exactly that. Precession alone leaves about 15 arcseconds, which
+     * is what the first version of this measured before the nutation was added; the bar below is
+     * set at 2 because the measured worst is 1.6 and a tolerance ten times what the code achieves
+     * would let it drift back by a factor of six without going red.
+     *
+     * The five are the four stars bright enough and close enough to the ecliptic for the Moon to
+     * occult visibly, plus Alcyone in the Pleiades. That is not decoration: they are the positions
+     * an occultation is actually computed against.
+     */
+    private val precessions = listOf(
+        // 2026-06-15T00:00:00Z
+        Prec(1781481600000L, 68.98016279, 16.50930235, 69.361792, 16.563893),      // Aldebaran
+        Prec(1781481600000L, 152.09296244, 11.96720878, 152.448633, 11.837125),    // Regulus
+        Prec(1781481600000L, 201.29824736, -11.16131949, 201.649387, -11.299859),  // Spica
+        Prec(1781481600000L, 247.35191542, -26.43200261, 247.760394, -26.490450),  // Antares
+        Prec(1781481600000L, 56.87116533, 24.10516667, 57.267129, 24.187400),      // Alcyone
+        // 2035-01-01T00:00:00Z
+        Prec(2051222400000L, 68.98016279, 16.50930235, 69.482113, 16.575776),
+        Prec(2051222400000L, 152.09296244, 11.96720878, 152.559129, 11.793746),
+        Prec(2051222400000L, 201.29824736, -11.16131949, 201.760597, -11.341249),
+        Prec(2051222400000L, 247.35191542, -26.43200261, 247.889612, -26.503587),
+        Prec(2051222400000L, 56.87116533, 24.10516667, 57.392735, 24.208475),
+        // 2044-08-09T05:00:00Z
+        Prec(2354331600000L, 68.98016279, 16.50930235, 69.622334, 16.599595),
+        Prec(2354331600000L, 152.09296244, 11.96720878, 152.690827, 11.747668),
+        Prec(2354331600000L, 201.29824736, -11.16131949, 201.889255, -11.393759),
+        Prec(2354331600000L, 247.35191542, -26.43200261, 248.039409, -26.528763),
+        Prec(2354331600000L, 56.87116533, 24.10516667, 57.537718, 24.242092),
+    )
+
+    @Test fun precessedStarsMatchJplToBetterThanTwoArcseconds() {
+        var worst = 0.0
+        for (p in precessions) {
+            val got = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val off = Ephemeris.angularSeparationDeg(
+                got.rightAscensionDeg, got.declinationDeg, p.ra, p.dec,
+            )
+            worst = maxOf(worst, off)
+        }
+        assertTrue("worst precessed position is ${worst * 3600} arcsec from DE421", worst < 2.0 / 3600.0)
+    }
+
+    /**
+     * ⚠️ The whole reason this function exists: a J2000 catalogue position is a third of the Moon's
+     * radius away from where the star is now, so an occultation computed without it answers the
+     * wrong question. The bar is a quarter of a degree because in 2026 the drift is 22 arcminutes —
+     * measured, not assumed, and it grows by 50 arcseconds a year.
+     */
+    @Test fun ignoringPrecessionWouldBeWorthMostOfTheMoonsRadius() {
+        for (p in precessions.take(5)) {
+            // How far the function MOVES the catalogue position, not how far the fixture is from
+            // it -- otherwise this asserts something about the fixtures and nothing about the code.
+            val moved = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val drift = Ephemeris.angularSeparationDeg(
+                p.raJ2000, p.decJ2000, moved.rightAscensionDeg, moved.declinationDeg,
+            )
+            assertTrue("2026 drift of ${drift * 60} arcmin", drift > 0.25 && drift < 0.45)
+        }
+    }
+
+    // ---- the topocentric transform ----------------------------------------------------------
+
+    /**
+     * ⚠️ A star has no distance, so it must come back untouched.
+     *
+     * The transform subtracts the observer's position vector in Earth radii; for a body at
+     * infinity that subtraction is meaningless, and a [Ephemeris.Equatorial] with the default
+     * distance of zero would otherwise divide by it. Returning the input unchanged is what lets a
+     * caller put every target through one code path instead of branching on what kind of thing it
+     * is — which is how the two branches come to disagree.
+     */
+    @Test fun aBodyWithNoDistanceIsNotMovedByParallax() {
+        val star = Ephemeris.Equatorial(68.98, 16.5, distanceKm = 0.0)
+        val seen = Ephemeris.topocentric(star, 51.5, -0.13, 1781481600000L)
+        assertEquals(star.rightAscensionDeg, seen.rightAscensionDeg, 0.0)
+        assertEquals(star.declinationDeg, seen.declinationDeg, 0.0)
+    }
+
+    /**
+     * The Moon moves by roughly a degree, which is four times its own width — the fact the whole
+     * of [Eclipses] turns on, and the reason this transform is shared rather than copied. The Sun
+     * barely moves at all.
+     */
+    @Test fun parallaxMovesTheMoonFourTimesItsOwnWidthAndTheSunNotAtAll() {
+        for (r in positions) {
+            val moon = Ephemeris.moonEquatorial(r.ms)
+            val moonHere = Ephemeris.topocentric(moon, r.lat, r.lon, r.ms)
+            val moonShift = Ephemeris.angularSeparationDeg(
+                moon.rightAscensionDeg, moon.declinationDeg,
+                moonHere.rightAscensionDeg, moonHere.declinationDeg,
+            )
+            assertTrue("the Moon shifted $moonShift deg, which is not a lunar parallax", moonShift < 1.05)
+
+            val sun = Ephemeris.sunEquatorial(r.ms)
+            val sunHere = Ephemeris.topocentric(sun, r.lat, r.lon, r.ms)
+            val sunShift = Ephemeris.angularSeparationDeg(
+                sun.rightAscensionDeg, sun.declinationDeg,
+                sunHere.rightAscensionDeg, sunHere.declinationDeg,
+            )
+            assertTrue("the Sun shifted ${sunShift * 3600} arcsec", sunShift < 10.0 / 3600.0)
+        }
+        // And somewhere in the set the Moon really does move most of a degree, or the bound above
+        // would be passing on a transform that does nothing at all.
+        val biggest = positions.maxOf { r ->
+            val m = Ephemeris.moonEquatorial(r.ms)
+            val h = Ephemeris.topocentric(m, r.lat, r.lon, r.ms)
+            Ephemeris.angularSeparationDeg(
+                m.rightAscensionDeg, m.declinationDeg, h.rightAscensionDeg, h.declinationDeg,
+            )
+        }
+        assertTrue("the largest lunar parallax in the set was only $biggest deg", biggest > 0.5)
+    }
 }

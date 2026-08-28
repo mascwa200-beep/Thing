@@ -3,12 +3,10 @@ package dev.mascwa.pulse.core.telemetry
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
-import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.tan
 
 /**
  * When the Sun and the Moon get in each other's way, and what you would actually see of it.
@@ -454,50 +452,20 @@ object Eclipses {
     /**
      * The same body seen from a point on the surface rather than from the centre.
      *
-     * ⚠️ **A real vector subtraction, on a flattened Earth.** The Earth is 0.34% shorter through the
-     * poles, which moves the observer by up to 21 km — about eleven arcseconds of lunar parallax,
-     * which is comparable to the whole error budget of the ephemeris, so it is cheaper to do
-     * properly than to argue about.
+     * ⚠️ **Only the Moon is put through this, and that is deliberate.** At 150 million kilometres
+     * an Earth radius is nine arcseconds, so the Sun barely moves — and including it would mean the
+     * shadow geometry no longer matched the convention every published eclipse magnitude uses.
      *
-     * ⚠️ The Sun is deliberately NOT put through this. At 150 million kilometres an Earth radius is
-     * nine arcseconds, and including it would mean the shadow geometry no longer matched the
-     * convention every published eclipse magnitude uses.
+     * The transform itself lives in [Ephemeris.topocentric], because an occultation search needs
+     * exactly the same one and a second copy of a coordinate rotation is how two features come to
+     * disagree about where the Moon is. This wrapper carries the eclipse-specific reasoning above.
      */
     private fun topocentric(
         eq: Ephemeris.Equatorial,
         latDeg: Double,
         lonDeg: Double,
         epochMs: Long,
-    ): Ephemeris.Equatorial {
-        val lat = latDeg * DEG
-        // Geodetic latitude to the two Earth-radii components (Meeus ch. 11), sea level.
-        val u = atan(0.99664719 * tan(lat))
-        val rhoSin = 0.99664719 * sin(u)
-        val rhoCos = cos(u)
-
-        val lst = (Ephemeris.gmstDeg(Ephemeris.julianDate(epochMs)) + lonDeg) * DEG
-        // Observer, in Earth radii, in the same equatorial frame the body is in.
-        val ox = rhoCos * cos(lst)
-        val oy = rhoCos * sin(lst)
-        val oz = rhoSin
-
-        val r = eq.distanceKm / EARTH_RADIUS_KM
-        val ra = eq.rightAscensionDeg * DEG
-        val dec = eq.declinationDeg * DEG
-        val bx = r * cos(dec) * cos(ra)
-        val by = r * cos(dec) * sin(ra)
-        val bz = r * sin(dec)
-
-        val dx = bx - ox
-        val dy = by - oy
-        val dz = bz - oz
-        val d = sqrt(dx * dx + dy * dy + dz * dz)
-        return Ephemeris.Equatorial(
-            rightAscensionDeg = ((atan2(dy, dx) / DEG) + 360.0) % 360.0,
-            declinationDeg = asin((dz / d).coerceIn(-1.0, 1.0)) / DEG,
-            distanceKm = d * EARTH_RADIUS_KM,
-        )
-    }
+    ): Ephemeris.Equatorial = Ephemeris.topocentric(eq, latDeg, lonDeg, epochMs)
 
     /**
      * The fraction of the Sun's disc hidden by the Moon's — the number people mean by "80%".
