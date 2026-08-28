@@ -9834,3 +9834,102 @@ rather than showing a gate; that the first-launch notice names what is unavailab
 good; Settings → Device-owner controls should carry the same sentence; and MENU → Environment Scanner
 should say **"no ambient-light sensor on this phone"** or **"sensing is not running"** rather than a
 blank where a reading would be.
+
+### THE FIVE BUDGETS NOTHING READ, AND THE EMERGENCY FEED'S FIVE-HOUR ERROR (this session cont., PR #464)
+
+The potato pass shipped `DeviceClass.Budget` with **seven fields and two consumers**. The other five
+were computed on every probe, on both platforms, and read by nothing — this repository's oldest
+recurring defect class, sitting in code written the same session, in the one place the whole arc was
+supposed to spend its adaptivity. Then a sweep for the shape that produced it turned up a real
+wrong number on the emergency path. **Zero subagent and zero workflow spend**, as with every arc
+since the credit directive.
+
+**`imageCacheShare` + `imageDecodePx` (`e1af095`).** Both applications hardcoded `0.06`, arrived at
+independently for the same measured reason; that number is now the budget's, which is 0.06 down to
+MODEST, 0.04 at LEAN and 0.03 at MINIMAL. One `DecodeCapInterceptor` on the shared loader bounds
+every decode with no call-site change.
+- ⚠️ **Coil already bounds most decodes and this does not replace that** —
+  `requestOfWithSizeResolver` installs a `ConstraintsSizeResolver` unless the request names its own
+  size or `contentScale` is `None`, read out of the shipped coil-compose 2.7.0 bytecode. What it
+  does NOT bound is a dimension the layout left open, which arrives as `Dimension.Undefined` and
+  means *decode at source resolution*. A `fillMaxWidth()` image in a scrolling Column has exactly
+  that shape.
+- ⚠️ **It DOES change FULL behaviour**, and saying so beats pretending otherwise: at FULL the cap is
+  2048 px, above any phone screen, but a 4000 px article image is now decoded at 2048.
+- ⚠️ **`durableBudget()` versus `budgetCached()` is the load-bearing distinction.** A structure sized
+  once and kept for the process (the memory cache, the OkHttp dispatcher, a WorkManager period) must
+  NOT carry a momentary thermal reading, or a phone that merely happened to be warm at launch is
+  throttled all day; pressure arriving later is already handled by `onTrimMemory`. A per-request
+  decision (a decode size, a background download) wants the opposite. `budgetCached()` exists
+  because `probe()` makes five binder calls and a content-provider query — nothing once, ruinous per
+  thumbnail.
+
+**`parallelism`, `backgroundScale`, `heavyEngines` (`aa080b5`).**
+- **parallelism → the shared OkHttp dispatcher.** `maxRequests = 64` on a 2 GB phone is 64 threads,
+  sockets and read buffers. New pure `DeviceClass.scaleFanOut` scales a full-strength limit down —
+  MINIMAL gets 21 and 4. ⚠️ **DOWN only**: these limits were chosen against what a SERVER tolerates
+  and this repo has already earned one rate-limit ban being generous. ⚠️ `FULL_PARALLELISM` is
+  DERIVED from `budgetFor`, so it cannot drift — a `val` computed from the source of truth needs no
+  test to stay honest.
+- **backgroundScale → the worker's period.** ⚠️ Capped at the longest interval the settings picker
+  offers. Ran the shipped expression over the real picker × every tier: FULL unchanged at
+  15/30/60/120/240, MINIMAL on the default hour woken every four, and without the cap a MINIMAL
+  phone set to four hours would be woken about once a day. ⚠️ **The emergency watch is untouched**
+  and its own file says why at length.
+- **heavyEngines → the automatic gigabyte, and NOTHING else.** The provisioner asked only about
+  storage, which is not the binding constraint — a phone can have room for a model and no hope of
+  running it. ⚠️ A person tapping the download button is NOT overruled, and a model already on the
+  device is still loaded; the field's KDoc was narrowed to what it actually governs rather than left
+  claiming the engines wholesale.
+
+**`1a89c58` — the `SafetyRepository` trap survived in two more repositories, one of them the
+emergency path.** A `SimpleDateFormat` keeps a mutable `Calendar`, so one held as a field on a
+singleton is not safe to share. Exposure measured, not assumed: `EmergencyAlertRepository` has two
+independent callers on different threads (`BriefEngine.publish` from the worker,
+`EmergencyWatchService.sweep` on its own IO scope every sixty seconds) and `OrbitalRepository` has
+two consumers with their own scopes.
+
+⚠️ **The migration then turned up a second defect that had always been there.** Running the old and
+new implementations side by side over the real forms this feed publishes — 7 of 8 identical, and the
+one that differs is the bug:
+
+    2026-08-28T14:30:00.000-05:00
+      old -> 2026-08-28T14:30:00Z   (the -05:00 offset silently discarded)
+      new -> 2026-08-28T19:30:00Z
+
+The old pattern rejected fractional seconds, so that string fell through to the offset-less branch,
+which reads the first nineteen characters AS UTC — **five hours out, on an alert expiry**.
+
+**`Breadcrumbs.stampOf` deleted**: a public function holding a shared mutable formatter, in the one
+crash-layer class designed to be called from every thread, with zero callers.
+
+**Checked and deliberately left, so the next sweep does not re-chase them:** `SpaceWeatherRepository`,
+`SocialRepository` and `SafetyRepository` are already on `java.time`; `LaunchRepository`, `SkyDigest`
+and `Formatters` construct per call rather than sharing, so they carry allocation and not a race; the
+screen-level `DATE_FMT` fields (`NotesBody`, `DiaryBody`, `CrashLogScreen`, `RedAlertActivity`) are
+reached only from composition, which is single-threaded. `UsageRepository.SECRET_PATTERNS` looked
+like per-call `Regex` construction and is a companion `val` — a false positive of the sweep.
+
+**Verification, all local.** 2,144 `:core:telemetry` tests green **through Gradle** — the task CI
+runs, not the kotlinc runner; `:core:feeds:classes` and `:desktop:build` (274 tests) both compile,
+the latter being the tandem check since shared modules changed; five new `scaleFanOut` tests with
+both load-bearing rules negative-tested against a baseline asserted green first, restored in a
+`finally`; `DecodeCapInterceptor` type-checked completely clean against the real coil-base 2.7.0 AAR
+with that gate negative-tested (`d.pixels` for `d.px` is caught).
+
+⚠️ **`tools/android_resolve_check.sh` now documents a THIRD cascading module.** `:core:update` is on
+neither of its classpaths, so every member of `DeviceProbeReader` and friends cascades, and a member
+just ADDED has no baseline complaint to cancel against — it reads exactly like a defect. The cheap
+control, now written into the script: plant a symbol from that module that unquestionably compiles in
+CI (`deviceProbe.budget()`), re-run, and if it reports identically the complaint is the classpath.
+⚠️ Also recorded there: `:core:feeds` is on that classpath as COMPILED CLASSES, so after changing a
+`:core:feeds` signature run `./gradlew :core:feeds:classes --configure-on-demand
+--no-configuration-cache` or the gate reports the new parameter as unresolved.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it cannot measure a phone. Everything above is
+invisible on a flagship BY DESIGN: FULL is byte-for-byte today's behaviour at every one of the seven
+budgets, which is what makes it safe to ship without hardware. The place to look is
+**Settings → Device & OS**, whose readout already names the tier, the pressure, what could not be
+measured, and a "So:" line stating exactly what the app is doing differently — animations, decode
+size, cache share, fan-out, background scale, work tier, heavy engines. On the Galaxy A16 that line
+is the whole test.

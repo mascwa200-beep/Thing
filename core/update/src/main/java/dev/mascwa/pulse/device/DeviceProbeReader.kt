@@ -143,9 +143,8 @@ class DeviceProbeReader(context: Context) {
         )
     }
 
+    /** Which class of phone this is. See [durableBudget], its only caller — and [budget] otherwise. */
     fun tier(): DeviceClass.Tier = DeviceClass.tierOf(probe())
-
-    fun pressure(): DeviceClass.Pressure = DeviceClass.pressureOf(probe())
 
     /** What the rest of the app may spend. The single entry point — see [DeviceClass.budgetFor]. */
     fun budget(): DeviceClass.Budget = DeviceClass.budgetFor(probe())
@@ -188,7 +187,7 @@ class DeviceProbeReader(context: Context) {
      * because there pressure genuinely is the right input.
      */
     fun durableBudget(): DeviceClass.Budget =
-        DeviceClass.budgetFor(DeviceClass.tierOf(probe()), DeviceClass.Pressure.NONE)
+        DeviceClass.budgetFor(tier(), DeviceClass.Pressure.NONE)
 
     /** One block of text for a diagnostic screen, naming what could not be measured as well as what could. */
     fun describe(): String = DeviceClass.describe(probe())

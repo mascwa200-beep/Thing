@@ -24,6 +24,12 @@ package dev.mascwa.pulse.core.telemetry
  * code already did before this existed, which is also what makes this safe to ship without hardware
  * to test it on: the phone in the owner's pocket cannot regress.
  *
+ * ⚠️ **One exception, stated rather than glossed, because an overstated claim here is worse than the
+ * exception.** [Budget.imageDecodePx] is 2048 at FULL where before there was no cap at all, so an
+ * image published larger than that is now decoded smaller. 2048 is above any phone screen, so
+ * nothing anybody looks at is softer — but "byte for byte" is not literally true of that one field,
+ * and the cap is written generous precisely because it applies at every tier including this one.
+ *
  * ## Where the numbers come from
  *
  * ⚠️ `ActivityManager.MemoryInfo.totalMem` **excludes kernel-reserved memory**, so a phone sold as
