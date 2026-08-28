@@ -127,3 +127,86 @@ TO REBUILD
     It fetches from the Gaia archive in tiles, splitting any query that comes
     back at the archive's undocumented 50,000-row ceiling, and verifies its own
     output by reading it back before it finishes. Expect it to take some hours.
+
+
+================================================================================
+
+
+constellations.json — where it comes from and what was done to it
+=================================================================
+
+SOURCE — THE FIGURES, ASTERISMS AND BOUNDARY EDGES
+    Stellarium's "modern" sky culture
+    https://github.com/Stellarium/stellarium/blob/master/skycultures/modern/index.json
+
+    ⚠️ LICENCE: Creative Commons Attribution-ShareAlike 4.0 International
+    (CC BY-SA 4.0), stated in that sky culture's own description.md under
+    "License: Text and data: CC BY-SA 4.0". Only the text and data are used
+    here — none of the illustrations, which carry a different licence.
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+    The boundary edges in that file are themselves attributed by Stellarium to
+    Pierre Barbier's transcription of the IAU boundaries, which descend from
+    Delporte (1930): https://pbarbier.com/constellations/edges_18.txt
+
+SOURCE — THE STAR POSITIONS
+    Hipparcos, the New Reduction of the Raw Data
+    van Leeuwen F., 2007, A&A 474, 653
+    Catalogue I/311 from the Centre de Données astronomiques de Strasbourg:
+    https://cdsarc.cds.unistra.fr/ftp/I/311/
+
+WHAT WAS DONE TO IT
+    tools/sky/build_constellations.py joins the three and writes one file:
+
+        88 constellation figures    695 segments over 914 polyline points
+        76 asterisms                11 "ray helper" entries excluded, being
+                                    scaffolding for pointer lines rather than
+                                    shapes anybody names
+        912 star positions          every figure and asterism vertex, stored
+                                    once and referenced by index
+        781 boundary edges          B1875, each naming both adjacent
+                                    constellations
+
+    ⚠️ THE FIGURES NAME THEIR VERTICES BY HIPPARCOS NUMBER, AND NEITHER BUNDLED
+    CATALOGUE CARRIES ONE. stars.tsv drops the cross-references (see above) and
+    stars.skycat is positions only. So each of the 912 is resolved against
+    Hipparcos here, at build time, and the app needs no cross-identification
+    index at all.
+
+    Hipparcos positions are at epoch J1991.25 and everything else this app draws
+    is J2000, so each is carried forward 8.75 years by its own proper motion.
+    That is not a formality: measured over these 912 the median shift is 0.49
+    arcseconds and the worst is 32.46 (Alpha Centauri A), which at the narrowest
+    field the map allows is thirty-nine screen pixels — a figure line visibly
+    missing the star it is drawn to. `pmRA` in that file is mu_alpha*, already
+    including cos(declination), which was settled against Polaris rather than
+    assumed.
+
+    ⚠️ THE BOUNDARIES ARE KEPT IN B1875 ON PURPOSE, NOT CONVERTED. The IAU
+    boundaries were defined in 1930 as straight lines of right ascension and
+    declination in the B1875 frame, so in any later frame they are curves. The
+    J2000 file at CDS (VI/49 bound_20.dat) approximates those curves with 11,415
+    added "shape points" — the same information as 781 straight edges, at
+    fifteen times the size and fixed to one epoch. Storing the edge lets the map
+    generate the curve for whatever date it is drawing.
+
+    Nothing else in that sky culture is used: not the illustrations, not the
+    references, not the 660 traditional star names.
+
+TO REBUILD
+    curl -o /tmp/index.json https://raw.githubusercontent.com/Stellarium/stellarium/master/skycultures/modern/index.json
+    curl -o /tmp/hip2.dat.gz https://cdsarc.cds.unistra.fr/ftp/I/311/hip2.dat.gz
+    python3 tools/sky/build_constellations.py /tmp/index.json /tmp/hip2.dat.gz \
+        app/src/main/assets/sky/constellations.json
+
+    ⚠️ CDS lists logical file names in its ReadMe and stores them gzipped, so a
+    request for the name the ReadMe prints returns a 404 page — and curl saves
+    it and exits successfully. Check the first two bytes are 1f 8b.
+
+    The builder re-derives Alpha Centauri A from its own output and refuses to
+    finish if it has moved more than an arcsecond from its published J2000
+    position, which is the guard against a dropped epoch correction or a shifted
+    column. It also refuses if fewer than all 781 edge rows parsed, if the
+    boundary right ascensions do not span the sky, or if a boundary names a
+    constellation the figures do not know.
