@@ -36,6 +36,7 @@ import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.LcarsIcons
@@ -74,7 +75,17 @@ private enum class SkyTab(val label: String) {
 }
 
 @Composable
-fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
+fun OrbitalScreen(
+    vm: OrbitalViewModel,
+    onBack: (() -> Unit)? = null,
+    /**
+     * Opens the full-screen chart.
+     *
+     * ⚠️ Additive and defaulted, so the one existing call site and the embedded [OrbitalBody]
+     * hosts are untouched. Null hides the control rather than showing one that does nothing.
+     */
+    onOpenSkyMap: (() -> Unit)? = null,
+) {
     PulseScaffold(
         title = "Observatory",
         onBack = onBack,
@@ -82,13 +93,17 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
             IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },
     ) { innerPadding ->
-        OrbitalBody(vm, Modifier.padding(innerPadding))
+        OrbitalBody(vm, Modifier.padding(innerPadding), onOpenSkyMap)
     }
 }
 
 /** The observatory body, scaffold-free so it can also be hosted inside another screen. */
 @Composable
-fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
+fun OrbitalBody(
+    vm: OrbitalViewModel,
+    modifier: Modifier = Modifier,
+    onOpenSkyMap: (() -> Unit)? = null,
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val tonight by vm.tonight.collectAsStateWithLifecycle()
     val passes by vm.passes.collectAsStateWithLifecycle()
@@ -131,7 +146,7 @@ fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
                         SkyTab.SATELLITES ->
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
                         SkyTab.SHOWERS -> showersTab(showers, site != null, c)
-                        SkyTab.CHART -> chartTab(d, tonight, c)
+                        SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
                         SkyTab.ASTEROIDS -> asteroidsTab(d, c)
                         SkyTab.LAUNCHES -> launchesTab(launches, c)
@@ -387,6 +402,7 @@ private fun LazyListScope.chartTab(
     d: OrbitalData?,
     tonight: OrbitalViewModel.Tonight?,
     c: NightwirePalette,
+    onOpenSkyMap: (() -> Unit)?,
 ) {
     item { LcarsHeaderBar("Looking up", trailing = "zenith at centre") }
     item {
@@ -425,6 +441,18 @@ private fun LazyListScope.chartTab(
             }
         }
         LcarsSkyPlot(points, Modifier.fillMaxWidth().height(320.dp))
+    }
+    if (onOpenSkyMap != null) {
+        item {
+            // This plot holds the Sun, the Moon and five planets in a fixed 320dp square. The map
+            // holds 8,404 stars as well and you can move around in it, which is what somebody
+            // standing outside actually wants.
+            LcarsButton(
+                "OPEN THE FULL SKY MAP",
+                onClick = onOpenSkyMap,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
     item {
         Hint(

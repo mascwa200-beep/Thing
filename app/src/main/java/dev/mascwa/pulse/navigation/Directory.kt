@@ -74,6 +74,9 @@ val GROUPS = listOf(
             listOf("aurora", "northern lights", "kp", "sun", "flare", "geomagnetic")),
         MenuEntry("Satellites & Asteroids", "The ISS, the Moon and close asteroid passes", Routes.ORBITAL,
             listOf("iss", "space station", "orbit", "sky tonight", "launches", "planets")),
+        MenuEntry("Sky Map", "Point it at the sky — 8,404 stars, offline", Routes.SKYMAP,
+            listOf("stars", "star chart", "constellation", "planetarium", "astronomy", "night sky",
+                "meteor", "shower")),
     )),
     MenuGroup("SOUND", { it.amber }, listOf(
         MenuEntry("Radio", "Local and internet stations, plays in the background", Routes.RADIO,

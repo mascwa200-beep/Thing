@@ -19,6 +19,7 @@ object Routes {
     const val COMPASS = "compass"
     const val SPACE_WX = "space_wx"
     const val ORBITAL = "orbital"
+    const val SKYMAP = "skymap" // the full-screen, pannable star chart
 
     // Survive
     const val SURVIVE = "survive"

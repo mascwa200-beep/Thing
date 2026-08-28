@@ -275,7 +275,15 @@ fun PulseApp(
             }
             composable(Routes.ORBITAL) {
                 val vm: OrbitalViewModel = viewModel(factory = factory)
-                OrbitalScreen(vm, onBack = { navController.popBackStack() })
+                OrbitalScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenSkyMap = { navController.navigate(Routes.SKYMAP) },
+                )
+            }
+            composable(Routes.SKYMAP) {
+                val vm: dev.mascwa.pulse.feature.sky.SkyMapViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.sky.SkyMapScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Survive (Phase 2) — all in the LCARS palette (matches TOOLS/QUESTS) ----

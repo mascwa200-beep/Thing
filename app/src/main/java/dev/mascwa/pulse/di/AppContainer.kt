@@ -310,6 +310,16 @@ class AppContainer(private val appContext: Context) {
     val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
+    /**
+     * The bundled star catalogue.
+     *
+     * ⚠️ Lazy, and it matters more here than usual: the parse is a quarter of a megabyte and 8,404
+     * objects, so a phone that never opens the sky map never pays for it at all.
+     */
+    val starCatalog: dev.mascwa.pulse.data.sky.StarCatalog by lazy {
+        dev.mascwa.pulse.data.sky.StarCatalog(appContext)
+    }
+
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
     }
