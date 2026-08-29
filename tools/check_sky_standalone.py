@@ -10,9 +10,18 @@ Three checks, and the third is the one that would actually catch a regression:
 
   1. **The project-dependency graph never reaches `:app`.** Walked transitively from `:sky`, so a
      shared module growing a dependency on the application is caught, not only a direct one.
-  2. **The manifest names no LCARS component or package.**
+  2. **The merged manifest declares no component from an LCARS-only package.**
   3. **The dex carries no class from a package that exists only in `:app`.** This is the real
      test. The other two are declarations; this is what shipped.
+
+⚠️ **Checks 2 and 3 ask ONE question and now share ONE function**, `declared_in` — because the first
+version of this file asked it two different ways and the weaker way was wrong. See the partition note
+below: check 3 was written with the derived rule and check 2 with a bare `dev.mascwa.pulse` substring
+search, and on its first real run that substring condemned `:core:update`'s own install-result
+receiver — shared code the star map legitimately contains, which check 3 passed in the same run. Two
+statements of one rule, one of them drifted. The syntaxes still differ (a dex type descriptor is
+`Lpath/to/Name;`, a manifest component is `path.to.Name`), so the separator and the terminator are
+parameters; the rule is not.
 
 ⚠️ **THE MARKER SET IS DERIVED, NEVER HAND-LISTED**, for the reason this repository has now
 corrected several times over: a hand-kept list beside a set of real facts drifts silently, and the
@@ -25,7 +34,10 @@ prefix-matching `dev.mascwa.pulse`. Measured: seven packages are declared in BOT
 shared module — `core.network`, `core.util`, `data.health`, `data.settings`, `data.weather`,
 `feature.health` and `feature.sky` — the last of which is `:core:sky`'s own. A check that read
 `dev.mascwa.pulse` as "LCARS code" would fail on the star chart itself, and a check that read only
-`:app`'s directory would miss nothing but claim far more than it proved.
+`:app`'s directory would miss nothing but claim far more than it proved. `:core:update`'s namespace
+`dev.mascwa.pulse.data.update` is the same case and is what the substring version actually tripped
+over: the module was carved out of `:app` and kept the package it came from, which is a naming
+choice and not a dependency.
 
 ⚠️ **The positive control is load-bearing and is not decoration.** Every check here is an ABSENCE,
 and an absence proves nothing until the search is known to find something. If the dex were
@@ -109,21 +121,87 @@ def declared_packages(root: str) -> set[str]:
     return found
 
 
-def app_only_packages() -> set[str]:
-    """Packages declared in `:app` and in no shared module — LCARS's own code.
+APPLICATIONS = (":app", ":sky", ":nutrition", ":desktop")
 
-    The shared set is every non-application module in the build, so a module added later is included
-    without this file being edited.
-    """
-    app = declared_packages(os.path.join(ROOT, "app", "src", "main"))
+
+def shared_packages() -> set[str]:
+    """Every package declared by a non-application module, so a module added later is included
+    without this file being edited."""
     shared: set[str] = set()
     for module in modules():
-        if module in (":app", ":sky", ":nutrition", ":desktop"):
+        if module in APPLICATIONS:
             continue
         main = os.path.join(module_dir(module), "src", "main")
         if os.path.isdir(main):
             shared |= declared_packages(main)
-    return app - shared
+    return shared
+
+
+def app_only_packages() -> set[str]:
+    """Packages declared in `:app` and in no shared module — LCARS's own code."""
+    return declared_packages(os.path.join(ROOT, "app", "src", "main")) - shared_packages()
+
+
+def all_packages() -> set[str]:
+    """Every package this build declares anywhere.
+
+    Used only to tell a sub-package from a class: a name that is itself a package we declare is a
+    package reference however much it looks like a class from the outside.
+    """
+    every = shared_packages()
+    for module in APPLICATIONS:
+        main = os.path.join(module_dir(module), "src", "main")
+        if os.path.isdir(main):
+            every |= declared_packages(main)
+    return every
+
+
+def declared_in(text: str, package: str, sep: str, head: str = "", tail: str = "") -> set[str]:
+    """The classes declared DIRECTLY in `package` that `text` names, as bare leaf names.
+
+    ⚠️ **DIRECTLY — one more segment and no further separator — and getting that wrong is what made
+    the first version of check 2 reject every real build.** `dev.mascwa.pulse` is itself an
+    LCARS-only package (it holds `MainActivity` and `PulseApplication`), so as a plain prefix it also
+    matches `dev.mascwa.pulse.data.update.ApkInstaller$ResultReceiver`, `dev.mascwa.pulse.sky.…` and
+    every other shared class. Sub-packages are not missed by this: each is derived on its own merits
+    and joins the marker set when it is LCARS-only, which is the whole reason the set is per-package
+    rather than one prefix.
+
+    `$` is deliberately inside the name run rather than a boundary — `Outer$Inner` is one class, and
+    treating the `$` as a terminator would let a nested class in an LCARS-only package go unreported.
+
+    `sep`/`head`/`tail` carry the two syntaxes: a dex type descriptor is `Lpath/to/Name;` and a
+    manifest component is `path.to.Name` with nothing after it, so the manifest form has to say
+    "and nothing that would continue this name" as a lookahead instead of matching a terminator.
+    `tail` is a regex fragment, NOT a literal — it is not escaped.
+
+    ⚠️ **Leaf names rather than a yes/no, because a SUB-PACKAGE looks exactly like a class here and
+    the caller is the only thing that can tell them apart.** Measured before it could reach CI: the
+    bare string `dev.mascwa.pulse.sky` — `:core:sky`'s own namespace, which a library module with no
+    manifest of its own still carries — matches under the marker `dev.mascwa.pulse` with `sky` as
+    the supposed class. Returning the leaf lets [not_a_package] drop it. The convention that saves
+    this (packages lowercase, classes capitalised) is only a convention, so the check is against the
+    real declared set rather than against the capital letter.
+    """
+    pattern = (
+        head
+        + re.escape(package.replace(".", sep))
+        + re.escape(sep)
+        + r"([A-Za-z_][A-Za-z0-9_$]*)"
+        + tail
+    )
+    return {match.group(1) for match in re.finditer(pattern, text)}
+
+
+def not_a_package(package: str, leaves: set[str], known: set[str]) -> set[str]:
+    """Of `leaves` found under `package`, those that are not themselves a package we declare."""
+    return {leaf for leaf in leaves if f"{package}.{leaf}" not in known}
+
+
+# The two syntaxes, as keyword bundles so a call site reads as "which artifact" rather than as four
+# punctuation arguments.
+DEX_SYNTAX = {"sep": "/", "head": "L", "tail": ";"}
+MANIFEST_SYNTAX = {"sep": ".", "head": "", "tail": r"(?![A-Za-z0-9_$.])"}
 
 
 def dex_bytes(apk: str) -> bytes:
@@ -153,73 +231,103 @@ def check_graph() -> bool:
     return True
 
 
-def check_manifest(apk: str) -> bool:
-    """No LCARS package named anywhere in the merged manifest.
+# The component that MUST be found for the manifest check's absences to mean anything. It is
+# `:core:update`'s install-result receiver, written fully qualified in that library's own manifest —
+# and the merger only ever expands a relative `android:name` to an absolute one, never the reverse,
+# so it survives verbatim. ⚠️ It is also the exact declaration the substring version of this check
+# wrongly condemned, which makes it the right control: the rule now has to accept it and find it.
+MANIFEST_CONTROL = "dev.mascwa.pulse.data.update"
 
-    ⚠️ The binary manifest is not text, but a package name survives in it as a UTF-16 string, so the
-    check searches for both encodings. Finding `dev.mascwa.pulse` here would mean a `<queries>`
-    entry, a provider authority or a component reaching into the other application.
+
+def check_manifest(apk: str, markers: list[str], known: set[str]) -> bool:
+    """No component from an LCARS-only package named in the merged manifest.
+
+    ⚠️ The binary manifest is not text, but its strings survive in it, so the whole blob is decoded
+    both ways and searched as text rather than parsed. UTF-16 is the usual encoding for an AXML
+    string pool and UTF-8 appears in some; a region that is neither decodes to garbage that cannot
+    match an ASCII package name. `latin-1` is not among them on purpose — it would map the UTF-16
+    NUL padding into the text and break every name in half.
+
+    Finding an LCARS-only component here would mean a `<queries>` entry, a provider authority or a
+    receiver reaching into the other application.
     """
     with zipfile.ZipFile(apk) as archive:
         raw = archive.read("AndroidManifest.xml")
-    needle = "dev.mascwa.pulse"
-    hits = [
-        label
-        for label, encoded in (("utf-8", needle.encode()), ("utf-16-le", needle.encode("utf-16-le")))
-        if encoded in raw
-    ]
-    if hits:
-        print(f"::error::the manifest names dev.mascwa.pulse ({', '.join(hits)}) — it should name only dev.mascwa.sky.")
-        return False
-    if b"dev.mascwa.sky" not in raw and "dev.mascwa.sky".encode("utf-16-le") not in raw:
+
+    texts = [raw.decode("utf-8", errors="ignore"), raw.decode("utf-16-le", errors="ignore")]
+
+    # The decode works — a substring, deliberately not routed through the regex, so this control and
+    # the one below fail for different reasons and each says which half is broken.
+    if not any("dev.mascwa.sky" in text for text in texts):
         print("::error::the manifest does not name dev.mascwa.sky — this check is not reading it.")
         return False
-    print("  the manifest names dev.mascwa.sky and no LCARS package")
+
+    # And the rule finds what it is supposed to find. Without this, a pattern that matched NOTHING
+    # would report every absence as a pass, which is the failure mode a search-for-absence has.
+    control = set()
+    for text in texts:
+        control |= not_a_package(MANIFEST_CONTROL, declared_in(text, MANIFEST_CONTROL, **MANIFEST_SYNTAX), known)
+    if not control:
+        print(f"::error::the manifest positive control ({MANIFEST_CONTROL}.*) was NOT found.")
+        print("The manifest is being read but the matching rule finds nothing in it, so every")
+        print("'absent' below would be meaningless. Either :core:update stopped declaring its")
+        print("install-result receiver, or `declared_in` is broken. Fix this before trusting a pass.")
+        return False
+
+    found: dict[str, set[str]] = {}
+    for package in markers:
+        leaves: set[str] = set()
+        for text in texts:
+            leaves |= not_a_package(package, declared_in(text, package, **MANIFEST_SYNTAX), known)
+        if leaves:
+            found[package] = leaves
+
+    if found:
+        print(f"::error::the merged manifest names {len(found)} package(s) that exist only in LCARS:")
+        for package in sorted(found):
+            print(f"    {package}.{{{', '.join(sorted(found[package]))}}}")
+        print("A shared module declares an LCARS component, or a manifest string was left behind")
+        print("in an application's own namespace when the module holding it was carved out.")
+        return False
+
+    print(f"  the manifest names dev.mascwa.sky and none of the {len(markers)} LCARS-only packages")
     return True
 
 
-def check_dex(apk: str) -> bool:
-    blob = dex_bytes(apk)
-    print(f"  dex: {len(blob)} bytes")
+def check_dex(apk: str, markers: list[str], known: set[str]) -> bool:
+    raw = dex_bytes(apk)
+    print(f"  dex: {len(raw)} bytes")
 
-    if POSITIVE_CONTROL.encode() not in blob:
+    # ⚠️ `latin-1` and nothing else: it is the one codec that maps every byte 1:1 to a codepoint, so
+    # scanning the decoded text is byte-exact for the ASCII patterns here and the dex's binary
+    # regions cannot swallow or split a descriptor. A lossy decode would silently drop bytes and
+    # every absence below would be worth less than it looks.
+    blob = raw.decode("latin-1")
+
+    if POSITIVE_CONTROL not in blob:
         print(f"::error::the positive control {POSITIVE_CONTROL} is NOT in the dex.")
         print("Every other result here is an absence, and an absence proves nothing when the search")
         print("cannot find something that is certainly there. Either the dex is obfuscated (R8 was")
         print("turned on for :sky), or it was extracted wrongly. This gate is not working — fix it")
         print("before trusting a pass.")
         return False
-    if SENTINEL.encode() in blob:
+    if SENTINEL in blob:
         print("::error::the sentinel matched — this search cannot tell present from absent.")
         return False
 
-    markers = sorted(app_only_packages())
-    if not markers:
-        print("::error::no LCARS-only packages were derived — the derivation is broken, not the APK.")
-        return False
-
-    # ⚠️ **A CLASS IN THIS PACKAGE, NOT ANYTHING BENEATH IT — and the first version of this check
-    # got that wrong in a way that would have failed every real build.** `dev.mascwa.pulse` is
-    # itself an LCARS-only package (it holds `MainActivity` and `PulseApplication`), so as a PREFIX
-    # its descriptor `Ldev/mascwa/pulse/` matches every shared class as well: the star renderer, the
-    # catalogue reader, the whole pure core. Found by running the gate over a synthetic APK carrying
-    # nothing but sky classes, which it duly rejected.
-    #
-    # A dex type descriptor is `Lpath/to/Name;`, so a class declared DIRECTLY in a package is the
-    # package path, one more segment, and the semicolon — no further slash. Sub-packages are not
-    # missed by this: each is derived on its own merits, joining the set when it is LCARS-only and
-    # staying out when it is shared. That is the whole reason the set is per-package rather than a
-    # single prefix.
-    found = []
+    # ⚠️ The package filter is applied here too even though a dex descriptor ends in `;` and a bare
+    # package can never wear one. One rule, both artifacts — a second spelling of it is what this
+    # commit exists to remove, and a filter that is a no-op here costs nothing.
+    found: dict[str, set[str]] = {}
     for package in markers:
-        pattern = re.compile(rb"L" + re.escape(package.replace(".", "/").encode()) + rb"/[^/;]+;")
-        if pattern.search(blob):
-            found.append(package)
+        leaves = not_a_package(package, declared_in(blob, package, **DEX_SYNTAX), known)
+        if leaves:
+            found[package] = leaves
 
     if found:
         print(f"::error::the star map's APK carries {len(found)} package(s) that exist only in LCARS:")
-        for package in found:
-            print(f"    {package}")
+        for package in sorted(found):
+            print(f"    {package}.{{{', '.join(sorted(found[package]))}}}")
         print("A shared module has grown a dependency on application code, or a package moved.")
         return False
 
@@ -245,8 +353,15 @@ def main() -> int:
 
     ok = check_graph()
     if apk:
-        ok = check_manifest(apk) and ok
-        ok = check_dex(apk) and ok
+        # Derived once and handed to both artifact checks, so they cannot come to disagree about
+        # what "LCARS code" means — which is exactly what happened when each had its own rule.
+        markers = sorted(app_only_packages())
+        if not markers:
+            print("::error::no LCARS-only packages were derived — the derivation is broken, not the APK.")
+            return 1
+        known = all_packages()
+        ok = check_manifest(apk, markers, known) and ok
+        ok = check_dex(apk, markers, known) and ok
     else:
         print("  (no APK given — the graph check is all that ran)")
     print("standalone" if ok else "NOT standalone")
