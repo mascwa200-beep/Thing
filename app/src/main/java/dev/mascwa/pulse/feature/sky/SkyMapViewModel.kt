@@ -134,20 +134,20 @@ class SkyMapViewModel(
      * the equatorial frame, so scrubbing the clock moves them exactly as it moves the stars — which
      * is to say, not at all in this frame, and entirely in the drawn one.
      *
-     * ⚠️ The obliquity is read ONCE, at construction, and that is deliberate rather than lazy: it
-     * drifts about 0.013 degrees a century, so across the hours this map's time control offers the
-     * change is smaller than any pixel on any screen. Rebuilding per scrub would be arithmetic spent
-     * to move nothing.
+     * ⚠️ The obliquity AND the epoch these are the circles of are read ONCE, at construction, and
+     * that is deliberate rather than lazy. The obliquity drifts about 0.013 degrees a century;
+     * precession, which carries them into the catalogue's frame, moves them about half an arcminute
+     * a year — so across the day this map's time control offers the change is a seventh of an
+     * arcsecond, smaller than any pixel on any screen. Rebuilding per scrub would be arithmetic
+     * spent to move nothing.
      */
     val equatorLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
     val eclipticLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
 
     init {
-        ReferenceLines.fill(equatorLine, null)
-        ReferenceLines.fill(
-            eclipticLine,
-            Ephemeris.trueObliquityDeg(System.currentTimeMillis()),
-        )
+        val built = System.currentTimeMillis()
+        ReferenceLines.fill(equatorLine, null, built)
+        ReferenceLines.fill(eclipticLine, Ephemeris.trueObliquityDeg(built), built)
     }
 
     /**
@@ -574,9 +574,11 @@ class SkyMapViewModel(
             // searched a list that had been converted to the horizon on every rebuild; that list no
             // longer holds stars, and this is both cheaper and the reason it can go.
             val at = System.currentTimeMillis() + _hourOffset.value * 3_600_000L
-            val eq = Ephemeris.toEquatorial(
-                Ephemeris.Horizontal(alt, az, 0.0), here.latitude, here.longitude, at,
-            )
+            // ⚠️ Through the same boundary the frame is built with, so a tap resolves in exactly
+            // the frame the stars are drawn in. Doing the conversion by hand here is what would put
+            // the touch twenty arcminutes from the dot it landed on — invisible at a wide field and
+            // the whole screen at the narrowest.
+            val eq = SkyFrame.catalogueOf(alt, az, here.latitude, here.longitude, at)
             val t = SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
             // ⚠️ A dot product against a precomputed cosine, NOT an angle. The file's own warning
             // about `acos` near 1.0 is about RECOVERING an angle, where the significant figures are
@@ -622,9 +624,9 @@ class SkyMapViewModel(
     private fun horizonOf(layer: StarLayer, i: Int, here: Site, at: Long): Ephemeris.Horizontal {
         val dec = Math.toDegrees(kotlin.math.asin(layer.vz[i].coerceIn(-1.0, 1.0)))
         val ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
-        return Ephemeris.toHorizontal(
-            Ephemeris.Equatorial(ra, dec, 0.0), here.latitude, here.longitude, at,
-        )
+        // ⚠️ The exact inverse of what [identify] used to find this star, so the altitude reported
+        // on the card is the altitude it is drawn at. `SkyFrame` holds both halves of that pair.
+        return SkyFrame.horizonOf(ra, dec, here.latitude, here.longitude, at)
     }
 
     private fun namedStar(i: Int, here: Site, at: Long): Body? {

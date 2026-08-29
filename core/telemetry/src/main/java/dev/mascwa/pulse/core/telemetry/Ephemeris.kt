@@ -667,6 +667,64 @@ object Ephemeris {
         precessRotate(raDeg, decDeg, centuriesFromJ2000, toDate = false)
 
     /**
+     * A position in the **mean equinox of date** expressed in J2000 — the frame every catalogue in
+     * this app is stated in.
+     *
+     * ⚠️ **The mean equinox, deliberately, and NOT [precessFromJ2000]'s true one.** [toEquatorial]
+     * and [toHorizontal] both run on Greenwich MEAN sidereal time, so everything that reaches the
+     * horizon from this file is in the mean equinox; a catalogue position carried into the TRUE
+     * equinox and then converted with GMST would be the wrong pairing rather than a more accurate
+     * one. Mean-with-GMST is self-consistent because the equation of the equinoxes is the same
+     * nutation term the apparent right ascension carries, so the two very nearly cancel — the
+     * residual is a few arcseconds, against the twenty-two arcminutes this rotation is worth.
+     *
+     * ⚠️ **This and [j2000ToMeanOfDate] are an EXACT inverse pair and a screen depends on it.** A
+     * star map hit-tests a tap by carrying the tapped direction into the catalogue's frame, then
+     * reads the answer back out to say how high the star is; if the two directions were not exact
+     * inverses the star you touched would report a different altitude from the one it is drawn at.
+     * They are transposes algebraically and, measured over a grid, agree to **4e-10 arcseconds** —
+     * floating point and nothing else.
+     *
+     * ⚠️ Negating the epoch is NOT the inverse and looks like one: it comes back within **0.56
+     * arcseconds**, which is a billion times worse and still small enough to pass a careless test.
+     * A test comparing the two must therefore measure in degrees rather than through
+     * [angularSeparationDeg], whose `acos` loses half its significant figures at a separation near
+     * zero — that instrument alone reports this pair as 4e-3 arcseconds apart when it is exact.
+     */
+    fun meanOfDateToJ2000(raDeg: Double, decDeg: Double, epochMs: Long): DoubleArray =
+        precessRotate(raDeg, decDeg, centuries(julianDateTT(epochMs)), toDate = false)
+
+    /** The exact inverse of [meanOfDateToJ2000]; see its warning about why that matters. */
+    fun j2000ToMeanOfDate(raDeg: Double, decDeg: Double, epochMs: Long): DoubleArray =
+        precessRotate(raDeg, decDeg, centuries(julianDateTT(epochMs)), toDate = true)
+
+    /**
+     * [meanOfDateToJ2000] for a direction already held as a unit vector, rotated in place.
+     *
+     * A convenience over the pair above rather than a second rotation, so the two can never drift.
+     * Its callers hold vectors because that is what a projection consumes — converting out to
+     * degrees and back costs four trigonometric calls, which is nothing beside the alternative of
+     * a second implementation of Meeus chapter 21.
+     *
+     * ⚠️ Safe at the celestial pole, where the right ascension recovered by [atan2] is arbitrary:
+     * every term carrying it is multiplied by `cos(dec)`, so at ±90 any value gives the same answer
+     * to **1.3e-12 degrees** — not exactly, because `cos(90°)` in binary floating point is 6.1e-17
+     * rather than zero. Measured rather than assumed, because a pole is exactly where a star map is
+     * pointed when somebody lies on their back.
+     */
+    fun precessVectorToJ2000(v: DoubleArray, epochMs: Long) {
+        val dec = asin(v[2].coerceIn(-1.0, 1.0)) / DEG
+        val ra = atan2(v[1], v[0]) / DEG
+        val j = meanOfDateToJ2000(ra, dec, epochMs)
+        val d = j[1] * DEG
+        val a = j[0] * DEG
+        val cd = cos(d)
+        v[0] = cd * cos(a)
+        v[1] = cd * sin(a)
+        v[2] = sin(d)
+    }
+
+    /**
      * Where the Earth is, relative to the Sun, in the J2000 mean ecliptic — rectangular, in AU.
      *
      * This is the other half of every minor-body position: an orbit solved from J2000 elements gives

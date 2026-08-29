@@ -17,6 +17,21 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  *
  * So [StarField] never needs reloading because time passed, only because the view moved somewhere it
  * had not loaded, or zoomed deep enough to want fainter stars.
+ *
+ * ⚠️ **The frame is built in J2000, not in the equinox of date, and that is what makes it agree
+ * with what it draws.** Everything this class is handed to — the star catalogue, the constellation
+ * lines and IAU boundaries, the deep-sky catalogue, the Milky Way's galactic raster — is stated in
+ * J2000, and everything the observer supplies (a look direction, the zenith) arrives in the equinox
+ * of date, because that is the frame [Ephemeris.toEquatorial] speaks. Treating one as the other
+ * rotates the entire star field against the horizon and against the planets, which are drawn
+ * through the horizon path and never touch this basis. **Measured over the whole sky at as much as
+ * twenty-two arcminutes in 2026** (least near the precession axis, at about six) — three pixels at
+ * the widest field, twenty at twenty degrees, and more than a whole field at the quarter-degree
+ * floor — reaching thirty-seven arcminutes by 2044.
+ *
+ * ⚠️ It is a rigid rotation, so it changes nothing else: [sinAltitude] still answers the true
+ * altitude because the zenith is carried into the same frame as the stars, and an angle between
+ * two directions is what it always was.
  */
 class SkyFrame private constructor(
     /** The projection basis, in the stars' own equatorial frame. */
@@ -60,17 +75,8 @@ class SkyFrame private constructor(
             longitudeDeg: Double,
             epochMs: Long,
         ): SkyFrame {
-            val centre = Ephemeris.toEquatorial(
-                Ephemeris.Horizontal(view.altitudeDeg, view.azimuthDeg, 0.0),
-                latitudeDeg, longitudeDeg, epochMs,
-            )
-            // Straight up. Its declination is the observer's latitude and its right ascension is the
-            // local sidereal time, which is the one number that carries the whole day's rotation.
-            val zenith = Ephemeris.toEquatorial(
-                Ephemeris.Horizontal(90.0, 0.0, 0.0),
-                latitudeDeg, longitudeDeg, epochMs,
-            )
-            val z = SkyProjection.equatorialVector(zenith.rightAscensionDeg, zenith.declinationDeg)
+            val centre = centreOf(view, latitudeDeg, longitudeDeg, epochMs)
+            val z = zenithVector(latitudeDeg, longitudeDeg, epochMs)
             val forward =
                 SkyProjection.equatorialVector(centre.rightAscensionDeg, centre.declinationDeg)
             return SkyFrame(
@@ -113,11 +119,13 @@ class SkyFrame private constructor(
             val up = DoubleArray(3)
             SkyPointing.toEquatorialVector(forwardEnu, latitudeDeg, longitudeDeg, epochMs, forward)
             SkyPointing.toEquatorialVector(upEnu, latitudeDeg, longitudeDeg, epochMs, up)
-            val zenith = Ephemeris.toEquatorial(
-                Ephemeris.Horizontal(90.0, 0.0, 0.0),
-                latitudeDeg, longitudeDeg, epochMs,
-            )
-            val z = SkyProjection.equatorialVector(zenith.rightAscensionDeg, zenith.declinationDeg)
+            // ⚠️ `SkyPointing` answers in the equinox of date and stays that way on purpose: its
+            // tests assert that the zenith's declination IS the observer's latitude, which is a
+            // true statement about that frame and would become an arbitrary rotated number here.
+            // The frame change is this class's job, and this is where it happens for both vectors.
+            Ephemeris.precessVectorToJ2000(forward, epochMs)
+            Ephemeris.precessVectorToJ2000(up, epochMs)
+            val z = zenithVector(latitudeDeg, longitudeDeg, epochMs)
             return SkyFrame(
                 basis = SkyProjection.basisOf(forward, up[0], up[1], up[2], fovDeg, 0.0),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
@@ -131,10 +139,8 @@ class SkyFrame private constructor(
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
-        ): Ephemeris.Equatorial = Ephemeris.toEquatorial(
-            Ephemeris.Horizontal(view.altitudeDeg, view.azimuthDeg, 0.0),
-            latitudeDeg, longitudeDeg, epochMs,
-        )
+        ): Ephemeris.Equatorial =
+            catalogueOf(view.altitudeDeg, view.azimuthDeg, latitudeDeg, longitudeDeg, epochMs)
 
         /**
          * The same, for a handset aim.
@@ -152,13 +158,78 @@ class SkyFrame private constructor(
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
-        ): Ephemeris.Equatorial = Ephemeris.toEquatorial(
-            Ephemeris.Horizontal(
-                SkyPointing.altitudeOf(forwardEnu),
-                SkyPointing.azimuthOf(forwardEnu),
-                0.0,
-            ),
+        ): Ephemeris.Equatorial = catalogueOf(
+            SkyPointing.altitudeOf(forwardEnu),
+            SkyPointing.azimuthOf(forwardEnu),
             latitudeDeg, longitudeDeg, epochMs,
         )
+
+        /**
+         * A horizon direction in the catalogue's frame — the ONE boundary between where somebody is
+         * looking and what the map holds.
+         *
+         * Every entry point above funnels through here rather than restating the two steps, because
+         * a frame conversion that exists in four places is a frame conversion three of which will
+         * eventually disagree. Public because a tap is the fifth: hit-testing carries the touched
+         * direction into the catalogue's frame and compares it against the stars there, which is one
+         * conversion rather than one per star.
+         */
+        fun catalogueOf(
+            altitudeDeg: Double,
+            azimuthDeg: Double,
+            latitudeDeg: Double,
+            longitudeDeg: Double,
+            epochMs: Long,
+        ): Ephemeris.Equatorial {
+            val eq = Ephemeris.toEquatorial(
+                Ephemeris.Horizontal(altitudeDeg, azimuthDeg, 0.0),
+                latitudeDeg, longitudeDeg, epochMs,
+            )
+            val j = Ephemeris.meanOfDateToJ2000(
+                eq.rightAscensionDeg, eq.declinationDeg, epochMs,
+            )
+            return Ephemeris.Equatorial(j[0], j[1], 0.0)
+        }
+
+        /**
+         * The way back: a catalogue position as an altitude and an azimuth.
+         *
+         * ⚠️ **The exact inverse of [catalogueOf], and it has to be.** A tap is answered by carrying
+         * the touched direction into the catalogue's frame, finding the nearest star there, and then
+         * reading that star back out to say how high it is — so a pair that were merely nearly
+         * inverse would report a star at an altitude it is not drawn at, by however much they
+         * disagreed. [Ephemeris.meanOfDateToJ2000] and [Ephemeris.j2000ToMeanOfDate] are the exact
+         * pair, and its warning records the trap: negating the epoch instead comes back within
+         * 0.7 arcseconds, which is close enough to look right.
+         */
+        fun horizonOf(
+            rightAscensionDeg: Double,
+            declinationDeg: Double,
+            latitudeDeg: Double,
+            longitudeDeg: Double,
+            epochMs: Long,
+        ): Ephemeris.Horizontal {
+            val d = Ephemeris.j2000ToMeanOfDate(rightAscensionDeg, declinationDeg, epochMs)
+            return Ephemeris.toHorizontal(
+                Ephemeris.Equatorial(d[0], d[1], 0.0), latitudeDeg, longitudeDeg, epochMs,
+            )
+        }
+
+        /**
+         * Straight up, as a catalogue-frame unit vector.
+         *
+         * In the equinox of date its declination is the observer's latitude and its right ascension
+         * is the local sidereal time, which is the one number carrying the whole day's rotation.
+         * Both entry points need it — [of] as the viewer's up, [ofPointing] only for [sinAltitude],
+         * because there the up is the handset's rather than the world's.
+         */
+        private fun zenithVector(
+            latitudeDeg: Double,
+            longitudeDeg: Double,
+            epochMs: Long,
+        ): DoubleArray {
+            val z = catalogueOf(90.0, 0.0, latitudeDeg, longitudeDeg, epochMs)
+            return SkyProjection.equatorialVector(z.rightAscensionDeg, z.declinationDeg)
+        }
     }
 }

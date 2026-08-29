@@ -473,4 +473,207 @@ class EphemerisTest {
         }
         assertTrue("the largest lunar parallax in the set was only $biggest deg", biggest > 0.5)
     }
+
+    // ---- the mean-equinox rotation the star map is built on ----------------------------------
+
+    /**
+     * ⚠️ **Measured in degrees, NOT through [Ephemeris.angularSeparationDeg], and that is the whole
+     * reason this reads the way it does.** That function ends in `acos`, which loses half its
+     * significant figures at a separation near zero: the same grid measured through it reports this
+     * pair as 4e-3 arcseconds apart when the direct measurement says 4e-10. A bound set from the
+     * lossy instrument would sit ten million times above what the code achieves, and the wrong
+     * inverse below (0.56 arcseconds) would sail under it.
+     */
+    private fun worstRoundTripDeg(): Double {
+        var worst = 0.0
+        for (ms in longArrayOf(1781481600000L, 2051222400000L, 2354331600000L)) {
+            var ra = 0
+            while (ra < 360) {
+                var dec = -85
+                while (dec <= 85) {
+                    val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
+                    val back = Ephemeris.j2000ToMeanOfDate(j[0], j[1], ms)
+                    var dRa = abs(back[0] - ra)
+                    if (dRa > 180.0) dRa = 360.0 - dRa
+                    worst = maxOf(worst, maxOf(dRa, abs(back[1] - dec)))
+                    dec += 5
+                }
+                ra += 5
+            }
+        }
+        return worst
+    }
+
+    /**
+     * The pair is an exact inverse, which is what a tap on a star map rests on: the touched
+     * direction goes into the catalogue's frame to find the star, and the star comes back out to
+     * say how high it is. Measured worst over 72 x 35 positions at three epochs: **4e-10
+     * arcseconds** — floating point and nothing else, since the two rotations are algebraically
+     * transposes. The bar is a microarcsecond, which is 2,400 times the measured value and still
+     * half a million times tighter than the wrong inverse below.
+     */
+    @Test fun theMeanEquinoxRotationsAreAnExactInversePair() {
+        val worst = worstRoundTripDeg() * 3600.0
+        assertTrue("worst round trip was $worst arcsec", worst < 1e-6)
+    }
+
+    /**
+     * ⚠️ **Negating the epoch looks like the inverse and is not.** It is the obvious shortcut —
+     * precession angles are odd in time to first order — and it comes back within 0.56 arcseconds,
+     * small enough that a test with any ordinary tolerance would pass. This pins the gap: the real
+     * inverse is a billion times better, so the two can never be confused by accident again.
+     */
+    @Test fun negatingTheEpochIsNotTheInverseAndIsFarWorse() {
+        var worst = 0.0
+        for (p in precessions) {
+            val j = Ephemeris.meanOfDateToJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val t = (Ephemeris.julianDateTT(p.ms) - 2451545.0) / 36525.0
+            val back = Ephemeris.precessToJ2000(j[0], j[1], -t)
+            worst = maxOf(
+                worst,
+                Ephemeris.angularSeparationDeg(p.raJ2000, p.decJ2000, back[0], back[1]),
+            )
+        }
+        assertTrue(
+            "the negated rotation came back within ${worst * 3600} arcsec, so this test proves nothing",
+            worst * 3600.0 > 0.1,
+        )
+        assertTrue("but it should still be under an arcsecond", worst * 3600.0 < 2.0)
+        assertTrue("the real inverse is far better", worstRoundTripDeg() * 3600.0 < 1e-6)
+    }
+
+    /**
+     * ⚠️ **The two directions are twice the drift apart, which is what makes a swap catchable.**
+     * Calling one where the other is meant does not fail, crash or look wrong: it produces a
+     * perfectly plausible sky at double the offset. In 2026 each direction moves 22 arcminutes and
+     * the two answers land 0.74 degrees from each other — measured, and asserted as a RATIO so it
+     * holds at every epoch rather than only at the one it was written against.
+     */
+    @Test fun theTwoDirectionsLandTwiceTheDriftApart() {
+        for (p in precessions) {
+            val toJ2000 = Ephemeris.meanOfDateToJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val toDate = Ephemeris.j2000ToMeanOfDate(p.raJ2000, p.decJ2000, p.ms)
+            val drift = Ephemeris.angularSeparationDeg(
+                p.raJ2000, p.decJ2000, toDate[0], toDate[1],
+            )
+            val gap = Ephemeris.angularSeparationDeg(toJ2000[0], toJ2000[1], toDate[0], toDate[1])
+            assertTrue("2026-2044 drift was ${drift * 60} arcmin", drift > 0.3 && drift < 0.7)
+            assertTrue("the two directions were only ${gap / drift} drifts apart", gap > 1.95 * drift)
+        }
+    }
+
+    /**
+     * ⚠️ **The MEAN equinox, not the true one — this is the half that pairs with GMST.**
+     * [Ephemeris.precessFromJ2000] carries the nutation and belongs with the Sun and the Moon;
+     * [Ephemeris.j2000ToMeanOfDate] deliberately does not, because [Ephemeris.toHorizontal] runs on
+     * Greenwich MEAN sidereal time and pairing an apparent position with a mean sidereal time is
+     * the wrong combination rather than a better one. Measured, the two differ by **4.9 to 11.1
+     * arcseconds** — present, so this cannot be passing on a function that quietly became the
+     * apparent one, and small, so it cannot be passing on something unrelated.
+     */
+    @Test fun theMeanRotationIsNotTheApparentOne() {
+        for (p in precessions) {
+            val mean = Ephemeris.j2000ToMeanOfDate(p.raJ2000, p.decJ2000, p.ms)
+            val apparent = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val arcsec = Ephemeris.angularSeparationDeg(
+                mean[0], mean[1], apparent.rightAscensionDeg, apparent.declinationDeg,
+            ) * 3600.0
+            assertTrue("nutation moved it $arcsec arcsec", arcsec > 2.0 && arcsec < 25.0)
+        }
+    }
+
+    /**
+     * The vector form is the degree form, so a star map that holds directions as unit vectors
+     * cannot end up with a second implementation of Meeus chapter 21. Measured worst component
+     * disagreement 1.8e-15, worst departure from unit length 4.4e-16.
+     */
+    @Test fun theVectorFormAgreesWithTheDegreeFormAndStaysAUnitVector() {
+        val ms = 1781481600000L
+        var worstComponent = 0.0
+        var worstLength = 0.0
+        var ra = 0
+        while (ra < 360) {
+            var dec = -85
+            while (dec <= 85) {
+                val v = SkyProjection.equatorialVector(ra.toDouble(), dec.toDouble())
+                Ephemeris.precessVectorToJ2000(v, ms)
+                val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
+                val w = SkyProjection.equatorialVector(j[0], j[1])
+                for (i in 0..2) worstComponent = maxOf(worstComponent, abs(v[i] - w[i]))
+                worstLength =
+                    maxOf(worstLength, abs(v[0] * v[0] + v[1] * v[1] + v[2] * v[2] - 1.0))
+                dec += 5
+            }
+            ra += 5
+        }
+        assertTrue("worst component disagreement $worstComponent", worstComponent < 1e-12)
+        assertTrue("worst |v|^2 - 1 was $worstLength", worstLength < 1e-12)
+    }
+
+    /**
+     * ⚠️ **The celestial pole, where the right ascension the vector form recovers is arbitrary.**
+     * A star map is pointed there whenever somebody lies on their back, so it is worth knowing
+     * rather than assuming: at a declination of ±90 the rotation's arithmetic drops the right
+     * ascension, because every term carrying it is multiplied by `cos(dec)`.
+     *
+     * ⚠️ **Not bit-identical, and the first version of this test asserted that it was.** `cos(90°)`
+     * in binary floating point is 6.1e-17 rather than zero, so the terms shrink by that factor
+     * instead of vanishing: three unrelated right ascensions agree to **1.3e-12 degrees**, which is
+     * five nanoarcseconds. The probe that suggested otherwise was printing six decimal places —
+     * print precision is not equality.
+     */
+    @Test fun thePoleIsSafeBecauseTheRightAscensionDropsOut() {
+        val ms = 1781481600000L
+        for (sign in doubleArrayOf(1.0, -1.0)) {
+            val first = Ephemeris.meanOfDateToJ2000(0.0, 90.0 * sign, ms)
+            for (anyRa in doubleArrayOf(90.0, 217.0, 359.9)) {
+                val other = Ephemeris.meanOfDateToJ2000(anyRa, 90.0 * sign, ms)
+                assertEquals(first[0], other[0], 1e-9)
+                assertEquals(first[1], other[1], 1e-9)
+            }
+            // The vector form takes the same path and must agree with it.
+            val v = doubleArrayOf(0.0, 0.0, sign)
+            Ephemeris.precessVectorToJ2000(v, ms)
+            val w = SkyProjection.equatorialVector(first[0], first[1])
+            for (i in 0..2) assertEquals(w[i], v[i], 1e-12)
+            // And a component rounded a hair outside [-1, 1] is clamped rather than made a NaN.
+            val over = doubleArrayOf(0.0, 0.0, sign * (1.0 + 1e-15))
+            Ephemeris.precessVectorToJ2000(over, ms)
+            for (i in 0..2) assertTrue("component $i was ${over[i]}", over[i].isFinite())
+        }
+    }
+
+    /**
+     * ⚠️ **What the star map's frame is actually worth: twenty-two arcminutes, today.**
+     * The map holds its catalogue in J2000 and every direction the observer supplies arrives in the
+     * equinox of date, so without this rotation the whole star field is turned against the horizon
+     * and against the planets — which are drawn through the horizon path and never touch the frame.
+     * Measured over the full sky from London in 2026 the worst is 22.2 arcminutes; the bar is a
+     * band rather than a floor, because doubling it (the swap above) or applying it twice would
+     * sail past a floor alone.
+     */
+    @Test fun theStarMapsFrameWouldBeTwentyTwoArcminutesOutWithoutThis() {
+        val ms = 1781481600000L
+        var worst = 0.0
+        var az = 0
+        while (az < 360) {
+            for (alt in intArrayOf(0, 30, 60, 90)) {
+                val eq = Ephemeris.toEquatorial(
+                    Ephemeris.Horizontal(alt.toDouble(), az.toDouble(), 0.0),
+                    51.5074, -0.1278, ms,
+                )
+                val j = Ephemeris.meanOfDateToJ2000(
+                    eq.rightAscensionDeg, eq.declinationDeg, ms,
+                )
+                worst = maxOf(
+                    worst,
+                    Ephemeris.angularSeparationDeg(
+                        eq.rightAscensionDeg, eq.declinationDeg, j[0], j[1],
+                    ),
+                )
+            }
+            az += 15
+        }
+        assertTrue("the frame moved ${worst * 60} arcmin", worst * 60.0 > 20.0 && worst * 60.0 < 26.0)
+    }
 }
