@@ -63,35 +63,10 @@ data class NeoObject(
     val closeApproachEpochMs: Long? = null,
 )
 
-@Serializable
-data class Planet(
-    val name: String,
-    val altitudeDeg: Double,   // above horizon if > 0
-    val azimuthDeg: Double,    // from true north, clockwise
-    val magnitude: Double,     // lower = brighter
-    val aboveHorizon: Boolean,
-    // ⚠️ Computed by PlanetCalc on the way to the altitude and azimuth above, and thrown away until
-    // something needed a coordinate that does not depend on where the observer is standing. Both
-    // default to zero so every existing construction still compiles; PlanetCalc fills them in.
-    val rightAscensionDeg: Double = 0.0,
-    val declinationDeg: Double = 0.0,
-    /**
-     * How far away, in astronomical units, and the Sun-planet-Earth angle in degrees.
-     *
-     * ⚠️ **Both were already computed and thrown away — this is the same defect the two fields above
-     * record, in the same file, a second time.** `PlanetCalc` needs the geocentric distance and the
-     * phase angle to work out an apparent magnitude at all, and then kept neither. Without the
-     * distance nothing can say how large a planet LOOKS; without the phase angle nothing can draw
-     * Venus as the crescent it plainly is through any telescope.
-     *
-     * Defaulted to zero so every existing construction still compiles and every cached entry still
-     * decodes; a zero means "not stated", which every consumer has to treat as unknown rather than
-     * as a planet sitting on top of the observer.
-     */
-    val distanceAu: Double = 0.0,
-    val phaseAngleDeg: Double = 0.0,
-)
-
+// ⚠️ `Planet` used to be declared here and now lives in `:core:telemetry`, beside `PlanetCalc`,
+// which is the only thing that produces one. It is the OUTPUT of a pure calculation, so it belongs
+// with the calculation; keeping it here forced the star map's module to depend on the whole HTTP
+// layer for a type made of eight numbers. Same package, so nothing that names it moved.
 @Serializable
 data class OrbitalData(
     val iss: IssPosition? = null,

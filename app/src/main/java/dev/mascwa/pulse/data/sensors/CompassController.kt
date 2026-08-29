@@ -55,6 +55,24 @@ class CompassController(
         val declination: Float = 0f,       // degrees east(+)/west(-)
         val accuracyLow: Boolean = false,  // needs figure-8 calibration
         val hasSensor: Boolean = true,
+        /**
+         * Whether the sensor has actually reported yet, as opposed to this being the seed.
+         *
+         * ⚠️ **[hasSensor] does NOT answer that and reading it as though it did cost a real
+         * defect.** It says the hardware exists, which is true from construction, so the seeded
+         * value below carries `hasSensor = true` with every angle at zero — the phone held level
+         * and pointed due north. A `StateFlow` hands a new collector its current value at once, so
+         * a caller that treats its first emission as a measurement is measuring nothing.
+         *
+         * The star map was doing exactly that: its "take the FIRST reading whole rather than
+         * blending it in" branch spent itself on the seed, and the first real sample then arrived
+         * weighted at a quarter, so the sky swept in from due north over about a third of a second
+         * every time pointing mode was switched on.
+         *
+         * ⚠️ **Defaulted false and never written except from a real event**, so a consumer that
+         * does not care is unaffected and one that does cannot get it wrong by omission.
+         */
+        val hasReading: Boolean = false,
         val pitch: Float = 0f,             // degrees up(+)/down(-); only meaningful in cameraUpright mode
         /**
          * Degrees the handset is tipped in its own plane, positive when its TOP goes to the RIGHT,
@@ -141,9 +159,11 @@ class CompassController(
                 rawRoll
             }
             filteredRoll = r
-            _reading.value = _reading.value.copy(magneticAzimuth = az, pitch = p, roll = wrapSigned(r))
+            _reading.value = _reading.value.copy(
+                magneticAzimuth = az, pitch = p, roll = wrapSigned(r), hasReading = true,
+            )
         } else {
-            _reading.value = _reading.value.copy(magneticAzimuth = az)
+            _reading.value = _reading.value.copy(magneticAzimuth = az, hasReading = true)
         }
     }
 

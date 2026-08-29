@@ -42,6 +42,15 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
 
+    // ⚠️ `api`, because SkyMapViewModel IS a ViewModel and both applications name it when they ask
+    // a factory to build one. A consumer that could construct it but not name its supertype would
+    // have to declare lifecycle itself, which is a dependency in all but name.
+    //
+    // Only the viewmodel artifact, NOT lifecycle-runtime-compose: the state lives here and
+    // collecting it is the screen's business, so `collectAsStateWithLifecycle` stays in whichever
+    // application draws.
+    api(libs.androidx.lifecycle.viewmodel.ktx)
+
     // ⚠️ The graphics artifacts, and deliberately NOT the Compose compiler plugin. Nothing here is
     // @Composable — the renderer is a DrawScope extension, which is an ordinary function — so this
     // module needs the TYPES (DrawScope, Brush, Color, Dp) and none of the compiler machinery. A

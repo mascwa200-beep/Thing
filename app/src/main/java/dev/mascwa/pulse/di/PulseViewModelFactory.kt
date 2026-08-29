@@ -50,10 +50,13 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sky.SkyMapViewModel::class.java) ->
                 dev.mascwa.pulse.feature.sky.SkyMapViewModel(
                     c.starCatalog, c.deepStarCatalog, c.constellationCatalog,
-                    c.deepSkyCatalog, c.milkyWayCatalog, c.locationProvider,
-                    // ⚠️ Camera-upright, and UNFILTERED: the sky map blends the two directions
-                    // rather than the three angles — see CompassController's note on the zenith.
-                    c.newCompassController(cameraUpright = true, smoothed = false),
+                    c.deepSkyCatalog, c.milkyWayCatalog,
+                    dev.mascwa.pulse.feature.sky.SkyDevice(
+                        c.locationProvider,
+                        // ⚠️ Camera-upright, and UNFILTERED: the sky map blends the two directions
+                        // rather than the three angles — see CompassController's note on the zenith.
+                        c.newCompassController(cameraUpright = true, smoothed = false),
+                    ),
                 )
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)

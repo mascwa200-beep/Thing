@@ -14,9 +14,9 @@ import dev.mascwa.pulse.data.sky.ConstellationCatalog
 import dev.mascwa.pulse.data.sky.DeepSkyCatalog
 import dev.mascwa.pulse.data.sky.MilkyWayCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
-import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sky.StarCatalog
-import dev.mascwa.pulse.data.weather.LocationProvider
+import dev.mascwa.pulse.sky.SkyDeps
+import dev.mascwa.pulse.sky.SkySite
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.SkyFrame
@@ -58,8 +58,16 @@ class SkyMapViewModel(
     private val constellationCatalog: ConstellationCatalog,
     private val deepSkyCatalog: DeepSkyCatalog,
     private val milkyWayCatalog: MilkyWayCatalog,
-    private val locationProvider: LocationProvider,
-    private val compass: CompassController,
+    /**
+     * This handset's own sense of place and aim — the only two things here an application has to
+     * supply, because they come from platform services rather than from a bundled catalogue.
+     *
+     * ⚠️ **An interface so BOTH applications drive one view model.** The alternative was a second
+     * copy of eight hundred lines of state management in the standalone sky app, which is the
+     * duplicated-definition drift this repository has corrected repeatedly. See [SkyDeps] for why
+     * the two services behind it stay where they are rather than moving in here.
+     */
+    private val device: SkyDeps,
 ) : ViewModel() {
 
     /**
@@ -234,16 +242,14 @@ class SkyMapViewModel(
 
     enum class Kind { STAR, SUN, MOON, PLANET }
 
-    data class Site(val latitude: Double, val longitude: Double)
-
     /** What the map is pointed at. Owned here so it survives a rotation. */
     private val _view = MutableStateFlow(
         SkyProjection.View(azimuthDeg = 180.0, altitudeDeg = 35.0, fovDeg = 80.0),
     )
     val view: StateFlow<SkyProjection.View> = _view.asStateFlow()
 
-    private val _site = MutableStateFlow<Site?>(null)
-    val site: StateFlow<Site?> = _site.asStateFlow()
+    private val _site = MutableStateFlow<SkySite?>(null)
+    val site: StateFlow<SkySite?> = _site.asStateFlow()
 
     private val _bodies = MutableStateFlow<List<Body>>(emptyList())
     val bodies: StateFlow<List<Body>> = _bodies.asStateFlow()
@@ -418,11 +424,7 @@ class SkyMapViewModel(
         if (outcome == StarField.Outcome.RELOADED) _revision.value++
     }
 
-    private suspend fun resolveSite(): Site? {
-        if (!locationProvider.hasPermission()) return null
-        return runCatching { locationProvider.current() }.getOrNull()
-            ?.let { Site(it.latitude, it.longitude) }
-    }
+    private suspend fun resolveSite(): SkySite? = device.site()
 
     // ------------------------------------------------------- following the handset
 
@@ -479,18 +481,23 @@ class SkyMapViewModel(
     fun clearTrim() { _trimDeg.value = 0.0 }
 
     private fun startPointing() {
-        compass.start()
-        _site.value?.let { compass.setLocation(it.latitude, it.longitude, 0.0) }
+        device.startAttitude()
+        _site.value?.let { device.declinationAt(it.latitude, it.longitude, 0.0) }
         pointingJob = viewModelScope.launch {
             var first = true
-            compass.reading.collect { r ->
-                if (!r.hasSensor) return@collect
+            device.attitude.collect { r ->
+                // ⚠️ Null is "nothing has measured this yet", which is a different fact from a
+                // reading, and keeping them apart is what makes [first] below mean what it says.
+                // The sensor wrapper this used to read published a seeded value carrying "the
+                // hardware exists" with every angle at zero, so `first` spent itself on a
+                // non-reading and the sky swept in from due north. See SkyAttitude.
+                if (r == null) return@collect
                 _needsCalibration.value = r.accuracyLow
                 val a = SkyPointing.trimmed(
                     SkyPointing.Attitude(
-                        azimuthDeg = r.trueAzimuth.toDouble(),
-                        altitudeDeg = r.pitch.toDouble(),
-                        rollDeg = r.roll.toDouble(),
+                        azimuthDeg = r.trueAzimuthDeg,
+                        altitudeDeg = r.altitudeDeg,
+                        rollDeg = r.rollDeg,
                     ),
                     _trimDeg.value,
                 )
@@ -514,7 +521,7 @@ class SkyMapViewModel(
     private fun stopPointing() {
         pointingJob?.cancel()
         pointingJob = null
-        compass.stop()
+        device.stopAttitude()
         _needsCalibration.value = false
     }
 
@@ -633,7 +640,7 @@ class SkyMapViewModel(
         return if (best >= 0) best else null
     }
 
-    private fun horizonOf(layer: StarLayer, i: Int, here: Site, at: Long): Ephemeris.Horizontal {
+    private fun horizonOf(layer: StarLayer, i: Int, here: SkySite, at: Long): Ephemeris.Horizontal {
         val dec = Math.toDegrees(kotlin.math.asin(layer.vz[i].coerceIn(-1.0, 1.0)))
         val ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
         // ⚠️ The exact inverse of what [identify] used to find this star, so the altitude reported
@@ -641,7 +648,7 @@ class SkyMapViewModel(
         return SkyFrame.horizonOf(ra, dec, here.latitude, here.longitude, at)
     }
 
-    private fun namedStar(i: Int, here: Site, at: Long): Body? {
+    private fun namedStar(i: Int, here: SkySite, at: Long): Body? {
         val row = brightRows.getOrNull(i) ?: return null
         val h = horizonOf(brightStars, i, here, at)
         return Body(
