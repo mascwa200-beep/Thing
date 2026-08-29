@@ -5034,7 +5034,7 @@ review's findings (triage on arrival); the PR #449 batch merge to main once CI i
   half; the tool checks both. Refuted findings recorded in the commit messages.
 - **Tip `7e27436` pushed; PR #449 title/body updated to B1–B13.** Merge to main once CI is green.
 
-### S10 — the standalone star map, three slices in (this session, PR #464)
+### S10 — the standalone star map, finished (this session, PR #464)
 
 S9b merged the proper-motion work; this is S10 from the sky plan, and the first three of its
 slices are pushed and CI-green. **Zero subagent and zero workflow spend**, per the standing credit
@@ -5102,31 +5102,78 @@ staged and NONE of the three edits, including the visibility fix that is its who
 complete and would have failed CI. Amended (the commit was local, so no force-push). **Stage paths
 individually and read `git status` afterwards, never the exit message.**
 
-**S10 is NOT finished. What remains, and why it stopped here rather than being rushed:**
-- ⚠️ **The `:sky` app needs the CANVAS in `:core:sky`, and that is the real remaining work.**
-  `SkyMapScreen`'s `SkyCanvas` is ~250 lines of draw wiring — remembered Paints, star buckets, a
-  line batch, a MilkyWayGlow that owns a Bitmap — and the plan is explicit that it belongs in
-  `:core:sky` parameterised by a colour set, because two copies of a star renderer is the drift this
-  repository has corrected repeatedly. ⚠️ That means giving `:core:sky` the **Compose compiler
-  plugin**, which its build file currently argues against on the grounds that nothing in it is
-  `@Composable` — a comment that becomes false with this change and must move with it.
-- Then the app itself: manifest, `MainActivity`, a plain Material 3 shell around the shared canvas,
-  resources, and `sky-build.yml` with its own path allowlist, concurrency group and `sky-latest`
-  rolling tag (⚠️ its own tag, never `latest` — `action-gh-release` rewrites the release NAME and
-  that is where each updater reads its build number).
-- ⚠️ **A half-written `sky/` module was deliberately NOT committed and is parked in the session
-  scratchpad at `skymodule/`** — `build.gradle.kts` (universal APK, no `abiFilters`, committed debug
-  key, R8 off, its own `noCompress += "skycat"`) and `SkyHardware.kt` (a `SkyDeps` over
-  `SensorManager`/`LocationManager`). Committing an unincluded module would be the
-  declared-but-never-built shape this file already records against `:core:sky` itself, and including
-  it without a manifest breaks the build. The design note worth keeping from it: `:sky` writes its
-  own attitude source rather than sharing `CompassController`, because that class carries two modes
-  the map does not want and **the part that could actually be got wrong is already shared** —
-  `SkyPointing.fromDeviceOrientation` is the one tested definition of what the sensor's numbers mean.
-- **S11** (the Gaia G<14 deep tier as an LCARS expansion pack) is untouched.
+**S10 IS FINISHED — S10d, S10e and S10f closed it, and the star map is its own application.**
 
-⚠️ **Owner-verify on the Pixel** — CI compiles, it cannot open a sensor: turn pointing mode on in the
-star map and check the sky arrives where the phone is aimed rather than swinging in from north.
+- **S10d `4cee00e` — the chart moved into `:core:sky` as `SkyChart`.** ⚠️ **The seam is a colour set
+  and nothing else, and that was MEASURED before it was designed**: the canvas reached into the
+  LCARS palette in exactly twenty-eight places for ten distinct colours and touched nothing else of
+  that application — no typeface, no icon, no string resource, no shape. So `SkyColors` is the whole
+  contract, and every application supplies only its own chrome. ⚠️ **Thirteen roles for ten
+  colours** because five collapse to one ink in LCARS and the standalone map pulls four of them
+  apart; naming the ROLE rather than the hue is what makes that a choice instead of a fork. Weights
+  and alphas do NOT cross — how assertive a line is follows from what it MEANS, which does not
+  change between applications. The file sits in `dev.mascwa.pulse.feature.sky`, so `:app` calls it
+  with no import at all. Two build-file comments were arguments AGAINST the change and had to move
+  with it (the Compose plugin, and `lifecycle-runtime-compose`).
+- **S10e `bdf5942` — `:sky`, and it published on its first run.** Plain Material 3, no device gate,
+  the committed debug key, its own `sky-latest` tag. ⚠️ **What makes it run on any phone is that no
+  architecture is narrowed, not the API floor** — and it is NOT free of native code, which the CI
+  check proves rather than assumes: **Sky Build #1 reported `libandroidx.graphics.path.so` present
+  for all four ABIs**, which is exactly why one universal APK works. **Measured from the shipped
+  artifact: 32,440,206 bytes (31 MB)**, against the plan's "near 160 MB" guess — that estimate
+  assumed the deep tier, which is S11. Star catalogue 23 MB, **Stored** (memory-mappable), all six
+  sky assets merged from `:core:sky`, sentinel correctly absent.
+- ⚠️ **NO INTERNET PERMISSION AT ALL**, the one thing this application can say that neither of the
+  others can — stated by absence, since a permission that is not declared cannot be requested
+  however the code asks. The manifest says outright that the paragraph changes when the updater
+  lands, so the claim cannot quietly go stale. **COARSE location, never FINE**: a kilometre of error
+  moves the sky by under a hundredth of a degree, three orders of magnitude below what the map can
+  use even at the quarter-degree floor.
+- ⚠️ **Its location notice tells two causes apart** — permission never granted, versus granted with
+  no recent fix — which is the shape this repository keeps finding. One message covering both would
+  send somebody to a permission screen where the switch is already on.
+- **S10f `7122901` — the sensor stops when nobody is looking.** With FOLLOW on, the rotation-vector
+  sensor ran at `SENSOR_DELAY_GAME` for the life of the process: `onCleared` stops it, but a
+  backgrounded activity's view model is not cleared. ⚠️ **Both applications had the shape**, so the
+  fix is in the chart they share. Two routes out, answered differently on purpose: ON_STOP remembers
+  the mode and ON_START restores it (the snap on return is correct — `startPointing` takes the first
+  reading WHOLE precisely so a stale aim is never shown), while leaving composition stops the sensor
+  and does NOT remember, since a map that silently resumed aiming would be a control acting without
+  being pressed. `rememberSaveable`, not `remember`, or a rotation would switch FOLLOW off every time.
+
+**Verification for the three slices, all local and free.** The whole of `:sky` + `:core:sky` + the
+pure core — **200 files** — type-checks against the real platform classes AND the real Compose,
+Material 3, activity and lifecycle artifacts, with that gate negative-tested twice (a wrong palette
+member; `text =` for `label =` on an AssistChip), each restore byte-compared. A **typed probe**
+compiled the app's `SkyColors(...)` construction and `SkyChart(...)` call against the real core types
+and was itself negative-tested. `module_dep_check.py` on both modules. All 17 version-catalog
+references in `sky/build.gradle.kts` resolved against the catalogue, the checker negative-tested by a
+planted typo. Every workflow parsed **iterating every job**.
+
+⚠️ **Three verification lessons worth keeping.**
+1. **The resolve gate's `:core:sky` cascade must be proven with an IMPORTED control.** A
+   fully-qualified `dev.mascwa.pulse.sky.StarLayer` is blamed on the *package* segment, whose message
+   already appears at HEAD, so the differencing cancels it and the control silently proves nothing.
+   Import the symbol and it reports identically to the real complaint, which is the proof.
+2. **`androidx.compose.ui:ui` declares `runtime-saveable` in its `releaseApiElements` variant** —
+   checked against the published Gradle module metadata rather than assumed, the way the Guava
+   variant-scoping trap demands. So `rememberSaveable` needs no new declaration; only the local
+   compile gate, which resolves just the artifacts it is named, had to be told.
+3. **`androidx.savedstate:savedstate` has no `-android` variant** while
+   `lifecycle-viewmodel-savedstate` has no `-android` variant either — both are the bare coordinate.
+   Probe with `curl` before concluding an artifact does not exist.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one or opens a sensor.**
+Install **Star Map** from Releases ▸ `sky-latest` (31 MB, alongside LCARS rather than over it) and
+check: the sky fills the screen; granting coarse location produces stars; FOLLOW arrives where the
+phone is aimed rather than swinging in from north; the screen stays awake while following and not
+otherwise; pressing HOME with FOLLOW on and returning re-arms it; and on a phone with no
+rotation-vector sensor the FOLLOW chip is disabled with a sentence rather than silently inert.
+
+**Open: S11** — the Gaia G<14 deep tier (~16.8 M stars, ~135 MB) as an optional LCARS expansion pack
+via the existing `PackRepository`, and bundled outright in `:sky`. Also open, deliberately: `:sky`
+has no self-updater yet, so `:core:update` and the INTERNET permission arrive together in one slice
+with the surface that uses them.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
