@@ -225,7 +225,23 @@ private fun SkyCanvas(
                     if (half > 0f) {
                         val perUnit = SkyProjection.degreesPerUnit(vm.view.value)
                         // Screen y grows downward and altitude grows upward, hence the sign.
-                        vm.pan(-pan.x / half * perUnit, pan.y / half * perUnit)
+                        val dx = -pan.x / half * perUnit
+                        // ⚠️ `vm.pointing.value`, NOT the `pointing` collected above. A
+                        // `pointerInput(Unit)` block is started once and never restarted, so it
+                        // would capture whatever the flag was at first composition — false — and
+                        // this branch could never be taken. Reading the flow is what makes it
+                        // current, and it is what the line above already does for the view.
+                        if (vm.pointing.value) {
+                            // ⚠️ **Nudge-to-align, and it exists because a phone magnetometer is
+                            // good to a few degrees at best.** Drag until a star you can actually
+                            // see sits where the map draws it. The same sign as panning, so the
+                            // gesture feels identical whether it is moving the chart or correcting
+                            // the aim; the vertical component is dropped, because the altitude comes
+                            // from gravity, which is not in doubt.
+                            vm.nudge(dx)
+                        } else {
+                            vm.pan(dx, pan.y / half * perUnit)
+                        }
                     }
                     if (gestureZoom != 1f) vm.zoom(gestureZoom.toDouble())
                 }
@@ -554,6 +570,7 @@ private fun Controls(
 ) {
     val pointing by vm.pointing.collectAsStateWithLifecycle()
     val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
+    val trim by vm.trimDeg.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
@@ -570,6 +587,19 @@ private fun Controls(
                 c.amber, JetBrainsMono, 10,
             )
         }
+        // ⚠️ A standing correction has to be visible, or it is a map quietly pointing somewhere
+        // other than where the sensor says with nothing on screen to explain the difference.
+        //
+        // ⚠️ **Shown SIGNED and to a tenth, and both of those are corrections to how I first wrote
+        // it.** `SkyPointing.addTrim` keeps the offset in [0, 360) because that is the range an
+        // azimuth lives in — so a three-degree nudge to the west reads as 357, which is true and
+        // useless. And rounding to whole degrees printed "Nudged 0°" for any correction under half a
+        // degree, which a single drag of ten pixels produces: a line insisting there is a correction
+        // while reporting none.
+        if (pointing && trim != 0.0) {
+            val signed = if (trim > 180.0) trim - 360.0 else trim
+            Text("Nudged ${"%.1f".format(signed)}° off the compass", c.ink2, JetBrainsMono, 10)
+        }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -583,6 +613,12 @@ private fun Controls(
                 selected = pointing,
                 onClick = { vm.setPointing(!pointing) },
             )
+            // ⚠️ A chip rather than a tap on the caption above it. That line is ten point text, which
+            // is a readout and not a touch target; the screen's own idiom for something you press is
+            // this row. Shown only when there is a correction to undo.
+            if (pointing && trim != 0.0) {
+                LcarsChip("UNDO NUDGE", selected = false, onClick = vm::clearTrim)
+            }
             LcarsChip(
                 linesLabel(lines),
                 // Selected whenever anything is drawn, so the chip shows the state as well as the
