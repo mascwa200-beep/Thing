@@ -32,6 +32,14 @@ on:
       - "core/update/**"
       - "core/feeds/**"
       - "tools/sky/**"
+      # ⚠️ **`app/**` is deliberately NOT here, and that is not an oversight.** The independence
+      # check below derives its marker set from `:app`'s own packages, so an LCARS commit does
+      # change the check's input — but only in the safe direction. Adding an LCARS-only package can
+      # only make the set LARGER, i.e. the gate stricter, over an APK that did not change; and
+      # MOVING a package out of `:app` into a shared module necessarily edits a `core/**` file,
+      # which IS listed, so the laxer direction rebuilds anyway. Listing `app/**` would rebuild and
+      # republish a 33 MB artifact on every news-screen commit for a verdict that cannot flip.
+      - "tools/check_sky_standalone.py"
       # ⚠️ The five root files that change what Gradle does, all of them. The desktop workflow's
       # filter once did not name a directory it genuinely read, and the nutrition one missed
       # `gradle.properties` — where the heap ceiling lives — so the fix for a heap failure would not
@@ -182,6 +190,21 @@ jobs:
             exit 1
           fi
           echo "star catalogue: $((size / 1048576)) MB, Stored (memory-mappable)"
+
+      # ⚠️ **The promise this application exists to keep, checked rather than asserted.** The star
+      # map is meant to be downloadable and installable on its own, attached to LCARS in no way at
+      # all — while `:core:sky` stays shared, because one renderer that both applications draw is
+      # the whole reason a feature built here also appears there. So "standalone" is a claim about
+      # the ARTIFACT, and the only honest way to hold it is to look inside the APK that shipped.
+      #
+      # ⚠️ Its own step rather than folded into the one above, because the two answer different
+      # questions and a failure should say which. That one asks whether the catalogues arrived; this
+      # asks whether anything arrived that should not have.
+      #
+      # See tools/check_sky_standalone.py for what each check is and, more usefully, for the two
+      # ways the obvious version of it is wrong.
+      - name: Prove the star map stands alone
+        run: python3 tools/check_sky_standalone.py "$(ls sky/build/outputs/apk/release/*.apk | head -1)"
 
       # ⚠️ For a computer, not a phone: GitHub zips every artifact and offers no way not to, so this
       # is a `.zip` Android cannot install; the mobile app lists no artifacts at all; and the drawer
