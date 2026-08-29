@@ -33,6 +33,20 @@ on:
       # shared and deliberately NOT listed — a change to either can move this build.
       - "nutrition/**"
       - ".github/workflows/nutrition-build.yml"
+      # ⚠️ The standalone star map, for exactly the reason above and MISSED when that module was
+      # created — so every `:sky`-only commit has been costing a full thirteen-minute build here
+      # and republishing a 329 MB APK that the in-app updater then pulls in full. Two of those
+      # shipped in the hour before this line was written, which is the second time this repository
+      # has learned the same lesson.
+      #
+      # ⚠️ **`sky/**` and NOT `core/sky/**`, and the distinction is load-bearing.** `:app` really
+      # does depend on `:core:sky` — it declares it, draws its console star map through `SkyChart`,
+      # and this workflow has a step asserting the sky assets packaged — so a change there must
+      # rebuild this app. What `:app:assembleRelease` never reaches is the `:sky` APPLICATION
+      # module: nothing depends on it (checked, not assumed — no `project(":sky")` anywhere), and
+      # an application cannot depend on an application.
+      - "sky/**"
+      - ".github/workflows/sky-build.yml"
       # ⚠️ The session scratchpad — probes and measurement harnesses, kept beside the work they
       # justify. Checked before listing it rather than assumed: it is referenced by NO build script
       # at all (`settings.gradle.kts`, the root script and every module's), so nothing here can

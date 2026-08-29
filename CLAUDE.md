@@ -5264,6 +5264,18 @@ manifest-only, so the gate needs **`lifecycle-common-jvm`**; and a generated `Bu
 stood in with a five-line stub whose shape is derived from what AGP emits (`const val VERSION_CODE`,
 `const val VERSION_NAME`) rather than guessed.
 
+**⚠️ AND A COST FOUND BY WATCHING THE RUNS: an `:sky`-only commit was rebuilding LCARS.**
+`android-build.yml`'s `paths-ignore` already carried `nutrition/**` with the reasoning spelled out —
+that module cannot affect this build — and `sky/**` was simply missed when it was created. So every
+star-map commit cost a full thirteen-minute build AND republished a 329 MB APK that the in-app
+updater then pulls in full; two of those shipped in the hour before it was noticed, which is the
+second time this repository has learned that lesson. ⚠️ **`sky/**`, NOT `core/sky/**`** — `:app`
+genuinely depends on `:core:sky` (it declares it, draws its console map through `SkyChart`, and this
+workflow asserts the sky assets packaged), while nothing anywhere depends on the `:sky` APPLICATION
+module. Checked with a grep, not assumed, and the filter's behaviour verified across five real
+change shapes, including the two that must still build (`sky/**` alongside `core/update/**`, and
+`core/sky/**` alone).
+
 ⚠️ **Owner-verify on the Pixel — CI compiles an updater and never runs one.** Open ABOUT, paste a
 token that can read this repository's contents, and check it reports the build rather than a 404;
 then leave the app closed after a later build publishes and confirm the next open is already the
