@@ -1,6 +1,13 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+
+    // ⚠️ **Taken the day the chart itself moved in, and the comment below the dependencies used to
+    // argue against it.** That reasoning held while this module was only a `DrawScope` extension —
+    // an ordinary function drawing into somebody else's canvas. The chart is the engine, so two
+    // applications drawing the sky means either one `@Composable` here or two copies of it there,
+    // and a second copy of a star renderer is the drift this module exists to prevent.
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -46,20 +53,28 @@ dependencies {
     // a factory to build one. A consumer that could construct it but not name its supertype would
     // have to declare lifecycle itself, which is a dependency in all but name.
     //
-    // Only the viewmodel artifact, NOT lifecycle-runtime-compose: the state lives here and
-    // collecting it is the screen's business, so `collectAsStateWithLifecycle` stays in whichever
-    // application draws.
     api(libs.androidx.lifecycle.viewmodel.ktx)
 
-    // ⚠️ The graphics artifacts, and deliberately NOT the Compose compiler plugin. Nothing here is
-    // @Composable — the renderer is a DrawScope extension, which is an ordinary function — so this
-    // module needs the TYPES (DrawScope, Brush, Color, Dp) and none of the compiler machinery. A
-    // module that takes the plugin also takes its build cost and its stability rules, for nothing.
+    // ⚠️ **`lifecycle-runtime-compose`, which an earlier note here said would never be needed** on
+    // the grounds that collecting state is the screen's business. It became this module's business
+    // the day the chart moved in: SkyChart reads eleven flows off the view model, and collecting
+    // them WITHOUT lifecycle awareness would leave a backgrounded star map recomposing on every
+    // sensor sample.
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // ⚠️ The graphics artifacts. `api` on both ui and ui-graphics because this module's public
+    // signatures name their types — DrawScope and Color on the renderer, Modifier on SkyChart — and
+    // a caller that could invoke them but not name what they take would have to declare Compose
+    // itself, which is a dependency in all but name. (`ui` was `implementation` while nothing here
+    // was @Composable; the chart moving in is what put Modifier in a public signature.)
     //
-    // `api` on ui-graphics because the renderer's own signatures name DrawScope and Color: a caller
-    // that could invoke it but not name what it takes would have to declare Compose itself, which
-    // is a dependency in all but name.
+    // ⚠️ `foundation` is here and nowhere else in this build, and it stays `implementation` because
+    // nothing it holds reaches a signature. Canvas, the two gesture detectors and the layout
+    // modifiers all live there, and every other module reaches it transitively through material3 —
+    // which this one deliberately does not take, because a chart has no buttons on it and each
+    // application supplies its own chrome.
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui)
+    api(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation)
 }
