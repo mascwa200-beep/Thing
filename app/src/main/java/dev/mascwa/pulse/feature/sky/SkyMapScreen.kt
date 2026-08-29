@@ -275,27 +275,45 @@ private fun SkyCanvas(
             // ⚠️ Under the stars, on purpose. A constellation line is a note about the stars, so a
             // line drawn over one puts a stroke through the thing it is pointing at.
             val shapes = vm.constellations
-            if (shapes != null && linesMode != SkyMapViewModel.LinesMode.NONE) {
+            if (linesMode != SkyMapViewModel.LinesMode.NONE) {
                 // ⚠️ The angle to the screen CORNER, not the half-field — culling on the half-field
                 // would throw away lines that are plainly visible at the top and bottom of a
                 // portrait phone. See SkyProjection.coneRadiusDeg.
                 val cone = Math.toRadians(SkyProjection.coneRadiusDeg(view.fovDeg, viewport))
                 val coneCos = cos(cone)
                 val coneSin = sin(cone)
-                if (linesMode == SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS) {
+
+                // ⚠️ The two reference circles are drawn OUTSIDE the `shapes != null` guard, because
+                // they depend on no asset at all — they are two lines of trigonometry. Putting them
+                // inside would mean a failed constellation file silently took the ecliptic with it,
+                // which is the layer a planet-hunter would miss most.
+                drawSkyLineSet(
+                    vm.equatorLine, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, c.muted, REFERENCE_WIDTH_DP, EQUATOR_ALPHA,
+                )
+                // Amber, because this is the road the Sun walks — and every planet within a few
+                // degrees of it, which is the whole reason the line is worth drawing.
+                drawSkyLineSet(
+                    vm.eclipticLine, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, c.amber, REFERENCE_WIDTH_DP, ECLIPTIC_ALPHA,
+                )
+
+                if (shapes != null) {
+                    if (linesMode == SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS) {
+                        drawSkyLineSet(
+                            shapes.boundaries, frame, viewport, coneCos, coneSin, half, cx, cy,
+                            lineBatch, linePaint, c.muted, BORDER_WIDTH_DP, BORDER_ALPHA,
+                        )
+                    }
                     drawSkyLineSet(
-                        shapes.boundaries, frame, viewport, coneCos, coneSin, half, cx, cy,
-                        lineBatch, linePaint, c.muted, BORDER_WIDTH_DP, BORDER_ALPHA,
+                        shapes.asterisms, frame, viewport, coneCos, coneSin, half, cx, cy,
+                        lineBatch, linePaint, c.violet, ASTERISM_WIDTH_DP, ASTERISM_ALPHA,
+                    )
+                    drawSkyLineSet(
+                        shapes.figures, frame, viewport, coneCos, coneSin, half, cx, cy,
+                        lineBatch, linePaint, c.sky, FIGURE_WIDTH_DP, FIGURE_ALPHA,
                     )
                 }
-                drawSkyLineSet(
-                    shapes.asterisms, frame, viewport, coneCos, coneSin, half, cx, cy,
-                    lineBatch, linePaint, c.violet, ASTERISM_WIDTH_DP, ASTERISM_ALPHA,
-                )
-                drawSkyLineSet(
-                    shapes.figures, frame, viewport, coneCos, coneSin, half, cx, cy,
-                    lineBatch, linePaint, c.sky, FIGURE_WIDTH_DP, FIGURE_ALPHA,
-                )
             }
 
             // ⚠️ Over the lines and under the stars, and both halves matter. A border drawn across
@@ -655,6 +673,18 @@ private const val ASTERISM_WIDTH_DP = 1.0f
 private const val ASTERISM_ALPHA = 0.34f
 private const val BORDER_WIDTH_DP = 0.9f
 private const val BORDER_ALPHA = 0.22f
+
+/**
+ * The equator and the ecliptic: thin, and fainter than anything they cross.
+ *
+ * ⚠️ They run right across the sky, so they are the one layer that CANNOT afford to be assertive —
+ * a reference line brighter than the constellation it passes through stops being a reference and
+ * starts being the picture. The ecliptic is given slightly more weight than the equator because it
+ * is the one people actually use: it says where to look for a planet.
+ */
+private const val REFERENCE_WIDTH_DP = 0.8f
+private const val EQUATOR_ALPHA = 0.18f
+private const val ECLIPTIC_ALPHA = 0.26f
 
 /**
  * How faint a Sun, Moon or planet goes once it has set.

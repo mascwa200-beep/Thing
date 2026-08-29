@@ -18,6 +18,9 @@ import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
+import dev.mascwa.pulse.sky.SkyLines
+import dev.mascwa.pulse.sky.ReferenceLines
+import dev.mascwa.pulse.core.telemetry.ReferenceCircles
 import dev.mascwa.pulse.sky.stepAlong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,12 +122,42 @@ class SkyMapViewModel(
     var milkyWay: MilkyWay.Raster? = null
         private set
 
-    /** What the map draws over the stars. */
+    /**
+     * The celestial equator and the ecliptic, built once and never rebuilt.
+     *
+     * ⚠️ **Unlike [constellations] these depend on no asset and on no location**, so they are ready
+     * before anything is loaded and survive a catalogue that fails to open. They are also fixed in
+     * the equatorial frame, so scrubbing the clock moves them exactly as it moves the stars — which
+     * is to say, not at all in this frame, and entirely in the drawn one.
+     *
+     * ⚠️ The obliquity is read ONCE, at construction, and that is deliberate rather than lazy: it
+     * drifts about 0.013 degrees a century, so across the hours this map's time control offers the
+     * change is smaller than any pixel on any screen. Rebuilding per scrub would be arithmetic spent
+     * to move nothing.
+     */
+    val equatorLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
+    val eclipticLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
+
+    init {
+        ReferenceLines.fill(equatorLine, null)
+        ReferenceLines.fill(
+            eclipticLine,
+            Ephemeris.trueObliquityDeg(System.currentTimeMillis()),
+        )
+    }
+
+    /**
+     * What the map draws over the stars.
+     *
+     * ⚠️ The celestial equator and the ecliptic ride this control too, even though they come from
+     * arithmetic rather than from the constellation asset. The control is labelled **NO LINES**, and
+     * a mode called that which leaves two lines right across the sky would be lying about itself.
+     */
     enum class LinesMode {
-        /** Stars alone. */
+        /** Stars alone — no figures, no borders, and neither reference circle. */
         NONE,
 
-        /** The 88 stick figures, and the popular asterisms behind them. */
+        /** The equator, the ecliptic, the 88 stick figures, and the popular asterisms behind them. */
         FIGURES,
 
         /** The figures, and the IAU borders that divide the whole sky between them. */

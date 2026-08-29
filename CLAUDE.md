@@ -10236,3 +10236,167 @@ come from the shared table.
 **Open / steerable:** the desktop still has no ZODIAC surface — `Astrology` is in the core and
 `PlanetCalc` is available, so it is the same small shape as the eclipse slice whenever the owner
 wants it.
+
+### THE PLANETARIUM — the sky map becomes Stellarium (this session, PR #464, S1–S7)
+
+Owner: the sky map is *"a little too sparse… somehow just a circle when in reality it shouldn't be a
+circle… I don't want it to just show stars and astral bodies that are near… constellations… galaxies…
+the Milky Way… as if I'm actually able to see it,"* and it must *"effectively leave nothing out."*
+Then, separately: make it **its own standalone mobile app**, *"100% offline and purely math based."*
+Four binding AskUserQuestion answers: imagery **purely procedural**; catalogue **deeper than
+Tycho-2** (Gaia); **give LCARS the new engine too**; renderer **Compose Canvas, batched**.
+
+⚠️ **The owner's headline complaint was literally true and I had said otherwise.**
+`SkyProjection.Screen.inField` is `radius <= 1.0` and the screen multiplied it by
+`size.minDimension / 2f` — so the drawn sky was a **disc inscribed in the narrow dimension**, in a
+black rectangle, with dead bands above and below on a portrait phone. Not a metaphor; a circle.
+
+⚠️ **Two things stated before anything was designed, and both are still true.** "Accurate in a
+million years" is not achievable by anyone — Barnard's Star crosses 10.3″/yr, so the constellations
+dissolve in ~100,000 years and stellar velocities are not linear over that span anyway. What is
+delivered instead is sub-arcsecond over centuries, degrading gracefully over millennia, with the app
+saying what it assumes. And the catalogue conflict is arithmetic: **G < 12 is 3,087,821 stars at
+~25 MB** (bundled in both apps, 367× the old 8,404) while **G < 14 is 16,844,156 at ~135 MB**
+(the `:sky` deep tier). LCARS is already 329 MB and its updater re-downloads the whole APK.
+
+**The one idea everything rests on:** `SkyProjection.magnitudeLimit(fovDeg, deepest)` deepens the cut
+as the field narrows, so the DRAWN count is a few thousand at any zoom whatever is on disk. That is
+what makes a 16.8-million-star catalogue and a Compose Canvas compatible rather than needing OpenGL.
+
+**Shipped, each its own CI-green commit:** S1 the projection fills the rectangle · S2 `SkyGrid` +
+`SkyCatalogFormat` + the Gaia builder · S3 `:core:sky` (reader, index, batched canvas) · S4
+constellations (`0d61b1c`/`b6b6760`/`4a23b86`) · S5 deep sky (`7447798`/`3902103`/`b3796d9`) · S6 the
+Milky Way (`0c52e40`/`dcba62e`) · S7 the solar system (`8d13b5f`/`c88c680`/this commit).
+
+#### The measurements that overruled the plan
+
+- **S5: the packed binary was cancelled.** OpenNGC's 12,039 drawable objects fit a lean TSV at
+  **236 kB deflated** — cheaper than the estimate — so no record layout, no `noCompress`, no mmap and
+  no spatial index. Twelve thousand objects is a linear scan, the shape `ConstellationSource` already
+  uses. ⚠️ And the **median object is 1.20′ across**, so most of that catalogue can only ever be a
+  marker; shapes are for the few hundred that are genuinely large.
+- ⚠️ **S5: cutting on surface brightness would have shipped a deep-sky layer with no Andromeda in
+  it.** The top 200 by magnitude and the top 200 by surface brightness **overlap by 8**. Surface
+  brightness decides HOW an object is drawn, never WHETHER. Pinned by a test.
+- ⚠️ **S5: `magnitudeLimit` must NOT be reused from the stars.** Star counts rise 2.8-fold per
+  magnitude; deep-sky counts rise about 1.7 (measured 1.58/1.78/1.70 across the ladder). `DeepSky`
+  carries its own constants.
+- ⚠️ **S6: density, not flux — the plan's stated method was the weaker one.** Measured over the real
+  3,087,821-star catalogue: density gives a plane-to-pole contrast of **7.93×**, integrated flux only
+  **4.52×**, because flux is dominated by nearby bright stars and those are nearly isotropic.
+- ⚠️ **S6: and dust rifts are the MOST visible structure, not the least.** I expected a
+  magnitude-limited catalogue to lose them. Extinction pushes stars below the cut, removing them from
+  the count outright — so l = 20–50° reads 82 /deg² against ~210 either side, which is the Great Rift.
+- ⚠️ **S6: `SkyGrid` cannot carry it, and the plan's HEALPix figures do not apply** (S2 shipped
+  `SkyGrid`). Its polar bands are **51.4° wide**; a 51° × 2.8° sliver cannot hold a brightness. Its
+  own KDoc justifies its design by saying nothing computes a density — which is exactly what S6 does.
+  A 1° galactic raster at **63 kB** instead, a sixth of the plan's budget.
+
+#### The defects, all found by running shipped code rather than reading it
+
+- **S6b, the poles were a speckled ring.** Found by running the shipped reader over the real bundled
+  asset — every fixture in the test was one that file built itself. A 1° cell at |b| = 89.5 covers
+  0.0087 deg² and holds 0.16 stars, so 303 of that row's 360 cells were EMPTY and the rest read ~115
+  against a truth of ~23. The plan's "7.9% Poisson noise" was measured near the plane; at the poles it
+  is about 230%. Smoothed over 1/cos(b) columns, which covers a constant degree of arc and preserves
+  each row's total.
+- **S7a, four defects in the Galilean moons**, none visible by reading, all found against JPL DE421
+  and Horizons: an 1899-epoch phase set under J2000-era rates (Callisto out by 1.19 Jovian radii);
+  `− J` where Meeus specifies `− B` (J carries 0.9025179 °/day, drifting Io a whole orbit in seven
+  months); offsets labelled celestial when they are **Jupiter's own equatorial frame** (the line of
+  moons tilts 8–18° over 2026 alone); and `behind` **inverted** — `u` is measured from inferior
+  conjunction, so the hidden half is `cos(u) < 0`, confirmed 5/5 against Horizons ranges.
+- ⚠️ **That fourth one was found by a negative test coming back ASLEEP** — the guard asserted `behind`
+  was true for about half the orbit, which a flipped comparison satisfies perfectly. Mechanism #4 of
+  the recorded five. Chasing it meant fetching real ground truth, and the ground truth said the code
+  was wrong.
+- ⚠️ **The Laplace resonance is NOT a valid check on Meeus's method**, and the probe says so:
+  `λ₁ − 3λ₂ + 2λ₃` cancels the frame term entirely (1−3+2 = 0), so it could never have caught the
+  second defect, and the three periodic terms run at unrelated rates giving a **4.04° envelope**
+  against a real libration of 0.07°. What IS worth testing is that the method's own **constants**
+  satisfy it — phases to 180.0001, rates to −0.0000001 °/day — which needs no ephemeris and catches a
+  single mistyped digit in any of six numbers.
+
+#### Design decisions worth keeping
+
+- ⚠️ **Nothing in the renderer assumes which way round the projection puts the sky.** Every
+  orientation is naturally a position angle east of celestial north, and turning one into a screen
+  rotation needs two things a pure core has no business knowing. So `PlanetDisc.Appearance` carries
+  each direction as **a second point on the sky**; the renderer projects it with the same projection
+  and takes the screen difference. No parallactic angle to get backwards.
+- ⚠️ **Both the equator AND the pole are carried, and neither implies the other.** The equator fixes
+  which way the rings and the line of moons run; only the pole says which HALF of a ring passes behind
+  the globe and which side of the line a moon at +y belongs on.
+- ⚠️ **A crescent is a half-circle joined to a half-ELLIPSE, never two overlapping circles.** The
+  terminator's semi-minor axis is `r·cos(i)`, and the SIGN is what makes a gibbous disc bulge away
+  from the lit limb rather than toward it.
+- ⚠️ **A marker is still right most of the time.** At a 60° field on 1080 px there are 18 px to the
+  degree, so Jupiter — the largest planetary disc there is, ~50″ — is a QUARTER OF A PIXEL. The real
+  disc takes over only once it exceeds the marker it replaces.
+- **S6b's arithmetic runs BACKWARDS**, unlike every other pass: a screen pixel becomes a direction,
+  then galactic coordinates, then a raster index. Forward projection fails three ways — the cell count
+  is worst exactly where the picture matters least, quads give a mosaic, and an equirectangular grid
+  degenerates at the poles.
+
+#### S7c — the ecliptic and the celestial equator (this commit)
+
+`ReferenceCircles` (pure, 12 tests) + `ReferenceLines` (the filler) + two `SkyLines` on the view model
++ two draw calls. The ecliptic is the one that earns its place: every planet and the Moon are within a
+few degrees of it, so once it is drawn half the sky is ruled out at a glance.
+
+- ⚠️ **Both circles are cut into 12 runs and that is not cosmetic.** A great circle passes through
+  every part of the sky, so the smallest cap containing it is the whole sphere and `SkyLines`'s
+  per-run cap test could never reject it. **Measured** with the shipped fill and the shipped cap test,
+  pointed at the line from each of 360 directions: at 150° nine of twelve runs survive (144 of 192
+  vertices projected); at a quarter-degree field **exactly one run survives, so 16 vertices are
+  projected instead of 192** — and at every field at least one segment still reaches the screen, which
+  is the property that matters, because the failure mode is the ecliptic silently vanishing on zoom.
+- ⚠️ **A chord is not angularly wrong at all, and my first KDoc said it was.** Every point of a chord
+  lies in the plane of its own great circle, which passes through the observer, so from the centre of
+  the sphere a chord and its arc are the same set of directions. The error is a **projection**
+  artefact — this projection is stereographic, under which a great circle becomes a circle. Measured
+  through the shipped projection: **0.35 px on a 1080-wide portrait at the widest field**, falling
+  monotonically to 0.08 px at 5°. The old note's formula described a linear sagitta and its number
+  (0.017°) was wrong as well.
+- ⚠️ **The traversal moved into `ReferenceCircles.longitudeOf` because `:core:sky` HAS NO TEST SOURCE
+  SET and CI's test line does not name it.** A rule left in the filler would have had no gate at all.
+  The first filler also ran `while (step * STEP_DEG <= ARC_SPAN_DEG)` — a floating-point comparison
+  deciding how many slots of a **preallocated** buffer get used; two integer loops cannot drift.
+- The obliquity is a **parameter, not a constant**: it falls ~0.013°/century, invisible now and a
+  quarter of a degree by the year 4000, which is inside what a chart with a time control can be asked.
+- Both circles ride the existing **NO LINES / FIGURES / + BORDERS** control. A mode labelled "NO
+  LINES" that left two lines across the sky would be lying about itself.
+- ⚠️ They are drawn **outside** the `shapes != null` guard: they depend on no asset, so a failed
+  constellation file must not silently take the ecliptic with it.
+
+**Verification (S7c):** 12 tests locally green; **all seven load-bearing rules negative-tested**
+against a baseline asserted green first, each perturbation asserted to have matched the source and the
+file restored in a `finally` and byte-compared. `:core:sky` type-checks clean against the real
+platform plus the real Compose artifacts, gate negative-tested with a planted typo; a **typed probe**
+compiled and RAN every new view-model expression against the real types (192 vertices, 12 runs), and
+was itself negative-tested. The resolve gate's one complaint is its documented `:core:sky` cascade.
+
+⚠️ **Two of my own expectations were wrong again this slice, roughly the nineteenth in this
+arc-series.** A perturbation expectation listed a test that the perturbation is a literal **no-op**
+for (`sin(e)` in place of `sin(l)·sin(e)` is still 0 at zero obliquity) — the recorded "fixture never
+reached the branch", applied to the perturbation rather than the test. And the perturbation harness
+**reported "exited with code 0" for a run that raised an AssertionError** and never reached its own
+verdict line: do not read an exit code alone.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one.** In order: that the map
+**fills the screen** rather than being a disc in a black rectangle; that zooming to the floor shows
+the Sun as a disc with a limb rather than a dot; Saturn's rings and the four Galilean moons; that the
+Milky Way reads as the Milky Way and not a smudge; and the two reference lines — thin enough not to
+compete with what they cross, and the amber ecliptic passing through every planet on screen.
+
+**Open, in the plan (`robust-baking-dewdrop.md`):** **S8** pointing mode (`CompassController` already
+has rotation-vector, remap and true north; it needs roll and a stiffer filter, plus nudge-to-align
+because a phone magnetometer is good to a few degrees at best) · **S9** IAU precession–nutation,
+aberration, refraction, parallax, proper motion · **S10** the `:sky` standalone app, modelled on
+`:nutrition` · **S11** the deep tier as an LCARS expansion pack via the existing `PackRepository`.
+
+⚠️ **Recorded rather than acted on: `:core:sky` has no test source set at all**, and it now holds
+`StarLayer`, `SkyLines`, `SkyRenderer`, `ConstellationField`, `DeepSkyLayer`, the Milky Way glow,
+`SolarSystemRender` and `ReferenceLines`. Every pure rule in this arc was deliberately placed in
+`:core:telemetry` for that reason, which works but is a constraint on where logic may live. Adding
+`:core:sky:testDebugUnitTest` to `android-build.yml`'s test line is its own small slice.
