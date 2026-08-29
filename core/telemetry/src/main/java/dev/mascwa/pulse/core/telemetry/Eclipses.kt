@@ -125,8 +125,11 @@ object Eclipses {
 
     /** Kilometres. The values [Ephemeris] already uses for parallax, kept consistent with it. */
     private const val EARTH_RADIUS_KM = 6378.14
-    private const val MOON_RADIUS_KM = 1737.4
-    private const val SUN_RADIUS_KM = 696_000.0
+    // ⚠️ `internal`, not private, and only so the guard can exist: PlanetDisc states in writing
+    // that its own copies are taken verbatim from here, and a claim nothing checks is how three
+    // files end up with three solar radii. PlanetDiscTest compares them.
+    internal const val MOON_RADIUS_KM = 1737.4
+    internal const val SUN_RADIUS_KM = 696_000.0
 
     /**
      * ⚠️ **The Earth's shadow is enlarged by 2%, and that is not a fudge.** The geometric shadow of

@@ -127,7 +127,8 @@ object Occultations {
     }
 
     private const val DEG = Math.PI / 180.0
-    private const val MOON_RADIUS_KM = 1737.4
+    // ⚠️ `internal` for the same reason Eclipses' is — see PlanetDiscTest.
+    internal const val MOON_RADIUS_KM = 1737.4
 
     /**
      * Below this geocentric separation an occultation is possible from SOMEWHERE.
