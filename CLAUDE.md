@@ -10507,7 +10507,9 @@ dissolve in ~100,000 years and stellar velocities are not linear over that span 
 delivered instead is sub-arcsecond over centuries, degrading gracefully over millennia, with the app
 saying what it assumes. And the catalogue conflict is arithmetic: **G < 12 is 3,087,821 stars at
 ~25 MB** (bundled in both apps, 367× the old 8,404) while **G < 14 is 16,844,156 at ~135 MB**
-(the `:sky` deep tier). LCARS is already 329 MB and its updater re-downloads the whole APK.
+(the `:sky` deep tier). LCARS is already 329 MB and its updater re-downloads the whole APK. ⚠️ That
+329 MB was true when this was written and is now **371,423,433 bytes** — the argument holds a fortiori,
+and the S11 section at the end of this file carries the measured figure.
 
 **The one idea everything rests on:** `SkyProjection.magnitudeLimit(fovDeg, deepest)` deepens the cut
 as the field narrows, so the DRAWN count is a few thousand at any zoom whatever is on disk. That is
@@ -10689,9 +10691,18 @@ at `MIN_FOV_DEG` needs magnitude **17.7**, on the order of a billion stars.
 - `stars.skycat` is **committed to git** and `.git` is already **427 MB**. A 135 MB blob makes it
   ~562 MB permanently, on every clone in every run of four workflows. The repo's own pattern for a
   large generated binary is **build in CI behind a cache** (the 424 MB food database), never commit.
-- LCARS is **329 MB** and its updater downloads the whole APK on every build; `:sky` is **33 MB**.
-  So the same 135 MB is a very different proposition on each, and on LCARS it is a recurring cost on
-  the owner's phone rather than a one-off.
+- ⚠️ **LCARS is 371,423,433 bytes and `:sky` is 33 MB**, and its updater downloads the whole APK on
+  every build. So the same 135 MB is a very different proposition on each, and on LCARS it is a
+  recurring cost on the owner's phone rather than a one-off.
+  ⚠️ **The 329 MB this section was written against is stale by 26 MB.** Measured from LCARS #2137's
+  own "Check what actually shipped" line, alongside `star catalogue: 23 MB, Stored
+  (memory-mappable)` — `:core:sky` merges its assets into every consuming APK, so the LCARS build
+  carries the catalogue too. ⚠️ **What the delta is made of is NOT measured and is not claimed
+  here**: dozens of commits landed between the two builds and nothing attributes the bytes among
+  them. I said flatly that the growth "is the star catalogue" earlier in this session, which was an
+  inference dressed as a measurement. Every other 329 MB figure in this file is a dated record of
+  what a particular commit measured and is correct as written; these two are corrected because they
+  are inputs to a decision that has not been made yet.
 - The Gaia TAP is reachable from this container (a `COUNT(*)` at G < 14 answers in 4.4 s), so
   building it is possible — the obstacle is delivery, not data.
 
