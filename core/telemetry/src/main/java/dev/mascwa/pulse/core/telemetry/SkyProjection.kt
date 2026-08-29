@@ -3,6 +3,8 @@ package dev.mascwa.pulse.core.telemetry
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.log10
+import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -542,6 +544,114 @@ object SkyProjection {
 
     /** About as faint as an unaided eye reaches on a good night, and where the original bundle stops. */
     const val NAKED_EYE_LIMIT = 6.5
+
+    // ---- running out of catalogue -------------------------------------------------------------
+
+    /**
+     * The field below which [magnitudeLimit] stops deepening, because the catalogue has run out.
+     *
+     * ⚠️ **This is not a corner case; it is half the zoom range.** Measured against the shipped
+     * catalogue: G < 12 saturates at **5.59°**, and the map zooms to [MIN_FOV_DEG] — so over
+     * **48.6% of the range** (in decades of field, which is how zoom is actually felt) not one new
+     * star appears however far you pinch. The map said nothing about that, so the only reading
+     * available to somebody using it was that the sky itself is empty there. It is not; the file is.
+     *
+     * ⚠️ **Every extra magnitude buys exactly the same amount of zoom and costs about 2.2× the
+     * last, so there is no natural place to stop.** That falls straight out of the law: the limit is
+     * linear in log-field, so one magnitude is always 1/[MAGNITUDES_PER_DECADE] = 0.238 decades.
+     * Measured live against the Gaia DR3 archive, at [StarCatalogFormat.RECORD_BYTES] a star:
+     *
+     * | catalogue | stars | file | saturates | dead zoom |
+     * |---|---|---|---|---|
+     * | G < 12 (shipped) | 3,087,821 | 24.7 MB | 5.59° | 48.6% |
+     * | G < 13 | 7,369,627 | 59.0 MB | 3.23° | 40.0% |
+     * | G < 14 | 16,844,156 | 134.8 MB | 1.87° | 31.4% |
+     *
+     * Each step down that table buys 8.6 points of zoom range; the first costs 34 MB and the second
+     * 76 MB. Nothing closes the gap — saturating at [MIN_FOV_DEG] would need magnitude 17.7, which
+     * is on the order of a billion stars.
+     *
+     * @param deepest the depth the catalogue actually reaches — see [magnitudeLimit].
+     */
+    fun saturationFovDeg(deepest: Double): Double {
+        val fov = MAX_FOV_DEG * 10.0.pow(-(deepest - WIDEST_LIMIT) / MAGNITUDES_PER_DECADE)
+        return fov.coerceIn(MIN_FOV_DEG, MAX_FOV_DEG)
+    }
+
+    /**
+     * Is the cut being made by the catalogue's depth rather than by the field?
+     *
+     * ⚠️ **Exact, with no tolerance, and that is a property of [magnitudeLimit] rather than luck.**
+     * It ends in `coerceAtMost(deepest)`, which returns the very same `Double` when it clamps — so
+     * `>=` is true precisely when it clamped. An epsilon here would report saturation just before it
+     * happened, which is the one moment the reading is wrong in the direction that misleads.
+     */
+    fun isSaturated(fovDeg: Double, deepest: Double): Boolean =
+        magnitudeLimit(fovDeg, deepest) >= deepest
+
+    /**
+     * The field width, said in a unit that has meaning at that width.
+     *
+     * ⚠️ **Both readouts printed `fovDeg.roundToInt()`, so below half a degree they read
+     * "0° across".** Flatly wrong text on screen, and worst in exactly the range this map was
+     * rebuilt to reach — [MIN_FOV_DEG] is 0.25°, so the deepest three quarters of a decade of zoom
+     * all reported zero. Between 0.5° and 1.5° it was no better: everything read "1°", which is
+     * where the useful detail lives.
+     *
+     * Arcminutes below a degree, because that is the unit the sky is measured in there and it gives
+     * the reader something to hold on to — the Moon is 31′, so "30′ across" is a picture. Tenths of
+     * a degree up to ten, whole degrees above.
+     *
+     * ⚠️ **Built from integers rather than `String.format`, so it carries no locale.** Three reasons,
+     * and the third is the decisive one: a comma decimal would make the test pass or fail by the
+     * machine it runs on; the rest of the readout is already locale-free integer interpolation; and
+     * both applications ship `resourceConfigurations += listOf("en")`, so a comma decimal would be
+     * the only one on an English screen. This is not the "numbers that are data use Locale.US" rule
+     * — it is that a locale is not wanted here at all.
+     */
+    fun formatFieldWidth(fovDeg: Double): String {
+        val fov = fovDeg.coerceIn(MIN_FOV_DEG, MAX_FOV_DEG)
+        if (fov < 1.0) return "${(fov * 60.0).roundToInt()}′"
+        if (fov < 10.0) return tenths(fov) + "°"
+        return "${fov.roundToInt()}°"
+    }
+
+    /**
+     * What to say when the map has run out of stars, or null when it has not.
+     *
+     * ⚠️ **Null is the ordinary answer and the note is the exception**, which is the only way it
+     * stays worth reading. It says both numbers a reader needs to act on: how deep this catalogue
+     * goes, and where the deepening stopped — so "would a bigger file help, and by how much" is
+     * answerable from the screen rather than from this file.
+     *
+     * ⚠️ **It does not replace the note that says the catalogue failed to open.** Those are
+     * different facts — one is "the file is not there", the other "you have zoomed past what is in
+     * it" — and a surface may well want to show both at once.
+     */
+    fun depthNote(fovDeg: Double, deepest: Double): String? {
+        if (!isSaturated(fovDeg, deepest)) return null
+        val sat = saturationFovDeg(deepest)
+        val tail =
+            if (sat >= MAX_FOV_DEG) "Zooming shows no new stars."
+            else "Below ${formatFieldWidth(sat)} across, zooming shows no new stars."
+        return "Everything it holds down to magnitude ${tenths(deepest)} is on screen. $tail"
+    }
+
+    /**
+     * One decimal place, without a locale and without `String.format`.
+     *
+     * ⚠️ **`roundToInt` is the right rounding here and `kotlin.math.round` would not be.** Measured
+     * against the JDK rather than recalled, because a first draft of this file asserted the opposite:
+     * `roundToInt` is `Math.round`, which takes 0.5 → 1, 2.5 → 3, 14.5 → 15; `kotlin.math.round` is
+     * `Math.rint`, which is banker's and takes 0.5 → 0, 2.5 → 2, 14.5 → 14. Every value reaching here
+     * is a field width or a catalogue depth, so positive, where half-up and half-away-from-zero agree.
+     * [StarCatalogFormat] states the same rule for the same reason and reaches for `floor(v + 0.5)`
+     * because it must match a Python builder, whose own `round` is banker's too.
+     */
+    private fun tenths(v: Double): String {
+        val t = (v * 10.0).roundToInt()
+        return "${t / 10}.${t % 10}"
+    }
 
     /**
      * Angular separation between two horizon positions, degrees.

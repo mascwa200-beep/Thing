@@ -148,12 +148,23 @@ private fun Controls(
     val pointing by vm.pointing.collectAsStateWithLifecycle()
     val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
+    val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
+    val deepNote by vm.deepNote.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
-                "${view.fovDeg.roundToInt()}° across · ${whenLabel(hours)}",
+                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · ${whenLabel(hours)}",
             c.ink2, JetBrainsMono, 10,
         )
+        // ⚠️ **This screen never showed the catalogue's own note at all** — the standalone app has
+        // rendered it since it was written and this one did not, so the LCARS map could silently
+        // fall back to the eight-thousand-star bright list with nothing on screen to say so. Same
+        // gap, one line up, as the field width that read "0°".
+        deepNote?.let { Text(it, c.ink2, JetBrainsMono, 10) }
+        // ⚠️ A different fact from the note above, which is why it is a second line: that one says
+        // the file would not open, this one says you have zoomed past what is inside it. Null over
+        // half the zoom range, which is the only reason it is worth reading when it appears.
+        SkyProjection.depthNote(view.fovDeg, deepest)?.let { Text(it, c.ink2, JetBrainsMono, 10) }
         // ⚠️ Said rather than implied. A phone magnetometer is disturbed by whatever steel and
         // current happens to be nearby, and the sensor itself reports when it has stopped trusting
         // its own answer — a map that quietly points somewhere wrong is worse than one that admits

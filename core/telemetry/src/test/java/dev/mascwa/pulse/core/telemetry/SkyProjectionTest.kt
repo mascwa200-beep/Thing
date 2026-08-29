@@ -460,4 +460,118 @@ class SkyProjectionTest {
             }
         }
     }
+
+    // ---- running out of catalogue -------------------------------------------------------------
+
+    /**
+     * ⚠️ The load-bearing property of the pair, and the one that would let the note lie.
+     * [SkyProjection.depthNote] quotes [SkyProjection.saturationFovDeg] as the field below which
+     * nothing new appears, and [SkyProjection.isSaturated] is what decides whether the note is shown
+     * at all. If the two ever disagreed, the sentence would name a field at which the map is still
+     * deepening — so the boundary is asserted from both sides rather than either alone.
+     */
+    @Test
+    fun `the quoted field is exactly where the deepening stops`() {
+        for (deepest in listOf(7.0, 9.0, 12.0, 13.0, 14.0)) {
+            val sat = SkyProjection.saturationFovDeg(deepest)
+            assertTrue(
+                "at the quoted field the catalogue should already be the cut, deepest=$deepest",
+                SkyProjection.isSaturated(sat, deepest),
+            )
+            assertFalse(
+                "a whisker wider and the field should still be the cut, deepest=$deepest",
+                SkyProjection.isSaturated(sat * 1.001, deepest),
+            )
+        }
+    }
+
+    /**
+     * Computed from the shipped formula rather than recalled — 150 x 10^(-(d-6)/4.2) — and these are
+     * the three tiers the size decision is actually between.
+     */
+    @Test
+    fun `each extra magnitude moves the saturation field by the same factor`() {
+        assertEquals(5.591391, SkyProjection.saturationFovDeg(12.0), 1e-5)
+        assertEquals(3.231652, SkyProjection.saturationFovDeg(13.0), 1e-5)
+        assertEquals(1.867796, SkyProjection.saturationFovDeg(14.0), 1e-5)
+        // One magnitude is 1/4.2 of a decade, always, because the law is linear in log-field.
+        val step = SkyProjection.saturationFovDeg(12.0) / SkyProjection.saturationFovDeg(13.0)
+        val next = SkyProjection.saturationFovDeg(13.0) / SkyProjection.saturationFovDeg(14.0)
+        assertEquals("the ratio is a property of the law, not of the tier", step, next, 1e-9)
+    }
+
+    /** A catalogue too shallow to deepen at all, and one deeper than the map can zoom. */
+    @Test
+    fun `the saturation field is clamped to the range the map can actually show`() {
+        assertEquals(SkyProjection.MAX_FOV_DEG, SkyProjection.saturationFovDeg(4.0), 1e-9)
+        assertEquals(SkyProjection.MAX_FOV_DEG, SkyProjection.saturationFovDeg(6.0), 1e-9)
+        assertEquals(SkyProjection.MIN_FOV_DEG, SkyProjection.saturationFovDeg(20.0), 1e-9)
+    }
+
+    /**
+     * ⚠️ **The defect this exists for: both readouts printed `roundToInt`, so every field under half
+     * a degree read "0° across".** The map zooms to 0.25, so that was the deepest three quarters of a
+     * decade — exactly the range the deep catalogue was added to reach.
+     */
+    @Test
+    fun `no field width in range is ever rendered as zero`() {
+        var fov = SkyProjection.MIN_FOV_DEG
+        while (fov <= SkyProjection.MAX_FOV_DEG) {
+            val text = SkyProjection.formatFieldWidth(fov)
+            assertFalse("$fov rendered as $text", text == "0°" || text == "0′" || text == "0.0°")
+            fov *= 1.02
+        }
+    }
+
+    @Test
+    fun `the field width is said in a unit that has meaning at that width`() {
+        assertEquals("15′", SkyProjection.formatFieldWidth(0.25))
+        assertEquals("30′", SkyProjection.formatFieldWidth(0.5))
+        assertEquals("1.0°", SkyProjection.formatFieldWidth(1.0))
+        assertEquals("5.6°", SkyProjection.formatFieldWidth(5.591391))
+        assertEquals("10°", SkyProjection.formatFieldWidth(10.0))
+        assertEquals("60°", SkyProjection.formatFieldWidth(60.0))
+        // Out of range in both directions is clamped, not rendered.
+        assertEquals("15′", SkyProjection.formatFieldWidth(0.01))
+        assertEquals("150°", SkyProjection.formatFieldWidth(400.0))
+    }
+
+    /**
+     * ⚠️ Null is the ordinary answer. A note on every frame would be read once and then never again,
+     * which is the same as not having one.
+     */
+    @Test
+    fun `nothing is said while the field is still the cut`() {
+        assertEquals(null, SkyProjection.depthNote(60.0, 12.0))
+        assertEquals(null, SkyProjection.depthNote(5.6, 12.0))
+        // The bright catalogue alone is not saturated at the widest field either.
+        assertEquals(null, SkyProjection.depthNote(SkyProjection.MAX_FOV_DEG, SkyProjection.NAKED_EYE_LIMIT))
+    }
+
+    @Test
+    fun `the note names both the depth reached and where the deepening stopped`() {
+        assertEquals(
+            "Everything it holds down to magnitude 12.0 is on screen. " +
+                "Below 5.6° across, zooming shows no new stars.",
+            SkyProjection.depthNote(2.0, 12.0),
+        )
+        assertEquals(
+            "Everything it holds down to magnitude 6.5 is on screen. " +
+                "Below 114° across, zooming shows no new stars.",
+            SkyProjection.depthNote(100.0, SkyProjection.NAKED_EYE_LIMIT),
+        )
+    }
+
+    /**
+     * ⚠️ A catalogue that saturates at the widest field would otherwise be told to zoom out past the
+     * edge of the map. The sentence drops the clause instead of naming a field nobody can reach.
+     */
+    @Test
+    fun `a catalogue saturated everywhere does not quote a field`() {
+        val note = SkyProjection.depthNote(SkyProjection.MAX_FOV_DEG, SkyProjection.WIDEST_LIMIT)
+        assertEquals(
+            "Everything it holds down to magnitude 6.0 is on screen. Zooming shows no new stars.",
+            note,
+        )
+    }
 }

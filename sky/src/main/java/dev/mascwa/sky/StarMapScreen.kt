@@ -201,6 +201,7 @@ private fun Controls(
     val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
     val deepNote by vm.deepNote.collectAsStateWithLifecycle()
+    val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
 
     // ⚠️ **Only while following, and that is the whole justification.** Somebody holding the phone
     // up at the sky is not touching the screen, so the display blanks after whatever the system
@@ -216,10 +217,20 @@ private fun Controls(
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
-                "${view.fovDeg.roundToInt()}° across · ${whenLabel(hours)}",
+                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · ${whenLabel(hours)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // ⚠️ A different fact from `deepNote` below, which is why it is its own line: that one says
+        // the catalogue would not open, this one says you have zoomed past what is inside it. Null
+        // over half the zoom range, which is the only reason it is worth reading when it appears.
+        SkyProjection.depthNote(view.fovDeg, deepest)?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         // What the deep catalogue actually managed — how many stars are on screen, or why none are.
         // ⚠️ Surfaced rather than swallowed: a map drawing eight thousand stars and a map drawing
         // three million look similar at a wide field, and only one of them has the deep tier open.
