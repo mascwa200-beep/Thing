@@ -1,0 +1,335 @@
+package dev.mascwa.pulse.core.telemetry
+
+import kotlin.math.abs
+import kotlin.math.acos
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
+import kotlin.math.sqrt
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * ⚠️ **Every expectation here was computed by running the shipped functions first**
+ * (`scratchpad/sky/PointingProbe.kt`), and the roll sign was measured against the real Android
+ * sensor maths before that (`scratchpad/sky/PointProbe.kt`). Nothing below is a recollection.
+ */
+class SkyPointingTest {
+
+    private val fov = 60.0
+
+    private fun unit(azDeg: Double, altDeg: Double): DoubleArray {
+        val a = Math.toRadians(azDeg)
+        val h = Math.toRadians(altDeg)
+        return doubleArrayOf(cos(h) * sin(a), cos(h) * cos(a), sin(h))
+    }
+
+    private fun len(v: DoubleArray) = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+
+    private fun angleBetween(a: DoubleArray, b: DoubleArray): Double =
+        Math.toDegrees(acos((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]).coerceIn(-1.0, 1.0)))
+
+    // ------------------------------------------------------------------ the attitude
+
+    @Test
+    fun `the two directions are always a unit pair at right angles`() {
+        // Measured over 5,616 attitudes covering every azimuth, every altitude from pole to pole and
+        // six rolls including a half-turn: worst |f dot u| 1.8e-16, worst |len - 1| 3.3e-16.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        for (az in 0 until 360 step 7) {
+            for (alt in -90..90 step 5) {
+                for (roll in intArrayOf(0, 17, -33, 90, -90, 179)) {
+                    val a = SkyPointing.Attitude(az.toDouble(), alt.toDouble(), roll.toDouble())
+                    SkyPointing.forward(a, f)
+                    SkyPointing.screenUp(a, u)
+                    val label = "az $az alt $alt roll $roll"
+                    assertEquals("forward length, $label", 1.0, len(f), 1e-12)
+                    assertEquals("up length, $label", 1.0, len(u), 1e-12)
+                    assertEquals(
+                        "perpendicular, $label",
+                        0.0,
+                        f[0] * u[0] + f[1] * u[1] + f[2] * u[2],
+                        1e-12,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `with no roll the screen up is the look direction a quarter turn higher`() {
+        // The claim the class note makes, and the reason there is no singularity: measured worst
+        // component difference 2.8e-16 over the whole sweep.
+        val u = DoubleArray(3)
+        for (az in 0 until 360 step 7) {
+            for (alt in -90..90 step 5) {
+                SkyPointing.screenUp(SkyPointing.Attitude(az.toDouble(), alt.toDouble(), 0.0), u)
+                val q = unit(az.toDouble(), alt + 90.0)
+                for (i in 0..2) assertEquals("component $i at az $az alt $alt", q[i], u[i], 1e-12)
+            }
+        }
+    }
+
+    @Test
+    fun `tipping the top of the handset right turns the screen up toward the screen right`() {
+        // Aimed north and upright, screen-up is straight up and screen-right is east. A quarter turn
+        // clockwise should therefore put screen-up due east.
+        val u = DoubleArray(3)
+        SkyPointing.screenUp(SkyPointing.Attitude(0.0, 0.0, 90.0), u)
+        assertEquals("east", 1.0, u[0], 1e-12)
+        assertEquals("north", 0.0, u[1], 1e-12)
+        assertEquals("up", 0.0, u[2], 1e-12)
+    }
+
+    @Test
+    fun `the sensor's own signs are turned round exactly once`() {
+        val a = SkyPointing.fromDeviceOrientation(123.0, -45.0, 30.0)
+        assertEquals(123.0, a.azimuthDeg, 0.0)
+        assertEquals(45.0, a.altitudeDeg, 0.0)
+        assertEquals(-30.0, a.rollDeg, 0.0)
+    }
+
+    // ------------------------------------------------------------------ the two paths agree
+
+    @Test
+    fun `the vector path draws exactly what the angle path draws`() {
+        // ⚠️ THE ROLL SIGN, pinned. Measured against the real Android sensor maths over 36
+        // attitudes, `rollDeg = -orientation[2]` agrees with the picture computed straight from the
+        // attitude matrix to 2.4e-07 while the other sign is out by 2.98 screen units — the whole
+        // picture. `equivalentView` carries that negation, and this asserts the vector path, which
+        // needs no sign at all, produces the same thing. Measured worst here: 9.0e-16.
+        val targets = ArrayList<DoubleArray>()
+        for (az in 0 until 360 step 10) {
+            for (alt in -80..80 step 10) targets.add(unit(az.toDouble(), alt.toDouble()))
+        }
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        for (az in 0 until 360 step 30) {
+            for (alt in intArrayOf(-89, -60, -20, 0, 20, 60, 89)) {
+                for (roll in intArrayOf(0, 17, -33, 90, -90, 179)) {
+                    val a = SkyPointing.Attitude(az.toDouble(), alt.toDouble(), roll.toDouble())
+                    SkyPointing.forward(a, f)
+                    SkyPointing.screenUp(a, u)
+                    val vector = SkyProjection.basisOf(f, u[0], u[1], u[2], fov, 0.0)
+                    val angles = SkyProjection.basisOf(SkyPointing.equivalentView(a, fov))
+                    for (t in targets) {
+                        val p = SkyProjection.projectUnit(t[0], t[1], t[2], vector)
+                        val q = SkyProjection.projectUnit(t[0], t[1], t[2], angles)
+                        if (!p.visible || !q.visible) continue
+                        if (hypot(p.x, p.y) > 1.5) continue
+                        assertEquals("x at az $az alt $alt roll $roll", q.x, p.x, 1e-9)
+                        assertEquals("y at az $az alt $alt roll $roll", q.y, p.y, 1e-9)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `aimed at the zenith only the screen up gives a usable basis`() {
+        // ⚠️ THE WHOLE ARGUMENT FOR THE VECTOR PATH, asserted rather than left as a remark. A basis
+        // is `forward x up`; with up = the observer's zenith and the look direction AT the zenith
+        // that cross product is the zero vector, `usable` goes false, and a map built that way draws
+        // nothing at all. The screen-up is perpendicular to the look direction by construction, so
+        // it cannot happen.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val straightUp = SkyPointing.Attitude(37.0, 90.0, 0.0)
+        SkyPointing.forward(straightUp, f)
+        SkyPointing.screenUp(straightUp, u)
+        assertTrue("screen-up basis", SkyProjection.basisOf(f, u[0], u[1], u[2], fov, 0.0).usable)
+        assertFalse("zenith basis", SkyProjection.basisOf(f, 0.0, 0.0, 1.0, fov, 0.0).usable)
+    }
+
+    @Test
+    fun `the angle path clamps at the pole and the vector path does not`() {
+        // Documents the one place the two deliberately differ, so nobody "fixes" it into agreement.
+        val a = SkyPointing.Attitude(0.0, 90.0, 0.0)
+        assertEquals(SkyProjection.MAX_ALTITUDE_DEG, SkyPointing.equivalentView(a, fov).altitudeDeg, 0.0)
+        val f = DoubleArray(3)
+        SkyPointing.forward(a, f)
+        assertEquals(90.0, SkyPointing.altitudeOf(f), 1e-9)
+    }
+
+    // ------------------------------------------------------------------ smoothing
+
+    @Test
+    fun `a blended attitude is still a valid attitude`() {
+        // Measured over 16 blends: worst |f dot u| 1.1e-16, worst |len - 1| 1.1e-16.
+        val prevF = DoubleArray(3)
+        val prevU = DoubleArray(3)
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        for (az in 0 until 360 step 23) {
+            val p = SkyPointing.Attitude(az.toDouble(), 20.0, 10.0)
+            SkyPointing.forward(p, prevF)
+            SkyPointing.screenUp(p, prevU)
+            SkyPointing.smooth(prevF, prevU, SkyPointing.Attitude(az + 8.0, 25.0, -14.0), 0.25, f, u)
+            assertEquals("forward length at $az", 1.0, len(f), 1e-12)
+            assertEquals("up length at $az", 1.0, len(u), 1e-12)
+            assertEquals("perpendicular at $az", 0.0, f[0] * u[0] + f[1] * u[1] + f[2] * u[2], 1e-12)
+        }
+    }
+
+    @Test
+    fun `blending directions does not whip the picture round near the zenith`() {
+        // ⚠️ THE REASON THIS SMOOTHS VECTORS RATHER THAN ANGLES. At altitude 89.9 the azimuths 0 and
+        // 180 are two readings only 0.2 degrees apart in aim — a centimetre of hand movement — yet
+        // their azimuths are a half-turn apart. A smoother averaging the azimuth lands on 90, which
+        // turns the screen-up by a measured 90 degrees for that 0.2 degree change. Blending the
+        // directions cannot do that: the look direction stays within the 0.2 degrees the two
+        // readings actually span.
+        val a0 = SkyPointing.Attitude(0.0, 89.9, 0.0)
+        val a1 = SkyPointing.Attitude(180.0, 89.9, 0.0)
+        val f0 = DoubleArray(3)
+        val u0 = DoubleArray(3)
+        val f1 = DoubleArray(3)
+        SkyPointing.forward(a0, f0)
+        SkyPointing.screenUp(a0, u0)
+        SkyPointing.forward(a1, f1)
+        assertEquals("the two readings really are this close", 0.2, angleBetween(f0, f1), 1e-6)
+
+        // What the rejected design does, stated as a number so the comparison is not rhetorical.
+        // ⚠️ 89.99983, not 90 — and my first assertion here said 90 because I read it off a probe
+        // that printed one decimal place. It is a hair under a right angle because the altitude is
+        // 89.9 rather than the pole itself, which leaves the two screen-ups a little out of the
+        // horizontal plane. Pinned at the measured value rather than at the round one.
+        val perAngleUp = DoubleArray(3)
+        SkyPointing.screenUp(SkyPointing.Attitude(90.0, 89.9, 0.0), perAngleUp)
+        assertEquals("averaging the azimuth turns the picture", 89.99983, angleBetween(u0, perAngleUp), 1e-4)
+
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        SkyPointing.smooth(f0, u0, a1, 0.5, f, u)
+        assertTrue(
+            "blended aim ${angleBetween(f, f0)} left the span the readings cover",
+            angleBetween(f, f0) <= 0.2 + 1e-6 && angleBetween(f, f1) <= 0.2 + 1e-6,
+        )
+    }
+
+    @Test
+    fun `a half turn between frames keeps the newest reading rather than nothing`() {
+        // ⚠️ Two exactly opposite readings blend to a zero vector, and a normalised zero vector is an
+        // unusable basis — a BLANK MAP. At any real frame rate that is a sensor glitch, so the fresh
+        // reading stands. Asserted on both vectors because they degenerate independently.
+        val prevF = DoubleArray(3)
+        val prevU = DoubleArray(3)
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val freshF = DoubleArray(3)
+        val freshU = DoubleArray(3)
+        val north = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        val south = SkyPointing.Attitude(180.0, 0.0, 0.0)
+        SkyPointing.forward(north, prevF)
+        SkyPointing.screenUp(north, prevU)
+        SkyPointing.forward(south, freshF)
+        SkyPointing.screenUp(south, freshU)
+        SkyPointing.smooth(prevF, prevU, south, 0.5, f, u)
+        for (i in 0..2) {
+            assertEquals("forward $i", freshF[i], f[i], 1e-12)
+            assertEquals("up $i", freshU[i], u[i], 1e-12)
+        }
+        assertEquals("and it is still usable", 1.0, len(f), 1e-12)
+    }
+
+    @Test
+    fun `the handset spun in its own plane keeps the newest reading too`() {
+        // ⚠️ THE CASE THE TEST ABOVE CANNOT REACH, and a perturbation run found that out: with the
+        // look directions also opposite, the FORWARD guard returns first and the screen-up guard is
+        // never exercised. Deleting it failed nothing. Here the aim does not move at all — the
+        // handset is spun a half-turn in its own plane between two frames — so the forward blend is
+        // perfectly healthy and only the up vector cancels.
+        val prevF = DoubleArray(3)
+        val prevU = DoubleArray(3)
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val freshU = DoubleArray(3)
+        val upright = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        val inverted = SkyPointing.Attitude(0.0, 0.0, 180.0)
+        SkyPointing.forward(upright, prevF)
+        SkyPointing.screenUp(upright, prevU)
+        SkyPointing.screenUp(inverted, freshU)
+        assertEquals("the two screen-ups really are opposite", 180.0, angleBetween(prevU, freshU), 1e-6)
+
+        SkyPointing.smooth(prevF, prevU, inverted, 0.5, f, u)
+        for (i in 0..2) assertEquals("up $i", freshU[i], u[i], 1e-12)
+        assertEquals("still a unit vector", 1.0, len(u), 1e-12)
+        assertEquals("still square to the aim", 0.0, f[0] * u[0] + f[1] * u[1] + f[2] * u[2], 1e-12)
+    }
+
+    @Test
+    fun `the two ends of the smoothing range do what they say`() {
+        val prevF = DoubleArray(3)
+        val prevU = DoubleArray(3)
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val freshF = DoubleArray(3)
+        val here = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        val there = SkyPointing.Attitude(90.0, 30.0, 12.0)
+        SkyPointing.forward(here, prevF)
+        SkyPointing.screenUp(here, prevU)
+        SkyPointing.forward(there, freshF)
+
+        SkyPointing.smooth(prevF, prevU, there, 1.0, f, u)
+        for (i in 0..2) assertEquals("alpha 1 takes the reading, $i", freshF[i], f[i], 0.0)
+
+        SkyPointing.smooth(prevF, prevU, there, 0.0, f, u)
+        assertEquals("alpha 0 stays put", 0.0, angleBetween(f, prevF), 1e-9)
+    }
+
+    // ------------------------------------------------------------------ trim and read-out
+
+    @Test
+    fun `the hand set correction wraps rather than running off the end`() {
+        assertEquals(10.0, SkyPointing.trimmed(SkyPointing.Attitude(350.0, 0.0, 0.0), 20.0).azimuthDeg, 1e-9)
+        assertEquals(345.0, SkyPointing.addTrim(-5.0, -10.0), 1e-9)
+        assertEquals(5.0, SkyPointing.addTrim(355.0, 10.0), 1e-9)
+        // The trim moves only the bearing; nothing else about the attitude may change.
+        val a = SkyPointing.Attitude(10.0, 42.0, -7.0)
+        val t = SkyPointing.trimmed(a, 33.0)
+        assertEquals(42.0, t.altitudeDeg, 0.0)
+        assertEquals(-7.0, t.rollDeg, 0.0)
+    }
+
+    @Test
+    fun `reading angles back out of a direction round trips`() {
+        val f = DoubleArray(3)
+        for (az in 0 until 360 step 11) {
+            for (alt in -85..85 step 5) {
+                val a = SkyPointing.Attitude(az.toDouble(), alt.toDouble(), 0.0)
+                SkyPointing.forward(a, f)
+                assertEquals("altitude at az $az alt $alt", alt.toDouble(), SkyPointing.altitudeOf(f), 1e-9)
+                assertEquals("azimuth at az $az alt $alt", az.toDouble(), SkyPointing.azimuthOf(f), 1e-9)
+            }
+        }
+    }
+
+    @Test
+    fun `straight up has no bearing and says so rather than inventing one`() {
+        assertEquals(90.0, SkyPointing.altitudeOf(doubleArrayOf(0.0, 0.0, 1.0)), 1e-12)
+        assertEquals(-90.0, SkyPointing.altitudeOf(doubleArrayOf(0.0, 0.0, -1.0)), 1e-12)
+
+        // ⚠️ The exact zeros do NOT exercise the guard and an earlier version of this test used only
+        // those: `atan2(0.0, 0.0)` is 0.0, so deleting the guard changes nothing for that input. The
+        // cases that reach it are a NEGATIVE zero, where `atan2(0.0, -0.0)` is a confident 180, and
+        // the residue of a cancellation, where 1e-15 against -1e-15 is a confident 135. Both are
+        // bearings invented out of nothing, at the one place a bearing does not exist.
+        assertEquals("exact zeros", 0.0, SkyPointing.azimuthOf(doubleArrayOf(0.0, 0.0, 1.0)), 0.0)
+        assertEquals("a negative zero", 0.0, SkyPointing.azimuthOf(doubleArrayOf(0.0, -0.0, 1.0)), 0.0)
+        assertEquals("cancellation residue", 0.0, SkyPointing.azimuthOf(doubleArrayOf(1e-15, -1e-15, 1.0)), 0.0)
+        assertEquals("and pointing down", 0.0, SkyPointing.azimuthOf(doubleArrayOf(-1e-16, -1e-16, -1.0)), 0.0)
+    }
+
+    @Test
+    fun `how far apart two aims are ignores the roll`() {
+        val level = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        val rolled = SkyPointing.Attitude(0.0, 0.0, 47.0)
+        assertEquals("turning the handset is not looking elsewhere", 0.0, SkyPointing.separationDeg(level, rolled), 1e-9)
+        assertEquals(90.0, SkyPointing.separationDeg(level, SkyPointing.Attitude(90.0, 0.0, 0.0)), 1e-9)
+        assertEquals(30.0, SkyPointing.separationDeg(level, SkyPointing.Attitude(0.0, 30.0, 0.0)), 1e-9)
+        assertTrue(abs(SkyPointing.separationDeg(level, level)) < 1e-9)
+    }
+}

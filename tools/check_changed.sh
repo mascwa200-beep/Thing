@@ -68,14 +68,27 @@ fi
 # ---- 1. imports and duplicate companions, per package the change touches -------------------------
 echo
 echo "== import gate =="
-PKGS=$(echo "$CHANGED" | xargs -r -n1 dirname | sort -u)
+# ⚠️ `scratchpad/` is excluded from THIS gate and the duplicate-declaration one below, and only from
+# those two. Both reason per PACKAGE — "these files are compiled together, so a name declared twice
+# is an error, and a name used without an import is an error". Neither premise holds there: a
+# scratchpad probe is a one-shot instrument compiled ALONE with an explicit file list, so half a
+# dozen of them each declaring `main()` in one package is not a conflict, and one sharing a package
+# with the core it probes needs no imports. Left in, the reports grew by a file per slice until they
+# were seven lines of noise around any real finding — and a gate people learn to skim is worse than
+# no gate. The nul-byte and parse gates still cover scratchpad, because a broken probe IS a defect.
+PKGS=$(echo "$CHANGED" | xargs -r -n1 dirname | sort -u | grep -v '^scratchpad/' || true)
 for d in $PKGS; do
     OUT=$(python3 tools/kotlin_import_check.py "$d" 2>&1)
     if echo "$OUT" | grep -q "^clean"; then
         printf '   ok    %s\n' "$d"
     else
         printf '   CHECK %s\n' "$d"
-        echo "$OUT" | grep -E "used but not imported|does not resolve|companion" | sed 's/^/         /'
+        # ⚠️ Print WHATEVER the checker said, rather than filtering to a list of known phrasings. The
+        # filter used to name three, and the checker has grown several more since — so a package
+        # failing on an enum constant printed a bare `CHECK` with no reason under it at all, for as
+        # long as that check has existed. A gate that reports a problem and will not say what it is
+        # teaches the reader to skim past it, which is worse than not reporting at all.
+        echo "$OUT" | grep -v '^clean' | sed 's/^/         /'
         FAIL=1
     fi
 done

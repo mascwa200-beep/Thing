@@ -611,10 +611,28 @@ def main(pkgdir: pathlib.Path) -> int:
     # declarations with identical members are safe to judge against whichever one the file means,
     # which readmits every deliberately-duplicated kit type. Genuine collisions between unrelated
     # types differ in their members, and those are still skipped rather than guessed at.
+    #
+    # ⚠️ **The third collision family, and it is not a disagreement between two enums — it is an enum
+    # losing a name to something that is not an enum at all.** `core:telemetry` holds a top-level
+    # `object Body` (a person: mass, height, BMR) and, nested inside `PlanetDisc`, an
+    # `enum class Body` (the Sun, the Moon, the planets). Only the enum reaches the map above, since
+    # an `object` has no constants to collect — so every `Body.MIN_KG` in that package was judged
+    # against SATURN and MERCURY and reported, twenty-odd times, all false. Kotlin's own scoping is
+    # the answer: a bare `Body.` there means the TOP-LEVEL object, and the nested enum is only ever
+    # reachable as `PlanetDisc.Body`. So a simple name also declared as a non-enum type is ambiguous
+    # by construction and this check must say nothing about it.
+    non_enum = set()
     seen = {}
     for root in SRC_ROOTS:
         for kt in root.rglob("*.kt"):
             raw = kt.read_text(errors="replace")
+            # Top-level only — `^` with no leading indent — because a NESTED type does not shadow
+            # anything at package scope, which is the whole point of the rule above.
+            non_enum |= {
+                m.group(2) for m in
+                re.finditer(r'^(?!\s)(?:\w+\s+)*?(object|class|interface)\s+(\w+)', raw, re.M)
+                if not re.match(r'^enum\s', m.group(0))
+            }
             found = enum_constants(raw)
             if not found:
                 continue
@@ -626,7 +644,7 @@ def main(pkgdir: pathlib.Path) -> int:
                 pkgs.add(pkg)
     enums = {
         n: (set(next(iter(agree))), pkgs)
-        for n, (agree, pkgs) in seen.items() if len(agree) == 1
+        for n, (agree, pkgs) in seen.items() if len(agree) == 1 and n not in non_enum
     }
 
     bad = False
