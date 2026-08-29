@@ -33,6 +33,16 @@ on:
       # shared and deliberately NOT listed — a change to either can move this build.
       - "nutrition/**"
       - ".github/workflows/nutrition-build.yml"
+      # ⚠️ The session scratchpad — probes and measurement harnesses, kept beside the work they
+      # justify. Checked before listing it rather than assumed: it is referenced by NO build script
+      # at all (`settings.gradle.kts`, the root script and every module's), so nothing here can
+      # compile it. The other two workflows use allowlists, so it already cannot reach them; this is
+      # the only filter that needs the entry.
+      #
+      # It earns its place because a probe-only commit otherwise costs a full thirteen-minute build
+      # AND cancels whatever is in flight under `cancel-in-progress` — which in practice means
+      # holding the push until an unrelated run has published, and that has already cost real time.
+      - "scratchpad/**"
   workflow_dispatch:
 
 permissions:
