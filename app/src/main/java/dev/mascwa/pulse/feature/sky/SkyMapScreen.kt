@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeepSky
+import dev.mascwa.pulse.core.telemetry.PlanetDisc
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
 import dev.mascwa.pulse.feature.common.LcarsButton
@@ -47,6 +47,9 @@ import dev.mascwa.pulse.sky.MilkyWayGlow
 import dev.mascwa.pulse.sky.SkyFrame
 import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.SkyRenderer
+import dev.mascwa.pulse.sky.stepAlong
+import dev.mascwa.pulse.sky.measurePixelsPerDegree
+import dev.mascwa.pulse.sky.drawSolarSystemBody
 import dev.mascwa.pulse.sky.StarBatches
 import dev.mascwa.pulse.sky.collectLines
 import dev.mascwa.pulse.sky.collectStars
@@ -353,13 +356,36 @@ private fun SkyCanvas(
                 SkyMapViewModel.Kind.MOON -> c.ink
                 else -> c.sky
             }
-            drawCircle(if (isBelow) colour.copy(alpha = 0.3f) else colour, r, screen)
-            drawCircle(c.void, r * 0.35f, screen, style = Stroke(width = 1f))
+            // ⚠️ One projection for every direction the renderer needs, taken with the SAME
+            // projection the body itself went through — which is what lets the renderer measure
+            // orientations rather than assume them. See PlanetDisc.Appearance.
+            val project: (PlanetDisc.SkyPoint) -> Offset? = { pt ->
+                val q = SkyProjection.project(pt.azimuthDeg, pt.altitudeDeg, view)
+                if (q.visible) Offset(cx + (q.x * half).toFloat(), cy + (q.y * half).toFloat()) else null
+            }
+            // Measured a degree at a time rather than divided out of the field, because the
+            // projection is not linear and a body low down sits where that matters most.
+            val perDegree = measurePixelsPerDegree(
+                screen, project(stepAlong(b.azimuthDeg, b.altitudeDeg, 0.0)),
+            )
+            drawSolarSystemBody(
+                look = b.look,
+                centre = screen,
+                markerRadiusPx = r,
+                pixelsPerDegree = perDegree,
+                colour = colour,
+                shadow = c.void,
+                alpha = if (isBelow) BELOW_HORIZON_BODY_ALPHA else 1f,
+                project = project,
+            )
             b.label?.let {
                 labelPaint.color = colour.toArgb()
                 labelPaint.textSize = 11f * density
+                // The label clears whatever was actually drawn, which for a zoomed-in Sun is a great
+                // deal more than the marker it replaced.
+                val edge = maxOf(r, ((b.look?.diameterDeg ?: 0.0) / 2.0).toFloat() * perDegree)
                 drawContext.canvas.nativeCanvas.drawText(
-                    it, screen.x + r + 4f * density, screen.y + 4f * density, labelPaint,
+                    it, screen.x + edge + 4f * density, screen.y + 4f * density, labelPaint,
                 )
             }
         }
@@ -629,3 +655,12 @@ private const val ASTERISM_WIDTH_DP = 1.0f
 private const val ASTERISM_ALPHA = 0.34f
 private const val BORDER_WIDTH_DP = 0.9f
 private const val BORDER_ALPHA = 0.22f
+
+/**
+ * How faint a Sun, Moon or planet goes once it has set.
+ *
+ * The same 0.3 the fixed markers always used. It is kept rather than removed because a body below
+ * the horizon is still worth showing — knowing that Jupiter is under your feet rather than absent is
+ * half of what a sky map is for — and dimming is how the map says so.
+ */
+private const val BELOW_HORIZON_BODY_ALPHA = 0.3f

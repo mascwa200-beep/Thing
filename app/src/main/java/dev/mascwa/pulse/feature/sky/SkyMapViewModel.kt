@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.sky
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.PlanetDisc
 import dev.mascwa.pulse.core.telemetry.MilkyWay
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
@@ -17,6 +18,7 @@ import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
+import dev.mascwa.pulse.sky.stepAlong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -184,6 +186,12 @@ class SkyMapViewModel(
         val colourIndex: Double? = null,
         /** Only for the identify card — the full name, the constellation, the rest. */
         val detail: String = "",
+        /**
+         * How to draw this body as more than a dot. Null for stars, which have no resolvable size —
+         * the nearest is under a fiftieth of a milliarcsecond across, so a star is a point at any
+         * magnification this or any other telescope will ever reach.
+         */
+        val look: PlanetDisc.Appearance? = null,
     )
 
     enum class Kind { STAR, SUN, MOON, PLANET }
@@ -488,14 +496,40 @@ class SkyMapViewModel(
 
         _bodies.value = withContext(Dispatchers.Default) {
             val out = ArrayList<Body>(8)
+            // The Sun's place in equatorial coordinates, which every phased body needs: which way a
+            // crescent points is entirely a question of where the Sun is from there.
+            val sunEq = Ephemeris.sunEquatorial(at)
+
             val sun = Ephemeris.sunPosition(here.latitude, here.longitude, at)
-            out += Body(sun.azimuthDeg, sun.altitudeDeg, -26.7, "Sun", Kind.SUN, detail = "The Sun")
+            out += Body(
+                sun.azimuthDeg, sun.altitudeDeg, -26.7, "Sun", Kind.SUN, detail = "The Sun",
+                look = PlanetDisc.Appearance(
+                    diameterDeg = PlanetDisc.apparentDiameterDeg(
+                        PlanetDisc.equatorialRadiusKm(PlanetDisc.Body.SUN), sun.distanceKm,
+                    ),
+                    limbDarkened = true,
+                ),
+            )
 
             val moon = Ephemeris.moonPosition(here.latitude, here.longitude, at)
+            val moonEq = Ephemeris.moonEquatorial(at)
             val phase = Ephemeris.moonPhase(at)
             out += Body(
                 moon.azimuthDeg, moon.altitudeDeg, -12.0, "Moon", Kind.MOON,
                 detail = "The Moon · ${phase.name} · ${(phase.illuminatedFraction * 100).roundToInt()}% lit",
+                look = PlanetDisc.Appearance(
+                    diameterDeg = PlanetDisc.apparentDiameterDeg(
+                        PlanetDisc.equatorialRadiusKm(PlanetDisc.Body.MOON), moon.distanceKm,
+                    ),
+                    phaseAngleDeg = phase.phaseAngleDeg,
+                    limb = stepAlong(
+                        moon.azimuthDeg, moon.altitudeDeg,
+                        PlanetDisc.brightLimbAngle(
+                            sunEq.rightAscensionDeg, sunEq.declinationDeg,
+                            moonEq.rightAscensionDeg, moonEq.declinationDeg,
+                        ),
+                    ),
+                ),
             )
 
             runCatching { PlanetCalc.planetsNow(here.latitude, here.longitude, at) }
@@ -504,10 +538,76 @@ class SkyMapViewModel(
                     out += Body(
                         p.azimuthDeg, p.altitudeDeg, p.magnitude, p.name, Kind.PLANET,
                         detail = "${p.name} · magnitude ${"%.1f".format(java.util.Locale.US, p.magnitude)}",
+                        look = planetLook(p, sunEq, at),
                     )
                 }
             out
         }
+    }
+
+    /**
+     * How one planet looks right now, or null if this build knows no size for it.
+     *
+     * ⚠️ **A zero distance means "not stated", not "on top of the observer".** `PlanetCalc` defaults
+     * both new fields to zero so cached entries still decode, so the guard here is what stops a
+     * stale record being drawn as a planet filling the sky.
+     */
+    private fun planetLook(
+        p: dev.mascwa.pulse.data.orbital.Planet,
+        sunEq: Ephemeris.Equatorial,
+        at: Long,
+    ): PlanetDisc.Appearance? {
+        val body = PLANET_BODIES[p.name] ?: return null
+        if (p.distanceAu <= 0.0) return null
+        val diameter = PlanetDisc.apparentDiameterDegAu(
+            PlanetDisc.equatorialRadiusKm(body), p.distanceAu,
+        )
+        if (diameter <= 0.0) return null
+
+        val limb = stepAlong(
+            p.azimuthDeg, p.altitudeDeg,
+            PlanetDisc.brightLimbAngle(
+                sunEq.rightAscensionDeg, sunEq.declinationDeg,
+                p.rightAscensionDeg, p.declinationDeg,
+            ),
+        )
+        // The pole's position angle, and the equator ninety degrees from it. Only the two giants
+        // have anything worth orienting — rings, moons and a visible oblateness — so nothing else
+        // pays for the extra projections.
+        val poleRa: Double
+        val poleDec: Double
+        when (body) {
+            PlanetDisc.Body.SATURN -> {
+                poleRa = PlanetDisc.SATURN_POLE_RA_DEG
+                poleDec = PlanetDisc.SATURN_POLE_DEC_DEG
+            }
+            PlanetDisc.Body.JUPITER -> {
+                poleRa = PlanetDisc.JUPITER_POLE_RA_DEG
+                poleDec = PlanetDisc.JUPITER_POLE_DEC_DEG
+            }
+            else -> return PlanetDisc.Appearance(
+                diameterDeg = diameter,
+                phaseAngleDeg = p.phaseAngleDeg,
+                limb = limb,
+            )
+        }
+        val polePa = PlanetDisc.axisPositionAngle(
+            poleRa, poleDec, p.rightAscensionDeg, p.declinationDeg,
+        )
+        return PlanetDisc.Appearance(
+            diameterDeg = diameter,
+            flattening = PlanetDisc.flattening(body),
+            phaseAngleDeg = p.phaseAngleDeg,
+            limb = limb,
+            equator = stepAlong(p.azimuthDeg, p.altitudeDeg, polePa + 90.0),
+            pole = stepAlong(p.azimuthDeg, p.altitudeDeg, polePa),
+            rings = if (body == PlanetDisc.Body.SATURN) {
+                PlanetDisc.rings(p.rightAscensionDeg, p.declinationDeg)
+            } else {
+                null
+            },
+            moons = if (body == PlanetDisc.Body.JUPITER) PlanetDisc.galileanMoons(at) else emptyList(),
+        )
     }
 
     private fun starDetail(s: StarCatalog.Star): String {
@@ -518,6 +618,20 @@ class SkyMapViewModel(
     }
 
     private companion object {
+        /**
+         * PlanetCalc names to the bodies this map can draw as a disc.
+         *
+         * ⚠️ Keyed by NAME because that is all `PlanetCalc.Planet` carries, and deliberately not a
+         * `valueOf` on the uppercased string: a planet this map has no radius for must fall through
+         * to a marker rather than throw, and the two vocabularies are free to diverge.
+         */
+        val PLANET_BODIES = mapOf(
+            "Mercury" to PlanetDisc.Body.MERCURY,
+            "Venus" to PlanetDisc.Body.VENUS,
+            "Mars" to PlanetDisc.Body.MARS,
+            "Jupiter" to PlanetDisc.Body.JUPITER,
+            "Saturn" to PlanetDisc.Body.SATURN,
+        )
         /**
          * Sized for the bright catalogue exactly, so filling it never reallocates.
          *

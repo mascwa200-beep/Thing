@@ -170,17 +170,20 @@ object PlanetDisc {
     const val JUPITER_POLE_DEC_DEG = 64.495
 
     /**
-     * Where a planet's north pole points on the sky, in degrees east of celestial north.
+     * The position angle, degrees east of celestial north, of one sky direction seen from another.
      *
-     * ⚠️ **Two things need this and they used to be one function's private business.** Saturn's rings
-     * lie in its equator and so do Jupiter's moons, so "which way is the planet's axis tilted from
-     * here" is the same question twice — and answering it twice is the duplicated-definition drift
-     * this project has corrected repeatedly. It is pure geometry: the pole vector's components along
-     * local north and local east at the planet's own place, and an `atan2`. No series, nothing fitted,
-     * and checkable against any ephemeris with nothing but a right ascension and a declination.
+     * ⚠️ **Three things need this and they used to be one function's private business.** Saturn's
+     * rings lie in its equator and so do Jupiter's moons, so "which way is the planet's axis tilted
+     * from here" is the same question twice; and "which way does the Moon's lit side face" is that
+     * same question a third time with the Sun's direction in place of a pole. Answering it three
+     * times is the duplicated-definition drift this project has corrected repeatedly.
      *
-     * The value is the position angle of the pole itself. The planet's **equator**, which is what
-     * both callers actually draw along, lies ninety degrees from it.
+     * It is pure geometry: the far direction's components along local north and local east at the
+     * near body's own place, and an `atan2`. No series, nothing fitted, and checkable against any
+     * ephemeris with nothing but a right ascension and a declination.
+     *
+     * For a pole, the value is the position angle of the pole itself — the planet's **equator**,
+     * which is what those two callers draw along, lies ninety degrees from it.
      */
     fun axisPositionAngle(
         poleRaDeg: Double,
@@ -233,6 +236,99 @@ object PlanetDisc {
         val pa = axisPositionAngle(SATURN_POLE_RA_DEG, SATURN_POLE_DEC_DEG, saturnRaDeg, saturnDecDeg)
         return Rings(opening, pa)
     }
+
+    /**
+     * Which way the lit side of a phased body faces, degrees east of celestial north.
+     *
+     * The Sun's direction as seen from the body — which is [axisPositionAngle] with the Sun's place
+     * in the pole's seat, because "where does that lie on the sky from here" is one question however
+     * it is asked. The terminator's own axis runs across this, so a renderer rotates the phase
+     * ellipse by it.
+     *
+     * ⚠️ **This is what makes a crescent point the right way**, and getting it wrong is the second
+     * classic error in a drawn Moon after the shape itself: a waxing crescent lit on the wrong side
+     * is instantly wrong to anybody who has looked up, while a crescent of the right shape and the
+     * wrong orientation still looks like a moon in a screenshot.
+     */
+    fun brightLimbAngle(
+        sunRaDeg: Double,
+        sunDecDeg: Double,
+        bodyRaDeg: Double,
+        bodyDecDeg: Double,
+    ): Double = axisPositionAngle(sunRaDeg, sunDecDeg, bodyRaDeg, bodyDecDeg)
+
+    // ---- what a body looks like right now ---------------------------------------------------------
+
+    /**
+     * Everything a renderer needs to draw one solar-system body, and nothing about a screen.
+     *
+     * ## ⚠️ Directions are carried as a SECOND SKY POINT, not as an angle, and that is the design
+     *
+     * Every direction here — the bright limb, the ring tilt, the axis the moons run along — is
+     * naturally a position angle east of celestial north. Turning one into a screen rotation needs
+     * two things the pure core has no business knowing: which way round the projection puts east,
+     * and how much the field itself is rotated at this particular place on it, which for any
+     * wide-field projection is a real effect that grows toward the edges.
+     *
+     * So each direction is given instead as **a second point on the sky a short way along it**
+     * ([limb], [equator], [pole]). The renderer projects the body and those points with the
+     * projection it is already using and takes the screen-space differences. Correct by construction
+     * whatever the projection does, with no handedness assumed anywhere and no parallactic angle to
+     * get backwards.
+     *
+     * ⚠️ **[equator] and [pole] are BOTH needed and neither implies the other on screen.** The
+     * equator alone fixes which way the rings and the line of moons run, and that is enough to draw
+     * them — but not enough to say which HALF of the ring passes behind the globe, or which side of
+     * the line a moon at positive [Moonlet.y] belongs on. Both of those turn on which way round the
+     * projection puts the planet's north, which is a screen fact and is answered by projecting the
+     * pole too.
+     *
+     * @property diameterDeg the full angular diameter. Zero means the distance was not known, and a
+     *   caller must then fall back to a marker rather than drawing a body of no size.
+     * @property flattening 0 for a sphere; the giants are visibly oval, along [pole].
+     * @property phaseAngleDeg Sun-body-observer. Zero for the Sun itself, which is always full.
+     * @property limbDarkened only the Sun, whose surface really does dim toward its edge.
+     * @property limb a point toward the lit side — see [brightLimbAngle].
+     * @property equator a point along the way the planet's equator runs on the sky, which is ninety
+     *   degrees from [axisPositionAngle].
+     * @property pole a point toward the planet's NORTH pole.
+     * @property rings Saturn only.
+     * @property moons Jupiter's four, in Jupiter's own equatorial frame — see [galileanMoons].
+     */
+    class Appearance(
+        val diameterDeg: Double,
+        val flattening: Double = 0.0,
+        val phaseAngleDeg: Double = 0.0,
+        val limbDarkened: Boolean = false,
+        val limb: SkyPoint? = null,
+        val equator: SkyPoint? = null,
+        val pole: SkyPoint? = null,
+        val rings: Rings? = null,
+        val moons: List<Moonlet> = emptyList(),
+    ) {
+        /** The lit fraction, from [phaseAngleDeg]. */
+        val illuminated: Double get() = illuminatedFraction(phaseAngleDeg)
+
+        /** The terminator's signed semi-minor axis as a fraction of the radius. */
+        val terminator: Double get() = terminatorFactor(phaseAngleDeg)
+
+        /** True when the phase is worth drawing at all — Mars barely shows one, Jupiter never does. */
+        val phased: Boolean get() = limb != null && illuminated < FULL_ENOUGH
+    }
+
+    /** A direction, given as a place on the sky in the same horizon frame the map is drawn in. */
+    class SkyPoint(val azimuthDeg: Double, val altitudeDeg: Double)
+
+    /**
+     * Above this lit fraction a body is drawn as a full disc.
+     *
+     * ⚠️ Measured against what the outer planets actually do rather than picked. Jupiter's phase
+     * angle never exceeds about 12 degrees seen from here, which is 0.989 lit, and Saturn's never
+     * exceeds 6; a one-per-cent bite out of Jupiter is a sliver a fraction of a pixel wide that
+     * reads as a rendering fault rather than as a phase. Mars reaches about 0.85 at quadrature and
+     * genuinely shows a gibbous phase in a small telescope, so the bar sits well above that.
+     */
+    const val FULL_ENOUGH = 0.995
 
     // ---- Jupiter's moons -------------------------------------------------------------------------
 

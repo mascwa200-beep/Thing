@@ -178,7 +178,11 @@ object PlanetCalc {
                 "Saturn" -> -9.0 + 5 * log10(r * bigR) + 0.044 * fv
                 else -> 0.0
             }
-            Planet(p.name, alt, az, mag, alt > 0, ra, dec)
+            // ⚠️ `bigR` and `fv` are the geocentric distance and the phase angle, both computed just
+            // above because the magnitude needs them. They used to stop here. Carrying them out is
+            // what lets the sky map draw a planet at the size it really is and with the phase it
+            // really has, and it costs nothing — the arithmetic has already happened.
+            Planet(p.name, alt, az, mag, alt > 0, ra, dec, distanceAu = bigR, phaseAngleDeg = fv)
         }
     }
 }
