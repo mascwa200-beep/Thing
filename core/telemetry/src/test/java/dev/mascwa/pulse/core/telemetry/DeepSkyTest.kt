@@ -211,6 +211,52 @@ class DeepSkyTest {
     }
 
     @Test
+    fun `a NaN is not measured, which is the only thing the flat arrays can say`() {
+        // ⚠️ Every other test here goes through `visible(entry, ...)`, so until this one the NaN
+        // contract had no test at all — and NaN is the ONLY way `DeepSkyLayer`'s primitive arrays can
+        // express "nobody recorded this". The layer delegates precisely so there is one rule; this
+        // pins the half of that rule the delegation depends on.
+        //
+        // The point of NaN over a sentinel number is that every comparison against it is false, so an
+        // unmeasured magnitude cannot satisfy a `<=` cut however the cut is later written. -1.0 would
+        // pass `mag <= limit` and draw the whole catalogue at every zoom.
+        val limit = DeepSky.magnitudeLimit(60.0)
+        assertFalse(
+            "an unmeasured magnitude must not slip through the brightness clause",
+            DeepSky.visibleAt(Double.NaN, 1.2, limit, 60.0),
+        )
+        assertTrue(
+            "...and must fall through to the size clause, which the Hyades depends on",
+            DeepSky.visibleAt(Double.NaN, 329.0, limit, 60.0),
+        )
+
+        // The two paths agree on every combination, which is what makes the layer and the entry
+        // draw the same sky.
+        for (mag in listOf(null, 3.4, 14.0)) {
+            for (major in listOf(null, 1.2, 329.0)) {
+                for (fov in listOf(150.0, 60.0, 8.0, 1.0)) {
+                    val cut = DeepSky.magnitudeLimit(fov)
+                    assertEquals(
+                        "mag=$mag major=$major fov=$fov",
+                        DeepSky.visible(entry(mag = mag, major = major), cut, fov),
+                        DeepSky.visibleAt(
+                            mag ?: Double.NaN,
+                            major ?: Double.NaN,
+                            cut,
+                            fov,
+                        ),
+                    )
+                }
+            }
+        }
+
+        // ⚠️ And the conversion the layer actually performs, because it stores Floats: a Float NaN
+        // must still read as NaN once widened, or every unmeasured object would take the brightness
+        // clause with a nonsense value.
+        assertTrue((Float.NaN.toDouble()).isNaN())
+    }
+
+    @Test
     fun `Andromeda survives every cut, which is the surface-brightness trap pinned`() {
         // ⚠️ This test exists because of a design that was nearly shipped. Cutting this catalogue on
         // SURFACE BRIGHTNESS rather than magnitude leads with anonymous thirteenth-magnitude

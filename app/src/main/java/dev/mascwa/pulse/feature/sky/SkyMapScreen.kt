@@ -34,12 +34,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.DeepSky
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.sky.DeepSkyColors
 import dev.mascwa.pulse.sky.LineBatch
 import dev.mascwa.pulse.sky.SkyFrame
 import dev.mascwa.pulse.sky.SkyLines
@@ -47,6 +49,7 @@ import dev.mascwa.pulse.sky.SkyRenderer
 import dev.mascwa.pulse.sky.StarBatches
 import dev.mascwa.pulse.sky.collectLines
 import dev.mascwa.pulse.sky.collectStars
+import dev.mascwa.pulse.sky.drawDeepSky
 import dev.mascwa.pulse.sky.drawLineBatch
 import dev.mascwa.pulse.sky.drawStarBatches
 import dev.mascwa.pulse.sky.drawStarGlow
@@ -143,6 +146,31 @@ private fun SkyCanvas(
     // of thousands of floats; allocating that sixty times a second is the frame.
     val linePaint = remember { Paint() }
     val lineBatch = remember { LineBatch() }
+    // ⚠️ Its OWN Paint, not the star one, and the skew is exactly why. Oblique is how every printed
+    // chart tells a nebula's name from a star's, but `labelPaint` is shared with the star labels and
+    // the planet labels, and neither of those resets a skew it never set — so borrowing it would
+    // silently tilt every name on the map.
+    val deepSkyPaint = remember {
+        Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT; textSkewX = -0.22f }
+    }
+    // ⚠️ **`positive` and `negative` are deliberately absent.** The palette's own KDoc says they
+    // carry meaning elsewhere — a market moving up or down — and must never be borrowed for
+    // decoration, so the green and the red are not available here however well they would read.
+    //
+    // A supernova remnant takes the nebula's colour because it IS one: a shell of glowing gas, drawn
+    // with the same lobed glow, and eleven of them in the whole catalogue. `DeepSkyColors` keeps the
+    // two apart so the standalone app can answer differently, not because this one must.
+    val deepSkyColours = remember(c) {
+        DeepSkyColors(
+            galaxy = c.magenta, // 10,792 of the 12,579 — worth the one hue nothing else here uses
+            cluster = c.amber, // warm, because a cluster is made of stars
+            nebula = c.violet,
+            planetary = c.sky, // teal, which is what doubly-ionised oxygen actually looks like
+            remnant = c.violet,
+            dark = c.faint, // the dimmest ink in the palette, for the place with less light in it
+            other = c.muted,
+        )
+    }
 
     val site by vm.site.collectAsStateWithLifecycle()
     val linesMode by vm.linesMode.collectAsStateWithLifecycle()
@@ -249,6 +277,27 @@ private fun SkyCanvas(
                     shapes.figures, frame, viewport, coneCos, coneSin, half, cx, cy,
                     lineBatch, linePaint, c.sky, FIGURE_WIDTH_DP, FIGURE_ALPHA,
                 )
+            }
+
+            // ⚠️ Over the lines and under the stars, and both halves matter. A border drawn across
+            // Andromeda would cut the galaxy in two; a cluster's own member stars have to sit on top
+            // of its glow, because that is the thing being pointed at.
+            //
+            // ⚠️ **Its OWN cut, not the star `limit` above.** Deep-sky counts rise about 1.7-fold
+            // per magnitude where star counts rise 2.8-fold, so feeding this population the star law
+            // gives a cut far too shallow to draw anything at a wide field — see
+            // DeepSky.magnitudeLimit, which carries its own constants for exactly that reason.
+            vm.deepSky?.let { deepSkyLayer ->
+                deepSkyPaint.color = c.muted.toArgb()
+                deepSkyPaint.textSize = 9f * density
+                drawDeepSky(
+                    deepSkyLayer, frame, viewport, DeepSky.magnitudeLimit(view.fovDeg),
+                    view.fovDeg, half, cx, cy, deepSkyColours,
+                ) { lx, ly, name ->
+                    drawContext.canvas.nativeCanvas.drawText(
+                        name, lx + 5f * density, ly + 3f * density, deepSkyPaint,
+                    )
+                }
             }
 
             above.reset()

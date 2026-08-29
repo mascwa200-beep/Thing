@@ -7,10 +7,12 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.sky.ConstellationCatalog
+import dev.mascwa.pulse.data.sky.DeepSkyCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.sky.ConstellationField
+import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ class SkyMapViewModel(
     private val catalog: StarCatalog,
     private val deepCatalog: DeepStarCatalog,
     private val constellationCatalog: ConstellationCatalog,
+    private val deepSkyCatalog: DeepSkyCatalog,
     private val locationProvider: LocationProvider,
 ) : ViewModel() {
 
@@ -88,6 +91,17 @@ class SkyMapViewModel(
      * [revision] rather than by handing Compose a new object.
      */
     var constellations: ConstellationField? = null
+        private set
+
+    /**
+     * The galaxies, clusters and nebulae, or null until the asset is read.
+     *
+     * ⚠️ **Unlike [constellations] this is never rebuilt**, so it needs no [revision] bump of its
+     * own beyond the one [openDeepSky] does on first load. A line has to be subdivided and how finely
+     * depends on the field; a galaxy is a position and two axes, and nothing about it changes when
+     * the view moves.
+     */
+    var deepSky: DeepSkyLayer? = null
         private set
 
     /** What the map draws over the stars. */
@@ -202,6 +216,7 @@ class SkyMapViewModel(
                 fillBrightStars()
                 openDeepCatalogue()
                 openConstellations()
+                openDeepSky()
                 rebuild()
             } finally {
                 _loading.value = false
@@ -260,6 +275,19 @@ class SkyMapViewModel(
     private suspend fun openConstellations() {
         if (constellations != null) return
         constellations = constellationCatalog.data()?.let { ConstellationField(it) }
+    }
+
+    /**
+     * Read the deep-sky asset, once for the life of the screen.
+     *
+     * ⚠️ Bumps [revision] on success, which [openConstellations] does not need to: that one is
+     * followed by a cut in `refreshLines` which bumps it, and this has nothing to follow it. Without
+     * the bump twelve thousand objects would appear only on the next pan.
+     */
+    private suspend fun openDeepSky() {
+        if (deepSky != null) return
+        deepSky = deepSkyCatalog.layer()
+        if (deepSky != null) _revision.value++
     }
 
     /**

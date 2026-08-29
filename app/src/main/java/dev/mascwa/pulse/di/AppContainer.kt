@@ -339,6 +339,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sky.ConstellationCatalog(appContext)
     }
 
+    /** The galaxies, clusters and nebulae. Lazy for [starCatalog]'s reason. */
+    val deepSkyCatalog: dev.mascwa.pulse.data.sky.DeepSkyCatalog by lazy {
+        dev.mascwa.pulse.data.sky.DeepSkyCatalog(appContext)
+    }
+
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
     }

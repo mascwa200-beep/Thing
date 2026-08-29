@@ -219,11 +219,29 @@ object DeepSky {
      * the whole sky is 0.6 of them in an eight-degree field. That completes the catalogue at a cost
      * of nothing.
      */
-    fun visible(entry: Entry, limit: Double, fovDeg: Double): Boolean {
-        val mag = entry.magnitude
-        if (mag != null) return mag <= limit
-        val major = entry.majorAxisArcmin
-        if (major != null) return major >= fovDeg * 60.0 * CONSPICUOUS_FRACTION
+    fun visible(entry: Entry, limit: Double, fovDeg: Double): Boolean = visibleAt(
+        entry.magnitude ?: Double.NaN,
+        entry.majorAxisArcmin ?: Double.NaN,
+        limit,
+        fovDeg,
+    )
+
+    /**
+     * [visible], for a caller holding the two numbers as primitives — **NaN meaning not measured**.
+     *
+     * ⚠️ **This is the one definition and [visible] delegates to it**, rather than the renderer
+     * keeping a copy that reads its own flat arrays. Two statements of a rule is the drift this
+     * project has corrected seven times, and here it would be invisible: both would look right and
+     * they would disagree only about the edge the size clause exists for.
+     *
+     * NaN rather than a sentinel number because every comparison against NaN is false, so an
+     * unmeasured magnitude cannot accidentally satisfy a `<=` however the cut is later written.
+     */
+    fun visibleAt(magnitude: Double, majorAxisArcmin: Double, limit: Double, fovDeg: Double): Boolean {
+        if (!magnitude.isNaN()) return magnitude <= limit
+        if (!majorAxisArcmin.isNaN()) {
+            return majorAxisArcmin >= fovDeg * 60.0 * CONSPICUOUS_FRACTION
+        }
         return fovDeg <= UNMEASURED_FIELD_DEG
     }
 
