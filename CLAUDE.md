@@ -10964,3 +10964,23 @@ checks it is running.** `lintVital` ≠ lint.
 on the mutable one. A two-line Kotlin file compiled against the real `gradle-api-8.7.3.jar`, with a
 negative control on a genuinely immutable `Set` that failed with `unresolved reference 'plusAssign'`
 — the exact error the real code would have produced.
+
+⚠️ **AND THE GATE WAS NEGATIVE-TESTED IN CI, because two links of the chain were verified and one was
+not.** The DSL compiles and lint honours an explicit FATAL override — both read from real artifacts —
+but that AGP carries a module's own `lint {}` block into the analysis had never been observed, and
+"standard and documented" is exactly what I believed about `NewApi` being caught in the first place.
+So one unguarded `Context.getDataDir()` (API 24) was pushed into `:sky` on purpose. It failed with:
+
+    Execution failed for task ':sky:lintVitalRelease'.
+    > Lint found fatal errors while assembling a release target.
+      Lint found 1 errors, 0 warnings. First failure:
+      NewApiGateProbe.kt:22: Error: Call requires API level 24 (current min is 23):
+        android.content.Context#getDataDir [NewApi]
+
+which confirms all four things at once: the task is the one that already runs, the promotion made it
+**fatal**, the issue is `[NewApi]`, and lint is analysing at **min 23**. Reverted immediately after.
+
+⚠️ The test was safe to run on the dev branch for a checked reason rather than a hoped one: `sky/**`
+is in `android-build.yml`'s `paths-ignore` and matches no other workflow's allowlist, so only the
+five-minute sky build ran, and a FAILING sky build never reaches its publish step — `sky-latest` kept
+the last good APK throughout.
