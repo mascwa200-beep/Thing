@@ -4,10 +4,17 @@ plugins {
 }
 
 android {
-    // The Gradle module path is :core:sky and the package is dev.mascwa.pulse.sky. Unlike
-    // :core:health and :core:feeds — which were CARVED OUT of :app and kept their old packages so
-    // forty call sites did not have to move — nothing here existed before, so the package can simply
-    // match the module.
+    // The Gradle module path is :core:sky. Most of it is `dev.mascwa.pulse.sky`, which matches,
+    // because none of the renderer existed before the module did.
+    //
+    // ⚠️ The five catalogue readers under `dev.mascwa.pulse.data.sky` are the exception, and they
+    // keep the package they were written in for the reason :core:health and :core:feeds keep theirs:
+    // they were CARVED OUT of :app, and an identical package means not one of their call sites had
+    // to move. They came here because the assets they read did — a reader and the bytes it opens in
+    // one module, so a build that packages one packages the other.
+    //
+    // The namespace only fixes where R and BuildConfig are generated, so it is unaffected by holding
+    // two packages.
     namespace = "dev.mascwa.pulse.sky"
     compileSdk = libs.versions.compileSdk.get().toInt()
 

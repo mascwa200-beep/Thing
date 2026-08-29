@@ -125,11 +125,18 @@ class StarCatalog(private val context: Context) {
         }
     }.getOrDefault(emptyList())
 
-    internal companion object {
-        const val ASSET = "sky/stars.tsv"
+    companion object {
+        internal const val ASSET = "sky/stars.tsv"
 
         /**
          * The epoch these positions are referred to, as a Julian year.
+         *
+         * ⚠️ **Public where everything else in this companion is internal, and the day this class
+         * moved into `:core:sky` that stopped being a style question.** `internal` is scoped to a
+         * Gradle module, so the whole companion being internal was fine while the class lived in
+         * `:app` beside its two readers and became a compile error the moment it did not — the same
+         * shape that stopped a test seeing `StoredEntry` when the health layer was carved out.
+         * [ASSET] stays internal because nothing outside this file has ever named it.
          *
          * ⚠️ **Here rather than on either of the two view models that carry proper motion from it.**
          * The epoch is a property of the file, not of a screen, and there are now two readers — the
