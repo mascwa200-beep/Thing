@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      ⚠️ The same near-black the chart draws its empty sky in (SkyColors.space in Theme.kt). Two
+      statements of one colour, because a window background is a resource and a Compose colour is
+      Kotlin and neither can read the other — so this is the pair to keep in step by hand, and the
+      symptom of letting them drift is a visible edge on the first frame.
+    -->
+    <color name="window_background">#000105</color>
+    <color name="ic_launcher_background">#0B1430</color>
+</resources>

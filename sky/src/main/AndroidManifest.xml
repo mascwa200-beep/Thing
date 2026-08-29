@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      ⚠️ **ONE permission, and no INTERNET at all.** This is the only application in this repository
+      that cannot reach the network by any means: the star catalogue, the constellations, the deep
+      sky, the Milky Way and every planetary position are bundled or computed, so there is nothing
+      to fetch. That is a property worth being able to state, and it is stated here by absence
+      rather than by a comment somewhere — a permission that is not declared cannot be requested,
+      however the code asks.
+
+      ⚠️ It changes when the self-updater arrives, which is the next slice. That commit adds
+      INTERNET and ACCESS_NETWORK_STATE and rewrites this paragraph; leaving the claim standing
+      afterwards would be the overstated comment this repository treats as a defect.
+    -->
+
+    <!--
+      ⚠️ **COARSE, never FINE, and the arithmetic is why.** A degree of latitude moves the sky by a
+      degree, so a kilometre of error is under a hundredth of one — far below anything visible even
+      at the quarter-degree field floor this map can zoom to. Android's coarse location is fuzzed to
+      roughly a city block, which is three orders of magnitude better than the map can use. Asking
+      for the precise location would be asking for something the feature has no use for.
+
+      `SkyHardware.granted` accepts either, so a future FINE declaration would work without a code
+      change — which is exactly why the decision has to be recorded here rather than left implied.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!--
+      ⚠️ Every one `required="false"`, or this application would be hidden from phones that lack
+      them — which is the opposite of the point of a universal APK. None of the three is needed to
+      DRAW the sky: with no location the map says where it needs to be told, and with no
+      rotation-vector sensor the FOLLOW control says the phone cannot follow. The stars are still
+      all there, because they come from a file and some arithmetic.
+    -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+
+    <application
+        android:name=".SkyApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Sky">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

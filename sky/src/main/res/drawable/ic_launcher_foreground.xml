@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  An original mark: five stars joined into an asterism, drawn rather than borrowed. Not a real
+  constellation — inventing one avoids implying the app is about that particular patch of sky, and
+  a real figure at 108dp would be unreadable anyway.
+
+  ⚠️ Deliberately nothing to do with the LCARS application's icon. These are separate applications
+  and should be told apart in a launcher at a glance, which is the whole job of the thing.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- the joining lines, under the stars so a line never crosses a disc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#7FA8E0"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M32,68 L44,42 L58,56 L74,34 L80,62" />
+
+    <!-- the five stars, sized as a real chart would size them: by brightness -->
+    <path android:fillColor="#FFFFFF" android:pathData="M44,42 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M74,34 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0" />
+    <path android:fillColor="#E8EFFA" android:pathData="M58,56 m-3.5,0 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" />
+    <path android:fillColor="#E8EFFA" android:pathData="M32,68 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#C8D6EC" android:pathData="M80,62 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
+
+    <!-- the glow on the brightest one, which is what the chart itself does -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.3"
+        android:pathData="M44,42 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+</vector>

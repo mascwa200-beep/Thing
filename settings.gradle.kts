@@ -39,6 +39,12 @@ include(":core:sky")
 // :core:database; deliberately reaches nothing else of the LCARS application.
 include(":nutrition")
 
+// The standalone star map, on the same terms as :nutrition — plain Material 3, no device gate, no
+// native code of its own, so one universal APK. Everything it draws comes from :core:sky and
+// :core:telemetry; it reaches no other part of the LCARS application and, uniquely among the three,
+// makes no network request at all.
+include(":sky")
+
 // Windows desktop companion (Kotlin/JVM + Compose Multiplatform) — a structurally separate module, no
 // dependency on :app/:core:* on this first pass (see desktop/build.gradle.kts), so it never touches the
 // Android build's plugin/SDK requirements.

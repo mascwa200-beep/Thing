@@ -31,7 +31,17 @@ data class SkyColors(
      * visible edge where the terminator is meant to disappear.
      */
     val space: Color,
-    /** Every star, the glow around the bright ones, and the Milky Way's diffuse light. */
+    /**
+     * A star with no measured colour, and the Milky Way's diffuse light.
+     *
+     * ⚠️ **NOT every star, and the first version of this line said otherwise.** `StarNames.bandArgb`
+     * supplies a real colour from the catalogue's own B−V for the great majority; this is the
+     * fallback for the roughly three per cent that carry none, which the renderer names
+     * `unmeasuredColour` for exactly that reason — absent is a fact, and painting it a plausible
+     * white would be a claim about a measurement nobody made. So an application changing this
+     * changes what "unmeasured" looks like and the tint of the Milky Way, and moves no star that
+     * was actually measured.
+     */
     val starlight: Color,
     /** The Moon's disc. Separate from [starlight] because it is reflected light on a resolved body. */
     val moon: Color,

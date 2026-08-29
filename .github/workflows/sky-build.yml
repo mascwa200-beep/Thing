@@ -1,0 +1,264 @@
+name: Sky Build
+
+# ⚠️ **The run TITLE carries the instruction, because it is the one surface no client hides.** A
+# step summary is written below and by `setup-gradle`, and a phone screenshot showed NEITHER of them
+# rendering — the run page went jobs-graph → Annotations → Artifacts with no summary anywhere. Two
+# independent summaries missing is the tell that the client does not display them at all. The run
+# name shows on the run page, in the runs list and in the mobile app.
+run-name: "Sky #${{ github.run_number }} — install from Releases ▸ sky-latest"
+
+# The standalone star map: the sky half of the LCARS application with none of its novelty, its
+# device gate or its native code.
+#
+# ⚠️ **A PATH ALLOWLIST, not "every push".** The LCARS workflow builds on everything because that is
+# the application under continuous work; this one produces a large artifact from a much smaller
+# surface, and running it on a news-screen commit would publish an identical APK for nothing. The
+# list is what this module actually reads: itself, the two shared modules it depends on, the
+# catalogue builders, and the build wiring.
+#
+# ⚠️ `core/update/**` is deliberately ABSENT, and it belongs here the moment the self-updater does.
+# The nutrition workflow's own note records adding it late and why: a change to the green gate or
+# the installer ladder that did not rebuild this app would leave the applications disagreeing about
+# when a build is safe to install, which is the exact thing sharing that module prevents.
+on:
+  push:
+    branches:
+      - "**"
+      - "!debug-reports"
+    paths:
+      - "sky/**"
+      - "core/sky/**"
+      - "core/telemetry/**"
+      - "tools/sky/**"
+      # ⚠️ The five root files that change what Gradle does, all of them. The desktop workflow's
+      # filter once did not name a directory it genuinely read, and the nutrition one missed
+      # `gradle.properties` — where the heap ceiling lives — so the fix for a heap failure would not
+      # have rebuilt the app whose failure it was fixing.
+      - "gradle/libs.versions.toml"
+      - "settings.gradle.kts"
+      - "build.gradle.kts"
+      - "gradle.properties"
+      - "gradle/wrapper/**"
+      - ".github/workflows/sky-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ⚠️ Its own group. Sharing another workflow's would make each cancel the other's in-flight run on a
+# commit that touches both, and the three produce different artifacts.
+concurrency:
+  group: sky-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the release APK
+        run: |
+          set -o pipefail
+          ./gradlew :sky:assembleRelease \
+            -PSKY_VERSION_CODE=${{ github.run_number }} \
+            --stacktrace --no-daemon 2>&1 | tee /tmp/sky-build.log
+
+      - name: Say what actually went wrong
+        # ⚠️ Gradle's "What went wrong" says only "Compilation error. See log for more details", and
+        # the `e:` lines naming the file and symbol sit hundreds of stack frames earlier where no
+        # tail of the log will ever reach them. Re-printing them LAST is what makes a failure
+        # diagnosable in one round instead of two.
+        if: failure()
+        run: |
+          f=/tmp/sky-build.log
+          [ -f "$f" ] || exit 0
+          echo "----- compiler errors -----"
+          grep -E "^(e|w): .*: error:|^e: " "$f" | head -40 || true
+          echo "----- gradle's summary -----"
+          awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
+
+      - name: Check what actually shipped
+        run: |
+          set -e
+          apk=$(ls sky/build/outputs/apk/release/*.apk | head -1)
+          bytes=$(stat -c%s "$apk")
+          echo "APK: $apk"
+          echo "size: $bytes bytes ($(numfmt --to=iec "$bytes"))"
+
+          # ⚠️ **The rule is "every architecture", NOT "no native code".** This module compiles none
+          # of its own, but Compose UI depends transitively on `androidx.graphics:graphics-path`,
+          # which ships a small `.so` — for all four architectures, which is exactly why one
+          # universal APK still runs everywhere. What would genuinely take the property away is a
+          # library present for SOME architectures and not others, or an `abiFilters` narrowing the
+          # build, so the check is per-library.
+          #
+          # ⚠️ `.+` after the ABI, so a DIRECTORY entry (`lib/`, `lib/arm64-v8a/`) is not mistaken
+          # for a library. AGP's own APKs carry no directory entries, but the nutrition workflow's
+          # first version of this check rejected a synthetic APK that had all four — a check nobody
+          # can trust is worse than none.
+          abis="arm64-v8a armeabi-v7a x86 x86_64"
+          libs=$(unzip -l "$apk" | awk '$4 ~ /^lib\/[^\/]+\/.+/ {print $4}')
+          if [ -z "$libs" ]; then
+            echo "no native libraries at all: one APK covers $abis"
+          else
+            missing=""
+            for so in $(echo "$libs" | sed 's|^lib/[^/]*/||' | sort -u); do
+              for abi in $abis; do
+                echo "$libs" | grep -qx "lib/$abi/$so" || missing="$missing lib/$abi/$so"
+              done
+            done
+            if [ -n "$missing" ]; then
+              echo "::error::this APK is not architecture-independent — absent:$missing"
+              echo "$libs" | sed 's/^/    /'
+              exit 1
+            fi
+            echo "every native library is present for all four architectures:"
+            echo "$libs" | sed 's/^/    /'
+          fi
+
+          # ⚠️ **The catalogues, and their absence would be SILENT.** They live in `:core:sky` so one
+          # copy serves both applications, which means their presence here is a LIBRARY ASSET MERGE —
+          # and a merge that stopped working compiles, packages, publishes and goes green, showing up
+          # only as a star map with no stars. The expected list is DERIVED from the directory rather
+          # than typed here, so an asset added later is covered without anyone remembering.
+          dir=core/sky/src/main/assets/sky
+          missing=0
+          for f in "$dir"/*; do
+            name=$(basename "$f")
+            if ! unzip -l "$apk" | grep -q "assets/sky/$name"; then
+              echo "::error::$name is in $dir but NOT in the APK — the :core:sky asset merge broke."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Sky assets that DID make it:"
+            unzip -l "$apk" | grep "assets/sky/" || echo "(none at all)"
+            exit 1
+          fi
+          # ⚠️ The sentinel, for the reason every gate in this repository carries one: a grep that
+          # silently matches nothing, or one that matches anything, proves as much as no gate at all.
+          if unzip -l "$apk" | grep -q "assets/sky/this-must-not-exist.bin"; then
+            echo "::error::the sentinel matched — this check cannot tell present from absent."
+            exit 1
+          fi
+          echo "sky assets packaged: $(ls "$dir" | tr '\n' ' ') (sentinel correctly absent)"
+
+          # ⚠️ **STORED, not deflated.** `SkyCatalogSource` explains at length that a deflated asset
+          # cannot be memory-mapped, so the whole 25 MB would land on the heap of the cheap phone
+          # this module exists to run on and the tile index would buy nothing. That declaration is
+          # `androidResources { noCompress += "skycat" }` and it CANNOT live in the library, because
+          # packaging belongs to whichever module builds the APK — so every application bundling
+          # this asset has to say it separately, and the cost of forgetting is not a crash. It is
+          # the map working, slowly, using far more memory than it should.
+          entry=$(unzip -v "$apk" | grep "assets/sky/stars.skycat" || true)
+          if [ -z "$entry" ]; then
+            echo "::error::stars.skycat is not in the APK."
+            exit 1
+          fi
+          method=$(echo "$entry" | awk '{print $2}')
+          size=$(echo "$entry" | awk '{print $1}')
+          if [ "$method" != "Stored" ]; then
+            echo "::error::stars.skycat is packaged as '$method', not Stored."
+            echo "The noCompress declaration in sky/build.gradle.kts is missing or stopped matching."
+            exit 1
+          fi
+          # A floor, because "present" is not "whole". The real catalogue is 3,087,821 stars at
+          # 24.7 MB; a truncated one opens, reports a plausible star count and draws a partial sky.
+          if [ "$size" -lt 20000000 ]; then
+            echo "::error::the packaged catalogue is only $size bytes — not the full corpus."
+            exit 1
+          fi
+          echo "star catalogue: $((size / 1048576)) MB, Stored (memory-mappable)"
+
+      # ⚠️ For a computer, not a phone: GitHub zips every artifact and offers no way not to, so this
+      # is a `.zip` Android cannot install; the mobile app lists no artifacts at all; and the drawer
+      # lives on the run SUMMARY page rather than the job log most people land on after tapping a
+      # tick. The release below is the installable copy.
+      #
+      # ⚠️ `retention-days` because the release under `sky-latest` is the durable copy and is always
+      # the newest build, so an artifact older than a few days has no consumer — while this branch
+      # pushes many times a day. The honest cost is that an OLD run's page stops offering a download
+      # after a week.
+      - name: Upload the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: sky-release-apk
+          path: sky/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ **Its own tag, never `latest`.** `action-gh-release` rewrites the release NAME on
+          # every publish, and the name is where each app's updater reads its build number — the
+          # desktop companion learned this the hard way. Publishers sharing one tag would each
+          # overwrite the others' name, and every updater would then read somebody else's build.
+          tag_name: sky-latest
+          name: "Star Map — build #${{ github.run_number }}"
+          prerelease: true
+          # ⚠️ The direct link is spelled out because this is the half that reaches the GitHub mobile
+          # app, which shows releases and their assets but no workflow artifacts at all. The asset
+          # name is stable (`sky-release.apk`, from the module name), so the URL never changes and
+          # always serves the newest build.
+          body: |
+            Standalone star map, build #${{ github.run_number }}, from ${{ github.sha }}.
+
+            **[▸ Download and install it](${{ github.server_url }}/${{ github.repository }}/releases/download/sky-latest/sky-release.apk)**
+
+            One APK for every architecture, Android 8.0 and later, no device gate. Installs
+            alongside the LCARS app rather than over it — different package name — so both can be
+            on one phone at once. Sideload it and allow "install unknown apps".
+
+            Three million stars, the constellations, the deep sky, the Milky Way and every planet,
+            all bundled. It asks for an approximate location and nothing else; it holds no network
+            permission at all, so nothing it draws can have come from anywhere but the phone.
+
+            This repository is private, so following that link needs a signed-in GitHub session in
+            whatever browser opens it.
+          files: sky/build/outputs/apk/release/*.apk
+
+      # ⚠️ What a run page can carry that is genuinely installable — the summary renders at the TOP
+      # of the run summary, above the artifacts drawer, and links to the bare `.apk` rather than to
+      # a zip. `always()` so it still appears when the publish itself failed: the previous build's
+      # release is then still the newest thing there is to install, and a run that says nothing is
+      # exactly the dead end being removed. Gated on the APK existing, so a failed compile writes no
+      # misleading link.
+      - name: Say where to get it
+        if: always() && hashFiles('sky/build/outputs/apk/release/*.apk') != ''
+        run: |
+          apk=$(ls sky/build/outputs/apk/release/*.apk | head -1)
+          size=$(numfmt --to=iec "$(stat -c%s "$apk")")
+          base="${{ github.server_url }}/${{ github.repository }}"
+          {
+            echo "## Star Map — build #${{ github.run_number }}"
+            echo
+            echo "### [▸ Download and install it]($base/releases/download/sky-latest/sky-release.apk)"
+            echo
+            echo "$size · one APK for every architecture · Android 8.0 and later · installs"
+            echo "alongside the LCARS app, not over it."
+            echo
+            echo "That link is a bare \`.apk\` the phone's installer opens directly. You must be"
+            echo "**signed in to GitHub in that browser** — this repository is private."
+            echo
+            echo "The artifact below is a **zip**, because GitHub zips every artifact; Android"
+            echo "cannot install one. It is there for a computer."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ⚠️ The same link as an ANNOTATION, because a phone screenshot proved this block renders
+          # where the summary above does not — and renders URLs as tappable links. Deliberately
+          # `notice` and NOT `warning`: a warning would be a lie about severity, and dressing a
+          # download up as one teaches a reader to skim past the genuine ones beside it.
+          echo "::notice title=Download the star map ($size)::$base/releases/download/sky-latest/sky-release.apk"
