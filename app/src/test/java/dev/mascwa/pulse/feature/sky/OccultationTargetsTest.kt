@@ -23,7 +23,7 @@ import java.io.File
  */
 class OccultationTargetsTest {
 
-    private val asset = File("src/main/assets/sky/stars.tsv")
+    private val asset = File("../core/sky/src/main/assets/sky/stars.tsv")
 
     private class Row(
         val ra: Double,

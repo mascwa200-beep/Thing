@@ -605,6 +605,70 @@ jobs:
           fi
           echo "generic-food seed packaged: $seedSize bytes (sentinel correctly absent)"
 
+      - name: Verify the sky assets packaged, and the catalogue stored uncompressed
+        # ⚠️ **These moved out of this application and into `:core:sky`, so from here on their
+        # presence is a LIBRARY ASSET MERGE and its failure would be silent.** Two applications read
+        # them now; one copy in the repository is the point. But a merge that stopped working
+        # compiles, packages, publishes and goes green, and shows up only as a star map with no
+        # stars — exactly the class of failure the food-seed check beside this one was written for.
+        #
+        # ⚠️ The expected list is DERIVED from the directory rather than typed here, so an asset
+        # added later is covered without anyone remembering. That deliberately does not guard
+        # against a file being deleted from disk — a different problem, and one the :app unit tests
+        # already catch by reading each of them.
+        run: |
+          set -e
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          dir=core/sky/src/main/assets/sky
+          missing=0
+          for f in "$dir"/*; do
+            name=$(basename "$f")
+            if ! unzip -l "$apk" | grep -q "assets/sky/$name"; then
+              echo "FAIL: $name is in $dir but NOT in the APK — the :core:sky asset merge broke."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Sky assets that DID make it:"
+            unzip -l "$apk" | grep "assets/sky/" || echo "(none at all)"
+            exit 1
+          fi
+          # ⚠️ The sentinel, for the reason every other gate here carries one: a grep that silently
+          # matches nothing, or one that matches anything, proves as much as no gate at all.
+          if unzip -l "$apk" | grep -q "assets/sky/this-must-not-exist.bin"; then
+            echo "FAIL: the sentinel matched — this check cannot distinguish present from absent."
+            exit 1
+          fi
+          echo "sky assets packaged: $(ls "$dir" | tr '\n' ' ') (sentinel correctly absent)"
+
+          # ⚠️ **STORED, not deflated — and nothing checked this before today.** `SkyCatalogSource`
+          # explains at length that a deflated asset cannot be memory-mapped, so the whole 25 MB
+          # would land on the heap of a phone this app is meant to run on and the tile index would
+          # buy nothing. That declaration is `androidResources { noCompress += "skycat" }` and it
+          # CANNOT live in the library, because packaging belongs to whichever module builds the
+          # APK — so every application bundling this asset has to say it separately. The cost of
+          # forgetting is not a crash. It is the map working, slowly, using far more memory than it
+          # should, which is precisely why it needs a gate rather than a comment.
+          entry=$(unzip -v "$apk" | grep "assets/sky/stars.skycat" || true)
+          if [ -z "$entry" ]; then
+            echo "FAIL: stars.skycat is not in the APK."
+            exit 1
+          fi
+          method=$(echo "$entry" | awk '{print $2}')
+          size=$(echo "$entry" | awk '{print $1}')
+          if [ "$method" != "Stored" ]; then
+            echo "FAIL: stars.skycat is packaged as '$method', not Stored."
+            echo "The noCompress declaration in app/build.gradle.kts is missing or stopped matching."
+            exit 1
+          fi
+          # A floor, because "present" is not "whole". The real catalogue is 3,087,821 stars at
+          # 24.7 MB; a truncated one opens, reports a plausible star count and draws a partial sky.
+          if [ "$size" -lt 20000000 ]; then
+            echo "FAIL: the packaged catalogue is only $size bytes — that is not the full corpus."
+            exit 1
+          fi
+          echo "star catalogue: $((size / 1048576)) MB, Stored (memory-mappable)"
+
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
         # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64

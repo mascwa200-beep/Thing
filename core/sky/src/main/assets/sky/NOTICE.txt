@@ -46,7 +46,7 @@ WHAT WAS DONE TO IT
 
 TO REBUILD
     curl -o bsc5.gz https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz
-    python3 tools/sky/build_star_catalog.py bsc5.gz app/src/main/assets/sky/stars.tsv
+    python3 tools/sky/build_star_catalog.py bsc5.gz core/sky/src/main/assets/sky/stars.tsv
 
 STAR NAMES
     The proper names shown for the brightest stars are not from this file. They
@@ -122,7 +122,7 @@ WHAT WAS DONE TO IT
     draw three million stars and would still look like a sky.
 
 TO REBUILD
-    python3 tools/sky/build_catalogue.py app/src/main/assets/sky/stars.skycat
+    python3 tools/sky/build_catalogue.py core/sky/src/main/assets/sky/stars.skycat
 
     It fetches from the Gaia archive in tiles, splitting any query that comes
     back at the archive's undocumented 50,000-row ceiling, and verifies its own
@@ -198,7 +198,7 @@ TO REBUILD
     curl -o /tmp/index.json https://raw.githubusercontent.com/Stellarium/stellarium/master/skycultures/modern/index.json
     curl -o /tmp/hip2.dat.gz https://cdsarc.cds.unistra.fr/ftp/I/311/hip2.dat.gz
     python3 tools/sky/build_constellations.py /tmp/index.json /tmp/hip2.dat.gz \
-        app/src/main/assets/sky/constellations.json
+        core/sky/src/main/assets/sky/constellations.json
 
     ⚠️ CDS lists logical file names in its ReadMe and stores them gzipped, so a
     request for the name the ReadMe prints returns a 404 page — and curl saves
@@ -307,7 +307,7 @@ TO REBUILD
     curl -o /tmp/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv
     curl -o /tmp/addendum.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
     python3 tools/sky/build_deepsky.py /tmp/NGC.csv /tmp/addendum.csv \
-        app/src/main/assets/sky/deepsky.tsv
+        core/sky/src/main/assets/sky/deepsky.tsv
 
     The builder re-derives M31 from its own output and refuses to finish if it
     has moved more than five arcseconds from its published J2000 position,

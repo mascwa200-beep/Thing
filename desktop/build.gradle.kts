@@ -81,7 +81,7 @@ tasks.processResources {
     // text, one copy in the repository, so the phone's chart and the companion's can never disagree
     // about where a star is. Its NOTICE.txt travels with it — the catalogue is CDS-licensed and the
     // attribution is a condition rather than a courtesy.
-    from(rootProject.file("app/src/main/assets/sky")) { into("sky") }
+    from(rootProject.file("core/sky/src/main/assets/sky")) { into("sky") }
     from(writeBuildInfo)
 }
 

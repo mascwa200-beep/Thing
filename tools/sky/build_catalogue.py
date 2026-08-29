@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the packed star catalogue from Gaia DR3.
 
-    python3 tools/sky/build_catalogue.py --magnitude 12 --out app/src/main/assets/sky/stars.skycat
+    python3 tools/sky/build_catalogue.py --magnitude 12 --out core/sky/src/main/assets/sky/stars.skycat
 
 ⚠️ **EVERY CONSTANT COMES OUT OF THE KOTLIN.** The record layout, the magnitude and colour scales,
 the proper-motion square law and the number of declination bands are read from
@@ -425,7 +425,7 @@ def write_parity(path: str, grid: Grid) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--magnitude", type=float, default=12.0, help="faintest G magnitude to include")
-    ap.add_argument("--out", default="app/src/main/assets/sky/stars.skycat")
+    ap.add_argument("--out", default="core/sky/src/main/assets/sky/stars.skycat")
     ap.add_argument("--cache", default=os.path.join(ROOT, "build/skycat-cache"))
     # ⚠️ A TEST RESOURCE, not a file beside this script: loaded from the classpath, the Kotlin side
     # needs no path walking and cannot be broken by whichever directory Gradle runs a test from.

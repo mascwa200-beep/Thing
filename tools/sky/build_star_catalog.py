@@ -7,7 +7,7 @@ output is derived data; the source of truth is the BSC and nothing in the reposi
 the only copy of a star's position.
 
     curl -o bsc5.gz https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz
-    python3 tools/sky/build_star_catalog.py bsc5.gz app/src/main/assets/sky/stars.tsv
+    python3 tools/sky/build_star_catalog.py bsc5.gz core/sky/src/main/assets/sky/stars.tsv
 
 Source: Bright Star Catalogue, 5th Revised Ed. (Hoffleit D., Warren Jr W.H., 1991), catalogue V/50
 at the Centre de Données astronomiques de Strasbourg. Positions are J2000.

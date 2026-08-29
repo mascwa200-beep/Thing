@@ -4,7 +4,7 @@
     curl -o /tmp/index.json https://raw.githubusercontent.com/Stellarium/stellarium/master/skycultures/modern/index.json
     curl -o /tmp/hip2.dat.gz https://cdsarc.cds.unistra.fr/ftp/I/311/hip2.dat.gz
     python3 tools/sky/build_constellations.py /tmp/index.json /tmp/hip2.dat.gz \
-        app/src/main/assets/sky/constellations.json
+        core/sky/src/main/assets/sky/constellations.json
 
 WHY THE LINE ENDPOINTS HAVE TO BE RESOLVED HERE
 -----------------------------------------------

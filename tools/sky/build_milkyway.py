@@ -19,7 +19,7 @@ Reads `MilkyWay.kt` for the raster's shape and file layout, and `StarCatalogForm
 rather than a second copy here that can drift.
 
     python3 tools/sky/build_milkyway.py
-    python3 tools/sky/build_milkyway.py --catalogue app/src/main/assets/sky/stars.skycat
+    python3 tools/sky/build_milkyway.py --catalogue core/sky/src/main/assets/sky/stars.skycat
 """
 
 from __future__ import annotations

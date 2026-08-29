@@ -9,7 +9,7 @@ import java.io.File
 object AssetProbe
 
 fun main() {
-    val bytes = File("app/src/main/assets/sky/milkyway.bin").readBytes()
+    val bytes = File("core/sky/src/main/assets/sky/milkyway.bin").readBytes()
     println("file: ${bytes.size} bytes, expected ${MilkyWay.FILE_BYTES}")
     val r = MilkyWay.readRaster(bytes)
     if (r == null) { println("REFUSED — the shipped reader will not read the shipped asset"); return }

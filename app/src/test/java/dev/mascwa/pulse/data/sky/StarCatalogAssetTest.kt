@@ -20,7 +20,7 @@ import kotlin.math.hypot
  */
 class StarCatalogAssetTest {
 
-    private val asset = File("src/main/assets/sky/stars.tsv")
+    private val asset = File("../core/sky/src/main/assets/sky/stars.tsv")
 
     private class Star(
         val ra: Double,

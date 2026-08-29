@@ -19,7 +19,7 @@ import kotlin.math.hypot
  * both, and how fast they move.
  */
 fun main() {
-    val f = File("app/src/main/assets/sky/stars.skycat")
+    val f = File("core/sky/src/main/assets/sky/stars.skycat")
     println("catalogue: ${f.length() / 1_000_000} MB")
     val raf = RandomAccessFile(f, "r")
     val buf = raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length())

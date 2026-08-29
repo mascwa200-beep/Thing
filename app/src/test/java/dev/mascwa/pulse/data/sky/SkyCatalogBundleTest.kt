@@ -25,7 +25,7 @@ import java.nio.ByteBuffer
  */
 class SkyCatalogBundleTest {
 
-    private val asset = File("src/main/assets/sky/stars.skycat")
+    private val asset = File("../core/sky/src/main/assets/sky/stars.skycat")
 
     private fun reader(): StarCatalogReader {
         assertTrue("the catalogue is missing: ${asset.absolutePath}", asset.isFile)
@@ -304,7 +304,7 @@ class SkyCatalogBundleTest {
     fun `the catalogue says where it came from`() {
         // Gaia's data licence asks for the acknowledgement; a copy step that dropped the notice would
         // leave twenty-five megabytes of somebody's work unattributed, and nothing would complain.
-        val notice = File("src/main/assets/sky/NOTICE.txt")
+        val notice = File("../core/sky/src/main/assets/sky/NOTICE.txt")
         assertTrue("the NOTICE is missing", notice.isFile)
         // ⚠️ Whitespace-normalised, because the NOTICE is wrapped prose and the acknowledgement ESA
         // asks for is long enough to break across lines. My first version of this searched the raw

@@ -4,7 +4,7 @@
     curl -o /tmp/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv
     curl -o /tmp/addendum.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
     python3 tools/sky/build_deepsky.py /tmp/NGC.csv /tmp/addendum.csv \
-        app/src/main/assets/sky/deepsky.tsv
+        core/sky/src/main/assets/sky/deepsky.tsv
 
 WHY A LEAN TSV AND NOT A PACKED BINARY
 --------------------------------------
