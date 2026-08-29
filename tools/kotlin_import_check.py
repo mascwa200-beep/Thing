@@ -721,8 +721,20 @@ def main(pkgdir: pathlib.Path) -> int:
         used -= {n for decl in re.findall(
                      r'\b(?:fun|class|interface|object)\s*(?:\w+\s*)?<([^>]*)>', body)
                  for n in re.findall(r'\b([A-Z]\w*)\b', decl)}
+        # ⚠️ `GENERATED` is excused HERE as well as in `unresolvable_imports`, and the gap between
+        # the two was a standing false positive. A module whose `namespace` equals a file's package
+        # gets `BuildConfig` and `R` written into that package by the build — so the file needs no
+        # import, and no source anywhere declares them. `:sky`'s container hit exactly that. A
+        # sub-package file (`dev.mascwa.nutrition.data`) imports it instead, and that import is
+        # still validated above.
+        #
+        # ⚠️ What this gives up, said rather than glossed: a file using ANOTHER module's
+        # `BuildConfig` without importing it now goes unreported here. That is a compile error CI
+        # catches in three minutes, and it is not a shape anybody writes — while standing noise is
+        # what makes a whole gate get ignored, which is the more expensive failure.
         missing = sorted(u for u in used
-                         if u not in imported and u not in same_pkg and u not in BUILTINS)
+                         if u not in imported and u not in same_pkg
+                         and u not in BUILTINS and u not in GENERATED)
         if missing:
             bad = True
             print(f"  {f.name}: used but not imported: {missing}")

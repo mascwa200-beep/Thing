@@ -8,6 +8,8 @@ import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.reader.ReaderRepository
+import dev.mascwa.pulse.data.update.SelfUpdate
+import dev.mascwa.pulse.data.update.UpdateRepository
 import dev.mascwa.pulse.device.DeviceProbeReader
 import dev.mascwa.pulse.data.food.OpenFoodFactsRepository
 import dev.mascwa.pulse.data.food.db.FoodDatabase
@@ -113,7 +115,28 @@ class NutritionContainer(context: Context) {
      * constructs it — but the activity DOES ask on every foreground, so in practice it is built
      * early. That is deliberate: an updater nobody has to remember is the point.
      */
-    val updates: NutritionUpdates by lazy { NutritionUpdates(appContext, http, settings) }
+    val updates: SelfUpdate by lazy {
+        SelfUpdate(
+            appContext,
+            UpdateRepository(
+                appContext,
+                http,
+                tag = UpdateRepository.NUTRITION_TAG,
+                workflow = UpdateRepository.NUTRITION_WORKFLOW,
+                currentVersionCode = BuildConfig.VERSION_CODE,
+                currentVersionName = BuildConfig.VERSION_NAME,
+                token = { settings.currentUpdateToken() },
+            ),
+            saveToken = { settings.setUpdateToken(it) },
+            pendingInstall = { settings.pendingInstall() },
+            setPendingInstall = { settings.setPendingInstall(it) },
+            // ⚠️ On a phone that also carries LCARS, none of this app's own updater is the route
+            // that runs: that application is a device owner, holds a token already, and reinstalls
+            // this one whenever a newer build is published. Naming it here is what lets the card say
+            // so instead of insisting on a token nobody needs today.
+            companionPackage = UpdateRepository.LCARS_PACKAGE,
+        )
+    }
 
     private val http: HttpClient by lazy {
         HttpClient(

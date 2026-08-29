@@ -265,6 +265,19 @@ class UpdateRepository(
         const val NUTRITION_TAG = "nutrition-latest"
         const val NUTRITION_WORKFLOW = "nutrition-build.yml"
 
+        /**
+         * The standalone star map's own rolling release, for the same reason as the one above.
+         *
+         * ⚠️ Four publishers now write to this repository's releases and each has its own tag, so
+         * the "rewrites the release NAME" hazard is now four ways to read somebody else's build
+         * number rather than two. The workflow file that publishes each tag is named beside it
+         * because `run_number` is per-workflow: asking about all runs would let a different
+         * workflow carrying the same number answer, and give a confident wrong verdict about
+         * whether a build is finished.
+         */
+        const val SKY_TAG = "sky-latest"
+        const val SKY_WORKFLOW = "sky-build.yml"
+
         /** The standalone app's applicationId, which the release build carries with no suffix. */
         const val NUTRITION_PACKAGE = "dev.mascwa.nutrition"
 

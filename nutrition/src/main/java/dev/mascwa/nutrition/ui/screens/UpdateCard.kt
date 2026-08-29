@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.nutrition.data.NutritionUpdates
+import dev.mascwa.pulse.data.update.SelfUpdate
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.StatRow
 import kotlinx.coroutines.launch
@@ -36,12 +36,12 @@ import kotlinx.coroutines.launch
  * is false on the phone this app was written for.** When the LCARS application installed this one it
  * also maintains it: it is a device owner, it already holds a token, and its background pass
  * reinstalls a newer build with no dialog and nothing asked for. So this card reads
- * [NutritionUpdates.maintainedByCompanion] first and says which of the two worlds it is in, rather
+ * [SelfUpdate.maintainedByCompanion] first and says which of the two worlds it is in, rather
  * than demanding a credential that is already being supplied by something else. The field stays
  * either way — LCARS can be uninstalled, and this app's own updater is then the only route left.
  */
 @Composable
-fun UpdateCard(updates: NutritionUpdates) {
+fun UpdateCard(updates: SelfUpdate) {
     val state by updates.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
@@ -63,22 +63,22 @@ fun UpdateCard(updates: NutritionUpdates) {
         StatRow("Installed", "${updates.installedVersion} (build ${updates.installedCode})")
 
         when (val s = state) {
-            NutritionUpdates.State.Idle -> Note("Checks when the app opens.")
-            NutritionUpdates.State.Checking -> Note("Asking GitHub…")
-            is NutritionUpdates.State.Current -> Note("This is the newest build (${s.latest}).")
-            is NutritionUpdates.State.Pending ->
+            SelfUpdate.State.Idle -> Note("Checks when the app opens.")
+            SelfUpdate.State.Checking -> Note("Asking GitHub…")
+            is SelfUpdate.State.Current -> Note("This is the newest build (${s.latest}).")
+            is SelfUpdate.State.Pending ->
                 Note("Build ${s.latest} is published but still being built or did not pass. Nothing to install yet.")
-            is NutritionUpdates.State.Available -> Note("Build ${s.info.versionName} is ready to download.")
-            is NutritionUpdates.State.Downloading -> {
+            is SelfUpdate.State.Available -> Note("Build ${s.info.versionName} is ready to download.")
+            is SelfUpdate.State.Downloading -> {
                 Note("Downloading ${s.info.versionName} — ${s.percent}%")
                 LinearProgressIndicator(
                     progress = { s.percent / 100f },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            is NutritionUpdates.State.Ready ->
+            is SelfUpdate.State.Ready ->
                 Note("Build ${s.info.versionName} is downloaded. It installs when you leave the app.")
-            is NutritionUpdates.State.Failed -> Text(
+            is SelfUpdate.State.Failed -> Text(
                 s.reason,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
@@ -90,11 +90,11 @@ fun UpdateCard(updates: NutritionUpdates) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(onClick = { scope.launch { updates.check() } }) { Text("Check now") }
-            val ready = state as? NutritionUpdates.State.Available
+            val ready = state as? SelfUpdate.State.Available
             if (ready != null) {
                 Button(onClick = { scope.launch { updates.download(ready.info) } }) { Text("Download") }
             }
-            if (state is NutritionUpdates.State.Ready) {
+            if (state is SelfUpdate.State.Ready) {
                 Button(onClick = { scope.launch { updates.install() } }) { Text("Install now") }
             }
         }
