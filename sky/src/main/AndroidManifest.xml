@@ -2,17 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      ⚠️ **ONE permission, and no INTERNET at all.** This is the only application in this repository
-      that cannot reach the network by any means: the star catalogue, the constellations, the deep
-      sky, the Milky Way and every planetary position are bundled or computed, so there is nothing
-      to fetch. That is a property worth being able to state, and it is stated here by absence
-      rather than by a comment somewhere — a permission that is not declared cannot be requested,
-      however the code asks.
+      ⚠️ **NOTHING THIS APPLICATION DRAWS COMES FROM THE NETWORK, and that is now a claim about the
+      code rather than about this file.** The star catalogue, the constellations, the deep sky, the
+      Milky Way and every planetary position are bundled or computed; put this phone in aeroplane
+      mode and the map is complete. What INTERNET is for is the two things that are not the map:
+      fetching a newer build of the app itself, and sending on a fault it has already recorded.
 
-      ⚠️ It changes when the self-updater arrives, which is the next slice. That commit adds
-      INTERNET and ACCESS_NETWORK_STATE and rewrites this paragraph; leaving the claim standing
-      afterwards would be the overstated comment this repository treats as a defect.
+      ⚠️ **The previous version of this paragraph said "no INTERNET at all", and it was true when it
+      was written.** It also said, in as many words, that the commit adding the self-updater would
+      add these two permissions and rewrite it — because leaving that claim standing afterwards
+      would be the overstated comment this repository treats as a defect. This is that rewrite.
+
+      ⚠️ ACCESS_NETWORK_STATE is what lets the automatic update ask whether it is on Wi-Fi before it
+      pulls tens of megabytes. Without it the question cannot be asked, and the honest fallback
+      would be to never update automatically at all.
+
+      ⚠️ **Two more are MERGED IN from `:core:update` and are not written here** —
+      REQUEST_INSTALL_PACKAGES and UPDATE_PACKAGES_WITHOUT_USER_ACTION. That library declares them
+      once for every application that installs its own updates, which is the point of it; naming
+      them again here would be a second statement of one fact. They are mentioned because a reader
+      comparing this file against the installed app's permission list would otherwise find two it
+      does not explain.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
       ⚠️ **COARSE, never FINE, and the arithmetic is why.** A degree of latitude moves the sky by a

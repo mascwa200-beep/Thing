@@ -16,10 +16,10 @@ run-name: "Sky #${{ github.run_number }} — install from Releases ▸ sky-lates
 # list is what this module actually reads: itself, the two shared modules it depends on, the
 # catalogue builders, and the build wiring.
 #
-# ⚠️ `core/update/**` is deliberately ABSENT, and it belongs here the moment the self-updater does.
-# The nutrition workflow's own note records adding it late and why: a change to the green gate or
-# the installer ladder that did not rebuild this app would leave the applications disagreeing about
-# when a build is safe to install, which is the exact thing sharing that module prevents.
+# ⚠️ `core/update/**` and `core/feeds/**` are here because the self-updater arrived, and the earlier
+# version of this note said they would. A change to the green gate or the installer ladder that did
+# not rebuild this app would leave the three applications disagreeing about when a build is safe to
+# install, which is the exact thing sharing that module prevents.
 on:
   push:
     branches:
@@ -29,6 +29,8 @@ on:
       - "sky/**"
       - "core/sky/**"
       - "core/telemetry/**"
+      - "core/update/**"
+      - "core/feeds/**"
       - "tools/sky/**"
       # ⚠️ The five root files that change what Gradle does, all of them. The desktop workflow's
       # filter once did not name a directory it genuinely read, and the nutrition one missed
@@ -223,8 +225,13 @@ jobs:
             on one phone at once. Sideload it and allow "install unknown apps".
 
             Three million stars, the constellations, the deep sky, the Milky Way and every planet,
-            all bundled. It asks for an approximate location and nothing else; it holds no network
-            permission at all, so nothing it draws can have come from anywhere but the phone.
+            all bundled. Put the phone in aeroplane mode and the map is complete — nothing it draws
+            can have come from anywhere but the phone. It asks for an approximate location, and
+            uses the network for two things that are not the map: fetching its own newer builds,
+            and sending on a fault it has already recorded.
+
+            It keeps itself current on its own, over Wi-Fi, once a GitHub token is pasted into
+            ABOUT — this repository is private, so there is no way around needing one.
 
             This repository is private, so following that link needs a signed-in GitHub session in
             whatever browser opens it.

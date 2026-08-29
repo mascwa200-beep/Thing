@@ -122,9 +122,21 @@ dependencies {
     implementation(project(":core:sky"))
     implementation(project(":core:telemetry"))
 
-    // ⚠️ `:core:update` is NOT here yet, deliberately. It is the next slice, and a dependency
-    // declared before anything imports it is the declared-and-never-used shape this repository
-    // keeps correcting — a line that reads as wired and is not. It arrives with the surface that
-    // uses it, and the INTERNET permission arrives in the same commit, so until then this
-    // application genuinely cannot reach the network at all and its manifest says so.
+    // Keeping itself current, and saying what went wrong: the GitHub release check with its green
+    // gate, the `PackageInstaller` ladder, and the crash reporter. Shared with the other two
+    // applications so the three cannot come to disagree about when a build is safe to install.
+    //
+    // ⚠️ **This is the only dependency here that costs the APK anything worth naming**, and the
+    // honest accounting is: it declares `api(project(":core:feeds"))`, which declares okhttp, okio
+    // and kotlinx-serialization as `api` in turn, and it declares `api(libs.coil.base)` for an
+    // image-decode interceptor this application will never call. With R8 off (see the release block
+    // above) none of that is shaken out. Measured jars: okhttp 771 kB, okio 351 kB, serialization
+    // 646 kB, plus coil-base and `:core:feeds`' own twenty-two repositories.
+    //
+    // ⚠️ It is accepted rather than worked around, and the alternative was worse: a self-contained
+    // updater here would be a third copy of the green gate and the installer ladder, in code that
+    // installs software. `UpdateRepository`'s own KDoc records that it was parameterised for
+    // exactly this — this is the fourth reader of these releases. Splitting `:core:update` so the
+    // updater does not drag coil is a real follow-up and a much bigger change than this slice.
+    implementation(project(":core:update"))
 }

@@ -46,18 +46,34 @@ import kotlin.math.roundToInt
  * sky to say the name of an application with one screen in it. What is left is the chart, a readout
  * of where it is looking, and two rows of controls.
  *
- * @param hasAttitudeSensor whether this phone has a rotation-vector sensor at all. ⚠️ Passed in
- *   rather than guessed from a silent FOLLOW control: a chip that does nothing when pressed and a
- *   chip that says the hardware is absent are very different things, and only one of them is honest.
+ * @param container this application's whole dependency bundle. ⚠️ Taken whole rather than as four
+ *   parameters, matching the standalone nutrition app's `NutritionApp(vm, container)`: everything
+ *   here beyond the map is the updater, the token and the fault reporter, and threading each of
+ *   them separately through [Controls] would be four arguments that always travel together.
  */
 @Composable
-fun StarMapScreen(vm: SkyMapViewModel, hasAttitudeSensor: Boolean) {
+fun StarMapScreen(vm: SkyMapViewModel, container: SkyContainer) {
     val view by vm.view.collectAsStateWithLifecycle()
     val bodies by vm.bodies.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val missing by vm.catalogueMissing.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+
+    // ⚠️ Whether this phone has a rotation-vector sensor at all, read from the hardware rather than
+    // guessed from a silent FOLLOW control: a chip that does nothing when pressed and a chip that
+    // says the hardware is absent are very different things, and only one of them is honest.
+    val hasAttitudeSensor = container.hardware.hasAttitudeSensor
+
+    var showAbout by remember { mutableStateOf(false) }
+    if (showAbout) {
+        AboutSheet(
+            container.updates,
+            container.settings,
+            container.crashUploader,
+            onDismiss = { showAbout = false },
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -75,7 +91,7 @@ fun StarMapScreen(vm: SkyMapViewModel, hasAttitudeSensor: Boolean) {
                 IdentifyCard(body, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
-        Controls(view, vm, hasAttitudeSensor)
+        Controls(view, vm, hasAttitudeSensor, onAbout = { showAbout = true })
     }
 }
 
@@ -177,6 +193,7 @@ private fun Controls(
     view: SkyProjection.View,
     vm: SkyMapViewModel,
     hasAttitudeSensor: Boolean,
+    onAbout: () -> Unit,
 ) {
     val hours by vm.hourOffset.collectAsStateWithLifecycle()
     val lines by vm.linesMode.collectAsStateWithLifecycle()
@@ -274,6 +291,10 @@ private fun Controls(
             )
             AssistChip(onClick = { vm.zoom(1.0 / ZOOM_STEP) }, label = { Text("−") })
             AssistChip(onClick = { vm.zoom(ZOOM_STEP) }, label = { Text("+") })
+            // ⚠️ Last in the row on purpose. This is a scrolling strip and the chips before it are
+            // used while looking at the sky; the build number and the token are opened about twice
+            // in the life of an install, so it takes the position that has to be scrolled to.
+            AssistChip(onClick = onAbout, label = { Text("ABOUT") })
         }
         Row(
             Modifier.fillMaxWidth().padding(bottom = 10.dp),
