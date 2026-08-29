@@ -10775,3 +10775,166 @@ the shape that fits what was measured is **G < 13 or G < 14 built in CI behind a
 git history nothing), with **LCARS left on the core tier** — its pack mechanism cannot carry a
 memory-mapped binary, and 329 → 464 MB re-downloaded on every build is not a trade worth making for
 the last third of a zoom range.
+
+### THE STAR MAP STANDS ON ITS OWN — horizon-locked, tiered, and down to API 23 (this session, PR #464)
+
+Owner: *"make the sky map stay stationary and you have to move your phone to see the stuff around
+the earth. it has to be horizon locked. Ensure that the sky map is made into its own separate app
+and that it is optimized for any phone, shitty or G.O.A.T.E.D. find the lowest common denominator
+for phones that runs still and then the highest and plan for each and every single one."* Three
+binding AskUserQuestion answers governed it: pointing **default-on with drag still there**; the
+`:sky` **APK** unattached to LCARS while every feature built for it also lands in LCARS; and reach
+**every Android version still officially supported, nothing already abandoned**.
+
+⚠️ **The owner's "do not use plan usage" is a hard constraint and it overrides BOTH plan mode's own
+instruction to dispatch Explore/Plan agents AND the ultracode directive.** Zero subagents and zero
+workflows for the whole arc. Every check below is local kotlinc + JUnit, a `javap`, a published
+artifact fetched from Maven, or CI.
+
+**Four parts, four commits:** `6ffa33a` horizon-locked by default · `1db8862` SkyBudget device
+tiering · `cd6ed6a` the independence gate · `ea467e7` the API floor.
+
+#### Part A — the map opens following the phone
+
+`SkyPreferences` (read+write as ONE interface, so the pair cannot be split), a `skyFollowByDefault`
+key in each application's own store, and `hasAttitudeSensor` plumbed through `SkyDeps`.
+
+⚠️ **Three defects found by reading the call sites before shipping, none by a gate.**
+`ReleaseTheSensorWhenNobodyIsLooking` calls `setPointing(false)` on ON_STOP and on dispose — with
+persistence that writes "not following" on every background, silently retiring the default the
+commit exists to add. Split into `applyPointing` (non-recording, returns whether anything changed)
+and `setPointing` (records), with the observer on the former; my own KDoc claiming "teardown does
+not come through here" was false and is corrected. Second: `init` racing `load()` left `_site` null
+when `startPointing` reads it for declination, so the compass reported MAGNETIC north — up to ~20°
+out — for the whole screen; `load()` now sets declination as soon as it has a fix. Third: `init`
+calling `setPointing` would do a full settings read-modify-write on every screen open.
+
+#### Part C — SkyBudget, and the trap the whole file is shaped around
+
+`core:telemetry/SkyBudget.kt` maps `DeviceClass.Tier` to sensor period, smoothing, Milky Way samples
+and the deep-sky shape threshold. **FULL is byte-for-byte today's behaviour**, which is what makes a
+ladder nobody here can measure on hardware safe to ship — the worst case is a weak phone getting a
+different experience, never a good one.
+
+⚠️ **`pointSmoothing` is a weight applied PER SAMPLE**, so carrying 0.25 to a device sampling a
+quarter as often gives four times the lag — the map would visibly trail the hand on exactly the
+phones this exists to help, reading as a broken sensor rather than a setting. An exponential blend
+of weight `w` every `Δt` leaves `(1-w)^(t/Δt)` = `exp(-t/τ)` for `τ = -Δt/ln(1-w)`; inverting gives
+`w = 1 - exp(-Δt/τ)`, holding the lag in real TIME at every rate. Reference τ = 69.5 ms.
+
+⚠️ **20,000 µs is `SENSOR_DELAY_GAME`, read from the platform rather than recalled.** Disassembling
+`SensorManager.getDelay` gives the whole table — 0→0, 1(GAME)→20,000, 2(UI)→66,667, 3(NORMAL)→200,000
+— and a `default:` that returns the argument unchanged. So `registerListener` genuinely takes a raw
+microsecond period and only 0..3 are special-cased, which is what lets MODEST sit at 33,333 (the
+named ladder jumps straight from 20 ms to 67).
+
+⚠️ **I had the deep-sky threshold INVERTED.** `DeepSky.SHAPE_MIN_PX` is a FLOOR on apparent size, so
+a smaller value draws MORE shapes; my first LEAN/MINIMAL values were below the shipped 7.0 and would
+have loaded the weakest phones with the most work. Corrected to 11.0/16.0, field renamed
+`deepSkyShapePx` so its direction is legible at the call site, and a test ("the ladder only ever
+asks for less") makes it a build failure.
+
+**Two plan items dropped after reading the code:** star labels are already bounded to ~17 on screen
+by `StarGlyph.LABEL_HEADROOM`; and capping catalogue depth would bite only in the deep half of the
+zoom range AND make the depth readout claim "everything down to magnitude 10.5" about a catalogue
+holding 12 — the app more confident than its data.
+
+#### Part B — independence proved, not asserted
+
+`tools/check_sky_standalone.py`: the project-dependency graph never reaches `:app` (walked
+TRANSITIVELY, since a shared module growing that dependency is the realistic regression), the
+manifest names no LCARS package, and the dex carries no class from an `:app`-only package.
+
+⚠️ **The marker set is DERIVED from the source trees, never hand-listed** — carve a package out of
+`:app` and it leaves the set on its own. And the obvious derivation is wrong TWICE, both found by
+running the gate rather than reading it. **Seven packages are declared in BOTH `:app` and a shared
+module** (`core.network`, `core.util`, `data.health`, `data.settings`, `data.weather`,
+`feature.health`, `feature.sky` — the last is `:core:sky`'s own), so package names are not a
+partition and a check reading `dev.mascwa.pulse` as "LCARS code" fails on the star chart itself.
+Worse: the first version matched each marker as a PREFIX, and **`dev.mascwa.pulse` is itself an
+`:app`-only package** (MainActivity, PulseApplication), so its descriptor matched every shared class
+and the gate rejected a synthetic APK carrying nothing but sky classes. A dex descriptor is
+`Lpath/to/Name;`, so a class declared DIRECTLY in a package has no further slash.
+
+⚠️ **The positive control is load-bearing.** Every check is an ABSENCE, and an absence proves nothing
+until the search is known to find something — an obfuscated or wrongly-extracted dex would report
+every marker "absent" and pass. R8 is off for `:sky` today, but the gate does not depend on that
+staying true. ⚠️ And an EMPTY argument is a failure rather than a mode: CI resolves the path with
+`$(ls .../*.apk)`, which yields "" when the build produced nothing.
+
+⚠️ **`app/**` is deliberately NOT in the workflow's path filter.** The marker set derives from
+`:app`'s packages, but only safely: adding an LCARS-only package makes the set stricter over an APK
+that did not change, and moving a package OUT necessarily edits a `core/**` file, which is listed.
+Listing `app/**` would republish 33 MB on every news-screen commit for a verdict that cannot flip.
+
+**Deliberately NOT added: a "get the star map" link in LCARS.** Nutrition has one; this app was
+asked to be unattached, and a link is exactly the attachment.
+
+#### Part D — minSdk 26 → 23, and three things that had to be true first
+
+⚠️ **23 is where THIS CODE naturally sits, which is a far better reason than my reading of Google's
+support window.** Every borderline platform member the three modules touch lands at exactly 23 and
+none lower: `Context.getSystemService(Class)`, `ConnectivityManager.activeNetwork` and
+`PowerManager.isDeviceIdleMode`. Going to 21 would mean guarding three things that work today. The
+support window is the part I could NOT verify (cutoff May 2026, and it moves), so `minSdkSky` is its
+own catalogue entry with the evidence beside it and changing it changes nothing else.
+
+- **Core library desugaring**, landing BEFORE the floor drops. Enabled even though nothing in `:sky`'s
+  own source uses `java.time` — the reach is `:core:feeds` transitively, and a future core could add
+  one without this module noticing. ⚠️ desugar_jdk_libs **2.1.5 is safe for AGP 8.7.3 by
+  MEASUREMENT**: the `desugar_jdk_libs_configuration` jars for 2.0.4/2.1.4/2.1.5 all declare
+  `configuration_format_version: 200` and `required_compilation_api_level: 30`. It is a JAR, so no
+  `aar-metadata.properties` and no `checkDebugAarMetadata` trap.
+- ⚠️ **A pre-26 launcher icon, which the plan did not know about and which would have failed the
+  build.** `:sky` shipped ONLY `mipmap-anydpi-v26/ic_launcher.xml`; below 26, `@mipmap/ic_launcher` —
+  which the manifest names — has no resource at all. `tools/sky/build_legacy_icon.py` renders it from
+  the same mark and **crops to the adaptive SAFE ZONE** (the central 72 of 108 units), because drawn
+  full-viewport into an unmasked legacy icon the asterism fills 44% of the frame instead of 66%.
+- ⚠️ **`Math.floorDiv` is API 24, used eight times in `:core:telemetry` and `:core:feeds` — plain-JVM
+  modules whose classes land in the dex as a jar dependency, which lint does NOT analyse for NewApi.**
+  Green build, clean lint, `NoSuchMethodError` on the device. Asked R8 directly rather than recalling:
+  `com.android.tools.r8.BackportedMethodList --min-api 23` lists `Math#floorDiv(JJ)J` and `floorMod`
+  among its backports. **The r8 jar is not in the Gradle cache here — AGP fetches it only when it
+  runs — so pull it from Google's maven for this class of question.**
+
+⚠️ **Declaring the lower floor on `:core:sky` and `:core:update` is not a formality**: a library
+declaring a higher minimum than its consumer fails the manifest merge, AND it puts those modules'
+sources under lint at 23, which is what turns an unguarded newer API into a build failure. `:app`
+and `:nutrition` are unaffected — lint analyses each module at its own minimum.
+
+**DELIBERATELY NOT DONE: the plan's `:core:net` extraction.** Its stated purpose was removing
+`java.time` from the sky graph — and **`:core:feeds` is ALREADY a plain Kotlin/JVM module, not an
+Android library**, so it declares no minSdk and gates nothing; desugaring covers it completely. What
+the extraction still buys is ~1 MB of repositories and coil that this app never calls and R8 is not
+on to shake. Worth doing, not part of the floor, and `sky/build.gradle.kts` already records it as
+non-urgent. Bundling a module carve-out into a floor change lands two independent risks together.
+
+#### Method notes worth reusing
+
+- **A published artifact answers a toolchain question for free.** `desugar_jdk_libs_configuration`'s
+  format version, R8's backport list, and every AndroidX AAR's declared `minSdkVersion` were all read
+  from Maven rather than recalled. The AAR-manifest trick also confirmed the dependency set's own
+  technical floor is 21.
+- ⚠️ **`tools/android_compile_check.sh` reported "0 errors" for a run that compiled NOTHING** — it
+  aborts on an unresolvable artifact (`lifecycle-viewmodel-savedstate-android` has no `-android`
+  variant), exits 1 correctly, and a caller piping it into `grep 'error:'` sees silence. Hardened to
+  say `COMPILE CHECK ABORTED … this is NOT a pass`. Same family as its coroutines check; a silent
+  false pass is worse than no check.
+- ⚠️ The resolve gate's complaints were settled by the documented control — planting
+  `calendarRepository` and `pointForward`, both unquestionably valid, and watching it report them
+  identically. `:core:sky`, `:core:update` and `:core:health` all cascade there.
+
+**⚠️ NOT DOING: iOS.** The owner said "Android or iOS" and there is no iOS app. `:core:sky` is an
+Android library built on `Context`, `AssetManager`, `SensorManager` and the Compose **Android**
+artifacts, the catalogue reader memory-maps an Android asset, and `:sky` is an AGP application
+module. A port is real but it is its own arc — KMP with `expect`/`actual` for assets and sensors,
+Compose Multiplatform's iOS target, an Xcode project, and a distribution route for a sideloaded app
+on a platform that has none.
+
+⚠️ **Owner-verify on the Pixel, and one item is unverifiable anywhere here.** The map should open
+already following the phone and remember that across launches; a phone with no rotation-vector sensor
+should stay in drag with the chip disabled and a sentence saying why; and the tiering is **invisible
+on a flagship BY DESIGN** — the line under the star map's controls is where it surfaces, and on a
+Pixel it should say nothing at all. The Galaxy A16 is where the ladder is actually tested. ⚠️ **There
+is no API 23 device here and CI compiles rather than installs**: what CI proves is that nothing
+unguarded slipped past lint; what only a phone proves is that it runs.
