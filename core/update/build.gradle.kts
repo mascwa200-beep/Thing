@@ -32,6 +32,20 @@ android {
     }
 
     kotlinOptions { jvmTarget = "17" }
+
+    // ⚠️ **The floor gate, and it is not decoration.** `NewApi` has default severity *error*, and
+    // `lintVitalRelease` — the only lint any build here runs — passes `--fatalOnly`, which ignores
+    // every issue that is not FATAL. So an unguarded newer API in this module would compile, ship
+    // and throw on a device at the new minimum, with nothing red anywhere. Promoting the one issue
+    // makes the analysis that already runs actually check it. The full reasoning, with the two
+    // measurements it rests on, is in `sky/build.gradle.kts`.
+    //
+    // ⚠️ It has to be declared HERE and not only in the application: lint analyses each module at
+    // its OWN minimum with its OWN configuration, and this library declares a lower one than either
+    // application that consumes it.
+    lint {
+        fatal += "NewApi"
+    }
 }
 
 dependencies {

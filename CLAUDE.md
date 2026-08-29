@@ -10938,3 +10938,29 @@ on a flagship BY DESIGN** — the line under the star map's controls is where it
 Pixel it should say nothing at all. The Galaxy A16 is where the ladder is actually tested. ⚠️ **There
 is no API 23 device here and CI compiles rather than installs**: what CI proves is that nothing
 unguarded slipped past lint; what only a phone proves is that it runs.
+
+⚠️ **THAT SENTENCE WAS FALSE WHEN IT WAS WRITTEN, and it took a `lint { fatal += "NewApi" }` block
+in all three modules to make it true.** `assembleRelease` genuinely runs `lintVitalRelease` — the log
+names it for `:sky`, `:core:sky` and `:core:update` — so it looked settled. But `lintVital` passes
+`--fatalOnly`, and measuring what that means rather than recalling it:
+
+  * `ApiDetector.UNSUPPORTED.defaultSeverity` is **error**, not fatal. Instantiated from the real
+    lint-checks 31.7.3 and printed, because the constant is passed as a local in a static
+    initializer and cannot be read off the bytecode.
+  * `FlagConfiguration.getDefinedSeverity` under `fatalOnly` returns **IGNORE** for any issue whose
+    default severity is not FATAL, unless something explicitly configures it FATAL. Read from the
+    bytecode: `getDefaultSeverity() == FATAL ? … : IGNORE`.
+  * Nothing configured it — there was no `lint {}` block anywhere in the repository and no workflow
+    ran a full `lint` task.
+
+So `NewApi` was ignored on every release build, and the whole safety argument for the floor change
+rested on my having read each `android.*` import by hand. Promoting the one issue costs no new task
+and no extra CI time, because the analysis that was ignoring it is already running. ⚠️ **The general
+lesson is bigger than this module: a lint task appearing in a build log says nothing about which
+checks it is running.** `lintVital` ≠ lint.
+
+⚠️ The DSL was confirmed by a typed probe, not recalled: `javap` reports `getFatal()` as
+`java.util.Set<String>`, which is what BOTH `Set` and `MutableSet` erase to, and `+=` compiles only
+on the mutable one. A two-line Kotlin file compiled against the real `gradle-api-8.7.3.jar`, with a
+negative control on a genuinely immutable `Set` that failed with `unresolved reference 'plusAssign'`
+— the exact error the real code would have produced.

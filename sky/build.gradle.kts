@@ -92,6 +92,36 @@ android {
 
     kotlinOptions { jvmTarget = "17" }
 
+    // ⚠️ **THE FLOOR CHANGE ABOVE HAD NO AUTOMATED GATE UNTIL THIS BLOCK, AND I BELIEVED IT DID.**
+    // The claim was that lint catches an unguarded newer API at the new minimum. `assembleRelease`
+    // does run `lintVitalRelease` — the log names it — but `lintVital` passes `--fatalOnly`, and
+    // that is a much smaller set than "the errors".
+    //
+    // Measured rather than recalled, from the real jars this build resolves:
+    //
+    //   * `ApiDetector.UNSUPPORTED.defaultSeverity` is **error**, not fatal. Instantiated from
+    //     lint-checks 31.7.3 and printed, because the constant is passed as a local in a static
+    //     initializer and cannot be read off the bytecode directly.
+    //   * `FlagConfiguration.getDefinedSeverity` under `fatalOnly` returns **IGNORE** for any issue
+    //     whose default severity is not FATAL, unless a configuration explicitly makes it FATAL.
+    //
+    // So `NewApi` was being ignored on every release build, and nothing in this repository
+    // configured otherwise: there is no `lint {}` block anywhere else and no workflow runs a full
+    // `lint` task. Promoting the one issue is the whole fix — it costs no new Gradle task and no
+    // extra CI time, because the analysis that ignores it is already running.
+    //
+    // ⚠️ Deliberately `fatal` and NOT `abortOnError` plus a full `lint` task: that would also fail
+    // on every other error-severity issue in the module, which is a different and much larger
+    // decision than "the floor must be honest". Only the check that guards the floor is promoted.
+    //
+    // ⚠️ Deliberately NOT added to `:app` or `:nutrition`. Their minimum did not move, so nothing
+    // here created that risk, and a pre-existing finding in either would turn three workflows red
+    // for a change that is supposed to be about the star map. They are candidates for the same
+    // treatment on their own merits, which is a separate decision with its own blast radius.
+    lint {
+        fatal += "NewApi"
+    }
+
     buildFeatures {
         compose = true
         // `BuildConfig.VERSION_CODE` is how the app knows which build it is running, which is the
