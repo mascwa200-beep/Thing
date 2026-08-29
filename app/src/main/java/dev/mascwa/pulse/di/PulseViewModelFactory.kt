@@ -57,6 +57,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                         // rather than the three angles — see CompassController's note on the zenith.
                         c.newCompassController(cameraUpright = true, smoothed = false),
                     ),
+                    dev.mascwa.pulse.feature.sky.SkyPrefs(c.settingsRepository),
                 )
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)

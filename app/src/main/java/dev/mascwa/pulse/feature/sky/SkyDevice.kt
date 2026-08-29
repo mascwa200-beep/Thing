@@ -45,6 +45,17 @@ class SkyDevice(
             ?.let { SkySite(it.latitude, it.longitude) }
     }
 
+    /**
+     * ⚠️ **`hasSensor` answers this and NOTHING ELSE, which is the one thing it is good for.** Its
+     * own KDoc on [dev.mascwa.pulse.data.sensors.CompassController.Reading] warns that it is not a
+     * statement about whether anything has been measured — that is `hasReading`, tested separately
+     * below. Here the question genuinely is "does this handset own a rotation-vector sensor", which
+     * is fixed at construction from `getDefaultSensor` and never changes.
+     *
+     * Read from `.value` rather than collected: a capability cannot arrive later.
+     */
+    override val hasAttitudeSensor: Boolean get() = compass.reading.value.hasSensor
+
     override fun startAttitude() {
         compass.start()
         // ⚠️ Guarded, so a second `startAttitude` cannot leave two collectors on one flow. They

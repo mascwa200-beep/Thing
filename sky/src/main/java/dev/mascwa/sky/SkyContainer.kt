@@ -148,7 +148,7 @@ class SkyContainer(context: Context) {
 
     /**
      * ⚠️ A factory rather than `viewModels()` with a no-argument constructor, because
-     * [SkyMapViewModel] takes six dependencies and there is nowhere else to hand them to it. The
+     * [SkyMapViewModel] takes seven dependencies and there is nowhere else to hand them to it. The
      * `@Suppress` is the standard shape for this API: the cast is checked one line above it.
      */
     val viewModelFactory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -164,6 +164,7 @@ class SkyContainer(context: Context) {
                 deepSkyCatalog,
                 milkyWayCatalog,
                 hardware,
+                settings,
             ) as T
         }
     }

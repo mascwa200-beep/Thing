@@ -267,25 +267,36 @@ fun LcarsChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     accent: Color = Pulse.colors.accent,
+    /**
+     * ⚠️ **The kit's own idiom, not a new one — [LcarsButton] has taken this since it was written
+     * and the chip was the outlier.** Its shape here is the same: dim to [Pulse.colors.muted] and
+     * decline the press. Added for the star map's FOLLOW control on a handset with no
+     * rotation-vector sensor, where a chip that responds is a chip that lies.
+     */
+    enabled: Boolean = true,
 ) {
     val c = Pulse.colors
     // Wired at the kit rather than at the call site: the app has a full 13-cue haptic vocabulary that
     // reached exactly one screen, and putting the cue here means every chip in every screen gains it
     // without a 109-file sweep.
     val cue = rememberLcarsCue()
+    val tint = if (enabled) accent else c.muted
     val shape = CutCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 0.dp, bottomStart = 10.dp)
     Box(
         modifier
             .clip(shape)
-            .background(if (selected) accent else Color.Transparent)
-            .border(1.dp, if (selected) accent else c.line, shape)
-            .clickable { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
+            .background(if (selected) tint else Color.Transparent)
+            .border(1.dp, if (selected) tint else c.line, shape)
+            // ⚠️ `enabled` on the modifier rather than a branch inside the lambda, so a disabled chip
+            // is not a click target at all — a press that consumes the touch and plays a cue while
+            // doing nothing reads as the control being broken rather than unavailable.
+            .clickable(enabled = enabled) { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
             .padding(horizontal = 15.dp, vertical = 7.dp),
     ) {
         Text(
             text.uppercase(),
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
-            color = if (selected) c.void else c.ink,
+            color = if (selected) c.void else if (enabled) c.ink else c.muted,
         )
     }
 }

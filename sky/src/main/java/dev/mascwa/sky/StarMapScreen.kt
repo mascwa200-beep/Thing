@@ -63,7 +63,12 @@ fun StarMapScreen(vm: SkyMapViewModel, container: SkyContainer) {
     // ⚠️ Whether this phone has a rotation-vector sensor at all, read from the hardware rather than
     // guessed from a silent FOLLOW control: a chip that does nothing when pressed and a chip that
     // says the hardware is absent are very different things, and only one of them is honest.
-    val hasAttitudeSensor = container.hardware.hasAttitudeSensor
+    //
+    // ⚠️ Asked of the view model rather than of the hardware directly, even though the answer comes
+    // from the same place. The view model refuses to follow without it, so a screen reading its own
+    // copy could disagree with the object doing the refusing — and the LCARS map, which had no such
+    // check at all, now reads the same property.
+    val hasAttitudeSensor = vm.hasAttitudeSensor
 
     var showAbout by remember { mutableStateOf(false) }
     if (showAbout) {

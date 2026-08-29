@@ -42,6 +42,21 @@ interface SkyDeps {
      */
     val attitude: StateFlow<SkyAttitude?>
 
+    /**
+     * Whether this device can answer where it is aimed AT ALL.
+     *
+     * ⚠️ **This is a different question from [attitude] being null, and conflating them is what
+     * makes a map freeze.** A null attitude means "nothing has measured this yet", which is the
+     * ordinary state for the first few tens of milliseconds after [startAttitude]. This means "there
+     * is no rotation-vector sensor in this handset", which never becomes false and never resolves.
+     * Turning following on without consulting it registers a listener that can never fire, leaves
+     * `pointing` reading true, and — because dragging is refused while following — hands somebody a
+     * sky they cannot turn by any means. Read before enabling, not after.
+     *
+     * Cheap and constant: both implementations answer from a `getDefaultSensor` performed once.
+     */
+    val hasAttitudeSensor: Boolean
+
     /** Begin reporting into [attitude]. A device with no sensor may do nothing at all. */
     fun startAttitude()
 

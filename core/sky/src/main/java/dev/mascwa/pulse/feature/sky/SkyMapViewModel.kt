@@ -16,6 +16,7 @@ import dev.mascwa.pulse.data.sky.MilkyWayCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.sky.SkyDeps
+import dev.mascwa.pulse.sky.SkyPreferences
 import dev.mascwa.pulse.sky.SkySite
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
@@ -68,6 +69,17 @@ class SkyMapViewModel(
      * the two services behind it stay where they are rather than moving in here.
      */
     private val device: SkyDeps,
+    /**
+     * Whether the map opens following, remembered between launches.
+     *
+     * ⚠️ **Read HERE rather than by each application, so the rule that governs it exists once.**
+     * "Read the stored answer, apply it at most once, write every change but never a teardown" is
+     * four sentences of ordering that both applications would otherwise have to get right
+     * separately — and the two of them reach this screen by completely different routes, one as its
+     * whole reason for existing and one as a route among forty. See [SkyPreferences] for why it is
+     * an interface rather than a defaulted lambda.
+     */
+    private val preferences: SkyPreferences,
 ) : ViewModel() {
 
     /**
@@ -268,7 +280,24 @@ class SkyMapViewModel(
     private val _catalogueMissing = MutableStateFlow(false)
     val catalogueMissing: StateFlow<Boolean> = _catalogueMissing.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        // ⚠️ **In `init` rather than in a call the screen has to remember, and that is what makes
+        // "at most once" free.** A composable would re-run its effect on every return to the screen
+        // and on every rotation, so applying the default there needs a guard that survives both —
+        // which is a flag on this object, which is this object doing it. Done here there is nothing
+        // to guard: a view model is constructed once and outlives the composition either way.
+        //
+        // ⚠️ [applyPointing] rather than [setPointing], so the stored answer is not written straight
+        // back. The two differ only in that, and the difference matters: on the LCARS side a write
+        // is a read-modify-write of a settings record with well over a hundred fields, through a
+        // Keystore cipher — paid on every open of the screen, to store a value that was just read
+        // out of it. The refusal and the sensor registration are shared, which is the half that has
+        // to be common.
+        viewModelScope.launch {
+            if (runCatching { preferences.followByDefault() }.getOrDefault(true)) applyPointing(true)
+        }
+    }
 
     fun refresh() = load()
 
@@ -277,7 +306,21 @@ class SkyMapViewModel(
             _loading.value = true
             try {
                 val here = resolveSite()
-                if (here != null) _site.value = here
+                if (here != null) {
+                    _site.value = here
+                    // ⚠️ **Told here as well as in [startPointing], and the reason is an ordering
+                    // that only appeared once the map began opening in pointing mode.** That method
+                    // reads `_site` and finds it null when following starts before this load has
+                    // resolved a position — which is now the ordinary case, because both run from
+                    // `init`. Without this the compass would keep reporting MAGNETIC north for the
+                    // life of the screen: as much as twenty degrees out in parts of the world, on a
+                    // map whose whole claim is that it points at the real sky. It also covers a
+                    // case that was never handled at all — a fix arriving, or moving far enough for
+                    // a new one, while the map is already following.
+                    //
+                    // Harmless when not following: it stores a number, it starts nothing.
+                    device.declinationAt(here.latitude, here.longitude, 0.0)
+                }
                 fillBrightStars()
                 openDeepCatalogue()
                 openConstellations()
@@ -431,11 +474,25 @@ class SkyMapViewModel(
     /**
      * Whether the map is following where the phone is aimed.
      *
-     * Off by default, and off is exactly what shipped before: nothing below runs, the sensor is not
-     * registered, and dragging works as it always has.
+     * ⚠️ **False at construction even though the map now OPENS following, and that is not the
+     * default being ignored.** This flow says whether the sensor is actually being read, and at the
+     * moment a view model is built nothing has registered a listener yet. Seeding it true would put
+     * the chip in its FOLLOWING state over a sensor that is not running — a claim about the world
+     * rather than a record of it, which is the same mistake [dev.mascwa.pulse.sky.SkyAttitude]
+     * exists to make unrepresentable. The stored default is applied a moment later by [init], which
+     * goes through [setPointing] and therefore starts the hardware.
      */
     private val _pointing = MutableStateFlow(false)
     val pointing: StateFlow<Boolean> = _pointing.asStateFlow()
+
+    /**
+     * Whether this handset can follow where it is pointed at all.
+     *
+     * Read from the hardware rather than inferred from a control that does nothing when pressed:
+     * "there is no such sensor" and "the sensor has not reported yet" are different facts and only
+     * one of them is permanent. Both screens read it from here so neither can answer differently.
+     */
+    val hasAttitudeSensor: Boolean get() = device.hasAttitudeSensor
 
     /** True when the magnetometer says it needs a figure-of-eight before it can be believed. */
     private val _needsCalibration = MutableStateFlow(false)
@@ -459,11 +516,48 @@ class SkyMapViewModel(
 
     private var pointingJob: kotlinx.coroutines.Job? = null
 
-    /** Start or stop following the handset. */
+    /**
+     * Start or stop following the handset, and remember which.
+     *
+     * ⚠️ **A handset with no rotation-vector sensor is refused rather than obliged, and this is the
+     * one guard that must not move to a call site.** Honouring the request there registers a
+     * listener that can never fire, leaves this flow reading true, and — because [pan] declines to
+     * drag while following — hands somebody a sky that cannot be turned by pointing, dragging or
+     * anything else, with a chip reading FOLLOWING to explain it. Refusing here means no caller can
+     * produce that state, whatever it asks for.
+     *
+     * ⚠️ **Call this ONLY for something the user did.** It records the answer, so anything that
+     * stops following for a reason of its own must use [applyPointing] instead — see the note there
+     * for what happens when it does not. [lookAt] is a legitimate caller: choosing to look north
+     * instead of wherever the phone is pointed is a genuine change of mode, not a transient.
+     */
     fun setPointing(on: Boolean) {
-        if (on == _pointing.value) return
+        if (!applyPointing(on)) return
+        viewModelScope.launch { runCatching { preferences.setFollowByDefault(on) } }
+    }
+
+    /**
+     * Change the mode without recording it, and say whether anything actually changed.
+     *
+     * ⚠️ **This exists because a caller that stops following is not always a person choosing to.**
+     * `ReleaseTheSensorWhenNobodyIsLooking` in [SkyChart] turns following off on ON_STOP and on
+     * leaving composition, and back on when the screen returns — sound behaviour that has nothing to
+     * do with what the user wants next time. Routed through [setPointing] it would write "not
+     * following" to storage on every background and on every navigation away, so the remembered
+     * default would be spent by the first time somebody left the screen, and a process killed while
+     * backgrounded would come back in drag mode for good.
+     *
+     * `internal` rather than private: the observer that needs it lives in this module beside the
+     * view model, and neither application has any business reaching it. The visibility IS the rule.
+     *
+     * Returning false for a no-op is what stops a repeated press writing the same value every tap.
+     */
+    internal fun applyPointing(on: Boolean): Boolean {
+        if (on && !device.hasAttitudeSensor) return false
+        if (on == _pointing.value) return false
         _pointing.value = on
         if (on) startPointing() else stopPointing()
+        return true
     }
 
     /**

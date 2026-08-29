@@ -404,6 +404,13 @@ fun SkyChart(
  *
  * ⚠️ Registering an observer replays the lifecycle up to its current state, so ON_START arrives
  * immediately on first composition — harmless, because the wish starts false.
+ *
+ * ⚠️ **[SkyMapViewModel.applyPointing], never `setPointing`, and getting that wrong would silently
+ * retire the map's own default.** `setPointing` records the answer so it survives a launch; every
+ * call below is the screen going away or coming back, which is not a decision about what should
+ * happen next time. Through the recording path, backgrounding the app or pushing any other
+ * destination would write "not following" — so the first time somebody left the map, opening
+ * horizon-locked would stop happening for good, on a path that compiles and looks correct.
  */
 @Composable
 private fun ReleaseTheSensorWhenNobodyIsLooking(vm: SkyMapViewModel) {
@@ -414,12 +421,12 @@ private fun ReleaseTheSensorWhenNobodyIsLooking(vm: SkyMapViewModel) {
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
                     resumeFollowing = vm.pointing.value
-                    vm.setPointing(false)
+                    vm.applyPointing(false)
                 }
                 Lifecycle.Event.ON_START -> {
                     if (resumeFollowing) {
                         resumeFollowing = false
-                        vm.setPointing(true)
+                        vm.applyPointing(true)
                     }
                 }
                 else -> Unit
@@ -430,7 +437,7 @@ private fun ReleaseTheSensorWhenNobodyIsLooking(vm: SkyMapViewModel) {
             lifecycle.removeObserver(observer)
             // ⚠️ Not remembered — see above. And harmless after ON_STOP, which has already set it
             // false, so the two paths cannot fight over one flag.
-            vm.setPointing(false)
+            vm.applyPointing(false)
         }
     }
 }

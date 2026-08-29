@@ -188,6 +188,18 @@ private fun Controls(
             val signed = if (trim > 180.0) trim - 360.0 else trim
             Text("Nudged ${"%.1f".format(signed)}° off the compass", c.ink2, JetBrainsMono, 10)
         }
+        // ⚠️ **This screen never said this at all, and the standalone star app has since it was
+        // written.** A handset with no rotation-vector sensor could press FOLLOW here, get a chip
+        // reading FOLLOWING over a listener that can never fire, and — because dragging is declined
+        // while following — a sky nothing could turn. The view model refuses that outright now; this
+        // line is what makes the refusal legible rather than a control that silently does nothing.
+        if (!vm.hasAttitudeSensor) {
+            Text(
+                "This phone has no rotation-vector sensor, so the map cannot follow where it is " +
+                    "pointed. Everything else works: drag to look around.",
+                c.ink2, JetBrainsMono, 10,
+            )
+        }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -200,6 +212,7 @@ private fun Controls(
                 if (pointing) "FOLLOWING" else "FOLLOW",
                 selected = pointing,
                 onClick = { vm.setPointing(!pointing) },
+                enabled = vm.hasAttitudeSensor,
             )
             // ⚠️ A chip rather than a tap on the caption above it. That line is ten point text, which
             // is a readout and not a touch target; the screen's own idiom for something you press is

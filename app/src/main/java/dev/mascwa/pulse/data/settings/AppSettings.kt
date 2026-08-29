@@ -469,6 +469,15 @@ data class AppSettings(
     // Bookkeeping
     val onboardingComplete: Boolean = false,
     val deviceGateAcknowledged: Boolean = false,
+    /**
+     * Whether the sky map opens following where the handset is aimed. Default ON.
+     *
+     * ⚠️ Default TRUE rather than the usual quiet answer, and the standalone star app's own
+     * preference makes the same choice for the same reason: a star map is held up at the sky, and
+     * opening in drag mode hides the whole pointing mode behind a chip nobody would think to press.
+     * Written by `SkyMapViewModel` through `SkyPreferences`, so both applications obey one rule.
+     */
+    val skyFollowByDefault: Boolean = true,
     /** On launch AND on every foreground return, auto-download a GREEN (CI-passed) update newer than
      *  the running build and launch the installer for the user's one-tap confirm. A sideloaded app
      *  can't install fully silently (no device-owner), so the single Android "Update" tap is the floor;

@@ -144,6 +144,12 @@ class SkyHardware(private val context: Context) : SkyDeps, SensorEventListener {
     private fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    /** Whether this phone can follow where it is pointed at all. The screen says so if it cannot. */
-    val hasAttitudeSensor: Boolean get() = rotation != null
+    /**
+     * Whether this phone can follow where it is pointed at all. The screen says so if it cannot.
+     *
+     * ⚠️ On the interface now rather than on this class alone, because the view model consults it
+     * before honouring a request to follow — a listener that can never fire leaves a sky nothing can
+     * turn. See [SkyDeps.hasAttitudeSensor].
+     */
+    override val hasAttitudeSensor: Boolean get() = rotation != null
 }
