@@ -37,6 +37,34 @@ echo "== changed Kotlin files =="
 echo "$CHANGED" | sed 's/^/   /'
 FAIL=0
 
+# ---- 0. stray control bytes, over EVERY changed file, not just the Kotlin ------------------------
+# ⚠️ First, because it is the only gate here that catches a defect the compiler cannot see at all. A
+# NUL byte inside a Kotlin character literal compiles perfectly and IS the NUL character: `DeepSky.kt`
+# shipped `' '` as its "no photometric band" sentinel with a NUL inside the quotes, and every row came
+# out carrying NUL. Nothing warned. The only tell was `grep` answering "binary file matches" rather
+# than showing the line, which reads as noise.
+#
+# Deliberately over every changed file rather than the Kotlin list above: the hazard is in writing the
+# file, not in the language.
+echo
+echo "== control-byte gate =="
+if [ "${1:-}" = "--staged" ]; then
+    ALLCH=$(git diff --cached --name-only --diff-filter=d)
+else
+    ALLCH=$( { git diff --name-only --diff-filter=d HEAD
+               git ls-files --others --exclude-standard; } | sort -u )
+fi
+# Binary assets have control bytes by definition and are not what this is looking for.
+TEXTCH=$(echo "$ALLCH" | grep -E '\.(kt|kts|java|py|sh|yml|yaml|xml|json|md|txt|tsv|csv|pro|cpp|h|properties|gradle)$' || true)
+if [ -z "$TEXTCH" ]; then
+    echo "   (no changed text files)"
+elif OUT=$(echo "$TEXTCH" | xargs -r python3 tools/nul_byte_check.py 2>&1); then
+    echo "   ok    $OUT"
+else
+    echo "$OUT" | sed 's/^/   /'
+    FAIL=1
+fi
+
 # ---- 1. imports and duplicate companions, per package the change touches -------------------------
 echo
 echo "== import gate =="

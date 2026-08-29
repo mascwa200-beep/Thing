@@ -177,13 +177,32 @@ def strip(t: str) -> str:
             continue
         if t[i:i + 3] == '"""':
             i += 3
-            while i < n and t[i:i + 3] != '"""':
+            while i < n:
                 if t[i:i + 2] == "${":
                     out.append(" ")
                     i = interpolations(t, i, n, out)
-                else:
-                    i += 1
-            i += 3
+                    continue
+                if t[i] == '"':
+                    # ⚠️ **A RAW STRING ENDS AT THE LAST QUOTE OF THE RUN, NOT THE FIRST.** Kotlin
+                    # closes `"""` on a run of three or more quotes and gives the leading extras to
+                    # the content, so `Regex("""...\"([^\"$]+)"""")` — four quotes — is one quote of
+                    # content and then the terminator. Stopping at the first `"""` closed the string
+                    # a character early, left a stray `"` that opened a REGULAR string, and the scan
+                    # ran on inside-out from there: prose in later literals became "code" and real
+                    # code became "string", so every symbol after it went INVISIBLE to this gate.
+                    # That is the same desync the char-literal and escaped-identifier branches below
+                    # were written for, on a third shape. Found via a standing false positive in
+                    # `LazyKeyTest.kt`, which reported `Destinations` — a word from inside an
+                    # assertion message.
+                    run = 0
+                    while i + run < n and t[i + run] == '"':
+                        run += 1
+                    if run >= 3:
+                        i += run
+                        break
+                    i += run
+                    continue
+                i += 1
             out.append(" ")
             continue
         # ⚠️ **A CHARACTER LITERAL, and leaving this out silently inverted whole files.** Kotlin's
