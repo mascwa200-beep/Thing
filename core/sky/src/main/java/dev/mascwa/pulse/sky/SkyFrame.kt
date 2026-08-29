@@ -32,6 +32,48 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  * ⚠️ It is a rigid rotation, so it changes nothing else: [sinAltitude] still answers the true
  * altitude because the zenith is carried into the same frame as the stars, and an angle between
  * two directions is what it always was.
+ *
+ * ## ⚠️ What is deliberately NOT applied, with the measured size of each
+ *
+ * Precession is here because it is a rotation of the whole sky, and proper motion is applied per
+ * star where each layer is filled — see `ProperMotion` — because it changes only when a layer
+ * reloads. Four smaller terms remain, and in every case the reason they are absent is structural
+ * rather than an oversight:
+ *
+ * * **Refraction, 34.5 arcminutes at the horizon** — computed here from Bennett's formula, falling
+ *   to 9.9 arcminutes at five degrees of altitude and 1.0 at forty-five. Easily the largest of the
+ *   four, and the one that cannot be folded in here: it depends on each star's own altitude, so it
+ *   is a different shift for every star and it breaks the two-vectors-per-frame arrangement this
+ *   whole class exists for. Applying it would mean either a per-star correction every frame or a
+ *   chart whose geometry silently stops being geometry. That is a decision about what the map IS,
+ *   rather than a missing term.
+ * * **Annual aberration, up to 20.5 arcseconds** — the constant of aberration, the Earth's own
+ *   orbital velocity tilting the incoming light. A whole-sky term, so it WOULD fit this design; it
+ *   is simply an order of magnitude below refraction.
+ * * **Nutation, up to about 17 arcseconds of ecliptic longitude** — deliberately absent for a
+ *   reason that is not size. [Ephemeris.toEquatorial] runs on Greenwich MEAN sidereal time, so the
+ *   mean equinox is its self-consistent partner: the equation of the equinoxes carries the same
+ *   nutation term that apparent right ascension does, and the two very largely cancel. Adding
+ *   nutation on one side only would make the answer worse rather than better.
+ * * **Stellar parallax, under an arcsecond for the nearest star there is** — 0.77 arcseconds for
+ *   Proxima, which is the extreme. About one pixel at the quarter-degree floor and imperceptible
+ *   at every wider field, on a handful of stars out of three million. Diurnal parallax, from the
+ *   Earth's own radius rather than its orbit, is smaller again by five orders of magnitude.
+ *   Genuinely not worth a per-star term.
+ *
+ * ⚠️ **Parallax is a different story for the solar system, and there it is a real remaining gap
+ * rather than a negligible one.** Those bodies never touch this basis — they are drawn through the
+ * horizon path — so this is recorded here only because it is the fifth term somebody would look for.
+ * The Moon has it: `Ephemeris.moonPosition` corrects its altitude, which is the large one at about a
+ * degree. `Ephemeris.topocentric` exists and does it properly. But the map's planets come from
+ * `PlanetCalc`, which applies none, and the horizontal parallax at closest approach is **33
+ * arcseconds for Venus, 24 for Mars and 16 for Mercury** — computed from the Earth's radius over
+ * their minimum geocentric distance, so about forty pixels at the quarter-degree field. Larger than
+ * aberration and nutation together.
+ *
+ * For scale throughout: at the quarter-degree field one pixel is about 0.8 arcseconds, so
+ * aberration and nutation are visible there and nowhere else, while refraction is visible near the
+ * horizon at every field.
  */
 class SkyFrame private constructor(
     /** The projection basis, in the stars' own equatorial frame. */

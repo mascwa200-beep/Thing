@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.sky
 
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.ProperMotion
 import dev.mascwa.pulse.core.telemetry.SkyFieldPlan
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarCatalogReader
@@ -82,8 +83,13 @@ class StarField(private val reader: StarCatalogReader) {
      * already holds until this returns, which is why the loaded region is generous — a fast pan
      * would otherwise show the edge of the held region as a boundary where stars stop.
      *
-     * @param yearsFromEpoch how far to carry each star by its own proper motion, from the
-     *   catalogue's epoch to the date being drawn.
+     * ⚠️ **Proper motion is derived here rather than passed in, and that is why it works.** The
+     * parameter it replaces defaulted to zero, so every caller got a catalogue frozen at its own
+     * epoch — the machinery to carry a star forward shipped, was documented, and was never once
+     * invoked. Only this class holds both the reader (which knows the catalogue's epoch) and the
+     * instant being drawn, so working it out anywhere else would mean publishing the epoch and
+     * trusting a caller to remember.
+     *
      * @param centreOverride where the middle of the screen really points, when the caller knows it
      *   more precisely than [view] can say. ⚠️ **Pointing mode has to pass this.** Its view comes
      *   from `SkyPointing.equivalentView`, whose altitude is clamped to
@@ -98,9 +104,9 @@ class StarField(private val reader: StarCatalogReader) {
         latitudeDeg: Double,
         longitudeDeg: Double,
         epochMs: Long,
-        yearsFromEpoch: Double = 0.0,
         centreOverride: Ephemeris.Equatorial? = null,
     ): Outcome {
+        val yearsFromEpoch = ProperMotion.yearsSince(reader.epochYear, epochMs)
         // Which way the middle of the screen is pointing, in the catalogue's own coordinates.
         val centre = centreOverride ?: SkyFrame.centreOf(view, latitudeDeg, longitudeDeg, epochMs)
 

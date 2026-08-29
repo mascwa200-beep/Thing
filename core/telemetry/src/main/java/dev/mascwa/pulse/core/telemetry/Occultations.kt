@@ -206,6 +206,16 @@ object Occultations {
      * planet from the low-precision planetary theory is within 3 arcMINUTES, also measured, across
      * fifty years — a fifth of the Moon's radius, so near the limb a planetary occultation genuinely
      * cannot be called and [Local.grazing] says so.
+     *
+     * ⚠️ **The star figure covers the PRECESSION ROTATION ONLY, and it is a budget the caller has
+     * to keep rather than one this constant can enforce.** It was measured against DE421 for a
+     * fixed catalogue position, so the star's own proper motion is a separate error stacked on top
+     * — and over the 26.7 years since J2000 that is **6.6 arcseconds for Regulus and 5.3 for
+     * Aldebaran**, three times this whole budget, on two of the five names above. A [Target]
+     * position function that hands back a catalogue position without carrying it forward by
+     * [ProperMotion] is therefore claiming an accuracy it does not have, and the failure is silent:
+     * every event still looks perfectly reasonable and a graze near the limb is called the wrong
+     * way. `OrbitalViewModel` carries it; anything else building targets from a catalogue must too.
      */
     const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
     const val PLANET_UNCERTAINTY_DEG = 3.0 / 60.0

@@ -42,7 +42,7 @@ class OccultationTargetsTest {
             .filterNot { it.startsWith("#") || it.isBlank() }
             .map { line ->
                 val f = line.split('\t')
-                assertEquals("wrong column count in: $line", 7, f.size)
+                assertEquals("wrong column count in: $line", 9, f.size)
                 Row(f[0].toDouble(), f[1].toDouble(), f[2].toDouble(), f[4], f[5], f[6])
             }
     }

@@ -16,11 +16,19 @@ import kotlinx.coroutines.withContext
  *
  * ## What it does not carry, said once
  *
- * ⚠️ **Positions are J2000 and are used as if they were of-date.** Precession moves a star by about
- * 50 arcseconds a year, so by 2050 the whole sky will have drifted roughly two fifths of a degree
- * from these coordinates — which is a fifth of the Moon's width, smaller than the dot a star is
- * drawn as, and far smaller than how well anybody can point a phone. Proper motion is smaller still
- * for all but a handful. Correcting for either would be arithmetic nobody could see.
+ * ⚠️ **Positions are J2000, and both things that move them are now corrected — this note used to
+ * say neither was, and that reasoning went stale the day the map's field floor dropped to a quarter
+ * of a degree.** It argued that precession's 22 arcminutes was "smaller than the dot a star is
+ * drawn as", which was true at the old four-degree floor and is 1,573 pixels at the new one.
+ * Precession is handled once for the whole sky by `SkyFrame`, which builds its basis in J2000;
+ * proper motion is per-star and is carried from these columns by `ProperMotion` wherever the layer
+ * is filled.
+ *
+ * ⚠️ **The proper-motion columns were added for a measured reason.** The map draws this catalogue
+ * AND a deep Gaia one whole, overlapping — and 12,602 Gaia records fall inside this catalogue's own
+ * magnitude limit, so they are the same stars drawn twice. Carrying only Gaia's copy forward would
+ * put 1,339 of those pairs more than four pixels apart at the narrowest field, the worst by 226.
+ * Two dots where there is one star. Both sets carry proper motion or neither does.
  *
  * ⚠️ **A star that genuinely varies is plotted at the catalogue's magnitude, which may be its
  * maximum.** Across the whole naked-eye sky that matters for one entry — the recurrent nova T
@@ -46,6 +54,16 @@ class StarCatalog(private val context: Context) {
         val bayer: String,
         val flamsteed: String,
         val constellation: String,
+        /**
+         * The PROJECTED right-ascension motion, `cos(dec) * d(ra)/dt`, in milliarcseconds a year.
+         *
+         * ⚠️ Projected, as the catalogue's own ReadMe states it, and in the same unit the deep Gaia
+         * set uses — so `ProperMotion.carry` serves both without a conversion that could be
+         * forgotten at one of the two call sites. Zero for the four entries with none recorded, and
+         * zero is also what an older asset with only seven columns yields.
+         */
+        val pmRaMasPerYear: Double = 0.0,
+        val pmDecMasPerYear: Double = 0.0,
     ) {
         /** "Sirius", "α Canis Majoris", "61 Cygni", or null for a star with no designation. */
         val name: String? get() = StarNames.label(bayer, flamsteed, constellation)
@@ -95,12 +113,36 @@ class StarCatalog(private val context: Context) {
                 val ra = f[0].toDoubleOrNull() ?: return@mapNotNull null
                 val dec = f[1].toDoubleOrNull() ?: return@mapNotNull null
                 val mag = f[2].toDoubleOrNull() ?: return@mapNotNull null
-                Star(ra, dec, mag, f[3].toDoubleOrNull(), f[4], f[5], f[6])
+                Star(
+                    ra, dec, mag, f[3].toDoubleOrNull(), f[4], f[5], f[6],
+                    // ⚠️ `getOrNull`, so an asset written before these columns existed still parses
+                    // into a catalogue that simply does not move. The guard above still admits a
+                    // seven-column row; silently refusing every star would be a blank sky.
+                    f.getOrNull(7)?.toDoubleOrNull() ?: 0.0,
+                    f.getOrNull(8)?.toDoubleOrNull() ?: 0.0,
+                )
             }.toList()
         }
     }.getOrDefault(emptyList())
 
-    private companion object {
+    internal companion object {
         const val ASSET = "sky/stars.tsv"
+
+        /**
+         * The epoch these positions are referred to, as a Julian year.
+         *
+         * ⚠️ **Here rather than on either of the two view models that carry proper motion from it.**
+         * The epoch is a property of the file, not of a screen, and there are now two readers — the
+         * map's star layer and the occultation search — so a constant on one of them would be a
+         * second statement of the same fact, free to drift the day the asset is rebuilt against a
+         * different catalogue.
+         *
+         * ⚠️ A constant at all, rather than a column, because the whole file is one epoch. The deep
+         * Gaia catalogue is the other way round: it states its epoch in its own header and
+         * `StarCatalogReader` reads it, because that builder can be pointed at a different data
+         * release. This asset's second header line says J2000 and
+         * `tools/sky/build_star_catalog.py` is what put it there.
+         */
+        const val EPOCH_YEAR = 2000.0
     }
 }

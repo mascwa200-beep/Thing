@@ -129,6 +129,16 @@ object Ephemeris {
     /** Julian centuries since J2000.0. */
     private fun centuries(jd: Double): Double = (jd - J2000) / 36525.0
 
+    /**
+     * The Julian year an instant falls in — exactly 2000.0 at J2000.0.
+     *
+     * ⚠️ **This is what a catalogue epoch means, and it is not a calendar year.** J2000.0 and Gaia's
+     * J2016.0 are defined on the 365.25-day Julian year, so counting calendar years to work out how
+     * far to carry a star by its proper motion would drift by a day every four. [ProperMotion] is
+     * the caller, and this is the one place the conversion lives.
+     */
+    fun julianYear(epochMs: Long): Double = 2000.0 + (julianDate(epochMs) - J2000) / 365.25
+
     /** Greenwich mean sidereal time in degrees. */
     fun gmstDeg(jd: Double): Double {
         val t = centuries(jd)

@@ -2,8 +2,6 @@ package dev.mascwa.pulse.core.telemetry
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.abs
-import kotlin.math.cos
 
 /**
  * Reading the packed catalogue: which stars are in these tiles, down to this magnitude.
@@ -101,6 +99,9 @@ class StarCatalogReader private constructor(
         val cut = StarCatalogFormat.encodeMagnitude(magnitudeLimit)
         val recordsAt = StarCatalogFormat.recordsOffset(tileCount)
         var added = 0
+        // One scratch pair for the whole read rather than one per star: this loop runs over tens of
+        // thousands of records and an allocation inside it would dwarf the arithmetic.
+        val moved = DoubleArray(2)
 
         for (tile in tiles) {
             if (tile < 0 || tile >= tileCount) continue
@@ -118,17 +119,21 @@ class StarCatalogReader private constructor(
                 var ra = StarCatalogFormat.decodeRa(buffer.getShort(at).toInt() and 0xFFFF, bounds)
                 var dec = StarCatalogFormat.decodeDec(buffer.getShort(at + 2).toInt() and 0xFFFF, bounds)
                 if (yearsFromEpoch != 0.0) {
-                    val pmRa = StarCatalogFormat.decodeProperMotion(buffer.get(at + 6).toInt())
-                    val pmDec = StarCatalogFormat.decodeProperMotion(buffer.get(at + 7).toInt())
-                    // ⚠️ Gaia's `pmra` is mu-alpha-STAR — it already carries the cos(dec) factor, so
-                    // recovering a change in right ascension means dividing it back out. Forgetting
-                    // that is invisible at the equator and grows without limit toward the poles,
-                    // which is exactly where it would be hardest to notice.
-                    val shrink = cos(Math.toRadians(dec)).let { if (abs(it) < 1e-6) 1e-6 else it }
-                    ra += pmRa * yearsFromEpoch / (MAS_PER_DEGREE * shrink)
-                    dec += pmDec * yearsFromEpoch / MAS_PER_DEGREE
-                    dec = dec.coerceIn(-90.0, 90.0)
-                    ra = ((ra % 360.0) + 360.0) % 360.0
+                    // ⚠️ Through [ProperMotion] rather than written out here, because the map draws
+                    // TWO catalogues from two epochs and the same arithmetic has to run over both.
+                    // Its own note records why applying it to one and not the other would split
+                    // 1,339 naked-eye stars into two dots, and where the projected-motion
+                    // convention comes from in each source.
+                    ProperMotion.carry(
+                        ra,
+                        dec,
+                        StarCatalogFormat.decodeProperMotion(buffer.get(at + 6).toInt()),
+                        StarCatalogFormat.decodeProperMotion(buffer.get(at + 7).toInt()),
+                        yearsFromEpoch,
+                        moved,
+                    )
+                    ra = moved[0]
+                    dec = moved[1]
                 }
                 val slot = sink.count + added
                 sink.rightAscensionDeg[slot] = ra
@@ -172,7 +177,6 @@ class StarCatalogReader private constructor(
     }
 
     companion object {
-        private const val MAS_PER_DEGREE = 3_600_000.0
 
         /**
          * Open a catalogue, or say why not.

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
+import dev.mascwa.pulse.core.telemetry.ProperMotion
 import dev.mascwa.pulse.core.telemetry.MilkyWay
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
@@ -294,12 +295,23 @@ class SkyMapViewModel(
         val rows = catalog.all()
         _catalogueMissing.value = rows.isEmpty()
         if (rows.isEmpty()) return
+        // ⚠️ **Carried forward from J2000 by each star's own motion, and the deep catalogue is
+        // carried from J2016 by `StarField`.** Both or neither: 12,602 Gaia records fall inside
+        // this catalogue's magnitude limit, so they are the same stars drawn twice, and moving one
+        // copy alone would put 1,339 of those pairs more than four pixels apart at the narrowest
+        // field — the worst by 226. Measured over the real bundle, not estimated.
+        val years = ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, System.currentTimeMillis())
         withContext(Dispatchers.Default) {
             brightStars.clear()
             brightStars.ensure(rows.size)
+            val moved = DoubleArray(2)
             rows.forEach { s ->
+                ProperMotion.carry(
+                    s.rightAscensionDeg, s.declinationDeg,
+                    s.pmRaMasPerYear, s.pmDecMasPerYear, years, moved,
+                )
                 brightStars.add(
-                    s.rightAscensionDeg, s.declinationDeg, s.magnitude.toFloat(),
+                    moved[0], moved[1], s.magnitude.toFloat(),
                     // ⚠️ B−V, because that is what THIS catalogue measured. The deep one measured
                     // Gaia's bp_rp, and the two scales do not share a zero point — see
                     // StarNames.colourArgbFromBpRp. Each source keeps its own measurement.

@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.Astrology
 import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Comets
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.ProperMotion
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.telemetry.Occultations
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
@@ -17,6 +18,7 @@ import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
+import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +42,7 @@ class OrbitalViewModel(
     private val locationProvider: LocationProvider,
     private val tleRepository: TleRepository,
     private val launchRepository: LaunchRepository,
-    private val starCatalog: dev.mascwa.pulse.data.sky.StarCatalog,
+    private val starCatalog: StarCatalog,
     private val cometRepository: dev.mascwa.pulse.data.orbital.CometRepository,
 ) : ViewModel() {
 
@@ -344,16 +346,37 @@ class OrbitalViewModel(
         _occultations.value = withContext(Dispatchers.Default) {
             runCatching {
                 val targets = ArrayList<Occultations.Target>()
+                // ⚠️ One scratch pair per target rather than one shared by all of them: each lambda
+                // below is called repeatedly by the search, so a single array would be written by
+                // whichever target ran last. Allocated inside the loop for that reason.
 
                 for (name in OCCULTABLE_STARS) {
                     val s = stars.firstOrNull { it.name == name } ?: continue
+                    val here = DoubleArray(2)
                     targets += Occultations.Target(
                         name = name,
                         kind = Occultations.Kind.STAR,
                         magnitude = s.magnitude,
                         positionUncertaintyDeg = STAR_UNCERTAINTY_DEG,
                     ) { ms ->
-                        Ephemeris.precessFromJ2000(s.rightAscensionDeg, s.declinationDeg, ms)
+                        // ⚠️ **Its own motion FIRST, then precession — and without the first the
+                        // answer breaks this search's own stated budget.** `STAR_UNCERTAINTY_DEG`
+                        // is two arcseconds, measured for the precession rotation against DE421 at
+                        // a fixed J2000 position; the star's own motion is a separate error on top,
+                        // and over the 26.7 years since J2000 it is **6.6 arcseconds for Regulus
+                        // and 5.3 for Aldebaran** — three times the budget, on two of the five
+                        // targets. Measured from the catalogue's own columns.
+                        //
+                        // The order is not interchangeable: proper motion is stated in the
+                        // catalogue's own J2000 frame, so it has to be applied there, and
+                        // `precessFromJ2000` takes a J2000 position by contract.
+                        ProperMotion.carry(
+                            s.rightAscensionDeg, s.declinationDeg,
+                            s.pmRaMasPerYear, s.pmDecMasPerYear,
+                            ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, ms),
+                            here,
+                        )
+                        Ephemeris.precessFromJ2000(here[0], here[1], ms)
                     }
                 }
 

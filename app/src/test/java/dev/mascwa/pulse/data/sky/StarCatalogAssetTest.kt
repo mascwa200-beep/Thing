@@ -6,6 +6,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * The bundled star catalogue, checked against itself and against the tables that name it.
@@ -28,6 +30,8 @@ class StarCatalogAssetTest {
         val bayer: String,
         val flamsteed: String,
         val constellation: String,
+        val pmRaMas: Double,
+        val pmDecMas: Double,
     )
 
     private fun load(): List<Star> {
@@ -36,8 +40,11 @@ class StarCatalogAssetTest {
             .filterNot { it.startsWith("#") || it.isBlank() }
             .map { line ->
                 val f = line.split('\t')
-                assertEquals("wrong column count in: $line", 7, f.size)
-                Star(f[0].toDouble(), f[1].toDouble(), f[2].toDouble(), f[3], f[4], f[5], f[6])
+                assertEquals("wrong column count in: $line", 9, f.size)
+                Star(
+                    f[0].toDouble(), f[1].toDouble(), f[2].toDouble(), f[3], f[4], f[5], f[6],
+                    f[7].toDouble(), f[8].toDouble(),
+                )
             }
     }
 
@@ -49,10 +56,14 @@ class StarCatalogAssetTest {
         // Bayer letter and no Flamsteed number, so their rows genuinely end in empty fields — get
         // this wrong and every row past the bright ones loses its constellation.
         assertEquals(listOf("a", "b", "", ""), "a\tb\t\t".split('\t'))
-        // ⚠️ And 5,325 of the 8,404 rows really do end in three empty fields, because the Bright
-        // Star Catalogue leaves the whole designation blank for a star with neither a Bayer letter
-        // nor a Flamsteed number — the constellation lives in the same field and goes with it. That
-        // is the catalogue, not a parse fault: it names 3,157 of its 9,110 records and no more.
+        // ⚠️ **That hazard is now LATENT rather than live, and this note used to say otherwise.**
+        // 5,325 of the 8,404 rows carry three empty fields in a row, because the Bright Star
+        // Catalogue leaves the whole designation blank for a star with neither a Bayer letter nor a
+        // Flamsteed number and the constellation lives in the same field. Until the proper-motion
+        // columns were appended those empties were TRAILING, which is the case a Java-idiom split
+        // silently drops; now two numeric columns follow them and interior empties are kept by any
+        // split at all. Kept because the ordering could be changed back, and because the assertion
+        // above is about Kotlin rather than about this file.
         val stars = load()
         val anonymous = stars.count { it.bayer.isBlank() && it.flamsteed.isBlank() }
         assertTrue("expected most of the catalogue to be unnamed, got $anonymous", anonymous > stars.size / 2)
@@ -181,5 +192,47 @@ class StarCatalogAssetTest {
             "only $withColour of ${stars.size} have a B-V colour",
             withColour > stars.size * 9 / 10,
         )
+    }
+
+    @Test
+    fun `proper motion is present for practically the whole catalogue`() {
+        // ⚠️ **Two subsystems now depend on these two columns and neither would report their
+        // absence.** The star layer carries every plotted star forward from J2000 by them, and the
+        // occultation search does the same for its five targets — so a rebuild that dropped them
+        // would leave both quietly running the arithmetic against zeros, which is precisely the
+        // uncorrected behaviour they were added to replace. Nothing throws, nothing logs, and a
+        // chart of an unmoving sky looks exactly like a chart of a moving one.
+        //
+        // Coverage is stated as a measured share rather than a presence check, the same way the
+        // colour test above is, because the source genuinely lacks a few: 8,400 of 8,404 rows carry
+        // a measurement and four do not.
+        val stars = load()
+        val moving = stars.count { it.pmRaMas != 0.0 || it.pmDecMas != 0.0 }
+        assertTrue(
+            "only $moving of ${stars.size} rows carry a proper motion",
+            moving > stars.size * 99 / 100,
+        )
+    }
+
+    @Test
+    fun `the proper motion columns are the projected ones and are in milliarcseconds`() {
+        // ⚠️ The unit is invisible to a column count and a factor of a thousand wrong is the easy
+        // mistake — the source states these in arcseconds per year and the builder multiplies. So
+        // the guard is the SCALE of the numbers, and the bounds below are measured off this very
+        // asset rather than recalled: the largest single component is 5,813 mas/yr and the median
+        // total is 38.2. Arcseconds per year would make those 5.8 and 0.038; anything reading a
+        // different column entirely would miss the window in the other direction.
+        val stars = load()
+        val fastest = stars.maxOf { maxOf(abs(it.pmRaMas), abs(it.pmDecMas)) }
+        assertTrue(
+            "the fastest component is $fastest — not milliarcseconds a year for a naked-eye star",
+            fastest in 1_000.0..20_000.0,
+        )
+
+        // ⚠️ And the great majority barely move at all, because a bright star is usually a distant
+        // giant. Scaling the whole column would still pass the check above on its single fastest
+        // row, so the middle of the distribution is checked as well as the end of it.
+        val median = stars.map { hypot(it.pmRaMas, it.pmDecMas) }.sorted()[stars.size / 2]
+        assertTrue("the median star moves $median mas/yr", median in 5.0..200.0)
     }
 }

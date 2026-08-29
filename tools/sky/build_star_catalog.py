@@ -82,8 +82,26 @@ def parse(path):
             if bayer and sup:
                 bayer += SUPER.get(sup, sup)
             bv = line[109:114].strip()
-            out.append((ra, dec, mag, bv, bayer, flam, con))
+            # ⚠️ Bytes 149-160, arcsec/yr, converted to MILLIarcsec/yr — the unit the deep Gaia
+            # catalogue is stored in, so the app has one unit for proper motion rather than two.
+            # The ReadMe's own note settles the convention: "the proper motion in RA is the
+            # projected motion (cos(DE).d(RA)/dt)", which is Gaia's mu-alpha-star. Getting that
+            # wrong is invisible at the equator and grows without limit toward the poles.
+            pm_ra = _mas(line[148:154])
+            pm_dec = _mas(line[154:160])
+            out.append((ra, dec, mag, bv, bayer, flam, con, pm_ra, pm_dec))
     return out
+
+
+def _mas(field):
+    """Arcsec/yr as written, in mas/yr; 0 where the catalogue records none."""
+    t = field.strip()
+    if not t:
+        return 0.0
+    try:
+        return float(t) * 1000.0
+    except ValueError:
+        return 0.0
 
 
 def main():
@@ -92,24 +110,38 @@ def main():
         return 1
     stars = parse(sys.argv[1])
     stars.sort(key=lambda s: s[2])          # brightest first, so a truncated read is still useful
-    lines = ["# ra\tdec\tmag\tbv\tbayer\tflamsteed\tconstellation",
-             "# Bright Star Catalogue V/50 (Hoffleit & Warren 1991), CDS Strasbourg. J2000."]
-    for ra, dec, mag, bv, bayer, flam, con in stars:
-        lines.append(f"{ra:.4f}\t{dec:.4f}\t{mag:.2f}\t{bv}\t{bayer}\t{flam}\t{con}")
+    lines = ["# ra\tdec\tmag\tbv\tbayer\tflamsteed\tconstellation\tpmra_mas\tpmdec_mas",
+             "# Bright Star Catalogue V/50 (Hoffleit & Warren 1991), CDS Strasbourg. J2000.",
+             "# pmra_mas is the PROJECTED motion cos(dec).d(ra)/dt, as the catalogue states it."]
+    for ra, dec, mag, bv, bayer, flam, con, pm_ra, pm_dec in stars:
+        lines.append(
+            f"{ra:.4f}\t{dec:.4f}\t{mag:.2f}\t{bv}\t{bayer}\t{flam}\t{con}"
+            f"\t{pm_ra:.1f}\t{pm_dec:.1f}"
+        )
     body = "\n".join(lines) + "\n"
     with open(sys.argv[2], "w", encoding="utf-8") as fh:
         fh.write(body)
 
     # Prove the chain rather than assume it: Sirius is HR 2491, alpha Canis Majoris, V = -1.46, and
     # sits at 06h45m09s -16d42m58s in J2000. If an offset were out by one this would not match.
-    ra, dec, mag, bv, bayer, flam, con = stars[0]
+    ra, dec, mag, bv, bayer, flam, con, pm_ra, pm_dec = stars[0]
     assert abs(ra - 101.2871) < 0.001, ra
     assert abs(dec - (-16.7161)) < 0.001, dec
     assert abs(mag - (-1.46)) < 0.001, mag
     assert bayer == "α" and con == "CMa", (bayer, con)
+    # ⚠️ And its proper motion, which is among the fastest of any bright star and therefore the one
+    # entry where a wrong offset would be obvious. The record reads "-0.553-1.205" with the parallax
+    # "+.375" immediately after, so the two fields are cleanly bounded and these are the catalogue's
+    # OWN numbers rather than the modern ones. My first version of this assertion said -546/-1223,
+    # which are the HIPPARCOS values, and it was wrong here: the BSC is FK5 from 1991 and differs by
+    # about 7 and 18 mas/yr. Over the 26 years the app carries them that is a fifth and a half of an
+    # arcsecond -- immaterial to a chart, and material to an assertion written from memory.
+    assert abs(pm_ra - (-553.0)) < 1.0, pm_ra
+    assert abs(pm_dec - (-1205.0)) < 1.0, pm_dec
+    moving = sum(1 for s in stars if s[7] or s[8])
     named = sum(1 for s in stars if s[4] or s[5])
     print(f"{len(stars)} stars to magnitude {MAG_LIMIT}, {named} with a designation, "
-          f"{len(body) / 1024:.1f} kB")
+          f"{moving} with a measured proper motion, {len(body) / 1024:.1f} kB")
     print(f"brightest: {bayer} {con} at V={mag}")
     return 0
 
