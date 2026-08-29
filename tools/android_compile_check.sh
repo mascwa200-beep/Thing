@@ -165,7 +165,16 @@ for coord in "${libs[@]:-}"; do
       break
     fi
   done
-  case "$extra" in *"$art-$ver"*) ;; *) echo "could not resolve $coord"; exit 1 ;; esac
+  # ⚠️ NOTHING IS COMPILED past this point, so the message has to look like a failure. It exits 1,
+  # which is correct — but a caller that pipes this into `grep 'error:'` sees silence and reads it
+  # as a clean pass, because the compiler never ran to emit an error line. That happened once with a
+  # coordinate that does not exist (lifecycle-viewmodel-savedstate has no -android variant) and the
+  # run was reported as "0 errors" across five modules. Same family as the coroutines check below:
+  # a silent false pass is worse than no check at all, so say so unmistakably.
+  case "$extra" in *"$art-$ver"*) ;; *)
+    echo "COMPILE CHECK ABORTED — could not resolve $coord (nothing was compiled; this is NOT a pass)"
+    exit 1 ;;
+  esac
 done
 
 # ⚠️ The compiler's own -cp needs kotlin-stdlib + trove4j + annotations + kotlinx-coroutines. Omit

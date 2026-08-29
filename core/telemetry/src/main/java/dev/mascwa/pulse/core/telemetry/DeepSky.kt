@@ -446,10 +446,21 @@ object DeepSky {
      * be a marker, and a shape is for the few hundred that are genuinely large at the field being
      * drawn. Below [SHAPE_MIN_PX] an ellipse is a smudge that reads as a rendering fault.
      */
-    fun drawsShape(semiMajorUnits: Double, halfPx: Double): Boolean =
-        semiMajorUnits * halfPx >= SHAPE_MIN_PX / 2.0
+    fun drawsShape(
+        semiMajorUnits: Double,
+        halfPx: Double,
+        shapeMinPx: Double = SHAPE_MIN_PX,
+    ): Boolean = semiMajorUnits * halfPx >= shapeMinPx / 2.0
 
-    /** The smallest long axis, in pixels, that is drawn as a shape rather than as a marker. */
+    /**
+     * The smallest long axis, in pixels, that is drawn as a shape rather than as a marker.
+     *
+     * ⚠️ A DEFAULT rather than the only value, because a weak handset can afford fewer procedural
+     * shapes and the marker is what it falls back to — a path that already runs for the great
+     * majority of this catalogue at every zoom, so raising the bar asks for nothing new. See
+     * [dev.mascwa.pulse.core.telemetry.SkyBudget]. This one is safe to default: forgetting to pass a
+     * budget leaves the shipped behaviour rather than turning something off.
+     */
     const val SHAPE_MIN_PX = 7.0
 
     /**

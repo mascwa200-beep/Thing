@@ -225,7 +225,9 @@ fun SkyChart(
         // galaxy and every constellation line on this map is in front of it — and so is the chrome.
         // Drawn last it would be a haze OVER the sky instead of the sky's own background.
         if (frame != null) {
-            vm.milkyWay?.let { drawMilkyWay(it, frame, view, milkyWay, colors.starlight) }
+            vm.milkyWay?.let {
+                drawMilkyWay(it, frame, view, milkyWay, colors.starlight, vm.budget.milkyWaySamples)
+            }
         }
 
         drawHorizon(view, colors, half, cx, cy, viewport, cardinalPaint)
@@ -294,7 +296,7 @@ fun SkyChart(
                 deepSkyPaint.textSize = 9f * density
                 drawDeepSky(
                     deepSkyLayer, frame, viewport, DeepSky.magnitudeLimit(view.fovDeg),
-                    view.fovDeg, half, cx, cy, colors.deepSky,
+                    view.fovDeg, half, cx, cy, colors.deepSky, vm.budget.deepSkyShapePx,
                 ) { lx, ly, name ->
                     drawContext.canvas.nativeCanvas.drawText(
                         name, lx + 5f * density, ly + 3f * density, deepSkyPaint,

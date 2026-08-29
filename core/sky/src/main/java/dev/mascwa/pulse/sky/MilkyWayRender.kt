@@ -39,12 +39,19 @@ fun DrawScope.drawMilkyWay(
     view: SkyProjection.View,
     glow: MilkyWayGlow,
     tint: Color,
+    /**
+     * The most samples this device may take across the narrow axis, from
+     * [dev.mascwa.pulse.core.telemetry.SkyBudget]. Defaulted to the full-strength cap so nothing
+     * changes for a caller that does not care; the glow's own floor still wins, because below it the
+     * bilinear upscale creases and the cheaper setting would be the worse picture.
+     */
+    maxSamples: Int = MilkyWayGlow.MAX_SAMPLES,
 ) {
     if (size.width <= 0f || size.height <= 0f) return
     val minor = minOf(size.width, size.height)
     if (minor <= 0f) return
 
-    val across = MilkyWayGlow.samplesAcross(view.fovDeg)
+    val across = MilkyWayGlow.samplesAcross(view.fovDeg, maxSamples)
     // The bitmap is sampled in screen units, where the NARROW axis spans -1..+1 — the same
     // normalisation `SkyProjection.viewportOf` uses, so a pixel here lands where a star would.
     val halfW = size.width / minor

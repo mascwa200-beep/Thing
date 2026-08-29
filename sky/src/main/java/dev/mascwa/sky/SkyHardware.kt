@@ -82,11 +82,13 @@ class SkyHardware(private val context: Context) : SkyDeps, SensorEventListener {
         return SkySite(best.latitude, best.longitude)
     }
 
-    override fun startAttitude() {
+    override fun startAttitude(samplingPeriodUs: Int) {
         val sensor = rotation ?: return
-        // GAME rather than UI: the map follows the handset continuously, so a slower rate reads as
-        // the picture lagging the hand rather than as smoothness.
-        sensors?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+        // ⚠️ The period comes from the device budget rather than being fixed at SENSOR_DELAY_GAME,
+        // which is what it always was. On a phone with room that is still 20,000 us — the same
+        // number, by construction — and on a weak one it is longer, because asking for fifty frames
+        // a second from something that can draw fifteen spends battery producing frames nobody sees.
+        sensors?.registerListener(this, sensor, samplingPeriodUs)
     }
 
     override fun stopAttitude() {

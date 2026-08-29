@@ -105,10 +105,19 @@ class CompassController(
         _reading.value = _reading.value.copy(declination = geo.declination)
     }
 
-    fun start() {
+    /**
+     * @param samplingPeriodUs how often to ask for a reading, in microseconds.
+     *
+     * ⚠️ **Defaulted to `SENSOR_DELAY_GAME`, which is what every caller had and three of the four
+     * still want.** A compass rose, the HUD and the navigation screen all want a heading that keeps
+     * up with the hand and none of them redraws a planetarium to do it; only the star map has a
+     * budget to spend, so only the star map passes anything. `SensorManager` maps 0..3 to its named
+     * rates and passes anything larger through as microseconds, so a budget's value works here
+     * unchanged.
+     */
+    fun start(samplingPeriodUs: Int = SensorManager.SENSOR_DELAY_GAME) {
         val sensor = rotationSensor ?: return
-        // GAME rate gives smoother, more responsive heading updates than UI.
-        sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+        sensorManager?.registerListener(this, sensor, samplingPeriodUs)
     }
 
     fun stop() {

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.data.sky.ConstellationCatalog
@@ -13,6 +14,7 @@ import dev.mascwa.pulse.data.sky.MilkyWayCatalog
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.update.SelfUpdate
 import dev.mascwa.pulse.data.update.UpdateRepository
+import dev.mascwa.pulse.device.DeviceProbeReader
 import dev.mascwa.pulse.feature.sky.SkyMapViewModel
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -66,6 +68,16 @@ class SkyContainer(context: Context) {
 
     /** The token, the one-at-a-time install guard, and whether faults are sent on. */
     val settings by lazy { SkySettings(appContext) }
+
+    /**
+     * How much machine this is.
+     *
+     * ⚠️ Already a dependency of this module through `:core:update`, so this costs no new artifact —
+     * and it was the thing the potato pass left wired to nothing here. Lazy, because probing makes
+     * five binder calls and a content-provider query and nothing needs the answer until the map is
+     * built.
+     */
+    val deviceProbe by lazy { DeviceProbeReader(appContext) }
 
     /**
      * This application keeping itself current.
@@ -148,7 +160,7 @@ class SkyContainer(context: Context) {
 
     /**
      * ⚠️ A factory rather than `viewModels()` with a no-argument constructor, because
-     * [SkyMapViewModel] takes seven dependencies and there is nowhere else to hand them to it. The
+     * [SkyMapViewModel] takes eight dependencies and there is nowhere else to hand them to it. The
      * `@Suppress` is the standard shape for this API: the cast is checked one line above it.
      */
     val viewModelFactory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -165,6 +177,12 @@ class SkyContainer(context: Context) {
                 milkyWayCatalog,
                 hardware,
                 settings,
+                // ⚠️ Measured once, when the view model is built, rather than per frame: probing
+                // makes five binder calls and a content-provider query, and the answer to "how much
+                // machine is this" does not change while somebody looks at the sky. `durableBudget`
+                // is DeviceClass's own name for exactly this distinction and the tier comes from
+                // the same reader.
+                SkyBudget.forTier(deviceProbe.tier()),
             ) as T
         }
     }

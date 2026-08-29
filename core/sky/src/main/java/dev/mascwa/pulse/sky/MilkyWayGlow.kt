@@ -120,9 +120,13 @@ class MilkyWayGlow {
          * on a build machine and a few milliseconds on a weak phone, for a layer drawn under
          * everything else.
          */
-        fun samplesAcross(fovDeg: Double): Int {
+        fun samplesAcross(fovDeg: Double, cap: Int = MAX_SAMPLES): Int {
+            // ⚠️ The floor wins over the cap. A budget below MIN_SAMPLES would buy speed by making
+            // the picture worse rather than smaller — the upscale creases — so the two are applied
+            // in this order deliberately.
+            val ceiling = cap.coerceIn(MIN_SAMPLES, MAX_SAMPLES)
             if (!fovDeg.isFinite()) return MIN_SAMPLES
-            return Math.round(fovDeg).toInt().coerceIn(MIN_SAMPLES, MAX_SAMPLES)
+            return Math.round(fovDeg).toInt().coerceIn(MIN_SAMPLES, ceiling)
         }
 
         /** Below this the bilinear upscale itself can crease on a strong gradient. */

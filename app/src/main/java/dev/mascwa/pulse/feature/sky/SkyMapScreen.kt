@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
@@ -188,6 +189,9 @@ private fun Controls(
             val signed = if (trim > 180.0) trim - 360.0 else trim
             Text("Nudged ${"%.1f".format(signed)}° off the compass", c.ink2, JetBrainsMono, 10)
         }
+        // ⚠️ What this phone is doing differently, or nothing at all on a device with room — see
+        // the standalone star app for the same line and the same reason.
+        SkyBudget.describe(vm.budget)?.let { Text(it, c.ink2, JetBrainsMono, 10) }
         // ⚠️ **This screen never said this at all, and the standalone star app has since it was
         // written.** A handset with no rotation-vector sensor could press FOLLOW here, get a chip
         // reading FOLLOWING over a listener that can never fire, and — because dragging is declined

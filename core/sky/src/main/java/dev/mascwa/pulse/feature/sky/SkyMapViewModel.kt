@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
 import dev.mascwa.pulse.core.telemetry.ProperMotion
 import dev.mascwa.pulse.core.telemetry.MilkyWay
+import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
@@ -80,6 +81,24 @@ class SkyMapViewModel(
      * an interface rather than a defaulted lambda.
      */
     private val preferences: SkyPreferences,
+    /**
+     * What this handset can afford — see [SkyBudget].
+     *
+     * ⚠️ **Required rather than defaulted to full strength.** A default would compile everywhere,
+     * read as wired, and quietly leave every weak phone on the flagship settings — the "default that
+     * means do not do the thing" this repository has now shipped twice. Making it required means
+     * forgetting is a compile error.
+     *
+     * ⚠️ **Passed in rather than probed here**, because measuring a handset is a platform act and
+     * this module has no `Context`. Each application reads its own `DeviceProbeReader` and hands the
+     * answer over, the same shape as [device] and [preferences].
+     *
+     * ⚠️ Fixed for the life of the view model, which is deliberate: the sensor rate is chosen when
+     * following starts, and re-registering the listener because the phone warmed up for a minute
+     * would be a visible jerk bought with very little. The pressure levers that DO want to move
+     * live in `DeviceClass.Budget` and are read where they belong.
+     */
+    val budget: SkyBudget.Budget,
 ) : ViewModel() {
 
     /**
@@ -575,7 +594,7 @@ class SkyMapViewModel(
     fun clearTrim() { _trimDeg.value = 0.0 }
 
     private fun startPointing() {
-        device.startAttitude()
+        device.startAttitude(budget.sensorPeriodUs)
         _site.value?.let { device.declinationAt(it.latitude, it.longitude, 0.0) }
         pointingJob = viewModelScope.launch {
             var first = true
@@ -600,7 +619,7 @@ class SkyMapViewModel(
                 // reads as the sensor being wrong rather than as the picture arriving.
                 SkyPointing.smooth(
                     pointForward, pointUp, a,
-                    if (first) 1.0 else POINT_SMOOTHING,
+                    if (first) 1.0 else budget.pointSmoothing,
                     pointForward, pointUp,
                 )
                 first = false
@@ -926,15 +945,11 @@ class SkyMapViewModel(
          */
         const val TAP_RADIUS_FRACTION = 0.06
 
-        /**
-         * How much of each sensor sample to take when following the handset.
-         *
-         * ⚠️ Stiffer than `CompassController`'s own 0.2, and it has to be: the sensor arrives
-         * unfiltered here (see [CompassController]'s note on why a planetarium must take it that
-         * way), so this is the ONLY smoothing in the path rather than a second helping of it. It
-         * blends the two DIRECTIONS rather than three angles, which is what keeps the picture from
-         * whipping round when the phone is aimed near overhead.
-         */
-        const val POINT_SMOOTHING = 0.25
+        // ⚠️ The smoothing weight moved to [SkyBudget.FULL_SMOOTHING], because it can no longer be
+        // one number: it is a fraction of ONE SAMPLE, so it has to be derived from how often samples
+        // arrive or a slower device lags proportionally further behind the hand. The reasoning for
+        // the reference value — stiffer than `CompassController`'s own 0.2 because the sensor
+        // arrives unfiltered here, and blending the two DIRECTIONS rather than three angles so the
+        // picture does not whip round near the zenith — lives there with it.
     }
 }

@@ -58,6 +58,10 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                         c.newCompassController(cameraUpright = true, smoothed = false),
                     ),
                     dev.mascwa.pulse.feature.sky.SkyPrefs(c.settingsRepository),
+                    // ⚠️ `tier()`, not `budgetCached().` — the sky budget wants how much
+                    // machine this is, which does not change, rather than how warm it is
+                    // right now. See SkyBudget.forTier for why pressure is left out.
+                    dev.mascwa.pulse.core.telemetry.SkyBudget.forTier(c.deviceProbe.tier()),
                 )
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)

@@ -57,8 +57,17 @@ interface SkyDeps {
      */
     val hasAttitudeSensor: Boolean
 
-    /** Begin reporting into [attitude]. A device with no sensor may do nothing at all. */
-    fun startAttitude()
+    /**
+     * Begin reporting into [attitude]. A device with no sensor may do nothing at all.
+     *
+     * @param samplingPeriodUs how often to ask for a reading, in microseconds, from
+     *   [dev.mascwa.pulse.core.telemetry.SkyBudget]. ⚠️ **Chosen by the caller rather than fixed
+     *   here, because it is the map's frame rate while following** — the chart redraws on every
+     *   change of view and this is what changes it — so a phone that cannot draw fifty frames a
+     *   second should not be asked to try. `SensorManager` passes anything above 3 straight through
+     *   as microseconds; the budget's values are all far above that.
+     */
+    fun startAttitude(samplingPeriodUs: Int)
 
     /** Stop reporting. Calling this without a matching [startAttitude] must be harmless. */
     fun stopAttitude()

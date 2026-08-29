@@ -79,6 +79,13 @@ fun DrawScope.drawDeepSky(
     centreX: Float,
     centreY: Float,
     colours: DeepSkyColors,
+    /**
+     * How long an object must appear before it earns a drawn shape rather than the hollow marker,
+     * from [dev.mascwa.pulse.core.telemetry.SkyBudget]. Raising it means fewer procedural ellipses
+     * and stipples on a handset that cannot spare them — and the marker it falls back to is already
+     * the path the great majority of this catalogue takes at every zoom, so nothing new runs.
+     */
+    shapeMinPx: Double = DeepSky.SHAPE_MIN_PX,
     onLabel: (Float, Float, String) -> Unit,
 ): Int {
     val basis = frame.basis
@@ -109,7 +116,7 @@ fun DrawScope.drawDeepSky(
                 major, e.minorAxisArcmin, e.positionAngleDeg, basis,
             )
         }
-        if (shape != null && DeepSky.drawsShape(shape.semiMajorUnits, halfPx.toDouble())) {
+        if (shape != null && DeepSky.drawsShape(shape.semiMajorUnits, halfPx.toDouble(), shapeMinPx)) {
             val alpha = DeepSky.opacity(DeepSky.surfaceBrightness(e)).toFloat() * dim
             drawShape(e, shape, colour, alpha, halfPx, x, y)
         } else {

@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.feature.sky.SkyChart
 import dev.mascwa.pulse.feature.sky.SkyMapViewModel
@@ -264,6 +265,17 @@ private fun Controls(
             val signed = if (trim > 180.0) trim - 360.0 else trim
             Text(
                 "Nudged ${"%.1f".format(signed)}° off the compass",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // ⚠️ What this phone is doing differently, or nothing at all on a device with room. The
+        // tiering is otherwise entirely invisible — a map that quietly draws a softer Milky Way and
+        // follows at fifteen frames a second reads as the app being worse rather than as it being
+        // adapted, which is a bad trade for one line of text.
+        SkyBudget.describe(vm.budget)?.let {
+            Text(
+                it,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

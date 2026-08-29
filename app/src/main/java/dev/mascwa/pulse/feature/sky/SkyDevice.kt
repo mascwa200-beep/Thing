@@ -56,8 +56,8 @@ class SkyDevice(
      */
     override val hasAttitudeSensor: Boolean get() = compass.reading.value.hasSensor
 
-    override fun startAttitude() {
-        compass.start()
+    override fun startAttitude(samplingPeriodUs: Int) {
+        compass.start(samplingPeriodUs)
         // ⚠️ Guarded, so a second `startAttitude` cannot leave two collectors on one flow. They
         // would publish the same values and only one would be cancelled by `stopAttitude`, so the
         // survivor would keep the sensor listener alive behind a control that says it is off.
