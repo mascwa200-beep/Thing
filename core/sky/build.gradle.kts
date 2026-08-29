@@ -77,4 +77,11 @@ dependencies {
     api(libs.androidx.compose.ui.graphics)
     api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
+
+    // ⚠️ **The first test dependency this module has ever declared.** It shipped twenty-six files
+    // with no `src/test` at all, so the nine pure ones — about thirteen hundred lines of layer,
+    // field and batching arithmetic — had no gate of any kind. `android-build.yml`'s test line
+    // gains `:core:sky:testDebugUnitTest` in the same commit, because a test source set CI does not
+    // run is worth exactly nothing.
+    testImplementation(libs.junit)
 }

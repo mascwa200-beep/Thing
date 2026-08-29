@@ -318,7 +318,7 @@ jobs:
           # policy and its crash-report path were gated by nothing. It is an Android library,
           # so `testDebugUnitTest` is the right task name here — see the warning above about
           # getting that wrong quietly.
-          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :core:health:testDebugUnitTest :core:update:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
+          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :core:health:testDebugUnitTest :core:update:testDebugUnitTest :core:sky:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       # ─────────────────────────── the offline food database ───────────────────────────
       # ~4.5M retail barcodes, so a scan works in a supermarket basement with no signal. Built

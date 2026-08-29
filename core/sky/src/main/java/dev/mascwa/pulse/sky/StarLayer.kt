@@ -72,18 +72,34 @@ class StarLayer(initialCapacity: Int = 1024) {
     /**
      * Make room for at least this many stars in total.
      *
-     * ⚠️ Throws the old arrays away rather than copying them, because every caller fills from
-     * scratch after clearing. Copying would be preserving data that is about to be overwritten.
+     * ⚠️ **This used to throw the old arrays away, on the stated grounds that "every caller fills
+     * from scratch after clearing" — and [add] is a caller that does not.** `add` calls this with
+     * `count + 1`, so the moment it crosses the capacity every star already written is replaced by
+     * a zero vector at magnitude zero: the whole bright set collapsed to one point on the celestial
+     * sphere, drawn, with nothing thrown and nothing logged.
+     *
+     * ⚠️ **Not reachable today, and only by three hundred rows.** The one `add` caller pre-sizes
+     * with `ensure(rows.size)` first, so the growth never fires — but `BRIGHT_CAPACITY` is 8,704
+     * against a catalogue of 8,404, and nothing in the build would notice the day that asset gains
+     * three hundred stars. Copying makes `add`'s own contract true instead of leaving it right by
+     * the grace of a caller that need not have been written that way.
+     *
+     * It costs nothing measurable where it matters: both real call sites reach here with [count] at
+     * zero, having just cleared, so the copy is of no elements at all.
+     *
+     * ⚠️ `maxOf(vx.size, 1)` because zero doubles: a layer constructed with no capacity would
+     * otherwise spin here for ever rather than failing. Every construction today passes a positive
+     * constant, so this is a guard against a hang that cannot happen yet.
      */
     fun ensure(capacity: Int) {
         if (capacity <= vx.size) return
-        var size = vx.size
+        var size = maxOf(vx.size, 1)
         while (size < capacity) size *= 2
-        vx = DoubleArray(size)
-        vy = DoubleArray(size)
-        vz = DoubleArray(size)
-        magnitude = FloatArray(size)
-        colourBand = IntArray(size)
+        vx = vx.copyOf(size)
+        vy = vy.copyOf(size)
+        vz = vz.copyOf(size)
+        magnitude = magnitude.copyOf(size)
+        colourBand = colourBand.copyOf(size)
     }
 
     /**
