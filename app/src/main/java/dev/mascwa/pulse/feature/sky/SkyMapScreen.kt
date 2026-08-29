@@ -43,6 +43,7 @@ import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.sky.DeepSkyColors
 import dev.mascwa.pulse.sky.LineBatch
+import dev.mascwa.pulse.sky.MilkyWayGlow
 import dev.mascwa.pulse.sky.SkyFrame
 import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.SkyRenderer
@@ -51,6 +52,7 @@ import dev.mascwa.pulse.sky.collectLines
 import dev.mascwa.pulse.sky.collectStars
 import dev.mascwa.pulse.sky.drawDeepSky
 import dev.mascwa.pulse.sky.drawLineBatch
+import dev.mascwa.pulse.sky.drawMilkyWay
 import dev.mascwa.pulse.sky.drawStarBatches
 import dev.mascwa.pulse.sky.drawStarGlow
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -150,6 +152,10 @@ private fun SkyCanvas(
     // chart tells a nebula's name from a star's, but `labelPaint` is shared with the star labels and
     // the planet labels, and neither of those resets a skew it never set — so borrowing it would
     // silently tilt every name on the map.
+    // ⚠️ Remembered, like the star buckets, because it owns a Bitmap — see MilkyWayGlow. A fresh
+    // one per frame would allocate and free a bitmap sixty times a second.
+    val milkyWay = remember { MilkyWayGlow() }
+
     val deepSkyPaint = remember {
         Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT; textSkewX = -0.22f }
     }
@@ -238,20 +244,30 @@ private fun SkyCanvas(
         // bands. The question a renderer asks is whether a point is on the SURFACE.
         val viewport = SkyProjection.viewportOf(size.width.toDouble(), size.height.toDouble())
 
+        // ⚠️ **Built here rather than inside the block below, so the Milky Way can be drawn under
+        // the horizon line.** Two vectors rebuilt per frame; the stars themselves never move. See
+        // SkyFrame. Hoisting it is what avoids a second `SkyFrame.of` for the glow — the two would
+        // agree today and be free to stop agreeing later.
+        val here = site
+        val frame = if (here != null) SkyFrame.of(view, here.latitude, here.longitude, at) else null
+
+        // ⚠️ **First, before even the horizon.** It is unresolved starlight, so every star, every
+        // galaxy and every constellation line on this map is in front of it — and so is the chrome.
+        // Drawn last it would be a haze OVER the sky instead of the sky's own background.
+        if (frame != null) {
+            vm.milkyWay?.let { drawMilkyWay(it, frame, view, milkyWay, c.ink) }
+        }
+
         drawHorizon(view, c, half, cx, cy, viewport, cardinalPaint)
 
         val limit = SkyProjection.magnitudeLimit(view.fovDeg, deepest)
-        val here = site
-        if (here != null) {
+        if (frame != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
             // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
             // means Compose has no way to know a reload happened. Reading the revision inside the
             // draw lambda makes this draw depend on it, so new stars appear the moment they land
             // rather than on whatever pan happens next.
             deepRevision.value
-
-            // Two vectors rebuilt per frame; the stars themselves never move. See SkyFrame.
-            val frame = SkyFrame.of(view, here.latitude, here.longitude, at)
 
             // ⚠️ Under the stars, on purpose. A constellation line is a note about the stars, so a
             // line drawn over one puts a stroke through the thing it is pointing at.

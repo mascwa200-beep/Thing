@@ -114,6 +114,49 @@ object MilkyWay {
     /** How large a complete raster file is. */
     const val FILE_BYTES = HEADER_BYTES + CELLS
 
+    /**
+     * A decoded raster: the cells, and the density that a stored 255 stands for.
+     *
+     * The two travel together because neither means anything alone — a byte is a fraction of the
+     * peak, so handing the cells to a caller that has to remember to fetch the peak separately is
+     * one forgotten argument away from a sky scaled by 255 instead of 717.
+     */
+    class Raster(val cells: ByteArray, val peak: Double)
+
+    /**
+     * Decode a whole raster file, or refuse it.
+     *
+     * ⚠️ **Every check here guards a failure that is silent rather than loud.** A file read with the
+     * wrong byte order, truncated by a bad copy, or built to a future layout does not throw — it
+     * produces a perfectly plausible sky with the Milky Way in the wrong place, or a uniform haze,
+     * and there is nothing on screen to say which. The magic and the version catch a rebuild; the
+     * dimensions catch a raster built at a different resolution; the length catches truncation; and
+     * a peak that is not a positive finite number catches a header read the wrong way round, which
+     * is the specific mistake made once already while writing the builder for this file.
+     *
+     * ⚠️ **Little-endian**, matching `SkyCatalogFormat` and `tools/sky/build_milkyway.py`, which
+     * packs with `"<"`. Both ends are stated so neither can drift alone.
+     */
+    fun readRaster(bytes: ByteArray): Raster? {
+        if (bytes.size < FILE_BYTES) return null
+        if (u32(bytes, OFF_MAGIC) != MAGIC) return null
+        if (u16(bytes, OFF_VERSION) != FILE_VERSION) return null
+        if (u16(bytes, OFF_COLUMNS) != COLUMNS) return null
+        if (u16(bytes, OFF_ROWS) != ROWS) return null
+        val peak = Float.fromBits(u32(bytes, OFF_PEAK)).toDouble()
+        if (!peak.isFinite() || peak <= 0.0) return null
+        return Raster(bytes.copyOfRange(HEADER_BYTES, HEADER_BYTES + CELLS), peak)
+    }
+
+    private fun u16(b: ByteArray, at: Int): Int =
+        (b[at].toInt() and 0xFF) or ((b[at + 1].toInt() and 0xFF) shl 8)
+
+    private fun u32(b: ByteArray, at: Int): Int =
+        (b[at].toInt() and 0xFF) or
+            ((b[at + 1].toInt() and 0xFF) shl 8) or
+            ((b[at + 2].toInt() and 0xFF) shl 16) or
+            ((b[at + 3].toInt() and 0xFF) shl 24)
+
     // ---- the galactic frame --------------------------------------------------------------------
 
     /**
@@ -149,6 +192,59 @@ object MilkyWay {
     }
 
     /**
+     * The same transform for a direction already held as a unit vector, without allocating.
+     *
+     * ⚠️ **This is not a convenience wrapper — it exists because the glow pass runs it per screen
+     * pixel.** [galacticOf] takes angles, so a caller holding a vector would pay `atan2` and `asin`
+     * to make them and then five more trigonometric calls to undo that inside; and it allocates a
+     * [Galactic] each time. Written out as three dot products the whole transform is nine
+     * multiplications plus the one `atan2` and one `asin` that an angular answer genuinely requires.
+     *
+     * The three constant vectors are the same rotation [galacticOf] performs, rearranged. Expanding
+     * `cos δ cos(α − α_p)` into `v_x cos α_p + v_y sin α_p` turns each of its three expressions into
+     * a dot product with a fixed direction:
+     *
+     * - `sinB` is the projection onto the **pole** itself, which is the definition of latitude;
+     * - `y` is the projection onto the **node**, the point where the galactic equator crosses the
+     *   celestial one;
+     * - `x` is the projection onto the third axis that completes the frame.
+     *
+     * ⚠️ Computed from [POLE_RA_DEG], [POLE_DEC_DEG] and [NODE_L_DEG] rather than written out as
+     * nine literals. Hand-typed they would be a second definition of the frame, free to drift from
+     * the first without any test noticing — the two would simply disagree about where the sky is.
+     *
+     * @param out two doubles: longitude 0..360 then latitude −90..+90.
+     */
+    fun galacticOfVector(vx: Double, vy: Double, vz: Double, out: DoubleArray) {
+        val a = axes
+        val sinB = vx * a[0] + vy * a[1] + vz * a[2]
+        val y = vx * a[3] + vy * a[4] + vz * a[5]
+        val x = vx * a[6] + vy * a[7] + vz * a[8]
+        out[0] = wrapLongitude((NODE_L_DEG * DEG - atan2(y, x)) / DEG)
+        out[1] = asin(sinB.coerceIn(-1.0, 1.0)) / DEG
+    }
+
+    /**
+     * Pole, node and third axis, flattened — nine doubles, read in threes by [galacticOfVector].
+     *
+     * ⚠️ A plain `val`, deliberately, and not `by lazy`. Kotlin's default lazy is
+     * `SYNCHRONIZED`: every read goes through a `Lazy` object with a volatile load and a null
+     * check, which measured at **28 ns per call** in a loop that only wants a static array — a
+     * third of the whole per-pixel budget of the glow pass, spent on re-asking whether a constant
+     * has been computed yet. The constants it derives from are `const val`, so they are inlined at
+     * compile time and there is no initialisation-order hazard to protect against.
+     */
+    private val axes: DoubleArray = run {
+        val ra = POLE_RA_DEG * DEG
+        val dec = POLE_DEC_DEG * DEG
+        doubleArrayOf(
+            cos(dec) * cos(ra), cos(dec) * sin(ra), sin(dec),
+            -sin(ra), cos(ra), 0.0,
+            -sin(dec) * cos(ra), -sin(dec) * sin(ra), cos(dec),
+        )
+    }
+
+    /**
      * Galactic back to equatorial (J2000).
      *
      * ⚠️ Exists so [galacticOf] can be checked by round-tripping rather than against numbers typed
@@ -169,7 +265,25 @@ object MilkyWay {
         return doubleArrayOf(wrapLongitude(ra / DEG), dec / DEG)
     }
 
-    private fun wrapLongitude(deg: Double): Double = ((deg % 360.0) + 360.0) % 360.0
+    /**
+     * Longitude folded into 0..360.
+     *
+     * ⚠️ **The two branches above the modulo are not premature — `%` on a `Double` is one of the
+     * most expensive arithmetic operations the JVM has**, and this runs twice per screen pixel of
+     * the glow pass. Every real caller is already inside one turn of the circle:
+     * [galacticOfVector] produces `NODE_L_DEG − atan2(…)`, which spans −57..303, and [sample]'s
+     * input is a longitude somebody already had. The modulo survives as the total fallback so that
+     * a caller outside that range still gets a right answer rather than a wrong one.
+     *
+     * The only behavioural difference from the plain modulo is that a negative zero comes back
+     * unchanged instead of as positive zero. They compare equal, and every consumer here does
+     * arithmetic on it rather than inspecting its sign.
+     */
+    private fun wrapLongitude(deg: Double): Double {
+        if (deg >= 0.0 && deg < 360.0) return deg
+        if (deg >= -360.0 && deg < 720.0) return if (deg < 0.0) deg + 360.0 else deg - 360.0
+        return ((deg % 360.0) + 360.0) % 360.0
+    }
 
     // ---- the encoding --------------------------------------------------------------------------
 
@@ -178,13 +292,14 @@ object MilkyWay {
      *
      * ⚠️ **Square-root scaled, and the difference is nearly tenfold.** Measured over the real
      * 64,800-cell raster, whose densities run from 0 to 717 stars per square degree, the worst
-     * relative error a single byte forces is **55.2% stored linearly and 5.7% stored square-root
+     * relative error a single byte forces is **55.2% stored linearly and 3.6% stored square-root
      * scaled**. Linear spends almost all of its 256 steps on the bright end, where the eye cannot
      * tell them apart, and leaves the faint high-latitude sky — which is most of the sky, and the
      * half where a step is visible as banding — with a handful of levels.
      *
-     * 5.7% also sits comfortably under the 7.9% Poisson noise of the counting itself, which is where
-     * an encoding wants to be: not the thing limiting the answer.
+     * 3.6% also sits comfortably under the 7.9% Poisson noise of the counting itself, which is where
+     * an encoding wants to be: not the thing limiting the answer. (It was 5.7% before the polar
+     * smoothing below; averaging the noisiest cells away took the extreme values with it.)
      */
     fun encodeDensity(density: Double, peak: Double): Int {
         if (peak <= 0.0 || density <= 0.0) return 0
@@ -216,6 +331,19 @@ object MilkyWay {
      * @param cells the raster, [CELLS] bytes, row 0 at the south galactic pole.
      * @param peak the density the byte 255 stands for, carried with the raster.
      */
+    /**
+     * The density at a direction, interpolated between the four cells around it.
+     *
+     * ⚠️ **Longitude resolution near the poles is deliberately coarse, and it is the builder that
+     * makes it so.** An equirectangular cell's solid angle shrinks with the cosine of its latitude,
+     * so at |b| = 89.5 a cell covers 0.0087 deg² and holds — measured on the real catalogue — about
+     * 0.16 stars. A count of nought or one is not an estimate of a density: 303 of that row's 360
+     * cells came out empty and the other 57 read about 115 /deg², a speckled ring at each pole that
+     * reads as a rendering fault. `tools/sky/build_milkyway.py` therefore averages each row over
+     * `1/cos(b)` columns, which covers a constant one degree of great-circle arc at every latitude
+     * and preserves the row's total exactly. Both poles now read 24–31 /deg², below
+     * [FAINTEST_DENSITY], so the empty sky is drawn as empty.
+     */
     fun sample(cells: ByteArray, peak: Double, longitudeDeg: Double, latitudeDeg: Double): Double {
         if (cells.size < CELLS) return 0.0
         // Cell centres sit half a step in, so a sample exactly at a centre must weight it fully.
@@ -244,7 +372,17 @@ object MilkyWay {
     }
 
     private fun at(cells: ByteArray, column: Int, row: Int): Double {
-        val x = ((column % COLUMNS) + COLUMNS) % COLUMNS
+        // ⚠️ Two integer divisions replaced by two compares, for the same reason the longitude wrap
+        // has a fast path: [sample] calls this four times per screen pixel. Its `column` can only
+        // ever be −1..COLUMNS, because it comes from `floor(fx)` and `floor(fx) + 1` where fx spans
+        // −0.5..COLUMNS−0.5 — so the wrap is always by exactly one cell. The modulo stays for
+        // anything else, so the function is still total.
+        val x = when {
+            column in 0 until COLUMNS -> column
+            column == -1 -> COLUMNS - 1
+            column == COLUMNS -> 0
+            else -> ((column % COLUMNS) + COLUMNS) % COLUMNS
+        }
         val y = row.coerceIn(0, ROWS - 1)
         return (cells[y * COLUMNS + x].toInt() and 0xFF).toDouble()
     }

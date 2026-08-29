@@ -152,6 +152,23 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # device probe landed) and re-run: if it reports identically, the complaint is this classpath and
 # not your change. That control is one command and it beats reasoning about it.
 #
+# ⚠️ `:core:sky` is the third such module, and the one this gate blames most loudly, because the
+# sky map's whole renderer lives there: `StarBatches`, `SkyFrame`, `DeepSkyLayer`, `MilkyWayGlow`,
+# every `DrawScope.draw*` pass. A screen that starts using a NEW one of them gets it reported as an
+# unresolved name with nothing at HEAD to cancel it. ⚠️ **Do not reach for the plant-a-known-symbol
+# control here** — a fully-qualified `dev.mascwa.pulse.sky.X` reports as `unresolved reference
+# 'sky'`, which the app's own `dev.mascwa.pulse.data.sky` package already produces at HEAD, so the
+# differencing cancels it and the control comes back inconclusive. The instrument that works is
+# POSITIVE: `:core:sky` compiles completely clean against the real platform plus the real Compose
+# artifacts, which is stronger than a control because it type-checks the code rather than merely
+# reproducing the complaint. The invocation is
+#
+#   tools/android_compile_check.sh \
+#     -l androidx.compose.ui:ui-android:1.7.6 -l androidx.compose.ui:ui-graphics-android:1.7.6 \
+#     -l androidx.compose.ui:ui-unit-android:1.7.6 -l androidx.compose.ui:ui-geometry-android:1.7.6 \
+#     -l androidx.compose.runtime:runtime-android:1.7.6 -l androidx.annotation:annotation-jvm:1.9.1 \
+#     <the core/sky files> <the core/telemetry files they use>
+#
 # ⚠️ **A NEW EXPRESSION OVER AN UNRESOLVABLE APP TYPE REPORTS A TYPE-INFERENCE FAILURE OR A
 # RECEIVER MISMATCH, NOT AN UNRESOLVED NAME — so the differencing does not cancel it.** Adding a
 # `Pair<String, AppSettings>` field to `SettingsRepository`, plus `raw to it` and `x?.also { }` over

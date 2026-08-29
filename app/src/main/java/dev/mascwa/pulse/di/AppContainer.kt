@@ -344,6 +344,10 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sky.DeepSkyCatalog(appContext)
     }
 
+    val milkyWayCatalog: dev.mascwa.pulse.data.sky.MilkyWayCatalog by lazy {
+        dev.mascwa.pulse.data.sky.MilkyWayCatalog(appContext)
+    }
+
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
     }

@@ -2,6 +2,8 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -250,6 +252,115 @@ class MilkyWayTest {
      *
      * The harness needs the same care as the thing it checks.
      */
+    // ---- the vector form, and the file header ---------------------------------------------------
+
+    @Test
+    fun `the vector transform agrees with the angular one everywhere on the sky`() {
+        // ⚠️ The rearranged rotation is not obviously the same arithmetic — it folds
+        // `cos d cos(a - ap)` into two dot products — so this compares it against the readable form
+        // over the whole sphere rather than at a handful of remembered coordinates. Longitude error
+        // is weighted by cos(latitude) because at the pole longitude means nothing: an enormous
+        // difference there is no distance at all.
+        val out = DoubleArray(2)
+        var worstL = 0.0
+        var worstB = 0.0
+        var ra = 0.0
+        while (ra < 360.0) {
+            var dec = -89.0
+            while (dec <= 89.0) {
+                val v = SkyProjection.equatorialVector(ra, dec)
+                MilkyWay.galacticOfVector(v[0], v[1], v[2], out)
+                val ref = MilkyWay.galacticOf(ra, dec)
+                var dl = abs(out[0] - ref.longitudeDeg)
+                if (dl > 180.0) dl = 360.0 - dl
+                worstL = maxOf(worstL, dl * cos(ref.latitudeDeg * Math.PI / 180.0))
+                worstB = maxOf(worstB, abs(out[1] - ref.latitudeDeg))
+                // ⚠️ **An ABSOLUTE check beside the comparison, and it is not redundant.** Both
+                // functions fold their longitude through the same `wrapLongitude`, so a fault in
+                // THAT shifts the two sides equally and the comparison above stays perfectly happy
+                // — which is exactly what happened when the wrap's fast path was negative-tested.
+                // A range is a property neither function can talk the other into.
+                assertTrue("longitude ${out[0]} is outside 0..360", out[0] >= 0.0 && out[0] < 360.0)
+                assertTrue("latitude ${out[1]} is outside -90..90", abs(out[1]) <= 90.0)
+                dec += 3.7
+            }
+            ra += 2.3
+        }
+        // Measured at 1.1e-13 and 1.3e-13 degrees; the bound is loose enough not to be brittle and
+        // tight enough that a genuinely different rotation could not pass.
+        assertTrue("longitude drifted by $worstL deg", worstL < 1e-11)
+        assertTrue("latitude drifted by $worstB deg", worstB < 1e-11)
+    }
+
+    @Test
+    fun `a header read the wrong way round is refused, not drawn`() {
+        // ⚠️ The specific mistake this guards was made once while writing the builder: reading a
+        // little-endian file as big-endian. It does not throw and it does not look wrong in a
+        // debugger — the magic simply fails to match, and without this check the peak would come
+        // back as a nonsense float and the whole sky would be scaled by it.
+        val good = raster { _, _ -> 200 }
+        assertNotNull(MilkyWay.readRaster(good))
+
+        val swapped = good.copyOf()
+        for (i in 0 until 4) swapped[i] = good[3 - i]
+        assertNull("a byte-swapped magic must be refused", MilkyWay.readRaster(swapped))
+
+        val futureVersion = good.copyOf()
+        futureVersion[MilkyWay.OFF_VERSION] = (MilkyWay.FILE_VERSION + 1).toByte()
+        assertNull("a layout this code does not know must be refused", MilkyWay.readRaster(futureVersion))
+
+        val wrongShape = good.copyOf()
+        wrongShape[MilkyWay.OFF_COLUMNS] = 0
+        wrongShape[MilkyWay.OFF_COLUMNS + 1] = 1 // 256 columns, not 360
+        assertNull("a raster built at another resolution must be refused", MilkyWay.readRaster(wrongShape))
+
+        assertNull("a truncated file must be refused", MilkyWay.readRaster(good.copyOf(good.size - 1)))
+
+        val zeroPeak = good.copyOf()
+        for (i in 0 until 4) zeroPeak[MilkyWay.OFF_PEAK + i] = 0
+        assertNull("a peak of zero would scale every cell to nothing", MilkyWay.readRaster(zeroPeak))
+    }
+
+    @Test
+    fun `a decoded raster reads back the densities it was built from`() {
+        // The round trip that matters: a cell written at a known density comes back at that density
+        // through the file header rather than through a peak the caller had to remember separately.
+        val peak = 717.3
+        val bright = MilkyWay.encodeDensity(peak, peak)
+        val mid = MilkyWay.encodeDensity(peak / 4.0, peak)
+        val bytes = raster { c, _ -> if (c == 10) bright else mid }
+        val r = MilkyWay.readRaster(bytes)!!
+        assertEquals(peak, r.peak, 1e-3)
+        assertEquals(peak, MilkyWay.sample(r.cells, r.peak, 10.5, 0.0), peak * 0.02)
+        assertEquals(peak / 4.0, MilkyWay.sample(r.cells, r.peak, 200.5, 0.0), peak * 0.02)
+    }
+
+    /** A whole file: a real header plus one byte per cell from [fill]. */
+    private fun raster(fill: (column: Int, row: Int) -> Int): ByteArray {
+        val b = ByteArray(MilkyWay.FILE_BYTES)
+        put32(b, MilkyWay.OFF_MAGIC, MilkyWay.MAGIC)
+        put16(b, MilkyWay.OFF_VERSION, MilkyWay.FILE_VERSION)
+        put16(b, MilkyWay.OFF_COLUMNS, MilkyWay.COLUMNS)
+        put16(b, MilkyWay.OFF_ROWS, MilkyWay.ROWS)
+        put32(b, MilkyWay.OFF_PEAK, 717.3f.toRawBits())
+        for (row in 0 until MilkyWay.ROWS) {
+            for (col in 0 until MilkyWay.COLUMNS) {
+                b[MilkyWay.HEADER_BYTES + row * MilkyWay.COLUMNS + col] =
+                    fill(col, row).coerceIn(0, 255).toByte()
+            }
+        }
+        return b
+    }
+
+    private fun put16(b: ByteArray, at: Int, v: Int) {
+        b[at] = (v and 0xFF).toByte()
+        b[at + 1] = ((v ushr 8) and 0xFF).toByte()
+    }
+
+    private fun put32(b: ByteArray, at: Int, v: Int) {
+        for (i in 0 until 4) b[at + i] = ((v ushr (8 * i)) and 0xFF).toByte()
+    }
+
     private fun separation(ra1: Double, dec1: Double, ra2: Double, dec2: Double): Double {
         val d = Math.PI / 180.0
         val ux = cos(dec1 * d) * cos(ra1 * d)

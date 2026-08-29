@@ -321,6 +321,56 @@ object SkyProjection {
     }
 
     /**
+     * The exact inverse of [projectUnit]: a screen point back to a direction in the basis's frame.
+     *
+     * ⚠️ **[unproject] is NOT this function with a different signature, and the difference is the
+     * whole reason this exists.** That one takes a [View], rebuilds the axes with four trigonometric
+     * calls and two allocations, and answers in **horizon** coordinates — right for a tap, which
+     * happens once. This takes the prepared [Basis], costs no trigonometry at all, allocates
+     * nothing, and answers in whatever frame the basis was built in — which for [SkyFrame] is
+     * equatorial. A caller sweeping a whole screen of points needs all three of those properties.
+     *
+     * The stereographic inverse is closed-form, so unlike the forward direction there is no
+     * approximation anywhere: `z = (4 − r²)/(4 + r²)` falls straight out of `r² = 4(1 − z)/(1 + z)`.
+     * That also means **it never fails for a finite input** — stereographic covers the entire sphere
+     * bar the single antipodal point, which no finite screen coordinate can reach — so the only
+     * false answer is a basis with no defined orientation.
+     *
+     * @param out three doubles, written with the unit vector. Supplied by the caller because the
+     *   only reason to prefer this over [unproject] is to run it tens of thousands of times, and an
+     *   allocation per call would give back most of what the prepared basis saves.
+     * @return false if the basis is unusable, in which case [out] is untouched.
+     */
+    fun unprojectUnit(sx: Double, sy: Double, basis: Basis, out: DoubleArray): Boolean {
+        if (!basis.usable) return false
+        // ⚠️ Undo the roll FIRST and with the opposite sign — `projectUnit` applies it last. The
+        // error from skipping it is exactly zero at the centre of the screen, which is where anybody
+        // checking by eye would look.
+        val rx: Double
+        val ry: Double
+        if (basis.rolled) {
+            rx = sx * basis.cosRoll + sy * basis.sinRoll
+            ry = -sx * basis.sinRoll + sy * basis.cosRoll
+        } else {
+            rx = sx
+            ry = sy
+        }
+        val scale = 1.0 / basis.invScale
+        val bigX = rx * scale
+        // The forward direction flips y once, on the way out; this is the same flip on the way back.
+        val bigY = -ry * scale
+        val s = bigX * bigX + bigY * bigY
+        val z = (4.0 - s) / (4.0 + s)
+        val k = (4.0 + s) / 4.0
+        val px = bigX / k
+        val py = bigY / k
+        out[0] = basis.rx * px + basis.ux * py + basis.fx * z
+        out[1] = basis.ry * px + basis.uy * py + basis.fy * z
+        out[2] = basis.rz * px + basis.uz * py + basis.fz * z
+        return true
+    }
+
+    /**
      * A horizon direction as a unit vector, for a caller that wants to keep it.
      *
      * The star field converts a catalogue position to the horizon once per load and then projects it

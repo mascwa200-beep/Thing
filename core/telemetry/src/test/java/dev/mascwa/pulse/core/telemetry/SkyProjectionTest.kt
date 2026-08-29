@@ -389,4 +389,75 @@ class SkyProjectionTest {
         // Narrower field, same shape: the cone shrinks with it rather than staying fixed.
         assertTrue(SkyProjection.coneRadiusDeg(5.0, SkyProjection.Viewport(1.0, 2.0)) < 12.0)
     }
+
+    // ---- the prepared inverse -------------------------------------------------------------------
+
+    @Test
+    fun `unprojectUnit inverts projectUnit over the whole rectangle at every field and roll`() {
+        // ⚠️ Swept over the RECTANGLE a portrait phone draws, corners included, not over the unit
+        // circle — the circle is exactly the mistake this map shipped with once, and an inverse
+        // checked only inside it would be untested precisely where the bug was.
+        val out = DoubleArray(3)
+        var worst = 0.0
+        var worstAt = ""
+        for (fov in doubleArrayOf(0.25, 1.0, 5.0, 30.0, 60.0, 120.0, 150.0)) {
+            for (roll in doubleArrayOf(0.0, 17.0, -95.0, 180.0)) {
+                val basis = SkyProjection.basisOf(
+                    SkyProjection.View(137.0, 22.0, fov, roll),
+                )
+                var i = -22
+                while (i <= 22) {
+                    var j = -48
+                    while (j <= 48) {
+                        val sx = i / 20.0
+                        val sy = j / 20.0
+                        assertTrue(SkyProjection.unprojectUnit(sx, sy, basis, out))
+                        val n = Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2])
+                        assertEquals("not a unit vector at ($sx,$sy) fov=$fov", 1.0, n, 1e-12)
+                        val back = SkyProjection.projectUnit(out[0], out[1], out[2], basis)
+                        assertTrue(back.visible)
+                        val d = Math.hypot(back.x - sx, back.y - sy)
+                        if (d > worst) {
+                            worst = d
+                            worstAt = "($sx,$sy) fov=$fov roll=$roll"
+                        }
+                        j += 4
+                    }
+                    i += 4
+                }
+            }
+        }
+        // Measured at 7.4e-14. The inverse is closed-form, so this is floating-point noise and
+        // nothing else — a bound anywhere near a pixel would let a real error through.
+        assertTrue("worst round-trip error $worst at $worstAt", worst < 1e-11)
+    }
+
+    @Test
+    fun `the prepared inverse answers exactly what the View one does`() {
+        // ⚠️ Two inverses is one more than this file wants, and the only thing that makes it safe is
+        // that they must agree. `unproject` answers in horizon coordinates and `unprojectUnit` in
+        // the basis's own frame, so for a HORIZON basis the two are the same direction said twice.
+        val view = SkyProjection.View(212.0, -14.0, 70.0, rollDeg = 31.0)
+        val basis = SkyProjection.basisOf(view)
+        val out = DoubleArray(3)
+        for (sx in doubleArrayOf(-0.9, -0.3, 0.0, 0.45, 1.1)) {
+            for (sy in doubleArrayOf(-1.6, -0.2, 0.0, 0.8, 1.9)) {
+                assertTrue(SkyProjection.unprojectUnit(sx, sy, basis, out))
+                val (az, alt) = SkyProjection.unproject(sx, sy, view)
+                val ref = SkyProjection.unitVector(az, alt)
+                // ⚠️ **Measured as a chord, never with `acos`.** The derivative of `acos` is
+                // infinite at 1, so the angle between two nearly identical unit vectors comes back
+                // carrying about sqrt(machine epsilon) — 1.2e-6 degrees — however exact the inputs
+                // are. That is the number the first version of this assertion tripped on, and it
+                // was the instrument rather than the code: the same pair measured this way agree to
+                // 1e-13 degrees. `2 asin(chord/2)` is exact all the way down to zero.
+                val dx = out[0] - ref[0]
+                val dy = out[1] - ref[1]
+                val dz = out[2] - ref[2]
+                val chord = Math.sqrt(dx * dx + dy * dy + dz * dz)
+                val sep = Math.toDegrees(2.0 * Math.asin((chord / 2.0).coerceAtMost(1.0)))
+                assertEquals("the two inverses disagree at ($sx,$sy)", 0.0, sep, 1e-11)
+            }
+        }
+    }
 }

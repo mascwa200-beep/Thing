@@ -153,13 +153,40 @@ def build(catalogue: str, out_path: str) -> int:
     # solid angle is what makes the raster a measurement of the sky rather than of the grid.
     d = math.pi / 180.0
     density = [0.0] * raster.cells
+    widest = 1
     for row in range(raster.rows):
         lo = (-90.0 + row * raster.step) * d
         hi = lo + raster.step * d
         area = (math.sin(hi) - math.sin(lo)) * (raster.step * d) * (180.0 / math.pi) ** 2
+
+        # ⚠️ **A count of one star is not a measurement of a density, and near the poles that is all
+        # a cell holds.** Measured on the real 3,087,821-star catalogue: the row at |b| = 89.5 has a
+        # solid angle of 0.0087 deg^2 per cell and averages 0.16 stars in it, so 303 of its 360
+        # cells are EMPTY and the other 57 read about 115 /deg^2 — a speckled ring at each pole,
+        # which looks like a rendering fault rather than like sky. The row MEANS are right (19-26,
+        # matching the 23.2 measured for |b| > 75) — it is only the per-cell estimate that is noise.
+        #
+        # So the count is averaged over as many columns as it takes to cover roughly the same patch
+        # of SKY as an equatorial cell: 1/cos(b) of them, wrapping. That is the standard treatment
+        # for an equirectangular grid's polar convergence, it preserves each row's total exactly,
+        # and it is a no-op below 60 degrees where a window of one is already right. What it costs
+        # is longitude resolution near the poles, which is honest: at the pole there is none to have.
+        # `window * cos(b)` is the arc of great-circle longitude the average covers, so a window of
+        # 1/cos(b) covers one degree of it at every latitude — the same width as an equatorial cell.
+        cos_b = max(1e-6, math.cos((-90.0 + (row + 0.5) * raster.step) * d))
+        half = min(raster.columns // 2, max(0, int(round((1.0 / cos_b - 1.0) / 2.0))))
+        window = 2 * half + 1
+        widest = max(widest, window)
+        base = row * raster.columns
         for col in range(raster.columns):
-            i = row * raster.columns + col
-            density[i] = counts[i] / area
+            if half == 0:
+                n = counts[base + col]
+            else:
+                n = 0
+                for k in range(col - half, col + half + 1):
+                    n += counts[base + (k % raster.columns)]
+            density[base + col] = n / (area * window)
+    print(f"  polar smoothing: widest longitude window {widest} cells")
 
     peak = max(density)
     if peak <= 0.0:

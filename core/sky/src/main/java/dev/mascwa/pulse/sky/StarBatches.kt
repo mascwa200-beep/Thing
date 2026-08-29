@@ -78,7 +78,13 @@ class StarBatches {
         }
     }
 
-    /** How many stars were filed in total this frame — for a diagnostic readout. */
+    /**
+     * How many stars were filed in total this frame.
+     *
+     * ⚠️ No caller yet — the sky map has no diagnostic readout to hang it on. Kept because it
+     * costs nothing and the pointing-mode work will want it; the KDoc used to claim a readout
+     * that does not exist, which is a smaller version of the same mistake.
+     */
     val filed: Int get() = counts.sum()
 
     // ⚠️ Published only so `forEachBucket` can be inline, which is what keeps the visit free of a

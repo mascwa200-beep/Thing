@@ -3,11 +3,13 @@ package dev.mascwa.pulse.feature.sky
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.MilkyWay
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.sky.ConstellationCatalog
 import dev.mascwa.pulse.data.sky.DeepSkyCatalog
+import dev.mascwa.pulse.data.sky.MilkyWayCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -46,6 +48,7 @@ class SkyMapViewModel(
     private val deepCatalog: DeepStarCatalog,
     private val constellationCatalog: ConstellationCatalog,
     private val deepSkyCatalog: DeepSkyCatalog,
+    private val milkyWayCatalog: MilkyWayCatalog,
     private val locationProvider: LocationProvider,
 ) : ViewModel() {
 
@@ -102,6 +105,16 @@ class SkyMapViewModel(
      * the view moves.
      */
     var deepSky: DeepSkyLayer? = null
+        private set
+
+    /**
+     * The star-density raster the Milky Way is drawn from, or null until the asset is read.
+     *
+     * ⚠️ **Not a layer, and that is the point** — unlike [deepSky] there is nothing to precompute.
+     * The raster is already indexed the way the draw pass reads it, so what the catalogue hands
+     * over is the sixty-five kilobytes and the density a stored 255 stands for.
+     */
+    var milkyWay: MilkyWay.Raster? = null
         private set
 
     /** What the map draws over the stars. */
@@ -217,6 +230,7 @@ class SkyMapViewModel(
                 openDeepCatalogue()
                 openConstellations()
                 openDeepSky()
+                openMilkyWay()
                 rebuild()
             } finally {
                 _loading.value = false
@@ -288,6 +302,17 @@ class SkyMapViewModel(
         if (deepSky != null) return
         deepSky = deepSkyCatalog.layer()
         if (deepSky != null) _revision.value++
+    }
+
+    /**
+     * Read the Milky Way raster, once for the life of the screen.
+     *
+     * ⚠️ Bumps [revision] for the same reason [openDeepSky] does — nothing follows it that would.
+     */
+    private suspend fun openMilkyWay() {
+        if (milkyWay != null) return
+        milkyWay = milkyWayCatalog.raster()
+        if (milkyWay != null) _revision.value++
     }
 
     /**
