@@ -126,17 +126,22 @@ dependencies {
     // gate, the `PackageInstaller` ladder, and the crash reporter. Shared with the other two
     // applications so the three cannot come to disagree about when a build is safe to install.
     //
-    // ⚠️ **This is the only dependency here that costs the APK anything worth naming**, and the
-    // honest accounting is: it declares `api(project(":core:feeds"))`, which declares okhttp, okio
-    // and kotlinx-serialization as `api` in turn, and it declares `api(libs.coil.base)` for an
-    // image-decode interceptor this application will never call. With R8 off (see the release block
-    // above) none of that is shaken out. Measured jars: okhttp 771 kB, okio 351 kB, serialization
-    // 646 kB, plus coil-base and `:core:feeds`' own twenty-two repositories.
+    // ⚠️ **It brings a great deal with it: `api(project(":core:feeds"))` — which declares okhttp,
+    // okio and kotlinx-serialization as `api` in turn — plus `api(libs.coil.base)` for an
+    // image-decode interceptor this application will never call, and twenty-two repositories it
+    // will never call either. With R8 off (see the release block above) none of that is shaken.
+    //
+    // ⚠️ **And it costs 1,010,098 bytes, which is a tenth of what the jar sizes suggest.** The APK
+    // went 32,440,206 → 33,450,304 across the commit that added this line, read out of the two
+    // builds' own "Check what actually shipped" lines. An earlier version of this comment quoted
+    // the jars — okhttp 771 kB, okio 351 kB, serialization 646 kB — and implied several megabytes,
+    // which is wrong twice over: a jar is not dex, and the APK is deflated afterwards. Recorded
+    // because an overstated cost is as much a defect here as an overstated benefit.
     //
     // ⚠️ It is accepted rather than worked around, and the alternative was worse: a self-contained
     // updater here would be a third copy of the green gate and the installer ladder, in code that
     // installs software. `UpdateRepository`'s own KDoc records that it was parameterised for
     // exactly this — this is the fourth reader of these releases. Splitting `:core:update` so the
-    // updater does not drag coil is a real follow-up and a much bigger change than this slice.
+    // updater does not drag coil is a possible follow-up, and at one megabyte it is not urgent.
     implementation(project(":core:update"))
 }

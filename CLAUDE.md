@@ -5171,9 +5171,106 @@ otherwise; pressing HOME with FOLLOW on and returning re-arms it; and on a phone
 rotation-vector sensor the FOLLOW chip is disabled with a sentence rather than silently inert.
 
 **Open: S11** — the Gaia G<14 deep tier (~16.8 M stars, ~135 MB) as an optional LCARS expansion pack
-via the existing `PackRepository`, and bundled outright in `:sky`. Also open, deliberately: `:sky`
-has no self-updater yet, so `:core:update` and the INTERNET permission arrive together in one slice
-with the surface that uses them.
+via the existing `PackRepository`, and bundled outright in `:sky`. (The self-updater that was open
+here landed as S10g, below.)
+
+### S10g — the star map keeps itself current, and three claims are corrected (this session, PR #464)
+
+`:sky` shipped with no way to receive a newer build, and said so in three places. This closes it:
+`:core:update`, INTERNET, ACCESS_NETWORK_STATE, a check on every foreground over Wi-Fi, an install
+on the way out, an ABOUT dialog, and the crash reporter its own `SkyApplication` had promised would
+arrive alongside. Two commits, `5b42088` and `bf42c06`; **Sky #3 fully green in 3m59s and published
+to `sky-latest`; Nutrition #121 fully green and published; LCARS #2128's unit tests green.**
+
+**The extraction is the part worth keeping.** `:sky` is the FOURTH reader of this repository's
+releases, and `NutritionUpdates` was a 239-line state machine that would have become a third copy.
+It moved into `:core:update` as **`SelfUpdate`**, parameterised on the four things that genuinely
+differ — which release ([UpdateRepository]), where the token lives, where the one-at-a-time guard
+lives, and `companionPackage` (null = nothing else installs this app, which is `:sky`'s case).
+`UpdateRepository`'s own KDoc already recorded being parameterised for exactly this. Nutrition's
+`MainActivity` needed **no edit at all** — every method name preserved — and `UpdateCard` was
+thirteen type references.
+
+**⚠️ THREE STALE CLAIMS, and the manifest's was a promise made in writing.** Its paragraph did not
+merely go false: it said the commit adding the self-updater would add the two permissions **and
+rewrite it**, "because leaving that claim standing afterwards would be the overstated comment this
+repository treats as a defect". The same claim lived in `sky/build.gradle.kts` ("genuinely cannot
+reach the network at all") and in the release body ("holds no network permission at all"). All
+three corrected in the one commit, to what is true: **nothing the map DRAWS comes from the
+network** — aeroplane mode leaves it complete — and the network is for fetching a newer build and
+sending on a recorded fault. ⚠️ Two more permissions (REQUEST_INSTALL_PACKAGES,
+UPDATE_PACKAGES_WITHOUT_USER_ACTION) arrive **merged from `:core:update`**; the manifest names them
+without redeclaring them, because a reader comparing that file against the installed app's
+permission list would otherwise find two it does not explain.
+
+**⚠️ THE COST WAS MEASURED AND MY ESTIMATE WAS TEN TIMES TOO HIGH.** The build-file comment first
+quoted jar sizes — okhttp 771 kB, okio 351 kB, serialization 646 kB, plus coil-base and twenty-two
+unused repositories, none shaken with R8 off — and implied several megabytes. The real figure, from
+the two builds' own "Check what actually shipped" lines: **32,440,206 → 33,450,304 bytes, a delta of
+1,010,098.** A jar is not dex, and the APK is deflated afterwards. The comment now carries the
+measured number, because an overstated COST is as much a defect here as an overstated benefit.
+
+**Decisions worth keeping.**
+- `SkySettings` is plain SharedPreferences, not DataStore — three keys, nothing observes them, and
+  DataStore would be three new artifacts on the module built for the cheapest phone that exists.
+  Every read is on `Dispatchers.IO`: the first `getSharedPreferences` parses the file on whatever
+  thread asks, which is the main-thread decode this repository swept twenty-two stores to remove.
+- ⚠️ **`commit()`, not `apply()`.** The pending marker is written immediately before
+  `PackageInstaller.commit()`, which usually tears the process down, and `apply()` only promises the
+  write eventually through a queue this path does not take. A lost marker is the loop it prevents.
+- Every reader passes its OWN fallback. No token and no pending install — but `autoSendReports`
+  falls back to **true**, because turning fault reporting off on the one phone whose preferences will
+  not open is the opposite of what is wanted.
+- ⚠️ **`describe()` takes the state as a PARAMETER** rather than being a `when` written inline. The
+  caller holds it as `by collectAsStateWithLifecycle()`, a delegated property, and a delegated
+  property never smart-casts — the trap this file already records from a coordinate readout.
+- ABOUT is a dialog with a **bounded scrolling `Column`, never a `LazyColumn`**: a lazy list inside
+  a dialog is the `SubcomposeLayout` intrinsic-measurement refusal already recorded here, and an
+  unbounded `AlertDialog` grows until it takes its own buttons off the screen.
+- The token line says **both** halves — read for updates, write for reports. A classic `repo` token
+  carries write by accident; a fine-grained Contents:Read token updates the app and then 403s every
+  report, and that reads as a broken token rather than a missing scope.
+
+**⚠️ A KOTLIN SHADOWING HAZARD, avoided by renaming rather than by reasoning.** `SkyContainer` now
+holds `applicationContext`, and writing that as `private val context: Context = context.applicationContext`
+would leave a **property shadowing the constructor parameter** — which stays in scope through every
+property initializer, so `by lazy { StarCatalog(context) }` could capture the PARAMETER, discarding
+exactly the reference the line exists to discard, and compiling perfectly while doing it. Named
+`appContext`, as the nutrition container does.
+
+**⚠️ THE COMPOUND `git add` TRAP BIT FOR A FOURTH TIME.** `git add <paths>` including the pathspec of
+a file already staged as deleted by `git rm` **aborts the entire add** — nothing was staged and the
+message says only "did not match any files". Stage paths individually and read `git status`.
+
+**A local gate corrected, measured and negative-tested.** `tools/kotlin_import_check.py` excused
+`BuildConfig`/`R` when validating imports and not in the used-but-not-imported check, so a module
+whose `namespace` equals a file's package reported its own generated class as missing. Fixed;
+measured repo-wide over the only two packages that could change — **one report removed, none
+added**. ⚠️ What it gives up: a file using ANOTHER module's `BuildConfig` unimported now goes
+unreported, which is a compile error CI catches in three minutes, against standing noise that makes
+a whole gate get ignored.
+
+**Verification, all local and free.** `tools/check_changed.sh` clean; `tools/module_dep_check.py sky`
+clean; **`tools/android_compile_check.sh` reports the frontend clean over 220 files** — the whole
+`:sky` module, `:core:update`, `:core:sky`, `:core:feeds`' network and util packages and all of
+`:core:telemetry` — against the real platform classes and the real Compose, lifecycle, activity,
+material3 and okhttp jars. Two gate invocations negative-tested (a planted `installNope`, a planted
+`installedVersionTypo`), each restored byte-identical. A typed probe compiled the nutrition
+container's new construction and the cross-module state narrowing, with the store stubbed to the four
+signatures `HealthSettingsStore` actually declares — copied from source, not written from memory.
+
+⚠️ **The recipe additions worth reusing:** `androidx.lifecycle:lifecycle-common` is KMP and
+manifest-only, so the gate needs **`lifecycle-common-jvm`**; and a generated `BuildConfig` can be
+stood in with a five-line stub whose shape is derived from what AGP emits (`const val VERSION_CODE`,
+`const val VERSION_NAME`) rather than guessed.
+
+⚠️ **Owner-verify on the Pixel — CI compiles an updater and never runs one.** Open ABOUT, paste a
+token that can read this repository's contents, and check it reports the build rather than a 404;
+then leave the app closed after a later build publishes and confirm the next open is already the
+newer one. **The first install will show the system confirmation** — this app is not a device owner
+and is not yet its own installer of record, so the honest description is one tap the first time and
+none after. Fault reports need a token that can WRITE contents; with a read-only one the ABOUT card
+says so rather than printing a status code.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the

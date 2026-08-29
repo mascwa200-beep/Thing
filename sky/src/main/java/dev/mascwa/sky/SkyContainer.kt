@@ -19,7 +19,8 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 /**
- * Everything this application owns, which is five catalogue readers and one sensor adapter.
+ * Everything this application owns: five catalogue readers, a sensor adapter, three remembered
+ * preferences, the self-updater and the fault reporter.
  *
  * ⚠️ **Every member is `by lazy`, so constructing this opens no file and touches no sensor.** The
  * deep catalogue memory-maps twenty-five megabytes on its first read and the bright one parses eight
@@ -32,13 +33,27 @@ import java.util.concurrent.TimeUnit
  * than building its own, which is the mistake the nutrition application's container records having
  * made.
  */
-class SkyContainer(private val context: Context) {
+class SkyContainer(context: Context) {
 
-    val starCatalog by lazy { StarCatalog(context) }
-    val deepStarCatalog by lazy { DeepStarCatalog(context) }
-    val constellationCatalog by lazy { ConstellationCatalog(context) }
-    val deepSkyCatalog by lazy { DeepSkyCatalog(context) }
-    val milkyWayCatalog by lazy { MilkyWayCatalog(context) }
+    /**
+     * ⚠️ **`applicationContext`, not whatever was handed in.** Every member below outlives any
+     * screen — the catalogue mapping, the sensor listener, the updater — so holding an Activity
+     * here would leak one for the life of the process. [SkyApplication] does pass the application
+     * today, which is exactly the sort of thing that stays true until somebody writes a second
+     * caller; the same discipline the nutrition container states.
+     *
+     * ⚠️ Named `appContext` rather than shadowing the parameter, and that is not style. A
+     * constructor parameter stays in scope through every property initializer, so a property called
+     * `context` would leave `by lazy { StarCatalog(context) }` reading the PARAMETER — capturing
+     * exactly the reference this line exists to discard, and compiling perfectly while doing it.
+     */
+    private val appContext: Context = context.applicationContext
+
+    val starCatalog by lazy { StarCatalog(appContext) }
+    val deepStarCatalog by lazy { DeepStarCatalog(appContext) }
+    val constellationCatalog by lazy { ConstellationCatalog(appContext) }
+    val deepSkyCatalog by lazy { DeepSkyCatalog(appContext) }
+    val milkyWayCatalog by lazy { MilkyWayCatalog(appContext) }
 
     /**
      * Where this phone is and where it is aimed.
@@ -47,10 +62,10 @@ class SkyContainer(private val context: Context) {
      * one would leave the first arming the hardware behind a control that reads as off — the same
      * shape [SkyHardware.startAttitude] is guarded against internally.
      */
-    val hardware by lazy { SkyHardware(context) }
+    val hardware by lazy { SkyHardware(appContext) }
 
     /** The token, the one-at-a-time install guard, and whether faults are sent on. */
-    val settings by lazy { SkySettings(context) }
+    val settings by lazy { SkySettings(appContext) }
 
     /**
      * This application keeping itself current.
@@ -69,9 +84,9 @@ class SkyContainer(private val context: Context) {
      */
     val updates: SelfUpdate by lazy {
         SelfUpdate(
-            context,
+            appContext,
             UpdateRepository(
-                context,
+                appContext,
                 http,
                 tag = UpdateRepository.SKY_TAG,
                 workflow = UpdateRepository.SKY_WORKFLOW,
@@ -96,7 +111,7 @@ class SkyContainer(private val context: Context) {
      */
     val crashReporter: CrashReporter by lazy {
         CrashReporter(
-            context,
+            appContext,
             appLabel = "Star Map",
             versionName = BuildConfig.VERSION_NAME,
             versionCode = BuildConfig.VERSION_CODE,
@@ -105,7 +120,7 @@ class SkyContainer(private val context: Context) {
 
     val crashUploader: CrashUploader by lazy {
         CrashUploader(
-            context,
+            appContext,
             crashReporter,
             // ⚠️ Its own stream, so reports from three applications land in three places on the
             // `debug-reports` branch rather than interleaving into one file nobody can attribute.
