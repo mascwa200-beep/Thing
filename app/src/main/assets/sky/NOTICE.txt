@@ -210,3 +210,111 @@ TO REBUILD
     column. It also refuses if fewer than all 781 edge rows parsed, if the
     boundary right ascensions do not span the sky, or if a boundary names a
     constellation the figures do not know.
+
+
+================================================================================
+
+
+deepsky.tsv — where it comes from and what was done to it
+=========================================================
+
+SOURCE
+    OpenNGC — "a license friendly NGC/IC objects database"
+    Mattia Verga
+    https://github.com/mattiaverga/OpenNGC
+
+    Files used: database_files/NGC.csv and database_files/addendum.csv. The
+    addendum carries objects outside the NGC and IC catalogues, including the
+    two Messier objects (M40 and M45) that have no NGC or IC designation.
+
+LICENCE, AND EXACTLY WHAT THE EVIDENCE FOR IT IS
+    The project's README says, in its own words:
+
+        "Unlike other similar databases which are released with license
+         limitations, OpenNGC is released under CC-BY-SA-4.0 license, which
+         allows the use for a wider range of cases."
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+    ⚠️ THAT SENTENCE IS THE WHOLE OF THE LICENCE STATEMENT. The repository
+    contains no licence file: LICENSE, LICENSE.md, LICENSE.txt, COPYING,
+    LICENCE and license.txt all return 404 at master, and NGC_guide.txt is
+    silent on the question. This notice states that plainly rather than
+    implying a formal grant that is not there. What CC-BY-SA-4.0 asks for is
+    attribution and share-alike, and both are honoured here: the database is
+    credited above, this file travels with the app, and nothing about the
+    data has been relicensed.
+
+UPSTREAM SOURCES, ACKNOWLEDGED AS THEY ASK TO BE
+    OpenNGC is itself a merge, and its README carries the wording each of
+    these databases requests. Reproduced:
+
+    This research has made use of the NASA/IPAC Extragalactic Database (NED)
+    which is operated by the Jet Propulsion Laboratory, California Institute
+    of Technology, under contract with the National Aeronautics and Space
+    Administration.
+
+    We acknowledge the usage of the HyperLeda database
+    (http://leda.univ-lyon1.fr).
+
+    This research has made use of the SIMBAD database, operated at CDS,
+    Strasbourg, France.
+
+    Several tables from the HEASARC High Energy Astrophysics Science Archive
+    Research Center (http://heasarc.gsfc.nasa.gov/) are used by OpenNGC:
+    messier, mwsc, lbn, plnebulae, lmcextobj and smcclustrs.
+
+    Positions and notes also draw on Harold Corwin's NGC/IC work,
+    http://haroldcorwin.net/ngcic/index.html
+
+WHAT WAS DONE TO IT
+    tools/sky/build_deepsky.py reads the two files — 14,034 rows carrying
+    thirty-two fields each — and writes ten of them for the 12,579 rows that
+    are an object worth drawing:
+
+        identifier            unchanged
+        type                  unchanged, OpenNGC's own string
+        right ascension       converted from sexagesimal hours to degrees
+        declination           converted from sexagesimal to degrees
+        magnitude and band    V where measured, B otherwise, band recorded
+        major and minor axis  unchanged, arcminutes
+        position angle        unchanged, degrees
+        label                 the first common name, else the Messier number
+
+    1,455 rows are dropped: 652 duplicate entries, 546 single stars and 244
+    double stars (which the star catalogue already draws), 10 objects later
+    shown not to exist, and 3 transients.
+
+    ⚠️ THE MAGNITUDE IS NOT ALL IN ONE BAND, WHICH IS WHY THE BAND IS STORED.
+    11,303 rows carry a B magnitude and only 4,218 carry V, with 161 having V
+    and no B — so preferring V and falling back to B is the difference between
+    4,218 objects with a brightness and 11,464. B and V are different
+    photometric bands and for these mostly-red populations B is the fainter
+    number, so mixing them silently would put a systematic bias into any cut
+    the app applies. No conversion is done here: it would need a colour this
+    catalogue does not measure for these objects.
+
+    ⚠️ SOME ANGULAR SIZES ARE INFRARED, NOT VISUAL. OpenNGC's own notes say
+    that where LEDA has no major or minor axis for a galaxy the value comes
+    from SIMBAD, usually a 2MASS measurement. An infrared extent is not the
+    extent an eye or a camera sees, and the difference is not recorded per
+    row, so a drawn ellipse is the best size available rather than a promise.
+
+    Nothing else in that repository is used: not the nebula outlines, not the
+    Hubble classifications, not the radial velocities, not the notes.
+
+TO REBUILD
+    curl -o /tmp/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv
+    curl -o /tmp/addendum.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
+    python3 tools/sky/build_deepsky.py /tmp/NGC.csv /tmp/addendum.csv \
+        app/src/main/assets/sky/deepsky.tsv
+
+    The builder re-derives M31 from its own output and refuses to finish if it
+    has moved more than five arcseconds from its published J2000 position,
+    which is the guard against a shifted column or a lost hours-to-degrees
+    conversion. It also refuses if any row was silently dropped, if a type
+    appears that it has never seen, if a minor axis is longer than its major,
+    if the objects do not span the sky, or if any of eight famous objects —
+    Andromeda, Orion, the Pleiades, the Ring, the Sombrero, the Whirlpool, the
+    Hercules cluster and the Small Magellanic Cloud — is missing or has no
+    magnitude.
