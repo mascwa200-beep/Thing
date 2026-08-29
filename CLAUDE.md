@@ -10643,10 +10643,135 @@ compete with what they cross, and the amber ecliptic passing through every plane
 has rotation-vector, remap and true north; it needs roll and a stiffer filter, plus nudge-to-align
 because a phone magnetometer is good to a few degrees at best) · **S9** IAU precession–nutation,
 aberration, refraction, parallax, proper motion · **S10** the `:sky` standalone app, modelled on
-`:nutrition` · **S11** the deep tier as an LCARS expansion pack via the existing `PackRepository`.
+`:nutrition` · **S11** the deep tier as an LCARS expansion pack via the existing `PackRepository`
+— ⚠️ **and that last mechanism is measurably the wrong one; see the S11 section at the end of this
+file.**
 
-⚠️ **Recorded rather than acted on: `:core:sky` has no test source set at all**, and it now holds
-`StarLayer`, `SkyLines`, `SkyRenderer`, `ConstellationField`, `DeepSkyLayer`, the Milky Way glow,
-`SolarSystemRender` and `ReferenceLines`. Every pure rule in this arc was deliberately placed in
-`:core:telemetry` for that reason, which works but is a constraint on where logic may live. Adding
-`:core:sky:testDebugUnitTest` to `android-build.yml`'s test line is its own small slice.
+~~⚠️ **Recorded rather than acted on: `:core:sky` has no test source set at all** … Adding
+`:core:sky:testDebugUnitTest` to `android-build.yml`'s test line is its own small slice.~~
+**DONE — that slice is the second half of the S11 section at the end of this file**, and it found a
+real trap in `StarLayer` on the way in.
+
+### S11 — THE DEEP TIER: what it costs, what it buys, and why it is NOT built (this session, PR #464)
+
+The last item in the sky plan, and the one where measuring first changed the answer. **Zero subagent
+and zero workflow spend**, per the standing credit directive, which overrides the ultracode reminder
+as it has for every arc since. Everything below is a live measurement, a `grep`, or a local run.
+
+**⚠️ THE PLAN'S STATED MECHANISM CANNOT CARRY IT, and that is a fact about the code rather than a
+judgement.** `PackArchive` takes **only `*.json`** (`PackArchive.kt:39`), caps an entry at **32 MB**
+and a pack at 256 MB, and the merge happens at `SurvivalContentRepository.index()` — it is the
+library-guide mechanism, and the deep tier is a 135 MB binary that must be **memory-mapped**.
+Routing one through the other means lifting the JSON filter, raising the entry cap fourfold, and
+pointing a guide merger at a star catalogue. The plan's sentence "via the existing `PackRepository`"
+reads as reuse and is a rewrite of the safety-shaped part of that class.
+
+**⚠️ AND THE TIER HAS NO NATURAL STOPPING POINT, which the plan's own reasoning assumed it did.**
+Star counts read live from the Gaia DR3 archive this session; file sizes at
+`StarCatalogFormat.RECORD_BYTES` = 8 a star; saturation fields computed from the shipped
+`magnitudeLimit`:
+
+| catalogue | stars | file | saturates at | dead zoom | marginal |
+|---|---|---|---|---|---|
+| **G < 12 (shipped)** | 3,087,821 | 24.7 MB | 5.59° | **48.6%** | — |
+| G < 13 | 7,369,627 | 59.0 MB | 3.23° | 40.0% | +34 MB for +8.6 points |
+| G < 14 | 16,844,156 | 134.8 MB | 1.87° | 31.4% | +76 MB for +8.6 points |
+
+"Dead zoom" is the share of the range, **in decades of field**, over which the map already draws
+everything it holds. Every extra magnitude buys **exactly** 0.238 decades — always, because
+`magnitudeLimit` is linear in log-field, so one magnitude is 1/`MAGNITUDES_PER_DECADE` — and costs
+about **2.2× the last**. The plan justified stopping at G < 14 on drawn density (408 /deg²), but the
+adaptive cut bounds the drawn count identically at every tier, so that argument does not distinguish
+13 from 14. **It is a budget choice with no cliff in it.** Nothing closes the gap either: saturating
+at `MIN_FOV_DEG` needs magnitude **17.7**, on the order of a billion stars.
+
+**⚠️ Three more measurements that bear on the decision, so nobody re-derives them.**
+- `stars.skycat` is **committed to git** and `.git` is already **427 MB**. A 135 MB blob makes it
+  ~562 MB permanently, on every clone in every run of four workflows. The repo's own pattern for a
+  large generated binary is **build in CI behind a cache** (the 424 MB food database), never commit.
+- LCARS is **329 MB** and its updater downloads the whole APK on every build; `:sky` is **33 MB**.
+  So the same 135 MB is a very different proposition on each, and on LCARS it is a recurring cost on
+  the owner's phone rather than a one-off.
+- The Gaia TAP is reachable from this container (a `COUNT(*)` at G < 14 answers in 4.4 s), so
+  building it is possible — the obstacle is delivery, not data.
+
+**So S11 is left unbuilt and reported, deliberately.** Every remaining decision in it is a
+size-versus-depth trade with no engineering answer, on artefacts the owner downloads to their own
+phone. What shipped instead is the half that has an answer.
+
+### What DID ship: the map stops lying about its own ceiling (`b2ff8cb`)
+
+Over **48.6% of the zoom range** the shipped catalogue draws everything it has, and both readouts
+said nothing — so the only available reading was that the sky is empty there. It is not; the file is.
+⚠️ **And the field readout was worse than silent: both apps printed `fovDeg.roundToInt()`, so
+anything under half a degree read "0° across"** — the deepest three quarters of a decade, exactly the
+range the deep catalogue exists to reach, and everything from 0.5° to 1.5° read "1°".
+
+`SkyProjection` gained `saturationFovDeg`, `isSaturated`, `formatFieldWidth` and `depthNote`, beside
+the law they are properties of; both readouts use them.
+- ⚠️ **Null is the ordinary answer for the note.** A line on every frame is read once and never again.
+- ⚠️ **It does not replace the catalogue's own note** — "the file would not open" and "you have zoomed
+  past what is in it" are different facts. Which turned up a second gap of the same class: **the
+  LCARS screen never rendered that one at all**, though the standalone app has since it was written,
+  so the LCARS map could silently fall back to the 8,404-star bright list with nothing on screen.
+- ⚠️ Arcminutes below a degree — the Moon is 31′, so "30′ across" is a picture — built from integers
+  rather than `String.format` so it carries **no locale**: a comma decimal would make the test pass or
+  fail by the machine it runs on, the rest of the readout is already locale-free, and both apps ship
+  `resourceConfigurations += listOf("en")`.
+
+⚠️ **A claim in the first draft was wrong and is corrected in the source rather than dropped:
+`roundToInt` is NOT `Math.rint`.** Measured against the JDK — `roundToInt` is `Math.round`
+(0.5 → 1, 2.5 → 3, 14.5 → 15) and `kotlin.math.round` is `Math.rint`, banker's (0.5 → 0, 2.5 → 2,
+14.5 → 14). Every value here is positive, where half-up and half-away-from-zero agree.
+
+### `:core:sky` gets its first test source set, and it found a trap (`this commit`)
+
+The recorded gap, closed: the module shipped **26 files and no `src/test` at all**, nine of them pure
+Kotlin — about **1,300 lines** of layer, field and batching arithmetic with no gate of any kind.
+`core/sky/src/test` now exists, `libs.junit` is declared, and **`android-build.yml`'s test line gains
+`:core:sky:testDebugUnitTest`** in the same commit, because a test source set CI does not run is
+worth exactly nothing.
+
+**⚠️ The trap it was written against, found by reading `StarLayer` for it.** `ensure()` **replaced**
+its arrays rather than copying, on the stated grounds that "every caller fills from scratch after
+clearing" — and `add()` is a caller that does not. `add` calls `ensure(count + 1)` and keeps the
+count, so the moment it crossed the capacity every star already written became a **zero vector at
+magnitude zero**: the whole bright set collapsed to one point on the celestial sphere, drawn, with
+nothing thrown and nothing logged.
+
+⚠️ **Not reachable today, and only by three hundred rows.** The one `add` caller
+(`SkyMapViewModel:312`) pre-sizes with `ensure(rows.size)` first, so the growth never fires — but
+`BRIGHT_CAPACITY` is **8,704** against a bright catalogue of **8,404**, and nothing in the build
+would notice the day that asset gains three hundred stars. `ensure` copies now, which makes `add`'s
+own contract true instead of leaving it right by the grace of a caller that need not have been
+written that way, and costs nothing measurable: both real call sites reach it with `count` at zero.
+A second guard closes a hang — `var size = maxOf(vx.size, 1)`, because a layer built with no capacity
+would otherwise spin for ever in the doubling loop (zero times two is zero).
+
+⚠️ **`:core:sky:testDebugUnitTest` cannot be run in this container** — it is an Android library and
+there is no SDK. Its PURE files can be, and `/tmp/skytest.sh` in the session scratchpad is how:
+compile the whole telemetry core (every file that does not import `android.*`) plus the named sky
+files plus the test, then `JUnitCore` on `dev.mascwa.pulse.sky.<Class>`. Same jar discipline as
+`scratchpad/coretest/run.sh`, including the serialization compiler plugin without which nothing
+compiles at all.
+
+**Verification across both slices, all local and free:** 35 `SkyProjectionTest` cases (up from 28)
+and 4 `StarLayerTest` cases run locally, every expected value computed from the shipped formulas
+before the assertion was written; **all seven load-bearing rules negative-tested** against a baseline
+asserted green first, each perturbation asserted to have matched the source, each file restored in a
+`finally` and confirmed byte-identical; `:desktop:build` green at 280 tests, since a shared core
+changed. ⚠️ The resolve gate's complaints were its documented `:core:sky` cascade, **proved rather
+than assumed** by planting `vm.revision` — a member that unquestionably compiles in CI — and watching
+it report identically.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a readout, it does not draw one.** Zoom the star map
+right in: the field should read in arcminutes (`15′`) rather than `0°`, and once past about 5.6°
+across a line should say the catalogue is exhausted and where that happened. On the LCARS map only,
+a second line now appears if the packed catalogue fails to open — it never used to.
+
+**Open:** S11 itself, above — a size decision, not an engineering one. If the deep tier is wanted,
+the shape that fits what was measured is **G < 13 or G < 14 built in CI behind a cache and bundled in
+`:sky` alone** (which keeps the owner's "100% offline, no download ever" for that app and costs the
+git history nothing), with **LCARS left on the core tier** — its pack mechanism cannot carry a
+memory-mapped binary, and 329 → 464 MB re-downloaded on every build is not a trade worth making for
+the last third of a zoom range.
