@@ -533,6 +533,51 @@ class SkyMapViewModel(
     val pointForward = doubleArrayOf(0.0, 1.0, 0.0)
     val pointUp = doubleArrayOf(0.0, 0.0, 1.0)
 
+    /**
+     * The screen's own frame in HORIZON coordinates while the handset is aiming, or null when it is
+     * not — in which case the caller wants `SkyProjection.basisOf(view)` instead.
+     *
+     * ⚠️ **This exists so everything held in HORIZON coordinates reads the frame the STARS are drawn
+     * in** — the horizon line, the four compass letters, the eight solar-system bodies, and a tap.
+     * All four went through [view], while the stars come from `SkyFrame.ofPointing`, built from
+     * these two vectors — so aimed near the zenith they were in a different frame from everything
+     * they are drawn over, and a tap resolved somewhere the finger had not been. The planets are the
+     * sharpest of the four: they are what somebody aiming the handset straight up is most likely to
+     * be pointing at.
+     *
+     * ⚠️ **The ALTITUDE CLAMP is the whole of the difference, and the roll is not part of it.** My
+     * first note here said the view "carries a roll sign this pair does not need", implying it
+     * contributed; measured over a spread of attitudes the two roll conventions agree to
+     * **0.000000000 screen units**, because `equivalentView` negating it is exactly what makes the
+     * angle path match the vector path — which `SkyPointingTest` has always asserted. What does
+     * differ is `SkyPointing.equivalentView` coercing the altitude to
+     * [SkyProjection.MAX_ALTITUDE_DEG], leaving a fixed ANGULAR error of up to 0.5°:
+     *
+     * ```
+     * aimed 89.9° up, where does a tap in the middle of the screen resolve to?
+     *   field 120°  0.400°   under 1% of the screen
+     *   field  20°  0.400°   2%
+     *   field   1°  0.400°   40%
+     *   field 0.25° 0.400°   160%  — further than the whole screen is wide
+     * ```
+     *
+     * So it is invisible at a wide field and total at the narrowest, which is the shape of a defect
+     * nobody notices until they zoom in on something overhead.
+     *
+     * ⚠️ **On the view model rather than at either call site**, because two copies of one frame
+     * conversion is what `SkyFrame.catalogueOf` already exists to prevent — and here one caller is a
+     * draw pass and the other a tap, which is exactly the pair least likely to be changed together.
+     *
+     * A basis is a cross product and two normalisations, so building it per frame costs nothing
+     * worth caching; the stars' own basis beside it is rebuilt the same way for the same reason.
+     */
+    fun pointedHorizonBasis(fovDeg: Double): SkyProjection.Basis? {
+        if (!_pointing.value) return null
+        // Roll zero: it is already inside the screen-up, exactly as in SkyFrame.ofPointing, and
+        // passing it again would apply it twice.
+        return SkyProjection.basisOf(pointForward, pointUp[0], pointUp[1], pointUp[2], fovDeg, 0.0)
+    }
+
     private var pointingJob: kotlinx.coroutines.Job? = null
 
     /**
@@ -632,8 +677,11 @@ class SkyMapViewModel(
                 )
                 first = false
                 // ⚠️ The angle view is kept in step because everything ELSE reads it — the field of
-                // view, the constellation cut, the horizon, the tap. Only the drawn basis comes from
-                // the vectors, which is the half that has no seam at the zenith.
+                // view, the constellation cut, the readout above the chart. The horizon and the tap
+                // used to as well and no longer do: they go through [pointedHorizonBasis], because
+                // this value's altitude is clamped and theirs must not be. What is left reading it
+                // either wants only the field, or is a number for a person rather than a direction
+                // to draw at.
                 _view.value = SkyPointing.equivalentView(a, _view.value.fovDeg)
             }
         }
@@ -698,7 +746,20 @@ class SkyMapViewModel(
      */
     fun identify(screenX: Double, screenY: Double) {
         val v = _view.value
-        val (az, alt) = SkyProjection.unproject(screenX, screenY, v)
+        // ⚠️ **Through the pointed frame while the handset is aiming, for the same reason the
+        // horizon is.** [view] is the angle form of the aim and it is not the aim: its altitude is
+        // clamped to [SkyProjection.MAX_ALTITUDE_DEG], so a tap taken through it resolved up to 0.4°
+        // from where the finger was — under a percent of the screen at a wide field and 160% of it
+        // at the narrowest, which is the measurement in `pointedHorizonBasis`. Falls back to the
+        // view when the basis has no orientation, so a tap can never silently do nothing.
+        val pointed = pointedHorizonBasis(v.fovDeg)
+        val dir = DoubleArray(3)
+        val (az, alt) = if (pointed != null && SkyProjection.unprojectUnit(screenX, screenY, pointed, dir)) {
+            SkyPointing.azimuthOf(dir) to SkyPointing.altitudeOf(dir)
+        } else {
+            SkyProjection.unproject(screenX, screenY, v)
+        }
+        // The tolerance reads only the field, which both paths share, so it needs no branch.
         val toleranceDeg = SkyProjection.degreesPerUnit(v) * TAP_RADIUS_FRACTION
 
         // The Sun, the Moon and the planets: eight things, still in horizon coordinates.

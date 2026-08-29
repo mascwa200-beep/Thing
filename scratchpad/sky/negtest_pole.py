@@ -20,10 +20,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyPointing.kt"
+PROJ = ROOT / "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyProjection.kt"
 TEST = ROOT / "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry/SkyPointingTest.kt"
 RUNNER = ROOT / "scratchpad/coretest/run.sh"
 
 # (name, [(needle, replacement), ...], [tests that must fail])
+# ⚠️ Every case perturbs SkyPointing.kt unless it names another file with a leading `file=` entry —
+# the frame-gap rules the slice-5 tests guard live in SkyProjection.kt, and a harness that could only
+# reach one file would have reported those three guards "awake" without touching the rule at all.
 CASES = [
     (
         "the roll negation comes back",
@@ -63,6 +67,24 @@ CASES = [
         [("ux -= d * fx; uy -= d * fy; uz -= d * fz", "ux -= 0.0; uy -= 0.0; uz -= 0.0")],
         ["a stiffer screen up still leaves a valid attitude"],
     ),
+    (
+        "the clamp bites well below the pole",
+        [("file=" + str(PROJ)),
+         ("const val MAX_ALTITUDE_DEG = 89.5", "const val MAX_ALTITUDE_DEG = 88.0")],
+        ["what that clamp costs anything drawn through the angle view, and it is worse the closer you look"],
+    ),
+    (
+        "the clamp moves the azimuth as well as the altitude",
+        [("azimuthDeg = a.azimuthDeg,\n        altitudeDeg = a.altitudeDeg.coerceIn(",
+          "azimuthDeg = a.azimuthDeg + 0.1,\n        altitudeDeg = a.altitudeDeg.coerceIn(")],
+        ["what that clamp costs anything drawn through the angle view, and it is worse the closer you look"],
+    ),
+    (
+        "screen units stop being normalised to the field",
+        [("file=" + str(PROJ)),
+         ("invScale = 1.0 / edgeRadius(fovDeg)", "invScale = 1.0")],
+        ["what that clamp costs anything drawn through the angle view, and it is worse the closer you look"],
+    ),
 ]
 
 FAILED = re.compile(r"^\d+\) (.+?)\(dev\.mascwa\.pulse", re.M)
@@ -76,8 +98,14 @@ def run():
     return set(FAILED.findall(out)), out
 
 
+def split(subs):
+    """A case's target file and its substitutions; `file=<path>` may lead the list."""
+    if subs and isinstance(subs[0], str) and subs[0].startswith("file="):
+        return Path(subs[0][5:]), subs[1:]
+    return SRC, subs
+
+
 def main():
-    original = SRC.read_text()
     baseline, out = run()
     if baseline is None:
         sys.exit("the harness could not build at all:\n" + out)
@@ -87,18 +115,28 @@ def main():
     print("baseline: green\n")
 
     verdicts = []
-    backup = Path(tempfile.mkdtemp()) / "SkyPointing.kt"
-    shutil.copy2(SRC, backup)
+    tmp = Path(tempfile.mkdtemp())
+    # ⚠️ Back up EVERY file any case touches before the first perturbation, not the one being
+    # perturbed — a harness that can be killed must restore all of them, and it must know what they
+    # were before anything ran rather than what they were when its turn came round.
+    targets = {split(subs)[0] for _, subs, _ in CASES}
+    backups = {}
+    for t in targets:
+        b = tmp / t.name
+        shutil.copy2(t, b)
+        backups[t] = b
     try:
         for name, subs, expected in CASES:
+            target, edits = split(subs)
+            original = backups[target].read_text()
             text = original
-            for needle, replacement in subs:
+            for needle, replacement in edits:
                 if needle not in text:
                     sys.exit(f"PERTURBATION DID NOT MATCH THE SOURCE for {name!r}: {needle!r}")
                 text = text.replace(needle, replacement, 1)
-            SRC.write_text(text)
+            target.write_text(text)
             failures, _ = run()
-            SRC.write_text(original)
+            target.write_text(original)
             if failures is None:
                 verdicts.append((name, "DID NOT COMPILE — perturbation invalid", False))
                 continue
@@ -110,9 +148,10 @@ def main():
                 detail += f" (also failed: {'; '.join(extra)})"
             verdicts.append((name, detail, ok))
     finally:
-        SRC.write_text(original)
-        if SRC.read_bytes() != backup.read_bytes():
-            sys.exit("RESTORE FAILED — the source is not what it was")
+        for t, b in backups.items():
+            t.write_bytes(b.read_bytes())
+            if t.read_bytes() != b.read_bytes():
+                sys.exit(f"RESTORE FAILED — {t} is not what it was")
 
     print("restored byte-identical\n")
     for name, detail, ok in verdicts:

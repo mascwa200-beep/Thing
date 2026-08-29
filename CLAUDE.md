@@ -10995,3 +10995,133 @@ which confirms all four things at once: the task is the one that already runs, t
 is in `android-build.yml`'s `paths-ignore` and matches no other workflow's allowlist, so only the
 five-minute sky build ran, and a FAILING sky build never reaches its publish step — `sky-latest` kept
 the last good APK throughout.
+
+### THE SKY MAP SPUN WHEN YOU POINTED IT UP — one sign, negated twice (this session, PR #464)
+
+Owner, reported against **both** applications: *"whenever I look directly up or directly down the
+orientation of the skymap seems to go all wonky … it only shifts for a slightly and that slight shift
+causes such a massive rotation … it should stay completely orientate locked, horizon lock and
+whatever locked no matter what way you Orient your phone sideways cattywampus."* Two binding
+AskUserQuestion answers governed the design: roll = **stay fixed to the world** (the picture
+counter-rotates so a constellation keeps its real tilt — true horizon-lock), overhead = **extra
+damping near the pole**.
+
+⚠️ **"you cannot use the plan usage" is a HARD constraint and it overrode BOTH the ultracode
+directive AND plan mode's own instruction to dispatch Explore/Plan agents.** Zero subagents, zero
+workflows for the whole arc. Every check below is local kotlinc + JUnit, a probe against the real
+`SensorManager` maths, `tools/android_compile_check.sh`, or CI.
+
+**The cause was one character.** `SkyPointing.fromDeviceOrientation` negated the reported roll and
+`equivalentView` negates it again — the same sign applied twice. `SkyPointingTest` line 104 stated
+the correct design *in words* ("`equivalentView` carries that negation") while the code did it in two
+places.
+
+⚠️ **The tests could not have caught it, and the reason is this repo's recorded shape.** `the vector
+path draws exactly what the angle path draws` compares the two paths **against each other**, both
+built from the same wrong `Attitude` — they agree perfectly and prove nothing about the sensor. The
+other test asserted the negated value as an expectation. Two independent statements of one fact, both
+wrong the same way.
+
+**Measured end to end** (`scratchpad/sky/PoleProbe.kt`: synthetic attitude matrix → real
+`remapCoordinateSystem` → real `getOrientation` → the shipped composition), because a derivation is
+not evidence:
+
+| | worst picture error |
+|---|---|
+| shipped | **180°** |
+| corrected | **7.0e-06°** |
+
+A 0.25° nudge of the aim, at 10 / 1 / 0.5 / 0.25° from vertical, turned the picture by
+**2.8 / 29.0 / 60.0 / 175.0°** under the shipped sign and **0.000°** under the corrected one. The
+degeneracy is real and is why it presents at both poles: at the zenith the well-conditioned
+combination is `A − ρ` (the bearing of the nearly-horizontal screen-up); the shipped code formed
+`A + ρ`, which amplifies hand noise without bound.
+
+**Three more defects fell out of the same read.**
+- ⚠️ **`SkyPointing.smooth` was a total no-op at its only call site.** `smooth(f, u, next, α, f, u)`
+  aliases `prev` and `out`, and it wrote the fresh reading into `out` before the blend read `prev` —
+  so the blend was `new·(1−w) + new·w = new`. **The whole of `SkyBudget` is shaped around that
+  weight and none of it could have any effect.** No test caught it: every existing `smooth` test
+  passes distinct arrays. Fixed in the function (the aliased call is the natural way to use it and
+  the signature invites it), not at the call site.
+- **The horizon, the compass letters, the planets and every tap read the clamped angle view** while
+  the stars came from the vectors. See the next section.
+- Three comments overstating their own justification, corrected.
+
+**Slice 4 — the pole damping, and the arithmetic that makes it safe to ship blind.**
+`SkyPointing.upAlpha(alpha, altitudeDeg)` stretches the screen-up's time constant near the pole:
+`w' = 1 − (1−w)^(1/k)`, which is exact rather than a fudge — an exponential filter retains `(1−w)`
+per sample, so running it `k` times longer is that identity. ⚠️ It operates on the **already
+rate-corrected** weight `SkyBudget.smoothingFor` produces, so it stays correct at every sensor rate,
+which is the trap that whole file exists for; and **`k = 1` returns the argument unchanged**, so away
+from the pole this is provably today's behaviour. Only the screen-up is damped, never the look
+direction — damping the aim would make a deliberate sweep across the zenith lag, and `smooth`
+re-orthogonalises `up` against `forward` so the two may carry different weights safely. `k` ramps by
+smoothstep (a step would snap the picture at the crossing); `POLE_RAMP_DEG`/`POLE_MAX_STRETCH` are
+named constants because they are a guess at *feel*.
+
+⚠️ **Blast radius checked rather than assumed:** `Reading.roll` and `Reading.pitch` have exactly one
+consumer each (`SkyDevice.kt:75,77`), only in `cameraUpright` mode, which only the star map uses. The
+compass rose, the HUD and the nav map pass `cameraUpright = false`, where neither is ever written.
+
+### The horizon, the planets and every tap join the stars' frame (same PR)
+
+Everything the map holds in **horizon** coordinates went through `basisOf(equivalentView(a, fov))`
+while the stars came from `SkyFrame.ofPointing` — two frames for one picture. Now one
+`SkyMapViewModel.pointedHorizonBasis(fov)`, null when not aiming, used by `drawHorizon` (which takes
+a `Basis` instead of a `View`), by the four compass letters, by the eight solar-system bodies and by
+`identify`.
+
+⚠️ **THE FIRST VERSION OF THAT KDOC OVERSTATED IT AND THE MEASUREMENT CORRECTED ME.** I wrote that
+the view "clamps the altitude AND carries a roll sign the vector pair does not need", implying both
+contributed. Measured over a spread of attitudes (`scratchpad/sky/FrameGapProbe.kt`), the two roll
+conventions agree to **0.000000000 screen units** — `equivalentView` negating the roll is exactly
+what makes the angle path match the vector path, which `SkyPointingTest` has always asserted. **The
+altitude clamp is the whole difference**, and it is a fixed *angular* error that a narrow field
+magnifies without bound:
+
+```
+aimed 89.9° up, where does a tap in the middle of the screen resolve to?
+  field 120°  0.400°   under 1% of the screen        field   5°  0.400°    8%
+  field  20°  0.400°   2%                            field   1°  0.400°   40%
+                                                     field 0.25° 0.400°  160%
+```
+
+So it is invisible at a wide field and total at the narrowest — the shape of a defect nobody notices
+until they zoom in on something overhead. **The planets are the sharpest of the four**: they are what
+somebody aiming the handset straight up is most likely to be pointing at.
+
+⚠️ **A probe that reports 0.0000 has not necessarily measured anything.** My first field sweep swept
+*horizon directions* and reported a flat zero at 5° and below — because at that field none of them is
+on screen, so nothing was compared. That reads as "no error" and is really the recorded *fixture
+never reached the branch*. Rewritten to ask where the **middle of the screen** resolves to, which is
+what a tap actually asks and is defined at every field.
+
+**Also worth keeping:** `drawHorizon`'s `centreAzimuthDeg` only sets where the 360° sweep starts —
+verified numerically over seven centre values that the loop runs exactly 181 samples spanning exactly
+360°, so the polyline closes on itself and the parameter cannot leave a gap. And `unitVector` +
+`projectUnit` is **strictly cheaper** than the `project` it replaces, which rebuilt the whole basis
+(four trigonometric calls and a second allocation) for every one of the 181 samples.
+
+**Verification, all local and free.** `SkyPointingTest` 27 green (was 23); **nine load-bearing rules
+negative-tested** against a baseline asserted green first, each perturbation asserted to have matched
+the source, all restored byte-identical, all nine awake. `tools/check_changed.sh` clean per slice; the
+whole of `:core:sky` plus the pure core — 196 files — type-checks clean against the real platform and
+the real Compose artifacts, that gate negative-tested with a planted typo. CI green on the first four
+slices (all five check runs, including the Windows MSI).
+
+⚠️ **`scratchpad/negtest_pole.py` gained a per-case target file**, because three of the slice-5 rules
+live in `SkyProjection.kt` and a harness that could only reach `SkyPointing.kt` would have reported
+them "awake" without touching the rule at all. It now backs up **every** file any case touches before
+the first perturbation — not the one being perturbed when its turn comes round.
+
+⚠️ **`scratchpad/` is NOT gitignored**, and 64 files there are already tracked — so the probes are
+committed (the source KDocs cite them). Re-confirmed the `git add -A` trap the hard way.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one, and this container has no
+phone to wave about.** In order: point it straight up and move your wrist a little (the sky should
+barely move, where it used to spin); roll the handset (the constellations should keep their tilt
+against the horizon rather than turning with the glass); check the horizon line and the N/E/S/W
+letters still sit where they should when aimed high; tap a star near the zenith at a narrow field and
+confirm the identify card names what your finger was on. The pole damping's *feel* — steady versus
+sluggish — is the one thing only a hand can judge; both constants are named and easy to tune.

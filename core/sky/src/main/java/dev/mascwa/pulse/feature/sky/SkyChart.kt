@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeepSky
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
+import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
 import dev.mascwa.pulse.sky.LineBatch
@@ -230,7 +231,21 @@ fun SkyChart(
             }
         }
 
-        drawHorizon(view, colors, half, cx, cy, viewport, cardinalPaint)
+        // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters and
+        // the eight solar-system bodies — and it is the frame the stars above were built from
+        // whenever the handset is aiming.** All three used to go through `basisOf(view)`, whose
+        // altitude is clamped to [SkyProjection.MAX_ALTITUDE_DEG], while the stars came from the
+        // vectors; the measurement is in `SkyMapViewModel.pointedHorizonBasis`, and the short of it
+        // is a fixed 0.4° that is invisible at a wide field and wider than the whole screen at the
+        // narrowest. `pointedHorizonBasis` is null when the handset is not aiming, and then the
+        // view's own basis is right — the point is that only ONE of the two is ever in play.
+        val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
+        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
+        drawHorizon(
+            horizonBasis,
+            if (pointedBasis != null) SkyPointing.azimuthOf(vm.pointForward) else view.azimuthDeg,
+            colors, half, cx, cy, viewport, cardinalPaint,
+        )
 
         val limit = SkyProjection.magnitudeLimit(view.fovDeg, deepest)
         if (frame != null) {
@@ -328,8 +343,13 @@ fun SkyChart(
 
         // The Sun, the Moon and the planets: eight things, still in horizon coordinates because
         // that is what the ephemeris answers and eight conversions a rebuild costs nothing.
+        //
+        // ⚠️ Through `horizonBasis`, not the view — these are the eight objects somebody aiming the
+        // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
+        // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
-            val p = SkyProjection.project(b.azimuthDeg, b.altitudeDeg, view)
+            val bv = SkyProjection.unitVector(b.azimuthDeg, b.altitudeDeg)
+            val p = SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
             if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach
             val screen = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
             val isBelow = b.altitudeDeg < 0
@@ -347,7 +367,8 @@ fun SkyChart(
             // projection the body itself went through — which is what lets the renderer measure
             // orientations rather than assume them. See PlanetDisc.Appearance.
             val project: (PlanetDisc.SkyPoint) -> Offset? = { pt ->
-                val q = SkyProjection.project(pt.azimuthDeg, pt.altitudeDeg, view)
+                val qv = SkyProjection.unitVector(pt.azimuthDeg, pt.altitudeDeg)
+                val q = SkyProjection.projectUnit(qv[0], qv[1], qv[2], horizonBasis)
                 if (q.visible) Offset(cx + (q.x * half).toFloat(), cy + (q.y * half).toFloat()) else null
             }
             // Measured a degree at a time rather than divided out of the field, because the
@@ -517,9 +538,21 @@ private fun DrawScope.drawStarLabels(
  * looks straight when you are looking level at it; tilt up and it curves away, which is the whole
  * reason a projection was needed. Drawing it straight would be the giveaway that the map is a flat
  * picture rather than a window.
+ *
+ * ⚠️ **It takes a prepared [SkyProjection.Basis] rather than a [SkyProjection.View], so that while
+ * the handset is aiming it is drawn in the frame the STARS are in.** It used to take the view, whose
+ * altitude `SkyPointing.equivalentView` clamps to [SkyProjection.MAX_ALTITUDE_DEG] — so aimed near
+ * the zenith the line and the four letters sat in a different frame from everything they are drawn
+ * over. The roll is NOT part of that difference, measured: the two conventions agree exactly. See
+ * `SkyMapViewModel.pointedHorizonBasis`, which is where the one conversion and the numbers live.
+ *
+ * @param centreAzimuthDeg only sets where the 360° sweep starts. The polyline closes on itself
+ *   either way, so this cannot leave a gap; what it does buy is samples placed symmetrically about
+ *   the view, so the two visible ends fall in the same place they always have.
  */
 private fun DrawScope.drawHorizon(
-    view: SkyProjection.View,
+    basis: SkyProjection.Basis,
+    centreAzimuthDeg: Double,
     colors: SkyColors,
     half: Float,
     cx: Float,
@@ -528,9 +561,14 @@ private fun DrawScope.drawHorizon(
     paint: Paint,
 ) {
     var previous: Offset? = null
-    var az = view.azimuthDeg - 180.0
-    while (az <= view.azimuthDeg + 180.0) {
-        val p = SkyProjection.project(az, 0.0, view)
+    var az = centreAzimuthDeg - 180.0
+    while (az <= centreAzimuthDeg + 180.0) {
+        // ⚠️ `unitVector` rather than open-coding `(sin az, cos az, 0)`: writing a frame conversion
+        // out at a call site is what `SkyProjection.equatorialVector`'s own warning is about, and
+        // this is strictly CHEAPER than the `project` it replaces, which built the same vector AND
+        // rebuilt the whole basis — four trigonometric calls and a second allocation — every sample.
+        val v = SkyProjection.unitVector(az, 0.0)
+        val p = SkyProjection.projectUnit(v[0], v[1], v[2], basis)
         // ⚠️ Only join points that are BOTH drawable. Without the check a segment leaving the view
         // is drawn to a point far off screen and the horizon gains a spike across the chart.
         //
@@ -553,7 +591,8 @@ private fun DrawScope.drawHorizon(
 
     paint.textSize = 12f * density
     listOf("N" to 0.0, "E" to 90.0, "S" to 180.0, "W" to 270.0).forEach { (name, azimuth) ->
-        val p = SkyProjection.project(azimuth, 0.0, view)
+        val v = SkyProjection.unitVector(azimuth, 0.0)
+        val p = SkyProjection.projectUnit(v[0], v[1], v[2], basis)
         if (!p.onScreen(viewport)) return@forEach
         paint.color = (if (name == "N") colors.north else colors.label).toArgb()
         drawContext.canvas.nativeCanvas.drawText(

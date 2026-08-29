@@ -245,6 +245,68 @@ class SkyPointingTest {
         assertEquals(90.0, SkyPointing.altitudeOf(f), 1e-9)
     }
 
+    @Test
+    fun `what that clamp costs anything drawn through the angle view, and it is worse the closer you look`() {
+        // ⚠️ **This is why `SkyMapViewModel.pointedHorizonBasis` exists**, in the units a person sees
+        // rather than as a remark about a coerce. The horizon line, the four compass letters, the
+        // eight solar-system bodies and every tap are held in HORIZON coordinates, and all of them
+        // used to be projected through `basisOf(equivalentView(a, fov))` while the stars came from
+        // the vector pair. What follows measures the gap that opened between them.
+        //
+        // Screen units are the ones the renderer multiplies by half the SHORT dimension, so 1.0 is
+        // the near edge and 2.0 is the whole width.
+
+        // Inside the clamp there is no gap at all, and that is the half that makes the wiring change
+        // safe to ship without a phone: at every ordinary altitude the two frames are the same frame.
+        val safe = SkyPointing.Attitude(37.0, 89.0, 30.0)
+        val fs = DoubleArray(3)
+        val us = DoubleArray(3)
+        SkyPointing.forward(safe, fs)
+        SkyPointing.screenUp(safe, us)
+        for (field in doubleArrayOf(120.0, 20.0, 0.25)) {
+            val p = SkyProjection.projectUnit(
+                fs[0], fs[1], fs[2], SkyProjection.basisOf(SkyPointing.equivalentView(safe, field)),
+            )
+            // The true aim lands dead centre of the screen the clamped view lays out. Measured 0.0.
+            assertEquals("inside the clamp at $field°", 0.0, hypot(p.x, p.y), 1e-12)
+        }
+
+        // Above it the aim is a fixed ANGLE out — exactly the overshoot, because the clamp only
+        // moves the altitude and leaves the azimuth alone: 89.9 − 89.5 = 0.4°.
+        val over = SkyPointing.Attitude(37.0, 89.9, 30.0)
+        val clamped = SkyPointing.equivalentView(over, fov)
+        assertEquals(
+            "the clamp costs exactly the overshoot",
+            over.altitudeDeg - SkyProjection.MAX_ALTITUDE_DEG,
+            over.altitudeDeg - clamped.altitudeDeg,
+            1e-12,
+        )
+        assertEquals("and nothing sideways", over.azimuthDeg, clamped.azimuthDeg, 1e-12)
+
+        // ⚠️ **And a fixed angle is not a fixed error.** Screen units are normalised to the field, so
+        // the same 0.4° swells without bound as you zoom in — which is the shape of a defect nobody
+        // notices until they look closely at something overhead. Measured radii, in screen units:
+        //   120°  0.006046      5°  0.159975
+        //    60°  0.013027      1°  0.799998
+        //    20°  0.039899   0.25°  3.200012   ← further out than the screen is WIDE
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        SkyPointing.forward(over, f)
+        SkyPointing.screenUp(over, u)
+        var previous = -1.0
+        for (field in doubleArrayOf(120.0, 60.0, 20.0, 5.0, 1.0, SkyProjection.MIN_FOV_DEG)) {
+            val p = SkyProjection.projectUnit(
+                f[0], f[1], f[2], SkyProjection.basisOf(SkyPointing.equivalentView(over, field)),
+            )
+            val r = hypot(p.x, p.y)
+            assertTrue("narrowing the field must widen the gap, at $field°", r > previous)
+            previous = r
+        }
+        // At the narrowest field the true aim is off the screen entirely — a tap in the middle
+        // resolved to a direction more than a screen-width away from the finger.
+        assertTrue("off the screen at the narrowest field: $previous", previous > 2.0)
+    }
+
     // ------------------------------------------------- into the stars' own frame
 
     @Test
