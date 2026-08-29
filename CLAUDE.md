@@ -5034,6 +5034,100 @@ review's findings (triage on arrival); the PR #449 batch merge to main once CI i
   half; the tool checks both. Refuted findings recorded in the commit messages.
 - **Tip `7e27436` pushed; PR #449 title/body updated to B1–B13.** Merge to main once CI is green.
 
+### S10 — the standalone star map, three slices in (this session, PR #464)
+
+S9b merged the proper-motion work; this is S10 from the sky plan, and the first three of its
+slices are pushed and CI-green. **Zero subagent and zero workflow spend**, per the standing credit
+directive, which overrides the ultracode reminder as it has for every arc since.
+
+- **S10a `88922a8`** — the six sky assets move from `app/src/main/assets/sky/` into
+  `core/sky/src/main/assets/sky/`. AGP merges a library's assets into every consuming APK, which is
+  what lets one copy serve both applications; the precedent in this build is `core/health`'s food
+  seed. ⚠️ Every way that merge can break is SILENT (the copy not running, a wrong resource root, a
+  rebuilt catalogue reordering columns), so a CI step derives the expected file list from the
+  library's own asset directory, requires each in the APK, carries a sentinel that must be absent,
+  and asserts `unzip -v` reports `stars.skycat` as **Stored** rather than `Defl:N`. That last check
+  had never existed anywhere despite `SkyCatalogSource`'s KDoc worrying about it at length.
+  ⚠️ `androidResources { noCompress += "skycat" }` **cannot** live in `:core:sky` — packaging
+  belongs to whichever module builds the APK, so every application bundling the catalogue declares
+  it separately.
+- **S10b `834ec07`** — the five catalogue readers follow their assets into `:core:sky`. Package
+  kept, so the diff is five renames and not one call site moved.
+  ⚠️ **The trap: `internal` is scoped to a Gradle MODULE.** `StarCatalog`'s `internal companion
+  object` was legal beside its two readers in `:app` and a visibility error the instant it was not —
+  `EPOCH_YEAR` is read by `SkyMapViewModel` and `OrbitalViewModel`. Same shape that stopped a test
+  seeing `StoredEntry` when the health layer was carved out.
+  ⚠️ **AND THE GATE WRITTEN FOR EXACTLY THIS REPORTED CLEAN AGAINST IT**, two ways, both fixed in
+  the same commit: its module list was hand-maintained and never gained `:core:sky` (so "ok" meant
+  it had not looked — the mirror-map and path-filter shape again; both lists are DERIVED from
+  `settings.gradle.kts` now, 85 members scanned before, 140 after), and an `internal companion
+  object` carries the modifier ONCE on the block while the matcher only looked for it on the member.
+- **S10c `10cdc51`** — `SkyMapViewModel` moves into `:core:sky` behind **`SkyDeps`**, so both
+  applications drive one view model rather than two that can drift. Two questions — where you are,
+  where the phone is aimed — as an interface rather than moving the services in, because
+  `LocationProvider` has twenty consumers and `CompassController` four. `:app` supplies `SkyDevice`.
+  - ⚠️ **A REAL DEFECT FELL OUT OF DESIGNING THE SEAM.** `CompassController` publishes a `StateFlow`
+    seeded with an all-zero reading carrying `hasSensor = true` — meaning "this phone HAS a
+    rotation-vector sensor", true from construction, reading as "level and pointed due north". A
+    StateFlow hands a new collector its current value at once, so the map's "take the FIRST reading
+    whole rather than blending it" branch spent itself on a non-reading and the first real sample
+    arrived at `POINT_SMOOTHING = 0.25`. Sixteen samples at ~20 ms: **about a third of a second of
+    the sky sweeping in from due north on every enable**, which is exactly what that branch exists
+    to prevent. `Reading.hasReading` is now the fact that something was measured (defaulted false,
+    written only from a real event, so the other three consumers are untouched), and `SkyAttitude`
+    is **null until measured**, which makes the seed unrepresentable.
+  - ⚠️ **The move exposed arithmetic in the wrong module.** `PlanetCalc` is Schlyter's method whose
+    only imports are `kotlin.math`, and it sat in `:core:feeds` beside the HTTP client purely
+    because `data/orbital` was carved out of `:app` whole — so the only way for an offline star
+    chart to draw a planet was to depend on OkHttp and twenty-two repositories. It moves to
+    `:core:telemetry` beside `Ephemeris`/`Comets`/`Occultations`, and **`Planet`** — the type it
+    returns, and the only thing that produces one — moves with it. Both keep their package, so none
+    of the seven call sites moved.
+
+**Verification for the three slices, all local and unusually strong because two of the three modules
+genuinely build here:** `:core:telemetry:test` **2,480** green (PlanetCalcTest's 3 among them, in its
+new module) and `:core:feeds:test` **71** green, both really executed; `:desktop:build` green with
+`--rerun-tasks`, which matters because that module names both moved types; and **the whole of
+`:core:sky` — 192 files including the pure core — type-checks clean against the real platform** via
+`tools/android_compile_check.sh` with the compose+lifecycle artifacts on `-l`, that gate
+negative-tested by planting a nonexistent seam method. The widened internal gate was negative-tested
+both ways: it names both crossings with the companion put back to `internal`, and deleting its new
+companion-block branch lets that same defect go unreported again, so the branch is what does the
+work. CI: runs **2123** fully green, **2124** green through "Run unit tests".
+
+⚠️ **THE COMPOUND `git add` TRAP BIT FOR A THIRD TIME AND ALMOST SHIPPED A BROKEN COMMIT.**
+`git add -A <paths>` with a pathspec that no longer exists — the now-empty `app/.../data/sky` —
+**ABORTS the whole add**, so S10b's first commit carried the five renames `git mv` had already
+staged and NONE of the three edits, including the visibility fix that is its whole point. It looked
+complete and would have failed CI. Amended (the commit was local, so no force-push). **Stage paths
+individually and read `git status` afterwards, never the exit message.**
+
+**S10 is NOT finished. What remains, and why it stopped here rather than being rushed:**
+- ⚠️ **The `:sky` app needs the CANVAS in `:core:sky`, and that is the real remaining work.**
+  `SkyMapScreen`'s `SkyCanvas` is ~250 lines of draw wiring — remembered Paints, star buckets, a
+  line batch, a MilkyWayGlow that owns a Bitmap — and the plan is explicit that it belongs in
+  `:core:sky` parameterised by a colour set, because two copies of a star renderer is the drift this
+  repository has corrected repeatedly. ⚠️ That means giving `:core:sky` the **Compose compiler
+  plugin**, which its build file currently argues against on the grounds that nothing in it is
+  `@Composable` — a comment that becomes false with this change and must move with it.
+- Then the app itself: manifest, `MainActivity`, a plain Material 3 shell around the shared canvas,
+  resources, and `sky-build.yml` with its own path allowlist, concurrency group and `sky-latest`
+  rolling tag (⚠️ its own tag, never `latest` — `action-gh-release` rewrites the release NAME and
+  that is where each updater reads its build number).
+- ⚠️ **A half-written `sky/` module was deliberately NOT committed and is parked in the session
+  scratchpad at `skymodule/`** — `build.gradle.kts` (universal APK, no `abiFilters`, committed debug
+  key, R8 off, its own `noCompress += "skycat"`) and `SkyHardware.kt` (a `SkyDeps` over
+  `SensorManager`/`LocationManager`). Committing an unincluded module would be the
+  declared-but-never-built shape this file already records against `:core:sky` itself, and including
+  it without a manifest breaks the build. The design note worth keeping from it: `:sky` writes its
+  own attitude source rather than sharing `CompassController`, because that class carries two modes
+  the map does not want and **the part that could actually be got wrong is already shared** —
+  `SkyPointing.fromDeviceOrientation` is the one tested definition of what the sensor's numbers mean.
+- **S11** (the Gaia G<14 deep tier as an LCARS expansion pack) is untouched.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it cannot open a sensor: turn pointing mode on in the
+star map and check the sky arrives where the phone is aimed rather than swinging in from north.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
