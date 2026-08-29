@@ -29,7 +29,13 @@ android {
         //
         // ⚠️ **No `ndk { abiFilters }` and no `externalNativeBuild`, deliberately.** Naming an ABI
         // here is the one edit that would undo the point of the module.
-        minSdk = libs.versions.minSdkWide.get().toInt()
+
+        // ⚠️ **Its OWN floor, lower than every other module in the build.** The nutrition app sits
+        // at [minSdkWide] because 26 is where `java.time` arrives on the platform; this one carries
+        // core library desugaring (see `compileOptions` below), so that reason does not apply and it
+        // reaches the further back the owner asked for. See `minSdkSky` in the version catalogue for
+        // why the number is 23 and what was measured to arrive at it.
+        minSdk = libs.versions.minSdkSky.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = skyBuildNumber
         versionName = "1.0.$skyBuildNumber"
@@ -69,6 +75,17 @@ android {
     }
 
     compileOptions {
+        // ⚠️ **The safety net, and it goes in BEFORE the floor drops rather than after.** Below
+        // API 26 the platform has no `java.time`, and the failure mode without this is the one this
+        // project has already been bitten by twice: the build is green, the APK ships, and the app
+        // throws `NoClassDefFoundError` on the device — a class resolved at runtime that no compiler
+        // could have missed. D8 rewrites those calls against a bundled backport instead.
+        //
+        // ⚠️ It is enabled even though NOTHING in this application's own source uses `java.time`.
+        // The reach is `:core:feeds`, pulled in transitively by `:core:update`'s two imports, and a
+        // future shared core could add one at any time without this module noticing. A safety net
+        // that only covers what is there today is not one.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -101,6 +118,11 @@ android {
 }
 
 dependencies {
+    // ⚠️ Its OWN configuration, not `implementation`. This artifact is handed to D8 to rewrite
+    // against, never compiled against, and declaring it as an ordinary dependency compiles
+    // perfectly while desugaring nothing — a silent no-op behind a flag that reads as enabled.
+    coreLibraryDesugaring(libs.android.desugar.jdk.libs)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

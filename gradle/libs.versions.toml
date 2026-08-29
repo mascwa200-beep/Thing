@@ -11,8 +11,41 @@ minSdk = "31"
 # a 2021 minimum; the standalone nutrition app is meant to run anywhere, and the shared modules it
 # uses have to declare a floor at least as low or the manifest merger refuses the build. 26 is where
 # `java.time` becomes available without core library desugaring, and the shared code uses it in a
-# dozen places.
+# dozen places — measured since: 23 imports across 7 files, ALL of them in `:core:feeds`.
 minSdkWide = "26"
+
+# ⚠️ The star map's own floor, separate from [minSdkWide] because it is the one application whose
+# whole point is running on a phone nobody else supports, and because it is the only one that has
+# done the work to go lower — see `sky/build.gradle.kts` for what that work was.
+#
+# ⚠️ **23 is where THIS CODE naturally sits, which is a much better reason than my reading of
+# anyone's support window.** Every borderline platform member the star map and its two Android
+# libraries touch lands at exactly 23 and not one of them lower: `Context.getSystemService(Class)`,
+# `ConnectivityManager.activeNetwork` and `PowerManager.isDeviceIdleMode` are all API 23. Going to
+# 21 would mean adding a version guard around each of three things that work today, for devices
+# Google stopped serving. So the code chose this number; the support window merely agrees with it.
+#
+# What else was measured rather than recalled: every AndroidX and Compose artifact here declares
+# `minSdkVersion="21"` in its own shipped AAR manifest (lifecycle declares 19), so nothing in the
+# dependency set objects; and `Math.floorDiv`/`floorMod`, used eight times in the plain-JVM cores
+# whose classes land in this APK, are on R8's own backported-method list at min-api 23 — asked of
+# `com.android.tools.r8.BackportedMethodList --min-api 23` directly, because the failure mode of
+# guessing is a `NoSuchMethodError` on a device and lint cannot see inside a jar dependency.
+#
+# ⚠️ The one thing I could NOT verify is which Android release Google still serves — my knowledge
+# ends in May 2026 and that is exactly the kind of fact that moves. It is deliberately one line, and
+# changing it changes nothing else.
+minSdkSky = "23"
+
+# Core library desugaring, which is what makes a floor below 26 legal at all.
+#
+# ⚠️ 2.1.5 is the newest, and it is safe for AGP 8.7.3 by MEASUREMENT rather than recollection: the
+# `desugar_jdk_libs_configuration` artifact for 2.0.4, 2.1.4 and 2.1.5 all declare
+# `configuration_format_version: 200` and `required_compilation_api_level: 30`, read out of the
+# published jars. compileSdk is 35, so both conditions hold and the three are interchangeable as far
+# as the toolchain is concerned. It is a JAR rather than an AAR, so it carries no
+# `aar-metadata.properties` and cannot spring the `checkDebugAarMetadata` trap Health Connect did.
+desugarJdkLibs = "2.1.5"
 targetSdk = "35"
 
 # AndroidX core / lifecycle / activity
@@ -131,6 +164,10 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+# ⚠️ Declared on the `coreLibraryDesugaring` configuration, NOT `implementation` — it is fed to D8
+# rather than compiled against, and putting it on the wrong configuration compiles perfectly while
+# desugaring nothing at all.
+android-desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 coil-base = { group = "io.coil-kt", name = "coil-base", version.ref = "coil" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 coil-svg = { group = "io.coil-kt", name = "coil-svg", version.ref = "coil" }

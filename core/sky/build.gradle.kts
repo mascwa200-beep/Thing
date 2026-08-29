@@ -29,7 +29,13 @@ android {
         // ⚠️ The WIDE floor, for the reason :core:database states: a library declaring a higher
         // minimum than its consumer fails the manifest merge, and the standalone sky app this module
         // exists to serve will reach much further back than the Pixel-gated one.
-        minSdk = libs.versions.minSdkWide.get().toInt()
+        // ⚠️ The SKY floor, which is lower than [minSdkWide] — a library declaring a higher minimum
+        // than its consumer fails the manifest merge, and the standalone star map now reaches back to
+        // 23. Declaring it here is not a formality: it is what makes this module's own lint check its
+        // sources at 23, so an unguarded newer API becomes a build failure rather than a crash on the
+        // one phone that would ever hit it. The apps that consume this at a HIGHER floor are
+        // unaffected; lint analyses each module at its own minimum.
+        minSdk = libs.versions.minSdkSky.get().toInt()
     }
 
     compileOptions {

@@ -18,7 +18,12 @@ android {
         // ⚠️ The WIDE floor. A library declaring a higher minimum than its consumer fails the
         // manifest merge, and the standalone nutrition app reaches much further back than the
         // Pixel-gated one.
-        minSdk = libs.versions.minSdkWide.get().toInt()
+        // ⚠️ The SKY floor, for the reason `:core:sky` states at length: a library declaring a higher
+        // minimum than its consumer fails the manifest merge, the star map is now at 23, and declaring
+        // it here is what puts this module's own sources under lint at 23. This module is the one with
+        // real version-gated code — `SDK_INT` checks for S, TIRAMISU, R, 29 and 28 — so it is also the
+        // one where that check earns its keep.
+        minSdk = libs.versions.minSdkSky.get().toInt()
     }
 
     compileOptions {
