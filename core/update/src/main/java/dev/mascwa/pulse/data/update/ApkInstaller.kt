@@ -51,8 +51,27 @@ object ApkInstaller {
 
     private const val TAG = "ApkInstaller"
 
-    /** Broadcast action for the session's own result. Package-scoped; the receiver is not exported. */
-    private const val ACTION_RESULT = "dev.mascwa.pulse.INSTALL_RESULT"
+    /**
+     * Broadcast action for the session's own result. Package-scoped; the receiver is not exported.
+     *
+     * ⚠️ **This string and the `<action>` in this module's manifest are two literals that MUST
+     * agree**, and nothing in the build checks it — a mismatch compiles, installs, and then simply
+     * never delivers a result, which on a device that is neither device owner nor installer of
+     * record means rung 3's confirmation is never shown and updates silently stop arriving. Change
+     * one and change the other in the same commit.
+     *
+     * ⚠️ It reads `data.update` and not `dev.mascwa.pulse.INSTALL_RESULT`, which is what it said
+     * when this module was still part of `:app`. The action belongs to the library that declares
+     * it, not to one of the three applications that use it — and the old spelling put LCARS's own
+     * root namespace into the manifests of the star map and the nutrition app, neither of which is
+     * LCARS. `tools/check_sky_standalone.py` is what found it.
+     *
+     * ⚠️ Sharing one action across three installed apps is safe rather than merely tidy-looking:
+     * every send below is `setPackage(context.packageName)`, so a broadcast can only ever reach its
+     * own app, and each receiver is `exported="false"`, so it could not accept another app's
+     * anyway. The rename is about honesty, not about a leak.
+     */
+    private const val ACTION_RESULT = "dev.mascwa.pulse.data.update.INSTALL_RESULT"
 
     /**
      * Stage [file] and commit it. Returns false only when the session could not be created or
