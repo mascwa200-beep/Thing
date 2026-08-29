@@ -90,22 +90,108 @@ class SkyPointingTest {
     }
 
     @Test
-    fun `the sensor's own signs are turned round exactly once`() {
+    fun `the pitch is turned round and the roll is not`() {
+        // ⚠️ The roll used to be negated here as well, which put the negation in twice — see
+        // `fromDeviceOrientation`'s own note and the round-trip test below, which is what holds it.
         val a = SkyPointing.fromDeviceOrientation(123.0, -45.0, 30.0)
         assertEquals(123.0, a.azimuthDeg, 0.0)
         assertEquals(45.0, a.altitudeDeg, 0.0)
-        assertEquals(-30.0, a.rollDeg, 0.0)
+        assertEquals(30.0, a.rollDeg, 0.0)
+    }
+
+    /**
+     * What `SensorManager.getOrientation` answers for an attitude, after the camera-upright remap.
+     *
+     * ⚠️ **These three lines are the ONLY thing here taken on trust, and they are not taken on trust
+     * from me.** `scratchpad/sky/PoleProbe.kt` drives the real `remapCoordinateSystem` and
+     * `getOrientation` out of `org.robolectric:android-all` over the same attitudes and agrees with
+     * the composition to 7.0e-06° at aims out to 89.99°. That jar is 186 MB and has no business on a
+     * pure JVM module's test classpath, so the probe validates and this carries.
+     *
+     * The remap makes the matrix's second column the camera's forward direction and its third the
+     * screen-up, which is where each formula comes from: the azimuth and pitch read the aim, and the
+     * roll compares the up-components of screen-right and screen-up.
+     */
+    private fun reportedFor(f: DoubleArray, u: DoubleArray): Triple<Double, Double, Double> {
+        val right = cross(f, u)
+        return Triple(
+            Math.toDegrees(Math.atan2(f[0], f[1])),
+            Math.toDegrees(Math.asin((-f[2]).coerceIn(-1.0, 1.0))),
+            Math.toDegrees(Math.atan2(-right[2], u[2])),
+        )
+    }
+
+    private fun cross(a: DoubleArray, b: DoubleArray) = doubleArrayOf(
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+    /** [p] turned [deg] about [f] — a full circle of valid screen-up directions at any aim. */
+    private fun turnAbout(f: DoubleArray, p: DoubleArray, deg: Double): DoubleArray {
+        val q = cross(f, p)
+        val c = cos(Math.toRadians(deg))
+        val s = sin(Math.toRadians(deg))
+        val v = doubleArrayOf(p[0] * c + q[0] * s, p[1] * c + q[1] * s, p[2] * c + q[2] * s)
+        val n = len(v)
+        return doubleArrayOf(v[0] / n, v[1] / n, v[2] / n)
+    }
+
+    @Test
+    fun `the sensor's roll is read back the way round the handset is really held`() {
+        // ⚠️ **A ROUND TRIP against ground truth, which is what the older tests were missing.** They
+        // compared the vector path against the angle path — both built from the same Attitude — so
+        // they agreed perfectly while the sign that reached them was turned round twice. Here the
+        // attitude is chosen first, the sensor's numbers are derived from it, and the reconstruction
+        // has to come back to the attitude we started with.
+        //
+        // ⚠️ The aims go to 89.99°, where the older cases stopped at 70°. The failure this catches
+        // is at its worst exactly where nothing used to look.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        var worst = 0.0
+        for (az in intArrayOf(0, 47, 123, 231, 315)) {
+            for (alt in doubleArrayOf(0.0, 30.0, 70.0, 85.0, 89.0, 89.99, -45.0, -89.0, -89.9)) {
+                val aim = unit(az.toDouble(), alt)
+                // A perpendicular that is defined at the pole too, where "the vertical with the look
+                // direction taken off" is the zero vector.
+                val seed = if (abs(aim[0]) < 0.9) doubleArrayOf(1.0, 0.0, 0.0) else doubleArrayOf(0.0, 1.0, 0.0)
+                val perp = cross(aim, seed).let { val n = len(it); doubleArrayOf(it[0] / n, it[1] / n, it[2] / n) }
+                for (turn in doubleArrayOf(0.0, 37.0, 90.0, -115.0, 179.0)) {
+                    val up = turnAbout(aim, perp, turn)
+                    val (azDeg, pitchDeg, rollDeg) = reportedFor(aim, up)
+                    val a = SkyPointing.fromDeviceOrientation(azDeg, pitchDeg, rollDeg)
+                    SkyPointing.forward(a, f)
+                    SkyPointing.screenUp(a, u)
+                    val where = "az $az alt $alt turn $turn"
+                    // ⚠️ The tolerance is 1e-4 and not 1e-6 because `angleBetween` is an `acos` of a
+                    // dot product, and near 1 that CANNOT resolve better than sqrt(eps) — about
+                    // 8.5e-07 degrees. My first version asserted 1e-6 and one case came in at
+                    // 1.2e-6, which is the measurement's own floor rather than a defect. The bound
+                    // still separates right from wrong by six orders of magnitude: with the roll
+                    // negated these come in at 180 degrees.
+                    assertEquals("aim at $where", 0.0, angleBetween(aim, f), 1e-4)
+                    val off = angleBetween(up, u)
+                    worst = maxOf(worst, off)
+                    assertEquals("screen-up at $where", 0.0, off, 1e-4)
+                }
+            }
+        }
+        assertTrue("worst $worst", worst < 1e-4)
     }
 
     // ------------------------------------------------------------------ the two paths agree
 
     @Test
     fun `the vector path draws exactly what the angle path draws`() {
-        // ⚠️ THE ROLL SIGN, pinned. Measured against the real Android sensor maths over 36
-        // attitudes, `rollDeg = -orientation[2]` agrees with the picture computed straight from the
-        // attitude matrix to 2.4e-07 while the other sign is out by 2.98 screen units — the whole
-        // picture. `equivalentView` carries that negation, and this asserts the vector path, which
-        // needs no sign at all, produces the same thing. Measured worst here: 9.0e-16.
+        // ⚠️ **This proves the two paths agree with EACH OTHER and nothing more, which is exactly
+        // how a doubled sign survived in both.** Both bases below are built from the same
+        // `Attitude`, so whatever reaches it reaches them equally and they cannot disagree however
+        // wrong it is. It is still worth having — `equivalentView` negates the roll on its way to a
+        // `View` and the vector path needs no sign at all, so the two conventions really do have to
+        // be held together — but the statement about the SENSOR is
+        // `the sensor's roll is read back the way round the handset is really held`, above.
+        // Measured worst here: 9.0e-16.
         val targets = ArrayList<DoubleArray>()
         for (az in 0 until 360 step 10) {
             for (alt in -80..80 step 10) targets.add(unit(az.toDouble(), alt.toDouble()))
@@ -388,6 +474,124 @@ class SkyPointingTest {
 
         SkyPointing.smooth(prevF, prevU, there, 0.0, f, u)
         assertEquals("alpha 0 stays put", 0.0, angleBetween(f, prevF), 1e-9)
+    }
+
+    @Test
+    fun `a blend really blends when the caller aliases its arrays`() {
+        // ⚠️ **THE CALL SITE'S OWN PATTERN, which is the one no other test here uses.** The view
+        // model keeps a single pair of arrays and passes them as both `prev` and `out`, because that
+        // is what the signature invites and it allocates nothing. Written the obvious way, `smooth`
+        // wrote the fresh reading into `out` before reading `prev` — so every blend became
+        // `new·(1−w) + new·w`, the weight did nothing at all, and the map followed raw sensor
+        // jitter. Every other test below passes distinct arrays and could never have seen it.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val here = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        val there = SkyPointing.Attitude(40.0, 0.0, 0.0)
+        SkyPointing.forward(here, f)
+        SkyPointing.screenUp(here, u)
+
+        SkyPointing.smooth(f, u, there, 0.25, f, u)
+
+        val fresh = DoubleArray(3)
+        SkyPointing.forward(there, fresh)
+        val movedTowardTheReading = angleBetween(f, unit(0.0, 0.0))
+        assertTrue("it has to move at all: $movedTowardTheReading", movedTowardTheReading > 1.0)
+        assertTrue(
+            "a quarter weight must not arrive: ${angleBetween(f, fresh)}",
+            angleBetween(f, fresh) > 1.0,
+        )
+        // ⚠️ A quarter of the way round a 40 degree turn is NOT 10 degrees, and asserting that is
+        // how this test first failed. The blend is of the CHORD and then normalised, so the angle
+        // is atan(0.25 sin40 / (0.75 + 0.25 cos40)) = 9.6859 degrees. Computed from the shipped
+        // arithmetic, not from the shape of the number.
+        assertEquals("a quarter of the way", 9.6859, movedTowardTheReading, 1e-3)
+    }
+
+    // ------------------------------------------------------------------ the pole damping
+
+    @Test
+    fun `the up weight is untouched away from the pole and stiffer at it`() {
+        // Below the ramp nothing changes at all, which is what makes this safe to ship blind.
+        for (alt in doubleArrayOf(0.0, 30.0, 60.0, 74.9, -74.9)) {
+            assertEquals("alt $alt", 0.25, SkyPointing.upAlpha(0.25, alt), 0.0)
+        }
+        // At the pole the filter runs POLE_MAX_STRETCH times longer, which is a smaller weight:
+        // 1 - 0.75^(1/8) = 0.03532137. Computed rather than eyeballed — my first value was 0.035426,
+        // which is simply wrong arithmetic and the code was right.
+        assertEquals(0.03532137, SkyPointing.upAlpha(0.25, 90.0), 1e-8)
+        assertEquals("straight down is the same", 0.03532137, SkyPointing.upAlpha(0.25, -90.0), 1e-8)
+        // ⚠️ Both ends answer unchanged. 1 is what the caller passes for the very first reading and
+        // stiffening it would blend that against the arrays' starting values — the swept-in-from-north
+        // defect the first-reading branch exists to prevent.
+        assertEquals(1.0, SkyPointing.upAlpha(1.0, 90.0), 0.0)
+        assertEquals(0.0, SkyPointing.upAlpha(0.0, 90.0), 0.0)
+    }
+
+    @Test
+    fun `the stiffening ramps smoothly rather than stepping`() {
+        // ⚠️ **What smoothstep buys over a plain ramp is a slope that starts at zero, and only the
+        // SECOND difference can see that.** My first version asserted the largest single step, which
+        // separates the two by accident and by almost nothing — measured, smoothstep 0.00418 against
+        // linear 0.00968, so a threshold between them is luck rather than a statement. The slope
+        // jump separates them by a factor of twenty-four: 0.00040 against 0.00968. A discontinuity
+        // in slope at the threshold is a visible kink in how far the picture lags as you tilt across
+        // it, which is the thing worth forbidding.
+        val samples = ArrayList<Double>()
+        var alt = 90.0 - SkyPointing.POLE_RAMP_DEG - 1.0
+        while (alt <= 90.0) {
+            samples.add(SkyPointing.upAlpha(0.25, alt))
+            alt += 0.1
+        }
+        var largestJump = 0.0
+        for (i in 0 until samples.size - 1) {
+            assertTrue("never rises as the pole nears, at sample $i", samples[i + 1] <= samples[i] + 1e-12)
+        }
+        for (i in 0 until samples.size - 2) {
+            val d0 = samples[i + 1] - samples[i]
+            val d1 = samples[i + 2] - samples[i + 1]
+            largestJump = maxOf(largestJump, abs(d1 - d0))
+        }
+        assertTrue("the slope must not jump: $largestJump", largestJump < 0.002)
+    }
+
+    @Test
+    fun `a stiff screen up is still blended when the aim is taken whole`() {
+        // ⚠️ The early return has to require BOTH weights. Checking only `alpha` would mean a caller
+        // taking the aim whole while damping the picture got no damping at all — and it would look
+        // right, because the aim would be exactly where it should be.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val here = SkyPointing.Attitude(0.0, 0.0, 0.0)
+        SkyPointing.forward(here, f)
+        SkyPointing.screenUp(here, u)
+        val next = SkyPointing.Attitude(0.0, 0.0, 60.0)
+        val fresh = DoubleArray(3)
+        SkyPointing.screenUp(next, fresh)
+
+        SkyPointing.smooth(f, u, next, 1.0, f, u, upAlpha = 0.2)
+
+        assertTrue("the picture must not arrive whole", angleBetween(u, fresh) > 1.0)
+        assertTrue("but it must move", angleBetween(u, DoubleArray(3).also { SkyPointing.screenUp(here, it) }) > 1.0)
+    }
+
+    @Test
+    fun `a stiffer screen up still leaves a valid attitude`() {
+        // ⚠️ The pair is blended with two different weights, so it is NOT square afterwards — the
+        // re-orthogonalisation is what makes two weights safe rather than merely convenient. A
+        // sheared basis is not a crash; it is a picture very slightly skewed that nothing reports.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val here = SkyPointing.Attitude(10.0, 88.0, 0.0)
+        SkyPointing.forward(here, f)
+        SkyPointing.screenUp(here, u)
+        val next = SkyPointing.Attitude(64.0, 87.0, 25.0)
+
+        SkyPointing.smooth(f, u, next, 0.5, f, u, upAlpha = SkyPointing.upAlpha(0.5, next.altitudeDeg))
+
+        assertEquals("unit aim", 1.0, len(f), 1e-12)
+        assertEquals("unit up", 1.0, len(u), 1e-12)
+        assertEquals("square", 0.0, f[0] * u[0] + f[1] * u[1] + f[2] * u[2], 1e-12)
     }
 
     // ------------------------------------------------------------------ trim and read-out

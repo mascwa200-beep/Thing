@@ -35,22 +35,27 @@ import kotlin.math.sqrt
  * all**: it is already in the up vector. [equivalentView] exists only to cross-check that against
  * the angle form, and `SkyPointingTest` pins the two together.
  *
- * ## ⚠️ The roll sign, measured rather than reasoned about
+ * ## ⚠️ The roll sign, and the negation that was applied twice
  *
  * `org.robolectric:android-all` carries real bodies for `SensorManager`'s static orientation maths,
  * so the whole sensor path — rotation vector, `remapCoordinateSystem`, `getOrientation` — can be
- * simulated off-device. Run over 36 attitudes spanning every quadrant, altitudes from −30° to +70°
- * and rolls from −90° through 170°, and compared against the picture computed straight from the
- * attitude matrix with no angles in between (`scratchpad/sky/PointProbe.kt`):
+ * simulated off-device. `scratchpad/sky/PointProbe.kt` did that and measured
+ * `View.rollDeg = -orientation[2]`, out by 2.98 screen units the other way.
  *
- * ```
- * rollDeg = -orientation[2]   worst disagreement 2.4e-07 screen units
- * rollDeg = +orientation[2]   worst disagreement 2.98      screen units
- * ```
+ * ⚠️ **That verdict is about [equivalentView]'s output and NOT about this [Attitude], and reading it
+ * as though it were cost a shipped defect.** [equivalentView] negates the roll on its way to a
+ * `View`, so `Attitude.rollDeg` has to be `+orientation[2]` for the `View` to come out at
+ * `-orientation[2]` — and it was set to the negative, which made the composition `+orientation[2]`,
+ * exactly the sign that probe had rejected. Two statements of one fact, one of them second-hand.
  *
- * The same run confirms `azimuthDeg = orientation[0]` and `altitudeDeg = -orientation[1]`, which is
- * what `CompassController` already assumed for its pitch. What stays device-only is the **feel** —
- * how stiff the filter should be, and how far a real magnetometer is off in a real hand.
+ * The tests could not see it either: they compared the vector path against the angle path, both
+ * built from the same wrong `Attitude`, so the two agreed perfectly and said nothing about the
+ * sensor. `scratchpad/sky/PoleProbe.kt` is what measures the composition end to end, and
+ * `the sensor's roll is read back the way round the handset is really held` is what holds it.
+ *
+ * `azimuthDeg = orientation[0]` and `altitudeDeg = -orientation[1]` were right all along and are
+ * confirmed by the same run. What stays device-only is the **feel** — how stiff the filter should
+ * be, and how far a real magnetometer is off in a real hand.
  */
 object SkyPointing {
 
@@ -76,11 +81,35 @@ object SkyPointing {
      * remapped with `remapCoordinateSystem(r, AXIS_X, AXIS_Z, out)` — the camera-upright remap
      * `CompassController` already applies.
      *
-     * ⚠️ **Both negations are measured, not assumed** — see the class note. Doing them here rather
-     * than at the sensor is the point: this module has tests and the sensor callback does not.
+     * ⚠️ **The pitch is negated and the ROLL IS NOT, and that asymmetry is the whole of a defect
+     * this shipped with.** The roll was negated here too, on the strength of a probe whose verdict
+     * was about [equivalentView]'s `View.rollDeg` — and `equivalentView` applies that negation
+     * itself, so the sign was turned round twice. Doing the negations here rather than at the sensor
+     * is still right, for the reason it always was: this module has tests and a sensor callback does
+     * not. What was missing is that nothing measured the COMPOSITION.
+     *
+     * Measured against the real Android orientation maths by reconstructing the handset's own
+     * screen-up from these three numbers (`scratchpad/sky/PoleProbe.kt`, aims out to 89.99°):
+     *
+     * ```
+     * rollDeg = +orientation[2]   worst picture error   7.0e-06°
+     * rollDeg = −orientation[2]   worst picture error        180°
+     * ```
+     *
+     * ⚠️ **And it was not merely a picture rolled the wrong way — near the pole the wrong sign
+     * AMPLIFIES.** Within a degree of vertical the reported azimuth and roll are each
+     * ill-conditioned, and the combination that is not is their DIFFERENCE, which is what the
+     * correct sign forms. The wrong sign formed the sum, so a hand movement that turned the handset
+     * rigidly — one that must not move the picture at all — spun it:
+     *
+     * ```
+     * a 0.25° nudge, this far from vertical:   10.0°   1.0°   0.5°   0.25°
+     *   picture turned, wrong sign:             2.8°  29.0°  60.0°  175.0°
+     *   picture turned, correct sign:           0.0°   0.0°   0.0°    0.0°
+     * ```
      */
     fun fromDeviceOrientation(azimuthDeg: Double, pitchDeg: Double, rollDeg: Double): Attitude =
-        Attitude(azimuthDeg = azimuthDeg, altitudeDeg = -pitchDeg, rollDeg = -rollDeg)
+        Attitude(azimuthDeg = azimuthDeg, altitudeDeg = -pitchDeg, rollDeg = rollDeg)
 
     /**
      * Where the camera looks, as an east/north/up unit vector.
@@ -221,7 +250,9 @@ object SkyPointing {
      * somebody is trying to hold still on something overhead. Blending the two directions has no
      * such failure: the result is re-orthonormalised, so it is a valid attitude at every step.
      *
-     * @param alpha weight of the new reading, 0 (frozen) to 1 (no smoothing at all).
+     * @param alpha weight of the new reading for the LOOK DIRECTION, 0 (frozen) to 1 (no smoothing).
+     * @param upAlpha the same for the screen-up, which is allowed to be stiffer — see [upAlpha].
+     *   Defaults to [alpha], which is exactly the single-weight behaviour this had.
      */
     fun smooth(
         prevForward: DoubleArray,
@@ -230,33 +261,65 @@ object SkyPointing {
         alpha: Double,
         outForward: DoubleArray,
         outUp: DoubleArray,
+        upAlpha: Double = alpha,
     ) {
+        // ⚠️ **The previous pair is read into locals BEFORE anything is written, and without that
+        // this whole function is a no-op.** Its only caller passes the same two arrays as both
+        // `prev` and `out` — which is the natural way to use it and what the signature invites —
+        // so writing the fresh reading into `out` first destroys `prev`, every blend below becomes
+        // `new·(1−w) + new·w`, and the map follows raw sensor jitter at every aim however small the
+        // weight. `SkyBudget` is a whole file shaped around deriving that weight correctly and none
+        // of it could have any effect. No test caught it because every one of them passes distinct
+        // arrays; `a blend really blends when the caller aliases its arrays` now pins the call
+        // site's own pattern.
+        val pfx = prevForward[0]
+        val pfy = prevForward[1]
+        val pfz = prevForward[2]
+        val pux = prevUp[0]
+        val puy = prevUp[1]
+        val puz = prevUp[2]
+
         // The fresh reading is written first and is what survives if the blend turns out degenerate,
         // so the caller always ends up holding a valid attitude.
         forward(next, outForward)
         screenUp(next, outUp)
         val w = alpha.coerceIn(0.0, 1.0)
-        if (w >= 1.0) return
+        val wu = upAlpha.coerceIn(0.0, 1.0)
+        // ⚠️ BOTH have to be at 1 to skip out, or a stiffened screen-up would never be blended. When
+        // the caller wants the first reading taken whole it passes 1 for both and this is the branch
+        // that gives it that — see the call site, where blending a first reading against the arrays'
+        // starting values swept the sky in from due north.
+        if (w >= 1.0 && wu >= 1.0) return
 
-        var fx = prevForward[0] * (1 - w) + outForward[0] * w
-        var fy = prevForward[1] * (1 - w) + outForward[1] * w
-        var fz = prevForward[2] * (1 - w) + outForward[2] * w
-        var n = sqrt(fx * fx + fy * fy + fz * fz)
-        // ⚠️ Two look directions exactly opposite blend to nothing. At any real frame rate that is a
-        // sensor glitch rather than a hand movement, so the newest reading is the better answer —
-        // and a normalised zero vector would be an unusable basis, which is a BLANK MAP.
-        if (n < DEGENERATE) return
-        fx /= n; fy /= n; fz /= n
+        var fx = outForward[0]
+        var fy = outForward[1]
+        var fz = outForward[2]
+        if (w < 1.0) {
+            fx = pfx * (1 - w) + fx * w
+            fy = pfy * (1 - w) + fy * w
+            fz = pfz * (1 - w) + fz * w
+            val n = sqrt(fx * fx + fy * fy + fz * fz)
+            // ⚠️ Two look directions exactly opposite blend to nothing. At any real frame rate that
+            // is a sensor glitch rather than a hand movement, so the newest reading is the better
+            // answer — and a normalised zero vector would be an unusable basis, which is a BLANK MAP.
+            if (n < DEGENERATE) return
+            fx /= n; fy /= n; fz /= n
+        }
 
-        var ux = prevUp[0] * (1 - w) + outUp[0] * w
-        var uy = prevUp[1] * (1 - w) + outUp[1] * w
-        var uz = prevUp[2] * (1 - w) + outUp[2] * w
+        var ux = outUp[0]
+        var uy = outUp[1]
+        var uz = outUp[2]
+        if (wu < 1.0) {
+            ux = pux * (1 - wu) + ux * wu
+            uy = puy * (1 - wu) + uy * wu
+            uz = puz * (1 - wu) + uz * wu
+        }
         // ⚠️ A blend of two valid attitudes is NOT itself one — the pair drifts out of square, and
         // feeding that to a basis is not a crash but a picture very slightly sheared, which nothing
         // would ever report. Take off whatever now lies along the look direction.
         val d = ux * fx + uy * fy + uz * fz
         ux -= d * fx; uy -= d * fy; uz -= d * fz
-        n = sqrt(ux * ux + uy * uy + uz * uz)
+        val n = sqrt(ux * ux + uy * uy + uz * uz)
         // Same argument one axis over: a half-turn of the handset between two frames leaves nothing
         // to normalise, and the fresh reading already in `outUp` is what should stand.
         if (n < DEGENERATE) return
@@ -272,6 +335,64 @@ object SkyPointing {
      * frames, so 1e-6 is about a ten-thousandth of a degree short of an exact half-turn.
      */
     private const val DEGENERATE = 1e-6
+
+    /**
+     * The blend weight for the SCREEN-UP alone, stiffened as the aim nears straight up or down.
+     *
+     * ⚠️ **Only the screen-up, never the look direction, and that is the point.** Damping the aim
+     * would make a deliberate sweep across the zenith lag the hand, which is a worse fault than the
+     * one being fixed. [smooth] re-orthogonalises the up against the forward afterwards, so the two
+     * may carry different weights and still leave a valid attitude — which is what makes this safe
+     * rather than merely convenient.
+     *
+     * ⚠️ **Why the screen-up specifically.** Overhead, which way is up the screen is decided
+     * entirely by the handset's heading, and a magnetometer is good to a degree or two at best. Near
+     * the horizon that error is a degree or two of pan and barely visible; overhead it is the whole
+     * picture turning. So the filter is stiffened exactly where the reading is least trustworthy,
+     * rather than everywhere.
+     *
+     * ⚠️ **The stretch is exact rather than a fudge.** An exponential filter retains `(1 − w)` of the
+     * old value per sample, so running its time constant `k` times longer is `1 − w' = (1 − w)^(1/k)`.
+     * Working on the weight itself means it stays correct at every sensor rate for free — the trap
+     * `SkyBudget` is shaped around — because the weight handed in has already been derived from the
+     * rate. At `k = 1` this returns its argument, so a level aim is byte-for-byte unchanged.
+     *
+     * Both ends are answered unchanged: 0 stays frozen and 1 stays "take it whole", which is what
+     * the caller passes for the very first reading.
+     */
+    fun upAlpha(alpha: Double, altitudeDeg: Double): Double {
+        val w = alpha.coerceIn(0.0, 1.0)
+        if (w <= 0.0 || w >= 1.0) return w
+        val k = poleStretch(altitudeDeg)
+        if (k <= 1.0) return w
+        return 1.0 - Math.pow(1.0 - w, 1.0 / k)
+    }
+
+    /**
+     * How many times longer the screen-up's filter runs at this aim — 1 outside [POLE_RAMP_DEG].
+     *
+     * ⚠️ Smoothstep rather than a straight ramp or a threshold: a step in the filter weight is a step
+     * in how far the picture lags, which reads as a snap at the moment you tilt across it. This has
+     * zero slope at both ends, so there is no crossing to see.
+     */
+    private fun poleStretch(altitudeDeg: Double): Double {
+        val fromPole = 90.0 - abs(altitudeDeg.coerceIn(-90.0, 90.0))
+        if (fromPole >= POLE_RAMP_DEG) return 1.0
+        val t = ((POLE_RAMP_DEG - fromPole) / POLE_RAMP_DEG).coerceIn(0.0, 1.0)
+        return 1.0 + (POLE_MAX_STRETCH - 1.0) * t * t * (3.0 - 2.0 * t)
+    }
+
+    /**
+     * How close to straight up or down the extra damping starts, in degrees of altitude.
+     *
+     * ⚠️ A guess at FEEL and owner-tunable, which is why it is named rather than inlined. Nothing
+     * here can wave a handset about; what is measured is only that the arithmetic is exact and that
+     * a level aim is unaffected.
+     */
+    const val POLE_RAMP_DEG = 15.0
+
+    /** How much longer the screen-up's filter runs when aimed straight at the pole. Owner-tunable. */
+    const val POLE_MAX_STRETCH = 8.0
 
     /**
      * Turn the handset's reported azimuth by a hand-set correction.

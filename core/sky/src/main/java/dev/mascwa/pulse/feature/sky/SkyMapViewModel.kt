@@ -617,10 +617,18 @@ class SkyMapViewModel(
                 // ⚠️ The FIRST reading is taken whole. Blending it against the arrays' starting
                 // values would swing the map in from due north over the first half second, which
                 // reads as the sensor being wrong rather than as the picture arriving.
+                val weight = if (first) 1.0 else budget.pointSmoothing
                 SkyPointing.smooth(
                     pointForward, pointUp, a,
-                    if (first) 1.0 else budget.pointSmoothing,
+                    weight,
                     pointForward, pointUp,
+                    // ⚠️ The screen-up is filtered harder as the aim nears straight up or down, and
+                    // the look direction is NOT — damping the aim would make a deliberate sweep
+                    // across the zenith lag the hand. Overhead, which way is up the screen is
+                    // decided entirely by the handset's heading, which is the least trustworthy
+                    // thing the sensor reports; near the horizon the same error is a degree or two
+                    // of pan and barely visible. See SkyPointing.upAlpha.
+                    upAlpha = SkyPointing.upAlpha(weight, a.altitudeDeg),
                 )
                 first = false
                 // ⚠️ The angle view is kept in step because everything ELSE reads it — the field of
