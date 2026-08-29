@@ -6,10 +6,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,6 +23,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeepSky
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
@@ -127,6 +132,8 @@ fun SkyChart(
     // instant only moves when the scrubber does, which is what the existing map has always done.
     val at = remember(hours, site) { System.currentTimeMillis() + hours * 3_600_000L }
     var surface by remember { mutableStateOf(IntSize.Zero) }
+
+    ReleaseTheSensorWhenNobodyIsLooking(vm)
 
     // Bring the deep catalogue up to date for wherever the view has got to. Cheap when the region
     // already held still covers the view, which is most pans — see StarField.update.
@@ -366,6 +373,64 @@ fun SkyChart(
                     it, screen.x + edge + 4f * density, screen.y + 4f * density, labelPaint,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Stand the rotation-vector sensor down while this chart is not being looked at.
+ *
+ * ⚠️ **Without this, FOLLOW keeps a fused sensor running at `SENSOR_DELAY_GAME` — fifty samples a
+ * second — for as long as the process lives, with the phone in a pocket.** [SkyMapViewModel.onCleared]
+ * stops it, but a view model is NOT cleared by an application being backgrounded, so the drain is
+ * indefinite and invisible. Both applications have the shape, which is why the fix is here in the
+ * one composable they share rather than in either screen.
+ *
+ * ⚠️ **Two different routes out, answered differently on purpose.**
+ *  - ON_STOP is "I will be right back on this screen": the mode is REMEMBERED and restored on
+ *    ON_START, so returning re-arms the sensor and the map snaps to where the phone is now aimed.
+ *    That snap is correct rather than a compromise — [SkyMapViewModel] takes the first reading after
+ *    a restart whole rather than blending it, precisely so a stale aim is never shown.
+ *  - Leaving composition is "I have left the map", which in the LCARS console means pushing another
+ *    destination while this one stays in the back stack, view model and all. The sensor is stopped
+ *    and the mode is NOT remembered: coming back to a map that silently resumed aiming would be a
+ *    control acting without being pressed. The standalone application has no navigation, so only the
+ *    first route exists there.
+ *
+ * ⚠️ `rememberSaveable`, not `remember`. A rotation destroys the activity — ON_STOP fires, the wish
+ * is recorded, then the composition is discarded — while the view model survives. Plain `remember`
+ * would lose the wish on exactly the transition where the sensor is guaranteed to have been stopped,
+ * so FOLLOW would switch itself off every time the handset was turned.
+ *
+ * ⚠️ Registering an observer replays the lifecycle up to its current state, so ON_START arrives
+ * immediately on first composition — harmless, because the wish starts false.
+ */
+@Composable
+private fun ReleaseTheSensorWhenNobodyIsLooking(vm: SkyMapViewModel) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var resumeFollowing by rememberSaveable { mutableStateOf(false) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    resumeFollowing = vm.pointing.value
+                    vm.setPointing(false)
+                }
+                Lifecycle.Event.ON_START -> {
+                    if (resumeFollowing) {
+                        resumeFollowing = false
+                        vm.setPointing(true)
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            // ⚠️ Not remembered — see above. And harmless after ON_STOP, which has already set it
+            // false, so the two paths cannot fight over one flag.
+            vm.setPointing(false)
         }
     }
 }
