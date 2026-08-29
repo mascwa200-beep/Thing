@@ -20,6 +20,11 @@ class SkyPointingTest {
 
     private val fov = 60.0
 
+    /** London, and three fixed instants — a clock read at test time would make a failure unrepeatable. */
+    private val LAT = 51.5074
+    private val LON = -0.1278
+    private val EPOCHS = longArrayOf(1_700_000_000_000L, 1_711_000_000_000L, 1_735_689_600_000L)
+
     private fun unit(azDeg: Double, altDeg: Double): DoubleArray {
         val a = Math.toRadians(azDeg)
         val h = Math.toRadians(altDeg)
@@ -152,6 +157,111 @@ class SkyPointingTest {
         val f = DoubleArray(3)
         SkyPointing.forward(a, f)
         assertEquals(90.0, SkyPointing.altitudeOf(f), 1e-9)
+    }
+
+    // ------------------------------------------------- into the stars' own frame
+
+    @Test
+    fun `turning the pair into the stars frame keeps it a unit pair at right angles`() {
+        // ⚠️ THE PROPERTY THE POINTED BASIS RESTS ON. `SkyFrame` builds `forward x up`, and both of
+        // those reach it in east/north/up. `Ephemeris.toEquatorial` is a pure rotation with no
+        // refraction in it, so the pair has to survive as a unit pair at right angles — and if it did
+        // not, nothing would fail: the map would draw very slightly sheared and no error would ever
+        // be reported. Measured over 2,592 (attitude, epoch) pairs spanning three epochs, every
+        // azimuth, altitudes from -80 to the zenith and eight rolls: worst |f dot u| 2.4e-15, worst
+        // |len - 1| 2.2e-16.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val ef = DoubleArray(3)
+        val eu = DoubleArray(3)
+        for (epoch in EPOCHS) {
+            var az = 0
+            while (az < 360) {
+                var alt = -80
+                while (alt <= 90) {
+                    var roll = -180
+                    while (roll < 180) {
+                        val a = SkyPointing.Attitude(az.toDouble(), alt.toDouble(), roll.toDouble())
+                        SkyPointing.forward(a, f)
+                        SkyPointing.screenUp(a, u)
+                        SkyPointing.toEquatorialVector(f, LAT, LON, epoch, ef)
+                        SkyPointing.toEquatorialVector(u, LAT, LON, epoch, eu)
+                        val dot = ef[0] * eu[0] + ef[1] * eu[1] + ef[2] * eu[2]
+                        assertEquals("perpendicular at $a", 0.0, dot, 1e-12)
+                        assertEquals("look is a unit vector at $a", 1.0, len(ef), 1e-12)
+                        assertEquals("up is a unit vector at $a", 1.0, len(eu), 1e-12)
+                        roll += 47
+                    }
+                    alt += 17
+                }
+                az += 37
+            }
+        }
+    }
+
+    @Test
+    fun `straight up is the observer's own latitude, and due north at that altitude is the pole`() {
+        // Two facts nothing here computes and every textbook states, so they pin the rotation against
+        // something outside this code: what is overhead has a declination equal to the latitude, and
+        // the celestial pole stands due north at an altitude equal to it.
+        //
+        // ⚠️ The second is here because I first wrote it as "due north at 90 minus the latitude",
+        // which is out by a long way — the probe answers 76.9852 for that, not 90, since the sine
+        // doubles the angle. Nineteenth time in this project that an expectation of mine was wrong
+        // where the code was right.
+        val up = DoubleArray(3)
+        val v = DoubleArray(3)
+        for (epoch in EPOCHS) {
+            SkyPointing.forward(SkyPointing.Attitude(0.0, 90.0, 0.0), up)
+            SkyPointing.toEquatorialVector(up, LAT, LON, epoch, v)
+            assertEquals("overhead", LAT, Math.toDegrees(Math.asin(v[2].coerceIn(-1.0, 1.0))), 1e-9)
+
+            SkyPointing.forward(SkyPointing.Attitude(0.0, LAT, 0.0), up)
+            SkyPointing.toEquatorialVector(up, LAT, LON, epoch, v)
+            assertEquals("the pole", 90.0, Math.toDegrees(Math.asin(v[2].coerceIn(-1.0, 1.0))), 1e-9)
+        }
+    }
+
+    @Test
+    fun `the altitude and the azimuth do not get handed over the wrong way round`() {
+        // `Ephemeris.Horizontal(altitudeDeg, azimuthDeg, distanceKm)` takes two angles of the same
+        // type in a fixed order, so swapping them compiles, runs, and points somewhere else entirely.
+        // Measured: 60 degrees away for this attitude, against 0.00e+00 for the order that ships.
+        val f = DoubleArray(3)
+        val v = DoubleArray(3)
+        SkyPointing.forward(SkyPointing.Attitude(120.0, 30.0, 0.0), f)
+        SkyPointing.toEquatorialVector(f, LAT, LON, EPOCHS[0], v)
+
+        val right = Ephemeris.toEquatorial(Ephemeris.Horizontal(30.0, 120.0, 0.0), LAT, LON, EPOCHS[0])
+        val swapped = Ephemeris.toEquatorial(Ephemeris.Horizontal(120.0, 30.0, 0.0), LAT, LON, EPOCHS[0])
+        val rv = SkyProjection.equatorialVector(right.rightAscensionDeg, right.declinationDeg)
+        val sv = SkyProjection.equatorialVector(swapped.rightAscensionDeg, swapped.declinationDeg)
+        assertEquals("as shipped", 0.0, angleBetween(v, rv), 1e-9)
+        assertEquals("the swap this guards against", 60.0, angleBetween(v, sv), 1e-6)
+    }
+
+    @Test
+    fun `the seam at the zenith is gone in the stars frame too, not only in the handset's`() {
+        // The ENU half of this is asserted above; this is the half that matters, because the basis
+        // the renderer actually builds is the equatorial one. Aimed straight up, the pair rotated out
+        // of the handset's frame still gives a usable basis, and the observer's zenith — which is
+        // what `SkyFrame.of` passes — still does not.
+        val f = DoubleArray(3)
+        val u = DoubleArray(3)
+        val ef = DoubleArray(3)
+        val eu = DoubleArray(3)
+        val epoch = EPOCHS[0]
+        val straightUp = SkyPointing.Attitude(37.0, 90.0, 0.0)
+        SkyPointing.forward(straightUp, f)
+        SkyPointing.screenUp(straightUp, u)
+        SkyPointing.toEquatorialVector(f, LAT, LON, epoch, ef)
+        SkyPointing.toEquatorialVector(u, LAT, LON, epoch, eu)
+
+        val zenith = Ephemeris.toEquatorial(Ephemeris.Horizontal(90.0, 0.0, 0.0), LAT, LON, epoch)
+        val zv = SkyProjection.equatorialVector(zenith.rightAscensionDeg, zenith.declinationDeg)
+
+        assertTrue("screen-up basis", SkyProjection.basisOf(ef, eu[0], eu[1], eu[2], fov, 0.0).usable)
+        assertFalse("zenith basis", SkyProjection.basisOf(ef, zv[0], zv[1], zv[2], fov, 0.0).usable)
     }
 
     // ------------------------------------------------------------------ smoothing

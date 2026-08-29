@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
 import dev.mascwa.pulse.core.telemetry.MilkyWay
+import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.data.orbital.PlanetCalc
@@ -12,10 +13,12 @@ import dev.mascwa.pulse.data.sky.ConstellationCatalog
 import dev.mascwa.pulse.data.sky.DeepSkyCatalog
 import dev.mascwa.pulse.data.sky.MilkyWayCatalog
 import dev.mascwa.pulse.data.sky.DeepStarCatalog
+import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sky.StarCatalog
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
+import dev.mascwa.pulse.sky.SkyFrame
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
 import dev.mascwa.pulse.sky.SkyLines
@@ -55,6 +58,7 @@ class SkyMapViewModel(
     private val deepSkyCatalog: DeepSkyCatalog,
     private val milkyWayCatalog: MilkyWayCatalog,
     private val locationProvider: LocationProvider,
+    private val compass: CompassController,
 ) : ViewModel() {
 
     /**
@@ -386,7 +390,18 @@ class SkyMapViewModel(
         val field = deepField ?: return
         val here = _site.value ?: return
         val outcome = runCatching {
-            field.update(_view.value, viewport, here.latitude, here.longitude, at)
+            field.update(
+                _view.value, viewport, here.latitude, here.longitude, at,
+                // ⚠️ While the handset is aiming, the view's altitude is CLAMPED half a degree short
+                // of the zenith and its centre is therefore wrong by up to that much when somebody
+                // points straight up. At the quarter-degree field floor that is twice the whole
+                // view, and the cone loaded would not contain what is drawn.
+                centreOverride = if (_pointing.value) {
+                    SkyFrame.centreOfPointing(pointForward, here.latitude, here.longitude, at)
+                } else {
+                    null
+                },
+            )
         }.getOrNull()
         if (outcome == StarField.Outcome.RELOADED) _revision.value++
     }
@@ -397,7 +412,111 @@ class SkyMapViewModel(
             ?.let { Site(it.latitude, it.longitude) }
     }
 
+    // ------------------------------------------------------- following the handset
+
+    /**
+     * Whether the map is following where the phone is aimed.
+     *
+     * Off by default, and off is exactly what shipped before: nothing below runs, the sensor is not
+     * registered, and dragging works as it always has.
+     */
+    private val _pointing = MutableStateFlow(false)
+    val pointing: StateFlow<Boolean> = _pointing.asStateFlow()
+
+    /** True when the magnetometer says it needs a figure-of-eight before it can be believed. */
+    private val _needsCalibration = MutableStateFlow(false)
+    val needsCalibration: StateFlow<Boolean> = _needsCalibration.asStateFlow()
+
+    /** The standing hand-set correction to the handset's azimuth, in degrees. */
+    private val _trimDeg = MutableStateFlow(0.0)
+    val trimDeg: StateFlow<Double> = _trimDeg.asStateFlow()
+
+    /**
+     * Where the camera looks and which way is up the screen, east/north/up.
+     *
+     * ⚠️ **Mutable arrays read in the draw pass, exactly like [brightStars]**, and for the same
+     * reason: the sensor fires many times a second and allocating a pair of vectors each time is
+     * work spent to produce garbage. The screen reads them only while [pointing] is true, and the
+     * pair is always a valid attitude — `SkyPointing.smooth` re-orthonormalises or keeps the newest
+     * reading, so there is no state in which these two describe nothing.
+     */
+    val pointForward = doubleArrayOf(0.0, 1.0, 0.0)
+    val pointUp = doubleArrayOf(0.0, 0.0, 1.0)
+
+    private var pointingJob: kotlinx.coroutines.Job? = null
+
+    /** Start or stop following the handset. */
+    fun setPointing(on: Boolean) {
+        if (on == _pointing.value) return
+        _pointing.value = on
+        if (on) startPointing() else stopPointing()
+    }
+
+    /**
+     * Nudge the map's idea of north by a hand-set correction.
+     *
+     * ⚠️ **This exists because a phone magnetometer is good to a few degrees at best.** The offset
+     * is kept rather than applied once, so it survives the next sensor sample; without that it would
+     * be undone within about sixteen milliseconds and read as a control that does nothing.
+     */
+    fun nudge(dragDeg: Double) {
+        _trimDeg.value = SkyPointing.addTrim(_trimDeg.value, dragDeg)
+    }
+
+    /** Forget the correction and trust the sensor again. */
+    fun clearTrim() { _trimDeg.value = 0.0 }
+
+    private fun startPointing() {
+        compass.start()
+        _site.value?.let { compass.setLocation(it.latitude, it.longitude, 0.0) }
+        pointingJob = viewModelScope.launch {
+            var first = true
+            compass.reading.collect { r ->
+                if (!r.hasSensor) return@collect
+                _needsCalibration.value = r.accuracyLow
+                val a = SkyPointing.trimmed(
+                    SkyPointing.Attitude(
+                        azimuthDeg = r.trueAzimuth.toDouble(),
+                        altitudeDeg = r.pitch.toDouble(),
+                        rollDeg = r.roll.toDouble(),
+                    ),
+                    _trimDeg.value,
+                )
+                // ⚠️ The FIRST reading is taken whole. Blending it against the arrays' starting
+                // values would swing the map in from due north over the first half second, which
+                // reads as the sensor being wrong rather than as the picture arriving.
+                SkyPointing.smooth(
+                    pointForward, pointUp, a,
+                    if (first) 1.0 else POINT_SMOOTHING,
+                    pointForward, pointUp,
+                )
+                first = false
+                // ⚠️ The angle view is kept in step because everything ELSE reads it — the field of
+                // view, the constellation cut, the horizon, the tap. Only the drawn basis comes from
+                // the vectors, which is the half that has no seam at the zenith.
+                _view.value = SkyPointing.equivalentView(a, _view.value.fovDeg)
+            }
+        }
+    }
+
+    private fun stopPointing() {
+        pointingJob?.cancel()
+        pointingJob = null
+        compass.stop()
+        _needsCalibration.value = false
+    }
+
+    override fun onCleared() {
+        // ⚠️ Not conditional on [pointing]. A sensor listener outlives the screen if nobody
+        // unregisters it, and `stop()` on a controller that was never started is a no-op.
+        stopPointing()
+        super.onCleared()
+    }
+
     fun pan(dAzimuthDeg: Double, dAltitudeDeg: Double) {
+        // Dragging is what the map does when it is not being aimed; while it is, a drag would fight
+        // the next sensor sample and lose.
+        if (_pointing.value) return
         _view.value = SkyProjection.pan(_view.value, dAzimuthDeg, dAltitudeDeg)
     }
 
@@ -405,8 +524,15 @@ class SkyMapViewModel(
         _view.value = SkyProjection.zoom(_view.value, factor)
     }
 
-    /** Point the map at a compass direction, keeping the current tilt and field. */
+    /**
+     * Point the map at a compass direction, keeping the current tilt and field.
+     *
+     * ⚠️ Stops following the handset. Asking to look north while the phone is aimed south is a
+     * contradiction, and honouring the tap for the sixteen milliseconds until the next sensor sample
+     * would read as a control that does nothing.
+     */
     fun lookAt(azimuthDeg: Double, altitudeDeg: Double = _view.value.altitudeDeg) {
+        setPointing(false)
         _view.value = _view.value.copy(azimuthDeg = azimuthDeg, altitudeDeg = altitudeDeg)
     }
 
@@ -684,5 +810,16 @@ class SkyMapViewModel(
          * between the two stars at the end of the Plough's handle.
          */
         const val TAP_RADIUS_FRACTION = 0.06
+
+        /**
+         * How much of each sensor sample to take when following the handset.
+         *
+         * ⚠️ Stiffer than `CompassController`'s own 0.2, and it has to be: the sensor arrives
+         * unfiltered here (see [CompassController]'s note on why a planetarium must take it that
+         * way), so this is the ONLY smoothing in the path rather than a second helping of it. It
+         * blends the two DIRECTIONS rather than three angles, which is what keeps the picture from
+         * whipping round when the phone is aimed near overhead.
+         */
+        const val POINT_SMOOTHING = 0.25
     }
 }

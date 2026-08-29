@@ -140,6 +140,11 @@ private fun SkyCanvas(
     c: NightwirePalette,
     vm: SkyMapViewModel,
 ) {
+    // ⚠️ Read here rather than passed in, because the two arrays it selects are read in the DRAW
+    // pass and are not Compose state. What re-runs the frame is `view`, which the pointing collector
+    // rewrites on every sensor sample, so the arrays are always read at the same moment as the
+    // angles they were computed alongside.
+    val pointing by vm.pointing.collectAsStateWithLifecycle()
     val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT } }
     val cardinalPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
     // ⚠️ One Paint and two bucket sets, kept across frames. The renderer is built so that drawing a
@@ -252,7 +257,17 @@ private fun SkyCanvas(
         // SkyFrame. Hoisting it is what avoids a second `SkyFrame.of` for the glow — the two would
         // agree today and be free to stop agreeing later.
         val here = site
-        val frame = if (here != null) SkyFrame.of(view, here.latitude, here.longitude, at) else null
+        // ⚠️ Two ways to build one frame, and the pointed one is not merely `of` with a roll. `of`
+        // crosses the look direction with the observer's ZENITH, which is the zero vector when the
+        // two coincide — aim the handset straight up and the map would draw nothing. `ofPointing`
+        // crosses it with the screen's own up, which is perpendicular by construction.
+        val frame = when {
+            here == null -> null
+            pointing -> SkyFrame.ofPointing(
+                vm.pointForward, vm.pointUp, view.fovDeg, here.latitude, here.longitude, at,
+            )
+            else -> SkyFrame.of(view, here.latitude, here.longitude, at)
+        }
 
         // ⚠️ **First, before even the horizon.** It is unresolved starlight, so every star, every
         // galaxy and every constellation line on this map is in front of it — and so is the chrome.
@@ -537,12 +552,24 @@ private fun Controls(
     c: NightwirePalette,
     vm: SkyMapViewModel,
 ) {
+    val pointing by vm.pointing.collectAsStateWithLifecycle()
+    val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
                 "${view.fovDeg.roundToInt()}° across · ${whenLabel(hours)}",
             c.ink2, JetBrainsMono, 10,
         )
+        // ⚠️ Said rather than implied. A phone magnetometer is disturbed by whatever steel and
+        // current happens to be nearby, and the sensor itself reports when it has stopped trusting
+        // its own answer — a map that quietly points somewhere wrong is worse than one that admits
+        // it. Only while following: dragging does not consult the compass at all.
+        if (pointing && needsCalibration) {
+            Text(
+                "Compass unsure — sweep the phone in a figure of eight",
+                c.amber, JetBrainsMono, 10,
+            )
+        }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -551,6 +578,11 @@ private fun Controls(
                 LcarsChip(name, selected = false, onClick = { vm.lookAt(az) })
             }
             LcarsChip("ZENITH", selected = false, onClick = { vm.lookAt(view.azimuthDeg, 85.0) })
+            LcarsChip(
+                if (pointing) "FOLLOWING" else "FOLLOW",
+                selected = pointing,
+                onClick = { vm.setPointing(!pointing) },
+            )
             LcarsChip(
                 linesLabel(lines),
                 // Selected whenever anything is drawn, so the chip shows the state as well as the

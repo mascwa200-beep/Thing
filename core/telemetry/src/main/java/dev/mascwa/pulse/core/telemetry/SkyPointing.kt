@@ -173,6 +173,45 @@ object SkyPointing {
     }
 
     /**
+     * The same direction, expressed in the frame the star catalogue is held in.
+     *
+     * ⚠️ **Both of the attitude's directions have to come through here, and the reason is that the
+     * stars do not move and the observer does.** A catalogue held in horizon coordinates goes stale
+     * within seconds of being loaded — within a single frame at a narrow field — so `SkyFrame` holds
+     * equatorial positions and rebuilds the *basis* each frame instead. That basis is
+     * `forward × up`, and both of those arrive from the handset in east/north/up. Rotating one and
+     * not the other would build a basis out of two frames at once: it compiles, it draws a sky, and
+     * the sky is wrong by however far the Earth has turned since midnight.
+     *
+     * ⚠️ **The rotation is [Ephemeris.toEquatorial] rather than arithmetic written here**, so a
+     * pointed map and a dragged one cannot come to disagree about what an azimuth means — the same
+     * reason [forward] mirrors [SkyProjection]'s own convention. It is a pure rotation with no
+     * refraction in it, which is what makes the pair still orthonormal on the far side; `SkyPointingTest`
+     * pins that rather than trusting it, because a sheared basis is not a crash, it is a picture
+     * very slightly skewed that nothing would ever report.
+     *
+     * Passing the screen-up through [azimuthOf] costs nothing at the zenith even though a
+     * straight-up vector has no bearing: at 90° of altitude the azimuth cannot change the direction,
+     * so the zero that [azimuthOf] answers is as good as any other number.
+     */
+    fun toEquatorialVector(
+        enu: DoubleArray,
+        latitudeDeg: Double,
+        longitudeDeg: Double,
+        epochMs: Long,
+        out: DoubleArray,
+    ) {
+        val eq = Ephemeris.toEquatorial(
+            Ephemeris.Horizontal(altitudeOf(enu), azimuthOf(enu), 0.0),
+            latitudeDeg,
+            longitudeDeg,
+            epochMs,
+        )
+        val v = SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
+        out[0] = v[0]; out[1] = v[1]; out[2] = v[2]
+    }
+
+    /**
      * Blend an attitude toward a new reading, as directions rather than as angles.
      *
      * ⚠️ **Smoothing three Euler angles separately is right for a compass rose and wrong here.** A

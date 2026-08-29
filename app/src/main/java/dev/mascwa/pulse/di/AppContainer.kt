@@ -1132,9 +1132,17 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.reflection.ReflectionEngine(memoryStream, inferenceEngine, settingsRepository)
     }
 
-    /** Compass is stateful per-screen, so hand out a fresh controller each time. [cameraUpright] = AR mode. */
-    fun newCompassController(cameraUpright: Boolean = false): CompassController =
-        CompassController(appContext, cameraUpright)
+    /**
+     * Compass is stateful per-screen, so hand out a fresh controller each time.
+     *
+     * [cameraUpright] = AR mode, which is also the only mode where pitch and roll mean anything.
+     * [smoothed] = false hands over the sensor's angles unfiltered, which the sky map needs so it
+     * can blend the two DIRECTIONS instead — see `CompassController`'s own note on the zenith.
+     */
+    fun newCompassController(
+        cameraUpright: Boolean = false,
+        smoothed: Boolean = true,
+    ): CompassController = CompassController(appContext, cameraUpright, smoothed)
 
     /** Telemetry is stateful per-screen (sensor lifecycle), so hand out fresh. */
     fun newTelemetryController(): dev.mascwa.pulse.data.sensors.TelemetryController =

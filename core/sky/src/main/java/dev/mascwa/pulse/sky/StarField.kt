@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.sky
 
+import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.SkyFieldPlan
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarCatalogReader
@@ -83,6 +84,13 @@ class StarField(private val reader: StarCatalogReader) {
      *
      * @param yearsFromEpoch how far to carry each star by its own proper motion, from the
      *   catalogue's epoch to the date being drawn.
+     * @param centreOverride where the middle of the screen really points, when the caller knows it
+     *   more precisely than [view] can say. ⚠️ **Pointing mode has to pass this.** Its view comes
+     *   from `SkyPointing.equivalentView`, whose altitude is clamped to
+     *   [SkyProjection.MAX_ALTITUDE_DEG] — harmless for the magnitude cut and the field radius,
+     *   which is all [view] is otherwise read for, but up to half a degree of error in the centre
+     *   within half a degree of the zenith. At the quarter-degree field floor that is twice the
+     *   whole view, so the cone read here would not contain what is drawn.
      */
     suspend fun update(
         view: SkyProjection.View,
@@ -91,9 +99,10 @@ class StarField(private val reader: StarCatalogReader) {
         longitudeDeg: Double,
         epochMs: Long,
         yearsFromEpoch: Double = 0.0,
+        centreOverride: Ephemeris.Equatorial? = null,
     ): Outcome {
         // Which way the middle of the screen is pointing, in the catalogue's own coordinates.
-        val centre = SkyFrame.centreOf(view, latitudeDeg, longitudeDeg, epochMs)
+        val centre = centreOverride ?: SkyFrame.centreOf(view, latitudeDeg, longitudeDeg, epochMs)
 
         // ⚠️ Neither the clock nor the observer's position invalidates a load, and that is the point
         // of holding equatorial vectors: the region the plan reasons about is in the same frame the
