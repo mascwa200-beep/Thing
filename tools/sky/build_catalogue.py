@@ -508,17 +508,49 @@ def verify(out_path: str, grid: Grid, fmt: Format, expected_stars: int) -> None:
         ra_lo, ra_hi, dec_lo, dec_hi = grid.bounds(busiest)
         base = index_at + (tiles + 1) * 4
         previous = -1
+        edge = 0
         for i in range(index[busiest], index[busiest + 1]):
             ra_raw, dec_raw, mag, _colour, _pmra, _pmdec = struct.unpack_from(
                 "<HHBBbb", raw, base + i * record_bytes
             )
             ra = (ra_lo + ra_raw / 65535.0 * (ra_hi - ra_lo)) % 360.0
             dec = dec_lo + dec_raw / 65535.0 * (dec_hi - dec_lo)
-            assert grid.tile_of(ra, dec) == busiest, f"record {i} decoded outside tile {busiest}"
+            if grid.tile_of(ra, dec) != busiest:
+                # ⚠️ **A record on a tile's upper edge decodes into the NEXT tile, and that is the
+                # format working rather than failing.** A position is stored as a fraction of its own
+                # tile, so a star hard against the top quantises to 65535 and decodes to EXACTLY the
+                # upper bound — and tile bounds are half-open, so a boundary belongs to the tile
+                # above. `tile_of` is right, the filing is right, and the star is within one quantum
+                # of where it belongs.
+                #
+                # ⚠️ This assertion used to have no tolerance at all, and it was a lottery rather
+                # than a check. Measured over the shipped G<12 catalogue: 51 records sit at a
+                # quantisation maximum, 50 of them answer a different tile, and the largest quantum
+                # involved is 0.1545 arcsec — but NONE of them happened to land in that catalogue's
+                # busiest tile, which is the only tile this loop inspects, so it passed. At G<15
+                # there are about twelve times as many such records and the busiest tile holds
+                # fifteen times as many stars, and it lost: `record 14007680 decoded outside tile
+                # 1416` failed a build after a hundred minutes of crawling, on a catalogue that was
+                # entirely correct. `SkyCatalogBundleTest` has documented and tolerated this case
+                # since it was written; the two were two statements of one fact, disagreeing.
+                #
+                # ⚠️ The exception is stated as the exact condition the format creates, not as a
+                # count threshold. A decoded position is ALWAYS inside its tile's closed bounds —
+                # `lo + f*(hi-lo)` for f in [0,1] cannot leave them — so the only way `tile_of` can
+                # disagree is the half-open tie-break at the top, and the top is reachable only at a
+                # quantisation maximum. A builder that had genuinely got the geometry wrong would
+                # put essentially every record somewhere else, almost none of them maxed, and this
+                # fires on the first one.
+                assert ra_raw == 65535 or dec_raw == 65535, (
+                    f"record {i} decoded outside tile {busiest} and is not on a tile boundary — "
+                    f"the file and this build disagree about the geometry"
+                )
+                edge += 1
             assert mag >= previous, f"tile {busiest} is not sorted by magnitude at record {i}"
             previous = mag
         held = index[busiest + 1] - index[busiest]
-    print(f"  verified: busiest tile {busiest} holds {held} stars, in order")
+    note = f", {edge} on the tile's upper edge" if edge else ""
+    print(f"  verified: busiest tile {busiest} holds {held} stars, in order{note}")
 
 
 def write_parity(path: str, grid: Grid) -> None:
