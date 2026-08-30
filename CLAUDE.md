@@ -11125,3 +11125,140 @@ against the horizon rather than turning with the glass); check the horizon line 
 letters still sit where they should when aimed high; tap a star near the zenith at a narrow field and
 confirm the identify card names what your finger was on. The pole damping's *feel* — steady versus
 sluggish — is the one thing only a hand can judge; both constants are named and easy to tune.
+
+### S11 — THE DEEP TIER: G<15, 36.9 million stars, built in CI (this session, PR #464)
+
+Owner decided, via AskUserQuestion and twice over after the costs were measured and reported back:
+**G<15**, and **in LCARS as well as the standalone map** — the option I had explicitly advised
+against, because LCARS is 371 MB today and its auto-updater pulls the whole APK on every build. Their
+call; this builds it properly. **Zero subagent and zero workflow spend**, per the standing credit
+directive, which overrides the ultracode reminder as it has for every arc since.
+
+⚠️ **Everything numeric below was measured, not recalled.** Three live `COUNT(*)` queries against the
+ESA archive, a full local build at the shipped magnitude, and the shipped `saturationFovDeg` run over
+the shipped constants:
+
+    G<12 (was)   3,087,821 stars    24.7 MB   saturates 5.59°   48.6% dead zoom
+    G<15 (now)  36,909,335 stars   295.3 MB   saturates 1.08°   22.9% dead zoom
+
+Each magnitude buys exactly 0.238 decades (the limit is linear in log-field) and costs about 2.2× the
+last, so there is no natural stopping point — it is a budget choice, and the owner made it.
+
+#### The builder had to stop holding the sky in memory
+
+`main()` accumulated every row into one list and `pack()` re-bucketed them into a dict of lists, so
+both lived at once. A six-float Python tuple is ~250 bytes; 36.9M of them is roughly 9 GB on a runner
+already hosting Gradle. ⚠️ **The fix is cheaper than typed arrays because of a property that was
+CHECKED rather than assumed: a tile never straddles a declination band.** `SkyGrid` cuts bands first
+and divides each into whole RA columns, so every band is an independent packing problem — fetch it,
+bucket by tile as chunks arrive, write a part file, return only per-tile counts.
+
+⚠️ **Fetching and packing are ONE pool task on purpose.** A `Future` holds its result until the future
+itself is collected, so a worker that returned rows would keep every completed band alive for the
+whole run — exactly the memory this exists to avoid. And `fetch_chunk` now hands each leaf chunk to a
+sink and returns a count, rather than concatenating its children's lists, so a band never exists
+twice at the moment its last child returns.
+
+⚠️ `BandPacker.add` re-derives each row's tile with the shipped `Grid.tile_of` and refuses anything
+outside that band's range. That turns "the fetch bands and the grid bands line up" from prose into
+something the build fails on.
+
+**Measured at the shipped magnitude rather than on a toy: G<12, 3,087,821 stars, peak 191 MB.** The
+densest band at G<15 holds 1,159,100 rows against 97,000, so the deep tier lands near 2.2 GB.
+**Byte-identical to the builder it replaces** over the same cached chunks at G<6, G<9 and G<12; the
+write-flush branch was exercised separately by lowering the threshold to 64 bytes and comparing again.
+
+#### ⚠️ THE FINDING WORTH KEEPING: the archive does not answer twice the same way
+
+Rebuilding G<12 matched the committed catalogue in size, star count and tile index, and **differed in
+190 of 5,370 tiles — every one holding precisely the same records in a different order.** The cause
+is upstream and was settled by one repeated request rather than by reasoning: the query carries **no
+`ORDER BY`**, so a parallel execution plan may return the same rows differently, and asking the same
+small question twice returned an identical multiset that **differed at row 0**. `list.sort` is
+stable, so that order leaked straight into the file.
+
+Sorting server-side would mean an `ORDER BY` over a 36.9M-row scan, which is a far worse thing to ask
+of a research archive. Sorting on `(magnitude, ra, dec)` costs a few megabytes at the very largest
+tile, because `sort` builds its keys **per tile**, not per band. Four different upstream orders now
+produce one identical digest; without the tiebreak they produce four. Peak went 188 → 191 MB.
+
+#### What is now where, and why
+
+- **`.github/actions/star-catalogue`** is the ONE definition of the depth and the cache key. Three
+  workflows want this asset and a key drifting by one character would not fail — each would simply
+  never find the other's entry and rebuild for the best part of an hour, for ever.
+  ⚠️ Its build guard **reads the header** rather than asking whether a file exists: a checkout can
+  hand it a catalogue from another tier, and caching that under the right key would be permanent and
+  silent. Extracted from the YAML and run against real right-depth, wrong-depth and absent files.
+  ⚠️ Gated on the file, never on `steps.cache.outputs.cache-hit` — the recorded nutrition trap.
+- **`tools/sky/check_packaged.py`** answers present / STORED-not-deflated / right-DEPTH for a file on
+  disk or inside an APK. Ten cases negative-tested, including the count-floor branch, which the first
+  nine never reached. ⚠️ It says honestly what it **cannot** catch: a single lost chunk is 0.14% of
+  the catalogue, inside any floor a gate can carry. Completeness is the builder's own job.
+- **`.github/workflows/sky-catalogue.yml`** is a warmer, never a dependency — both builds still build
+  on a miss. It exists because a cold run is 1,100–1,900 requests to a research archive, and doing
+  that twice at once in two workflows is not polite.
+  ⚠️ **`workflow_dispatch` does not work from a feature branch.** GitHub registers dispatchable
+  workflows from the DEFAULT branch only: dispatching answered 404, and the API lists four workflows
+  here whose URLs all point at `blob/main`. So it also triggers on a push touching that file alone.
+  Once the cache is warm such a run finishes in about a minute, because the guard reads the header.
+  ⚠️ Its two `if:` guards are **truthiness, not `== ''`** — on a push event there is no `inputs`
+  context at all.
+
+#### Two defects found on the way, neither of them the thing being built
+
+- **The desktop jar has carried the packed catalogue since `:core:sky` was created.** Its build file
+  copies the whole asset directory while its comment claims "a quarter of a megabyte", and the
+  desktop `StarCatalogSource` opens exactly one resource, `/sky/stars.tsv` — there is no desktop
+  deep-tier reader at all. At G<15 that oversight would have put 295 MB into every MSI, silently.
+- **`build_milkyway.py`'s defaults still pointed at `app/src/main/assets/sky`**, gone since those
+  assets moved into the library that reads them. A run without `--catalogue` could only have failed.
+
+#### The test's split, and why it stops pinning numbers
+
+`SkyCatalogBundleTest` **maps** the file rather than reading it whole — 295 MB as a byte array, nine
+times over on the default test heap, is the difference between running and failing, and mapping is
+what the app itself does. It **no longer pins the star count or the depth**: those belong to whichever
+depth the build asked for, the Python gate checks them twice, and a stale copy in Kotlin would fail a
+perfectly good build. What the test owns is COHERENCE — the half a packaging gate cannot see.
+
+⚠️ Its tile-balance bounds are ratios now. Measured at G<12: thinnest 135, thickest 3,638, mean 575.
+Measured live at G<15: tile 372 holds 54,097 against a mean of 6,873. The absolute ceiling of 20,000
+was right for the shallow tier and would have failed the deep one while proving nothing extra. Colour
+completeness was measured too, before trusting the existing 90% assertion: **99.619% at G<15**.
+
+#### ⚠️ Not committed, and untracking saves nothing retroactively
+
+`.gitignore` already states the rule in this repository's own words about the food database: GitHub
+hard-rejects files over 100 MB and there is no LFS. The old 24.7 MB blob **stays in history for
+ever** — untracking avoids future growth and shrinks nothing. The BRIGHT catalogue beside it stays
+committed and must: Gaia saturates above about G = 3 and holds none of the fifteen brightest stars in
+the sky, so the two files are the faint and bright halves of one picture.
+
+#### The updater says when a build will not fit
+
+A build this size wants roughly two and a half times its own size transiently. ⚠️ Guessing at that
+multiplier and refusing on it would block installs that would have worked, so **the only bar is that
+a download needs somewhere to land**, checked again against the file's real size before the install.
+Both sentences carry the two numbers rather than saying "not enough space". The next APK's size is
+estimated from the RUNNING package (`applicationInfo.sourceDir`), because the release asset's size is
+not something `UpdateInfo` carries and adding it would be a second thing to keep in step.
+
+#### ⚠️ Owner-verify on the Pixel — and the cost you accepted
+
+The whole point is visible only past 5.6° of field: zoom well in and stars should keep appearing
+where the map used to go empty, with the depth line falling silent until much further in. **And the
+one to watch is that a ~642 MB update installs at all** on the budget phone rather than failing for
+space — that is what the new updater sentences are for, and only a device can settle it.
+
+⚠️ The recurring auto-update cost does not go away and cannot be mitigated within this design: every
+LCARS build republishes ~642 MB and the phone pulls it in full. If it becomes tiresome, the shape
+that fixes it is the deep tier as a **downloaded pack** rather than a bundled asset — but
+`PackArchive` takes only `*.json`, caps entries at 32 MB and merges through the guide index, so that
+is a rewrite of the pack format rather than a switch to flip.
+
+**Open, deliberately:** the Milky Way raster is still derived from the G<12 catalogue and is
+unchanged and correct as it stands. Whether rebuilding it from G<15 **strengthens or weakens** the
+Great Rift is a real question — the rift exists *because* extinction pushes stars below the cut — and
+it cannot be answered until the deep catalogue exists. Measure both and keep the one with more
+structure; do not guess, which is the trap this file records eighteen times.
