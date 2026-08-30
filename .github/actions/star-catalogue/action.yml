@@ -166,60 +166,81 @@ runs:
     # even a catalogue refetched cold in a different row order yields identical bytes. A G<12
     # reproduction has already been confirmed byte-identical, twice.
     #
-    # ROUND 1 — REPORT ONLY. This step currently rebuilds and reports; it does not fail on a
-    # mismatch, because the committed raster is still the G<12 one and the whole point of this round
-    # is to obtain the deep one and the statistics its thresholds derive from. The next commit turns
-    # the comparison into a hard gate.
-    - name: Rebuild the Milky Way raster from that catalogue
+    # ⚠️ **It costs about a minute of every round in three workflows, and that was measured rather
+    # than assumed: 56.1 s wall and 305 MB peak over 36.9 million stars.** If it ever hurts, the
+    # lever is a cache keyed on exactly (this catalogue's key, `build_milkyway.py`, `MilkyWay.kt`)
+    # holding a stamp, so the rebuild is skipped when none of its inputs moved. Named, not built —
+    # caching a gate is how gates go stale, and it should only be done against a measured need.
+    #
+    # ⚠️ **A HARD GATE. A raster that disagrees with the catalogue beside it fails the build.**
+    # There is no honest degraded state: the two would ship together describing different skies, and
+    # nothing downstream could tell — the app would draw a perfectly plausible galaxy scaled for a
+    # catalogue it is not reading. The builder's own thresholds check (see `report_thresholds`) is
+    # part of the same gate, so `MilkyWay.kt`'s two absolute densities are held here too.
+    - name: Rebuild the Milky Way raster and check it matches the committed one
       shell: bash
       run: |
         set -euo pipefail
         committed=core/sky/src/main/assets/sky/milkyway.bin
         out="${RUNNER_TEMP:-/tmp}/milkyway.rebuilt.bin"
 
-        # ⚠️ `|| true` is load-bearing and only for this round. `build()` WRITES the file before
-        # `verify()` runs, so even a failed gate leaves the bytes and the numbers on disk — and this
-        # round exists to obtain them. A builder that fell over silently and emitted nothing would
-        # cost a whole extra round for no reason.
-        #
         # The timer is guarded and uses `-v` rather than a format string, matching the catalogue
         # step above: /usr/bin/time is a package rather than the shell builtin, and a diagnostic
         # that can break the build is worse than no diagnostic.
+        #
+        # ⚠️ No `|| true` here, unlike the round that bootstrapped this. The builder raising is
+        # itself a finding — it means the raster it just wrote disagrees with `MilkyWay.kt`, which
+        # is precisely what this gate exists to catch — so it must fail rather than be reported.
         TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
         $TIMER python3 tools/sky/build_milkyway.py \
           --catalogue core/sky/src/main/assets/sky/stars.skycat \
-          --out "$out" 2> >(tee /tmp/milkyway-time.log >&2) \
-          || echo "::warning::the raster builder did not finish cleanly — read its output above"
+          --out "$out" 2> >(tee /tmp/milkyway-time.log >&2)
         grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/milkyway-time.log \
           | sed 's/^/    /' || true
 
-        if [ ! -s "$out" ]; then
-          echo "FAIL: the builder produced no raster at all."
-          exit 1
-        fi
-
         echo "--- committed vs rebuilt ---"
+        echo "  committed $(sha256sum "$committed" | cut -c1-16)…  $(stat -c%s "$committed") bytes"
+        echo "  rebuilt   $(sha256sum "$out"       | cut -c1-16)…  $(stat -c%s "$out") bytes"
         if cmp -s "$out" "$committed"; then
           echo "  identical — the committed raster is what this catalogue implies"
-        else
-          echo "  DIFFERENT — committed $(stat -c%s "$committed") bytes, rebuilt $(stat -c%s "$out")"
-          echo "  (expected while the committed raster is still the shallow one)"
+          exit 0
         fi
 
-        # The bytes, so they can be adopted without a second round. The artifact below is the
-        # primary route; this is the fallback that cannot fail, since a job log is always readable.
+        # ⚠️ The recovery path is the SAME MECHANISM that bootstrapped the deep raster in the first
+        # place, which is why it is here rather than left to be reinvented under time pressure:
+        # decode this block into `core/sky/src/main/assets/sky/milkyway.bin` and commit it, having
+        # first read the statistics the builder printed above and moved `MilkyWay.FAINTEST_DENSITY`
+        # and `BRIGHTEST_DENSITY` with it. The artifact below is the tidier route; base64 in the log
+        # is the one that cannot fail, since a job log is always readable.
+        #
         # ⚠️ Deliberately wrapped at the default 76 columns rather than `-w0`: one 86,000-character
         # line is at the mercy of whatever truncates long log lines, and nothing is gained by it.
+        #
+        # ⚠️ **A mismatch is not automatically the raster's fault.** The rebuild is deterministic in
+        # the strong sense — it depends only on the multiset of star positions — so if the catalogue
+        # has not changed depth, a difference means something upstream of both moved: the grid, the
+        # record layout, the smoothing. Read the builder's numbers before adopting these bytes.
+        echo "  DIFFERENT — this catalogue does not imply the committed raster."
         echo "--- rebuilt raster, base64 (between the markers) ---"
         echo "BEGIN_MILKYWAY_BASE64"
         base64 "$out"
         echo "END_MILKYWAY_BASE64"
+        exit 1
 
     - name: Keep the rebuilt raster
+      # ⚠️ `always()` so a FAILED step still uploads, and there are TWO ways it fails. A cmp
+      # mismatch prints the bytes into the log as well, so either route works — but the builder
+      # RAISING (its own thresholds check) fails before the base64 is ever reached, and `build()`
+      # writes the raster before either gate runs, so in that case this artifact is the only copy
+      # of the bytes there is. Without `always()` the upload happens exactly when nobody needs it.
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: milkyway-rebuilt-${{ github.run_id }}-${{ github.job }}
         path: ${{ runner.temp }}/milkyway.rebuilt.bin
-        # 64 KB, and its only purpose is to be collected in the round that adopts it.
+        # 64 KB, and its only purpose is to be collected in a round that has to adopt it.
         retention-days: 7
-        if-no-files-found: error
+        # ⚠️ `warn`, not `error`: the builder can fail before writing anything (a missing catalogue,
+        # a Kotlin constant it cannot read), and in that case the step above has already failed with
+        # the real reason. A second failure here would bury it.
+        if-no-files-found: warn

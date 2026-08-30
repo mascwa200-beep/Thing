@@ -201,23 +201,77 @@ class MilkyWayTest {
 
     // ---- drawing -------------------------------------------------------------------------------
 
+    // ⚠️ **THE FIXTURES BELOW ARE ABSOLUTE STAR DENSITIES AND THEREFORE BELONG TO A CATALOGUE
+    // DEPTH.** Every one was a different number while the raster came from a G<12 catalogue — the
+    // poles were 22.9 rather than 163, the rift 83 rather than 1660. Deepening the catalogue without
+    // moving them would leave the tests passing against a sky the app no longer draws, which is the
+    // whole reason `tools/sky/build_milkyway.py` now reads `MilkyWay.kt` and refuses a raster that
+    // disagrees with it.
+    //
+    // ⚠️ They are measured on the SHIPPED raster by ONE method, and the method matters more than the
+    // numbers: mean density over |b| <= 5 per whole degree of longitude, the trough taken as the
+    // minimum of that over l = 20..50 and the flanks as the mean of the best 20° either side. That
+    // is the method the old fixtures used — reading the previous raster with it returns 83.0 and
+    // 214.1, which is exactly what stood here. A different-but-reasonable method (single cells
+    // rather than a band mean) gives 487 and 3046 for the same sky, and comparing one method's
+    // number against another's is how a rebuild gets reported as having changed something it did
+    // not. `scratchpad/sky/measure_rift_depth.py` reaches the same conclusion from raw Gaia.
+    private companion object {
+        /** Both galactic poles, and the property that keeps half the sky black. */
+        const val POLE_DENSITY = 163.0
+
+        /** The Great Rift's trough, at galactic longitude 39. Was 83 at G<12. */
+        const val RIFT_DENSITY = 1660.0
+
+        /** The plane either side of that trough — the contrast the feature exists to show. */
+        const val PLANE_DENSITY = 4240.0
+
+        /** The single brightest cell in the raster, toward Carina–Crux. */
+        const val PEAK_DENSITY = 21947.0
+    }
+
     @Test
     fun `the poles are drawn as nothing at all`() {
-        // The measured polar density is 21-24 stars per square degree. Whatever else the curve
-        // does, it must leave that black, or the whole sky carries a wash.
-        assertEquals(0.0, MilkyWay.opacity(21.0), 0.0)
-        assertEquals(0.0, MilkyWay.opacity(24.0), 0.0)
+        // Whatever else the curve does, it must leave the high-latitude sky black, or everything
+        // carries a wash and the galaxy stops being a shape.
+        assertEquals(0.0, MilkyWay.opacity(POLE_DENSITY), 0.0)
         assertEquals(0.0, MilkyWay.opacity(MilkyWay.FAINTEST_DENSITY), 0.0)
     }
 
     @Test
+    fun `the floor stays above the polar sky whatever it is set to`() {
+        // ⚠️ The test above asks whether TODAY's numbers happen to work. This asks the thing that
+        // must stay true through any future rescale, and it is the property "roughly half the sky
+        // is genuinely black" reduces to: the floor is a threshold on density, so it protects the
+        // poles only while it is above them. A deeper catalogue moves both, and moving one without
+        // the other is exactly the failure that shipped a G<12 floor under a G<15 raster.
+        assertTrue(
+            "FAINTEST_DENSITY is ${MilkyWay.FAINTEST_DENSITY} but the poles measure $POLE_DENSITY " +
+                "— the high-latitude sky would glow",
+            MilkyWay.FAINTEST_DENSITY > POLE_DENSITY,
+        )
+        // And the ceiling has to be above the floor, or `opacity` divides by zero or by a negative.
+        assertTrue(
+            "BRIGHTEST_DENSITY must sit above FAINTEST_DENSITY",
+            MilkyWay.BRIGHTEST_DENSITY > MilkyWay.FAINTEST_DENSITY,
+        )
+    }
+
+    @Test
     fun `the Great Rift stays visibly darker than the plane around it`() {
-        // ⚠️ The whole point of the feature, expressed as a property. The measured trough is 82
-        // stars per square degree against ~210 either side; if the curve does not preserve that
-        // contrast the Milky Way draws as a featureless band and nobody could tell it from a
+        // ⚠️ The whole point of the feature, expressed as a property: if the curve does not preserve
+        // that contrast the Milky Way draws as a featureless band and nobody could tell it from a
         // painted one.
-        val rift = MilkyWay.opacity(82.0)
-        val plane = MilkyWay.opacity(210.0)
+        //
+        // The rift survived the deepening essentially unchanged in DENSITY — 2.56x below its flanks
+        // at G<15 against 2.58x at G<12, measured by the one method above — but it does draw with a
+        // little less contrast, at 0.59 of the plane's opacity where it was 0.50. That follows from
+        // the floor: the rift now sits 5.9x above it where it sat 2.1x, and `opacity` square-roots
+        // what is left. Recorded rather than tuned away, because the alternative is raising the
+        // floor past the median cell and giving up the "half the sky is black" property to buy back
+        // contrast in one feature.
+        val rift = MilkyWay.opacity(RIFT_DENSITY)
+        val plane = MilkyWay.opacity(PLANE_DENSITY)
         assertTrue("the rift must be drawn at all, was $rift", rift > 0.0)
         assertTrue("the rift ($rift) should be well under the plane ($plane)", rift < plane * 0.7)
     }
@@ -226,15 +280,23 @@ class MilkyWayTest {
     fun `brightness rises with density and never exceeds the cap`() {
         var previous = -1.0
         var d = 0.0
-        while (d <= 900.0) {
+        // ⚠️ Swept past PEAK_DENSITY rather than to some round number, so the loop covers every
+        // density the raster can actually produce. 388 of the 918 steps land inside the
+        // floor-to-ceiling ramp, which is where the curve is doing anything.
+        while (d <= PEAK_DENSITY + 1000.0) {
             val o = MilkyWay.opacity(d)
             assertTrue("opacity went backwards at $d", o >= previous)
             assertTrue("opacity $o exceeded the cap at $d", o <= MilkyWay.MAX_OPACITY + 1e-12)
             previous = o
-            d += 5.0
+            d += 25.0
         }
         assertEquals(MilkyWay.MAX_OPACITY, MilkyWay.opacity(MilkyWay.BRIGHTEST_DENSITY), 1e-12)
-        assertEquals("and it saturates rather than growing", MilkyWay.MAX_OPACITY, MilkyWay.opacity(5000.0), 1e-12)
+        assertEquals(
+            "and it saturates rather than growing — the brightest cell is well past the ceiling",
+            MilkyWay.MAX_OPACITY,
+            MilkyWay.opacity(PEAK_DENSITY),
+            1e-12,
+        )
     }
 
     // ---- helpers -------------------------------------------------------------------------------

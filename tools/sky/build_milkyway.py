@@ -6,13 +6,24 @@ Milky Way — the glow the eye sees is unresolved starlight — so counting how 
 catalogue holds in each direction measures the same thing, and the bulge, the thinning toward the
 anticentre and the dark dust rifts all fall out of the measurement.
 
-⚠️ **Density, not flux.** Measured both ways over the real catalogue, the plane-to-pole contrast is
-7.93x by density and 4.52x by flux: flux is dominated by the brightest stars in each direction, and
-those are nearby and so nearly isotropic. Counting is the better instrument and the cheaper one.
+⚠️ **Density, not flux.** Measured both ways over the catalogue as it stood at G<12, the
+plane-to-pole contrast is 7.93x by density and 4.52x by flux: flux is dominated by the brightest
+stars in each direction, and those are nearby and so nearly isotropic. Counting is the better
+instrument and the cheaper one. Those two numbers are LEFT at that depth deliberately — they are an
+argument about which instrument to use, not a description of the current raster, and quoting a fresh
+density beside a stale flux would compare two different sums.
 
-⚠️ **Dust shows up as ABSENCE, which is why a twelfth-magnitude catalogue can see it at all.** Dust
-does not dim a star a little, it pushes it below the magnitude cut and out of the count. Along the
-plane the density varies 4.63x and the troughs land on the real dust lanes.
+⚠️ **Dust shows up as ABSENCE, which is why a magnitude-limited catalogue can see it at all.** Dust
+does not dim a star a little, it pushes it below the magnitude cut and out of the count. On the
+shipped G<15 raster the density varies 9.63x along the plane (mean over |b| <= 5, per whole degree of
+longitude) and the troughs land on the real dust lanes.
+
+⚠️ **Deepening the catalogue did not fill the rifts in, which was the open question.** Measured by
+that one method against the raster this replaced: plane-to-pole went 8.03x -> 17.46x and the
+along-the-plane variation 5.03x -> 9.63x, while the Great Rift held at 2.58x -> 2.56x below its
+flanks. The band gained a great deal and the structure was not lost. One thing genuinely moved: the
+maximum is now Sagittarius at l = 1 rather than Carina-Crux at l = 289, the bulge emerging from its
+own extinction.
 
 Reads `MilkyWay.kt` for the raster's shape and file layout, and `StarCatalogFormat.kt` /
 `SkyGrid.kt` (through build_catalogue) for the star catalogue's, so there is one definition of each
@@ -264,12 +275,26 @@ def report_thresholds(raster: Raster, density: list[float], peak: float) -> None
 
     # ⚠️ The property the floor exists to give: the empty sky must stay empty. If the polar band is
     # at or above the floor then high latitudes are drawn as glow, which is the exact failure this
-    # whole function is here to prevent — so it is called out by name rather than left to be read
-    # off the two numbers above.
+    # whole function is here to prevent — so it is checked by name rather than left to be read off
+    # the two numbers above.
     poles = band(75.0, 90.0)
     if poles >= raster.faintest:
-        print(f"    ⚠️  THE POLES ({poles:.1f}) ARE AT OR ABOVE THE FLOOR ({raster.faintest:g}) — "
-              f"the high-latitude sky would be drawn as glow")
+        raise SystemExit(
+            f"MilkyWay.FAINTEST_DENSITY is {raster.faintest:g} and the poles of this raster measure "
+            f"{poles:.1f} — the high-latitude sky would be drawn as glow rather than left black")
+
+    # ⚠️ **±30% because the constants are DELIBERATELY ROUNDED and a depth change is not subtle.**
+    # Measured: the shipped pair sits +1.4% and +0.1% off this raster's statistics, and the G<12 pair
+    # sat +12% and -0.8% off its own. A change of catalogue depth moves them by 8-30x. So this band
+    # is wide enough that nobody has to write 276.2 in a source file, and narrower than anything that
+    # could actually go wrong by an order of magnitude.
+    for what, want, got in (("FAINTEST_DENSITY", median, raster.faintest),
+                            ("BRIGHTEST_DENSITY", p999, raster.brightest)):
+        if not (want * 0.7 <= got <= want * 1.3):
+            raise SystemExit(
+                f"MilkyWay.{what} is {got:g} but this raster says it should be about {want:.1f} "
+                f"— they are more than 30% apart, so the renderer is tuned for a different sky")
+    print("    both constants agree with this raster")
 
 
 def verify(path: str, raster: Raster, density: list[float], peak: float) -> None:
@@ -290,11 +315,22 @@ def verify(path: str, raster: Raster, density: list[float], peak: float) -> None
 
     body = blob[raster.header_bytes:]
     worst = 0.0
+    # ⚠️ The cost a LINEAR encoding would have carried, measured beside the real one rather than
+    # quoted from an old run. `MilkyWay.encodeDensity`'s KDoc justifies the square root with this
+    # comparison, and the two numbers move with the depth — so measuring both here is what keeps
+    # that justification true instead of leaving it a statement about a catalogue we no longer ship.
+    #
+    # ⚠️ It has to be computed against `density`, the array BEFORE encoding. Doing it against the
+    # decoded bytes measures the round-trip of an already-quantised value, which is exact by
+    # construction and reports a triumphant and meaningless 0.0%.
+    worst_linear = 0.0
     for i, v in enumerate(density):
         if v <= 0.0:
             continue
         back = (body[i] / 255.0) ** 2 * stored_peak
         worst = max(worst, abs(back - v) / v)
+        lin = round(255.0 * min(1.0, v / stored_peak)) / 255.0 * stored_peak
+        worst_linear = max(worst_linear, abs(lin - v) / v)
     if worst > 0.15:
         raise SystemExit(f"a byte costs up to {worst * 100:.1f}% — the encoding is not good enough")
 
@@ -312,7 +348,8 @@ def verify(path: str, raster: Raster, density: list[float], peak: float) -> None
     print(f"  plane {plane:.1f} vs poles {poles:.1f} stars/deg^2 — contrast {contrast:.2f}x")
     if contrast < 4.0:
         raise SystemExit(f"plane-to-pole contrast is only {contrast:.2f}x — this is not the Milky Way")
-    print(f"  worst byte error {worst * 100:.1f}%")
+    print(f"  worst byte error {worst * 100:.1f}% square-root scaled "
+          f"({worst_linear * 100:.1f}% had it been linear)")
 
 
 def main() -> int:

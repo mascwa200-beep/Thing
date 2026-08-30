@@ -22,8 +22,9 @@ import kotlin.math.sqrt
  *
  * ## ⚠️ Density, not flux — and this corrects the design it was written from
  *
- * The plan said to sum the *flux* of the stars in each direction. Measured both ways over the real
- * bundled catalogue (3,087,821 stars to G = 12), binned by galactic latitude:
+ * The plan said to sum the *flux* of the stars in each direction. Measured both ways over the
+ * bundled catalogue **as it stood at the time — 3,087,821 stars to G = 12** — binned by galactic
+ * latitude:
  *
  * | signal | plane (|b| < 5°) | poles (|b| > 75°) | contrast |
  * |---|---|---|---|
@@ -34,19 +35,43 @@ import kotlin.math.sqrt
  * in each direction, and those are nearby — so they are close to isotropic and dilute exactly the
  * structure this exists to show. Counting is the better instrument, and it is also the cheaper one.
  *
+ * ⚠️ Those four numbers are **left at the depth they were measured at, deliberately**. They are an
+ * argument about which of two instruments to use, and that argument does not turn on how deep the
+ * catalogue goes; re-measuring flux needs the packed catalogue in hand, and quoting a new density
+ * beside an old flux would compare two different sums — the exact mistake
+ * `scratchpad/sky/measure_milkyway.py` was written to stop. The figures below, which describe the
+ * raster this file actually reads, are the ones kept current.
+ *
  * ## ⚠️ Dust shows up as ABSENCE, which is why this works at all
  *
- * The natural worry is that a catalogue cut at twelfth magnitude is far too shallow to see a glow
- * made of much fainter stars. Measured along the plane (|b| ≤ 2°), density varies **4.63×** with
- * longitude and the structure lands exactly where the real sky puts it: a 2.6× trough at
- * l = 20–50° bottoming at 82 /deg² against ~210 either side — **the Great Rift** — a second trough
- * at l = 140–150° for the Taurus–Perseus dust, and a peak of 372 /deg² at l = 280–300° for
- * Carina–Crux. Sagittarius at l = 0° is high at 212 but is *not* the maximum, which is correct
- * rather than a fault: the bulge is heavily obscured at this depth.
+ * The natural worry is that a magnitude-limited catalogue is far too shallow to see a glow made of
+ * much fainter stars. Measured on the shipped raster — mean density over |b| ≤ 5°, per whole degree
+ * of longitude — it varies **9.63×** along the plane and the structure lands exactly where the real
+ * sky puts it: a trough at l = 20–50° bottoming at 1657 /deg² against ~4240 either side — **the
+ * Great Rift** — a second trough at l = 142° for the Taurus–Perseus dust at 875, and Carina–Crux at
+ * 6088 near l = 289.
  *
  * That is the mechanism. Dust does not dim a star a little; it pushes it below the magnitude cut and
  * takes it out of the count altogether. A rift is therefore the *most* visible thing in a
  * density map, not the least.
+ *
+ * ## ⚠️ What deepening the catalogue to G<15 did, measured rather than assumed
+ *
+ * The same mechanism raises a real question the other way round: a deeper cut recovers stars hidden
+ * behind dust that a shallower one could not see, so it might have *filled the rifts in*. Measured
+ * by the one method above, against the raster this replaced:
+ *
+ * | | G<12 | G<15 |
+ * |---|---|---|
+ * | plane / poles | 8.03× | **17.46×** |
+ * | variation along the plane | 5.03× | **9.63×** |
+ * | Great Rift below its flanks | 2.58× | **2.56×** |
+ *
+ * **The band roughly doubles in contrast and the rift is untouched** — it is the same trough, twelve
+ * times brighter, in a sky twelve times brighter. One thing genuinely changed: the maximum moved
+ * from Carina–Crux to **Sagittarius at l = 1°**, which at G<12 was high but not highest. That is the
+ * bulge emerging from its own extinction, and it is the one place where a deeper cut visibly
+ * *un-hides* something rather than merely scaling everything up.
  */
 object MilkyWay {
 
@@ -70,6 +95,13 @@ object MilkyWay {
      * 7.9% noise sits far under the ~160% signal the Great Rift presents, so one degree is limited
      * by neither. Half a degree triples the asset to buy noise that would swamp the structure; two
      * degrees is coarse enough to read as blocks once the field is narrow.
+     *
+     * ⚠️ That table was measured on the G<12 catalogue, and **deepening to G<15 only strengthens the
+     * conclusion**: the same median measured on the shipped raster is **2,130 stars a cell, so 2.2%
+     * noise**. Half a degree would now be about 4.3%, which is genuinely usable — but it quadruples
+     * a committed asset to sharpen structure whose narrowest real feature is several degrees wide,
+     * so the choice stands. The row is not rewritten because the *comparison between step sizes* is
+     * what the table is for, and re-measuring one row of it would make the three incomparable.
      */
     const val STEP_DEG = 1.0
 
@@ -119,7 +151,7 @@ object MilkyWay {
      *
      * The two travel together because neither means anything alone — a byte is a fraction of the
      * peak, so handing the cells to a caller that has to remember to fetch the peak separately is
-     * one forgotten argument away from a sky scaled by 255 instead of 717.
+     * one forgotten argument away from a sky scaled by 255 instead of 21,947.
      */
     class Raster(val cells: ByteArray, val peak: Double)
 
@@ -290,16 +322,24 @@ object MilkyWay {
     /**
      * Turn a density into the byte the raster stores, given the peak the whole raster reaches.
      *
-     * ⚠️ **Square-root scaled, and the difference is nearly tenfold.** Measured over the real
-     * 64,800-cell raster, whose densities run from 0 to 717 stars per square degree, the worst
-     * relative error a single byte forces is **55.2% stored linearly and 3.6% stored square-root
-     * scaled**. Linear spends almost all of its 256 steps on the bright end, where the eye cannot
-     * tell them apart, and leaves the faint high-latitude sky — which is most of the sky, and the
-     * half where a step is visible as banding — with a handful of levels.
+     * ⚠️ **Square-root scaled, and the difference is an order of magnitude.** Linear spends almost
+     * all of its 256 steps on the bright end, where the eye cannot tell them apart, and leaves the
+     * faint high-latitude sky — which is most of the sky, and the half where a step is visible as
+     * banding — with a handful of levels. Measured on the G<12 raster that settled the choice, the
+     * worst relative error a single byte forces was **55.2% stored linearly against 3.6% stored
+     * square-root scaled**. `tools/sky/build_milkyway.py` now prints both at whatever depth it is
+     * building, so that comparison stays a live measurement rather than a remembered one.
      *
-     * 3.6% also sits comfortably under the 7.9% Poisson noise of the counting itself, which is where
-     * an encoding wants to be: not the thing limiting the answer. (It was 5.7% before the polar
-     * smoothing below; averaging the noisiest cells away took the extreme values with it.)
+     * On the shipped G<15 raster, whose densities run from 0 to 21,947 stars per square degree, the
+     * square-root cost is **5.4%**.
+     *
+     * ⚠️ **That 5.4% is no longer under the counting noise, and it used to be.** The 3.6% figure sat
+     * comfortably beneath the 7.9% Poisson noise of the counting itself, which is where an encoding
+     * wants to be — not the thing limiting the answer. Thirteen times as many stars cut that noise
+     * to **2.2%**, measured the same way [STEP_DEG]'s table measures it. So the encoding is now the
+     * coarser of the two. It is still finer than the eye can see in a glow drawn at a third of full
+     * opacity, so this is recorded rather than acted on — but a further depth would want the byte
+     * reconsidered before the count.
      */
     fun encodeDensity(density: Double, peak: Double): Int {
         if (peak <= 0.0 || density <= 0.0) return 0
@@ -336,13 +376,18 @@ object MilkyWay {
      *
      * ⚠️ **Longitude resolution near the poles is deliberately coarse, and it is the builder that
      * makes it so.** An equirectangular cell's solid angle shrinks with the cosine of its latitude,
-     * so at |b| = 89.5 a cell covers 0.0087 deg² and holds — measured on the real catalogue — about
-     * 0.16 stars. A count of nought or one is not an estimate of a density: 303 of that row's 360
-     * cells came out empty and the other 57 read about 115 /deg², a speckled ring at each pole that
-     * reads as a rendering fault. `tools/sky/build_milkyway.py` therefore averages each row over
-     * `1/cos(b)` columns, which covers a constant one degree of great-circle arc at every latitude
-     * and preserves the row's total exactly. Both poles now read 24–31 /deg², below
-     * [FAINTEST_DENSITY], so the empty sky is drawn as empty.
+     * so at |b| = 89.5 a cell covers 0.0087 deg² and holds — measured on the G<12 catalogue that
+     * prompted the fix — about 0.16 stars. A count of nought or one is not an estimate of a density:
+     * 303 of that row's 360 cells came out empty and the other 57 read about 115 /deg², a speckled
+     * ring at each pole that reads as a rendering fault. `tools/sky/build_milkyway.py` therefore
+     * averages each row over `1/cos(b)` columns, which covers a constant one degree of great-circle
+     * arc at every latitude and preserves the row's total exactly.
+     *
+     * On the shipped G<15 raster the polar band reads **163 /deg²**, below [FAINTEST_DENSITY]'s 280,
+     * so the empty sky is still drawn as empty. ⚠️ That is a property of the PAIR rather than of
+     * either number, which is why the builder refuses to write a raster whose poles reach the floor:
+     * the twelvefold deeper catalogue raised the poles from 22.9 to 163, and against the old floor
+     * of 40 every high-latitude cell would have been painted.
      */
     fun sample(cells: ByteArray, peak: Double, longitudeDeg: Double, latitudeDeg: Double): Double {
         if (cells.size < CELLS) return 0.0
@@ -392,21 +437,45 @@ object MilkyWay {
     /**
      * The density below which nothing is drawn at all.
      *
-     * Measured: the galactic poles sit at 21–24 stars per square degree and the median cell over the
-     * whole raster is 38. A floor of 40 therefore leaves roughly half the sky genuinely black, which
-     * is what the real sky looks like — the naked-eye Milky Way covers well under half of it, and a
-     * glow smeared faintly over everything would read as a dirty lens rather than as our galaxy.
+     * Measured on the shipped G<15 raster: the galactic poles sit at 163 stars per square degree and
+     * the median cell over the whole raster is 276. A floor of 280 therefore leaves roughly half the
+     * sky genuinely black, which is what the real sky looks like — the naked-eye Milky Way covers
+     * well under half of it, and a glow smeared faintly over everything would read as a dirty lens
+     * rather than as our galaxy.
+     *
+     * ⚠️ **THIS IS AN ABSOLUTE DENSITY, SO IT BELONGS TO A PARTICULAR CATALOGUE DEPTH, AND THAT IS
+     * NOT OBVIOUS FROM ANYTHING ELSE ON THIS PAGE.** It was 40 while the raster came from a G<12
+     * catalogue whose poles were 22.9. Deepening to G<15 multiplied the poles by 7.1 and the plane
+     * by 15.5. Measured over the shipped raster, cell by cell, that is what the two pairs draw:
+     *
+     * | | sky drawn at all | at full opacity |
+     * |---|---|---|
+     * | G<12 raster, the old 40 / 400 | 43.6% | 0.11% |
+     * | **G<15 raster, 280 / 10,000** | **50.3%** | **0.10%** |
+     * | G<15 raster, the old 40 / 400 | **100%** | **37.5%** |
+     *
+     * The third row is what swapping the asset alone would have shipped: every direction glowing and
+     * more than a third of the sky pinned flat at the cap — a uniform wash with a slab through it,
+     * not a galaxy. Nothing in the build could have noticed, because the builder's own contrast
+     * check reads 17x on that raster and passes happily.
+     *
+     * So `tools/sky/build_milkyway.py` now REFUSES to write a raster whose poles reach this floor,
+     * and refuses if this number is more than 30% from the raster's own median. Change the depth and
+     * the builder tells you what both constants should become.
      */
-    const val FAINTEST_DENSITY = 40.0
+    const val FAINTEST_DENSITY = 280.0
 
     /**
      * The density at which the glow reaches [MAX_OPACITY] and stops brightening.
      *
-     * 400 is the 99.9th percentile of the real raster, so the Carina–Crux peak saturates and
-     * everything else has the full range to move in. Chosen over the true maximum of 717 because a
-     * ceiling set by the single brightest cell wastes most of the scale on cells that do not exist.
+     * 10,000 is the 99.9th percentile of the real raster, so the Carina–Crux peak saturates and
+     * everything else has the full range to move in. Chosen over the true maximum of 21,947 because
+     * a ceiling set by the single brightest cell wastes most of the scale on cells that do not exist.
+     *
+     * ⚠️ Absolute, and depth-bound, exactly as [FAINTEST_DENSITY] is — it was 400 against a G<12
+     * raster whose 99.9th percentile was 403. Same guard applies.
      */
-    const val BRIGHTEST_DENSITY = 400.0
+    const val BRIGHTEST_DENSITY = 10000.0
 
     /**
      * How opaque the brightest part of the glow may be.
