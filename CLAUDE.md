@@ -11482,9 +11482,157 @@ a CI step beside the builder is the obvious shape — and `measure_milkyway.py` 
 old raster before it ships, because the raster adds its own binning and smoothing on top of what
 was measured here.
 
+⚠️ **SUPERSEDED — THE REBUILD IS DONE. The paragraph immediately above is a dated record of why it
+had not been done YET, and it is correct as of when it was written; it is NOT a description of the
+current state, and a future session acting on it would redo finished work.** The shape it predicted
+is the shape that shipped: a CI step beside the builder. See **"THE MILKY WAY IS REBUILT FROM G<15"**
+at the end of this file. Left standing rather than rewritten for the reason the log is always left
+standing — but flagged, because unlike an ordinary stale record this one names an open task that is
+closed.
+
 ⚠️ **Two ADQL notes, both of which cost a round.** The parser rejects an EXPRESSION in `GROUP BY`
 outright — `GROUP BY FLOOR(l/10)` answers 400 with *"Was expecting ... &lt;REGULAR_IDENTIFIER&gt; ...
 &lt;UNSIGNED_INTEGER&gt;"* — so the alias or the column position is the only form it takes. And a 400
 from this endpoint carries the real complaint in the body, which `urllib` puts on the exception
 rather than raising with it: `except HTTPError as e: e.read()`. Guessing at the cause instead
 would have taken several attempts.
+
+### THE MILKY WAY IS REBUILT FROM G<15 (this session, `706cb7c` + `550d76e`, PR #464)
+
+The item above argued for it; this did it. The catalogue went to 36,909,335 stars at G<15 last arc
+while `milkyway.bin` was still derived from the old G<12 one, so the app shipped a catalogue and a
+galaxy that disagreed about how deep the sky goes. **Zero subagent and zero workflow spend**, as with
+every arc since the credit directive — local kotlinc + JUnit, live measurement, and CI.
+
+Owner's two binding decisions: the raster **stays committed and CI verifies it** (the picture stays
+reviewable in the repo, and drift from the catalogue becomes a build failure); and the thresholds are
+**rescaled with the builder asserting them**, so the pair can never move apart again.
+
+#### ⚠️ THE RESCALE WAS THE POINT, NOT THE ASSET — and one measurement is the whole argument
+
+`MilkyWay.opacity` maps a density in **stars per square degree** through two ABSOLUTE constants, and
+they were tuned for G<12. Measured over the shipped raster, cell by cell:
+
+| | sky drawn at all | at full opacity |
+|---|---|---|
+| G<12 raster, the old 40 / 400 | 43.6% | 0.11% |
+| **G<15 raster, 280 / 10,000** | **50.3%** | **0.10%** |
+| G<15 raster, the old 40 / 400 | **100%** | **37.5%** |
+
+**The third row is what swapping the asset alone would have shipped**: every direction glowing and
+more than a third of the sky pinned flat at the cap — a uniform wash with a slab through it, not a
+galaxy. **Every automated gate would have passed**; the builder's own contrast check reads 17x on
+that raster and is delighted. Only a person looking at a phone would have seen it. That is the
+recurring class — *an asset regenerated at a new scale while its consumer's absolute thresholds stay
+put* — and it is why the two must move in one commit.
+
+So `FAINTEST_DENSITY` 40 → **280** (the raster's own median cell is 276.2, which is what keeps
+roughly half the sky black) and `BRIGHTEST_DENSITY` 400 → **10,000** (its 99.9th percentile is
+9991.4). `AssetProbe` through the shipped reader over the real asset confirms the design intent
+landed: **50.3% drawn, 0.10% capped, both poles at zero opacity**, Sgr A* at l=359.944 b=-0.046.
+
+#### ⚠️ THE LIKE-FOR-LIKE TRAP, AND IT NEARLY SHIPPED A FALSE CLAIM
+
+My first replacement fixtures were measured by a **different method** from the ones they replaced,
+and implied the Great Rift had deepened **2.6x → 6.2x**. Reading the *previous* raster with the
+method the *old fixtures actually used* — mean density over |b| <= 5 per whole degree of longitude,
+trough as the minimum over l = 20..50, flanks as the mean of the best 20° either side — returns
+**83.0 and 214.1, exactly what stood in the test**. The same method on the new raster gives 1656.5
+and 4241.1. So the honest answer is **2.58x → 2.56x: unchanged**, which agrees with
+`measure_rift_depth.py`'s independent archive measurement (2.01 → 2.05) and disagrees with the number
+I was one sentence from writing.
+
+**Match the banked method before comparing to a banked number.** Twentieth appearance of this habit.
+The test's companion object now states the method as well as the numbers, and says outright that a
+different-but-reasonable method (single cells rather than a band mean) gives 487 and 3046 for the
+same sky.
+
+What *did* change, measured the one way: plane-to-pole **8.03x → 17.46x**, along-the-plane variation
+**5.03x → 9.63x**, and the maximum moved from Carina–Crux to **Sagittarius at l = 1** — the bulge
+emerging from its own extinction, the one place a deeper cut un-hides something rather than scaling
+everything up.
+
+#### The gate, and why each piece is load-bearing
+
+`.github/actions/star-catalogue/action.yml` rebuilds the raster and **hard `cmp`s** it against the
+committed bytes. It lives in the composite action for the reason that file's header already gives
+about the cache key: three workflows want it, and a definition drifting between two of them would not
+fail loudly.
+
+- **The builder RAISES rather than warns.** `report_thresholds` exits non-zero if the poles reach the
+  floor, or if either constant is more than **±30%** from the raster's own statistic. That tolerance
+  is measured, not chosen: the shipped pair sits +1.4% / +0.1% off this raster and the G<12 pair sat
+  +12% / −0.8% off its own, where a change of depth moves them 8–30x.
+- ⚠️ **`if: always()` on the artifact upload, and there are TWO failure modes.** A `cmp` mismatch
+  prints the bytes as base64 into the log as well — but the builder *raising* fails before the base64
+  is ever reached, and `build()` writes the raster **before** either gate runs, so in that case the
+  artifact is the only copy of the bytes that exists.
+- The comparison is sound because the rebuild is deterministic in the strong sense: it depends only
+  on the **multiset** of star positions, so a catalogue refetched cold in a different row order
+  yields identical bytes.
+
+#### Verification worth copying
+
+- **The new assert negative-tested with REAL DATA rather than a perturbation.** The G<12 catalogue is
+  still on disk; running the builder against it exits 1 naming `FAINTEST_DENSITY` and the 35.7 that
+  raster implies. Its `worst byte error 3.6% (55.2% had it been linear)` reproduces the KDoc exactly,
+  which independently confirms the new linear-cost reporting is right before it was ever pointed at
+  G<15.
+- **The gate's shipped shell lifted out of the YAML and executed** against real files in all three
+  states — identical → 0; different → 1 with both markers and base64 decoding byte-identical to the
+  rebuilt file; builder fails → 1 without claiming identical. (Assert no `${{` survived substitution.)
+- CI proved it end to end on a warm cache: **Sky #20** printed `both constants agree with this
+  raster` and `identical — the committed raster is what this catalogue implies`, with matching
+  digests. Then **Sky #21 and LCARS #2146** green on the follow-up commit.
+- ⚠️ **And re-verifying these very figures produced a false alarm, which is the harness lesson again
+  in its smallest form.** A throwaway script written to re-check the plane/pole contrast divided by
+  **11** rows where `|b| <= 5` actually holds **10**, so it reported 7.30x / 15.88x against the
+  recorded 8.03x / 17.46x — a 9% discrepancy that reads exactly like a wrong number in the record.
+  The record was right (CI's own line says `contrast 17.46x`); the checker was wrong. **A
+  verification script that miscounts its own denominator accuses the thing it is checking.** The
+  earlier measurement had it right by construction, using `len(vals)` rather than a hand-written
+  count — which is the general fix.
+
+#### ⚠️ A SIXTH WAY A GREEN TEST PROVES NOTHING
+
+The five recorded are: the perturbation never matched the source; it only *touched* the code without
+removing the property; the fixture never reached the branch; the assertion was too weak to see the
+damage; and the baseline was already failing. New:
+
+**A perturbation harness whose total runtime can exceed the tool's 2-minute timeout is SIGTERMed, and
+`finally` does not run.** It left a perturbation in the tree — caught immediately, but only because
+the next command checked the file rather than the exit message. **The restore belongs in the shell,
+after the python exits**, via a `trap … EXIT`, and run one case per invocation. All three test guards
+were then confirmed awake, including the decisive one: putting the G<12 floor of 40 back under the
+G<15 raster fails exactly the two pole tests.
+
+#### Two figures the first green run corrected (`550d76e`)
+
+- ⚠️ **I had quoted half a comparison.** `encodeDensity`'s KDoc gave `55.2% linear vs 3.6% sqrt` for
+  G<12 and only the `5.4%` sqrt figure for G<15, leaving a reader to pair a new number with an old
+  one — the "two different sums" mistake the same file warns about. CI prints the missing half:
+  **33.3%**. So the ratio moved **15.3x → 6.2x**; still decisive, less so than it was, because a
+  deeper catalogue fills in the faint end that linear scaling handles worst. Both halves are now
+  quoted at both depths.
+- The action's cost comment stated 56.1 s as *the* measured figure; this round measured **72.6 s**.
+  Now given as the range across two real runners (305 MB peak), with the reason — variance plus the
+  linear-cost computation the second one also does.
+
+#### Also corrected in `MilkyWay.kt`
+
+Every G<12 figure restated or labelled. ⚠️ **The density-vs-flux table is deliberately LEFT at its
+depth**: it argues which of two instruments to use, not what this raster looks like, and re-measuring
+flux needs the packed catalogue in hand — quoting a fresh density beside a stale flux would compare
+two different sums. The counting noise is **re-measured rather than derived**: 2,130 stars a cell
+near the plane, so **2.2%**, against the encoding's 5.4% — the byte is now the coarser of the two and
+says so. `STEP_DEG`'s step-size table keeps its G<12 rows for the same reason (the comparison
+*between* step sizes is what it is for) with the G<15 figure added beside it.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one.** The question no gate
+here can answer is whether the galaxy looks **better**: more structure in the band, the Great Rift
+still a visible dark lane through it, and the high-latitude sky still genuinely black rather than
+washed. That is the reason the raster stays committed and reviewable.
+
+**Open, unchanged by this arc:** nothing on the Milky Way. The sky plan's remaining item is still the
+owner-facing one — a screenshot would settle both the aesthetic and whether `MAX_OPACITY` wants
+tuning, and it is one constant.
