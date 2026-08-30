@@ -77,6 +77,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # ⚠️ The catalogue is no longer committed — at G<15 it is about 295 MB and GitHub hard-rejects
+      # files over 100 MB. Everything about the depth, the cache key, what a cold run costs and why
+      # this is a hard gate rather than a warning lives in the action, so the two build workflows
+      # cannot come to disagree about any of it.
+      - name: The star catalogue
+        id: skycat
+        uses: ./.github/actions/star-catalogue
+
       - name: Build the release APK
         run: |
           set -o pipefail
@@ -164,32 +172,13 @@ jobs:
           fi
           echo "sky assets packaged: $(ls "$dir" | tr '\n' ' ') (sentinel correctly absent)"
 
-          # ⚠️ **STORED, not deflated.** `SkyCatalogSource` explains at length that a deflated asset
-          # cannot be memory-mapped, so the whole 25 MB would land on the heap of the cheap phone
-          # this module exists to run on and the tile index would buy nothing. That declaration is
-          # `androidResources { noCompress += "skycat" }` and it CANNOT live in the library, because
-          # packaging belongs to whichever module builds the APK — so every application bundling
-          # this asset has to say it separately, and the cost of forgetting is not a crash. It is
-          # the map working, slowly, using far more memory than it should.
-          entry=$(unzip -v "$apk" | grep "assets/sky/stars.skycat" || true)
-          if [ -z "$entry" ]; then
-            echo "::error::stars.skycat is not in the APK."
-            exit 1
-          fi
-          method=$(echo "$entry" | awk '{print $2}')
-          size=$(echo "$entry" | awk '{print $1}')
-          if [ "$method" != "Stored" ]; then
-            echo "::error::stars.skycat is packaged as '$method', not Stored."
-            echo "The noCompress declaration in sky/build.gradle.kts is missing or stopped matching."
-            exit 1
-          fi
-          # A floor, because "present" is not "whole". The real catalogue is 3,087,821 stars at
-          # 24.7 MB; a truncated one opens, reports a plausible star count and draws a partial sky.
-          if [ "$size" -lt 20000000 ]; then
-            echo "::error::the packaged catalogue is only $size bytes — not the full corpus."
-            exit 1
-          fi
-          echo "star catalogue: $((size / 1048576)) MB, Stored (memory-mappable)"
+          # ⚠️ The catalogue's own three questions — present, STORED not deflated, and the right
+          # DEPTH — live in `tools/sky/check_packaged.py`, because this workflow, the LCARS one and
+          # the composite action all ask them and a shell copy in each is how they drift. The depth
+          # check is what matters now the file is built rather than committed: a restored shallower
+          # catalogue packages and installs and draws a perfectly plausible sky that stops early.
+          python3 tools/sky/check_packaged.py --apk "$apk" \
+            --magnitude ${{ steps.skycat.outputs.magnitude }}
 
       # ⚠️ **The promise this application exists to keep, checked rather than asserted.** The star
       # map is meant to be downloadable and installable on its own, attached to LCARS in no way at

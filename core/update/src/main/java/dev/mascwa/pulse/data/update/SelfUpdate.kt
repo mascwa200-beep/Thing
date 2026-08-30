@@ -179,6 +179,17 @@ class SelfUpdate(
 
     /** Fetch the APK, reporting progress. Returns the file, or null when it could not be had. */
     suspend fun download(info: UpdateInfo): File? {
+        // ⚠️ **Refused only when it CANNOT fit, never when it merely might not.** The LCARS build
+        // carries a 4.5-million-barcode food database, a 36.9-million-star catalogue and three
+        // native engines, so the APK is measured in hundreds of megabytes and an install wants
+        // roughly two and a half times that transiently — the downloaded copy, the installer's own
+        // staging copy, and the ahead-of-time artefacts. Guessing at that multiplier and refusing on
+        // it would block installs that would have worked. What is NOT a guess is that a download
+        // needs somewhere to land, so that is the only bar here, and the sentence carries the two
+        // numbers rather than saying "not enough space".
+        shortOfSpace(estimatedApkBytes(), "download")?.let {
+            _state.value = State.Failed(it); return null
+        }
         _state.value = State.Downloading(info, 0)
         return runCatching {
             repo.download(info) { pct -> _state.value = State.Downloading(info, pct) }
@@ -199,9 +210,42 @@ class SelfUpdate(
      */
     suspend fun install(): Boolean {
         val ready = _state.value as? State.Ready ?: return false
+        // ⚠️ Checked again, against the file's REAL size this time. `PackageInstaller` streams the
+        // APK into a staging session of its own, so a phone with room for the download and not for
+        // the copy would fail inside the platform — and a background install failure is about as
+        // quiet as a failure gets. Saying so costs one `statvfs`.
+        shortOfSpace(ready.file.length(), "install")?.let {
+            _state.value = State.Failed(it); return false
+        }
         setPendingInstall(ready.info.versionCode)
         return ApkInstaller.install(appContext, ready.file)
     }
+
+    /**
+     * How big the next APK will be, near enough: this one.
+     *
+     * ⚠️ Estimated from the RUNNING package rather than from the release, because the GitHub asset's
+     * size is not something [UpdateInfo] carries and adding it would mean a second thing to keep in
+     * step for a figure this already knows. Builds of one application do not change size by much
+     * between neighbouring versions, which is all this needs to be right about.
+     */
+    private fun estimatedApkBytes(): Long =
+        runCatching { File(appContext.applicationInfo.sourceDir).length() }.getOrDefault(0L)
+
+    /** A sentence when [needed] plainly will not fit where downloads go, or null when it will. */
+    private fun shortOfSpace(needed: Long, verb: String): String? {
+        if (needed <= 0L) return null                       // nothing measured; do not invent a refusal
+        val free = runCatching { appContext.cacheDir.usableSpace }.getOrDefault(Long.MAX_VALUE)
+        if (free >= needed) return null
+        return "Not enough room to $verb this build: it needs about ${megabytes(needed)} and this " +
+            "phone has ${megabytes(free)} free. Clearing some space and checking again is all it needs."
+    }
+
+    // Mebibytes and Locale.US, matching every other size this project prints — the file manager the
+    // reader would compare against uses the same unit, and a comma decimal in a number is a defect
+    // this repository has corrected repeatedly.
+    private fun megabytes(bytes: Long): String =
+        String.format(java.util.Locale.US, "%.0f MB", bytes / 1_048_576.0)
 
     /** Whether there is a downloaded build sitting ready to be installed. */
     val hasDownload: Boolean get() = _state.value is State.Ready

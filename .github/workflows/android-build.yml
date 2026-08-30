@@ -308,6 +308,15 @@ jobs:
             rm -rf app/src/main/cpp/llama.cpp
           fi
 
+      # ⚠️ **BEFORE the unit tests, unlike the food database below, and the ordering is load-bearing.**
+      # `SkyCatalogBundleTest` reads this asset off disk and runs in `:app:testDebugUnitTest`; the
+      # catalogue is no longer committed (295 MB, and GitHub hard-rejects files over 100 MB), so a
+      # restore placed after the tests would leave them reading a file that does not exist yet.
+      # Everything about the depth, the cache key and what a cold run costs lives in the action.
+      - name: The star catalogue
+        id: skycat
+        uses: ./.github/actions/star-catalogue
+
       - name: Run unit tests
         # ⚠️ Piped through tee so a failure can be RE-REPORTED readably below. `--stacktrace` puts
         # several hundred frames after the message, and the log API's tail cannot reach back past
@@ -661,33 +670,13 @@ jobs:
           fi
           echo "sky assets packaged: $(ls "$dir" | tr '\n' ' ') (sentinel correctly absent)"
 
-          # ⚠️ **STORED, not deflated — and nothing checked this before today.** `SkyCatalogSource`
-          # explains at length that a deflated asset cannot be memory-mapped, so the whole 25 MB
-          # would land on the heap of a phone this app is meant to run on and the tile index would
-          # buy nothing. That declaration is `androidResources { noCompress += "skycat" }` and it
-          # CANNOT live in the library, because packaging belongs to whichever module builds the
-          # APK — so every application bundling this asset has to say it separately. The cost of
-          # forgetting is not a crash. It is the map working, slowly, using far more memory than it
-          # should, which is precisely why it needs a gate rather than a comment.
-          entry=$(unzip -v "$apk" | grep "assets/sky/stars.skycat" || true)
-          if [ -z "$entry" ]; then
-            echo "FAIL: stars.skycat is not in the APK."
-            exit 1
-          fi
-          method=$(echo "$entry" | awk '{print $2}')
-          size=$(echo "$entry" | awk '{print $1}')
-          if [ "$method" != "Stored" ]; then
-            echo "FAIL: stars.skycat is packaged as '$method', not Stored."
-            echo "The noCompress declaration in app/build.gradle.kts is missing or stopped matching."
-            exit 1
-          fi
-          # A floor, because "present" is not "whole". The real catalogue is 3,087,821 stars at
-          # 24.7 MB; a truncated one opens, reports a plausible star count and draws a partial sky.
-          if [ "$size" -lt 20000000 ]; then
-            echo "FAIL: the packaged catalogue is only $size bytes — that is not the full corpus."
-            exit 1
-          fi
-          echo "star catalogue: $((size / 1048576)) MB, Stored (memory-mappable)"
+          # ⚠️ The catalogue's own three questions — present, STORED not deflated, and the right
+          # DEPTH — moved into `tools/sky/check_packaged.py`, because three workflows ask them and a
+          # shell copy in each is how they drift. The depth check is new and it is the one that
+          # matters now the file is built rather than committed: a restored G<12 catalogue in a
+          # G<15 build compiles, packages, installs and draws a perfectly plausible sky that simply
+          # stops early. Everything the old block explained about `noCompress` is in that script.
+          python3 tools/sky/check_packaged.py --apk "$apk" --magnitude ${{ steps.skycat.outputs.magnitude }}
 
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in

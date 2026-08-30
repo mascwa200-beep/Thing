@@ -7,7 +7,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 /**
- * Getting twenty-five megabytes of packed stars into a reader without loading them.
+ * Getting a few hundred megabytes of packed stars into a reader without loading them.
  *
  * [StarCatalogReader] is deliberately pure and takes a [ByteBuffer]; this is the one piece that
  * knows the bytes live in an Android asset. Keeping the two apart is what lets the decoder be run
@@ -17,7 +17,7 @@ import java.nio.channels.FileChannel
  *
  * Android deflates assets by default, and a deflated asset cannot be memory-mapped or read at a
  * random offset — the only way to get at it is to inflate the entire thing, which for this file is
- * twenty-five megabytes of heap on a phone the app is meant to run on. That defeats the point of a
+ * hundreds of megabytes of heap on a phone the app is meant to run on. That defeats the point of a
  * tile index: the format exists so a view reads a few kilobytes rather than the lot.
  *
  * So each application that bundles `stars.skycat` has to declare
@@ -46,7 +46,7 @@ object SkyCatalogSource {
          * True when the file was memory-mapped, which is what the format is designed for.
          *
          * False means it was read onto the heap instead — the catalogue works, and it cost
-         * twenty-five megabytes that it should not have. See [note].
+         * hundreds of megabytes that it should not have. See [note].
          */
         val mapped: Boolean,
         /** Null when everything is as it should be; otherwise what went wrong, in words. */

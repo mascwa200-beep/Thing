@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
  *
  * ⚠️ **No failure note, unlike the star catalogues, and that is deliberate.** Their two failure
  * modes are build mistakes that produce no crash and would never otherwise be noticed — a missing
- * asset makes the map look thin, a compressed one makes it cost twenty-five megabytes. This asset
+ * asset makes the map look thin, a compressed one costs hundreds of megabytes of heap. This asset
  * has neither hazard: it is 65 kB, read whole, and its absence draws no constellation lines, which
  * is plainly visible. Reporting it would be chrome nobody reads.
  */

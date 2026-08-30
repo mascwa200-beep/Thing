@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
  * preferences, the self-updater and the fault reporter.
  *
  * ⚠️ **Every member is `by lazy`, so constructing this opens no file and touches no sensor.** The
- * deep catalogue memory-maps twenty-five megabytes on its first read and the bright one parses eight
+ * deep catalogue memory-maps a few hundred megabytes on its first read and the bright one parses eight
  * thousand rows; doing either during `Application.onCreate` would put both in front of the first
  * frame for no reason. The view model asks for them when it loads, off the main thread.
  *

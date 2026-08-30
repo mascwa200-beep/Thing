@@ -206,7 +206,7 @@ android {
 
     // ⚠️ The star catalogue must be stored UNCOMPRESSED or it cannot be memory-mapped, and the
     // whole point of its tile index is that a view reads a few kilobytes rather than all
-    // twenty-five megabytes. Deflating it would force the entire file onto the heap.
+    // hundreds of megabytes. Deflating it would force the entire file onto the heap.
     //
     // Nearly free: measured, the packed binary deflates to 93.7% of its size, so this costs about
     // 1.5 MB of APK and buys zero-copy random access. SkyCatalogSource detects the mistake and says

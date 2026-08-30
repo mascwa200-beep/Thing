@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * The three million packed stars, opened once and kept.
  *
  * ⚠️ **Opening is not reading.** [SkyCatalogSource] memory-maps the asset, so this costs a file
- * descriptor and a page table entry rather than twenty-five megabytes of heap — which is the whole
+ * descriptor and a page table entry rather than the whole file on the heap — which is the whole
  * reason the format exists. What is read is decided per view by
  * [dev.mascwa.pulse.core.telemetry.SkyFieldPlan].
  *

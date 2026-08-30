@@ -89,3 +89,17 @@ app/src/main/assets/food/food.db.gz
 # The standalone nutrition app packages its own copy of the same database, from the same cache.
 nutrition/src/main/assets/food/food.db
 nutrition/src/main/assets/food/food.db.gz
+
+# The packed Gaia star catalogue: 36.9M stars at G<15, about 295 MB. Built by CI (or locally with
+# tools/sky/build_catalogue.py) and cached between runs, for the same reason as the food database
+# above — GitHub hard-rejects files over 100 MB and this repository has no LFS.
+#
+# ⚠️ It was tracked until the deep tier landed, at 24.7 MB. Untracking it does NOT shrink `.git`:
+# the old blob stays in history for ever and only future growth is avoided. Said plainly rather
+# than implying a saving that is not there.
+#
+# ⚠️ The BRIGHT catalogue beside it — `stars.tsv`, 8,404 naked-eye stars — IS committed and must
+# stay so. Gaia saturates above about G = 3 and holds none of the fifteen brightest stars in the
+# sky, so the two files are the faint and bright halves of one picture rather than two versions
+# of the same thing.
+core/sky/src/main/assets/sky/stars.skycat

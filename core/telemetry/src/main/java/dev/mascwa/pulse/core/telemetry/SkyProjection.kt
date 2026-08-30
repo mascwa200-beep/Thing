@@ -550,11 +550,11 @@ object SkyProjection {
     /**
      * The field below which [magnitudeLimit] stops deepening, because the catalogue has run out.
      *
-     * ⚠️ **This is not a corner case; it is half the zoom range.** Measured against the shipped
-     * catalogue: G < 12 saturates at **5.59°**, and the map zooms to [MIN_FOV_DEG] — so over
-     * **48.6% of the range** (in decades of field, which is how zoom is actually felt) not one new
-     * star appears however far you pinch. The map said nothing about that, so the only reading
-     * available to somebody using it was that the sky itself is empty there. It is not; the file is.
+     * ⚠️ **This is not a corner case; at the shallow tier it was half the zoom range.** G < 12
+     * saturates at **5.59°** and the map zooms to [MIN_FOV_DEG], so over **48.6% of the range** (in
+     * decades of field, which is how zoom is actually felt) not one new star appeared however far
+     * you pinched. The map said nothing about that, so the only reading available to somebody using
+     * it was that the sky itself is empty there. It is not; the file is.
      *
      * ⚠️ **Every extra magnitude buys exactly the same amount of zoom and costs about 2.2× the
      * last, so there is no natural place to stop.** That falls straight out of the law: the limit is
@@ -563,13 +563,19 @@ object SkyProjection {
      *
      * | catalogue | stars | file | saturates | dead zoom |
      * |---|---|---|---|---|
-     * | G < 12 (shipped) | 3,087,821 | 24.7 MB | 5.59° | 48.6% |
+     * | G < 12 | 3,087,821 | 24.7 MB | 5.59° | 48.6% |
      * | G < 13 | 7,369,627 | 59.0 MB | 3.23° | 40.0% |
      * | G < 14 | 16,844,156 | 134.8 MB | 1.87° | 31.4% |
+     * | **G < 15 (shipped)** | **36,909,335** | **295.3 MB** | **1.08°** | **22.9%** |
      *
-     * Each step down that table buys 8.6 points of zoom range; the first costs 34 MB and the second
-     * 76 MB. Nothing closes the gap — saturating at [MIN_FOV_DEG] would need magnitude 17.7, which
-     * is on the order of a billion stars.
+     * Each step down that table buys 8.6 points of zoom range; the first costs 34 MB and the last
+     * 160. Nothing closes the gap entirely — saturating at [MIN_FOV_DEG] would need magnitude 17.7,
+     * which is on the order of a billion stars.
+     *
+     * ⚠️ **The depth is not stated in this file and nothing here should assume it.** It is an input
+     * of the build — the `magnitude` of `.github/actions/star-catalogue` — and everything on the
+     * reading side takes it from the catalogue's own header, so a rebuilt file at any depth is
+     * described correctly with no code change. The table is measurement, not configuration.
      *
      * @param deepest the depth the catalogue actually reaches — see [magnitudeLimit].
      */

@@ -7,13 +7,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
-import java.nio.ByteBuffer
+import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
 
 /**
  * The packed Gaia catalogue, opened with the shipped reader and checked against what is actually in
  * it.
  *
- * ⚠️ **Every way a bundled binary breaks is silent.** It is twenty-five megabytes nobody can read: a
+ * ⚠️ **Every way a bundled binary breaks is silent.** It is hundreds of megabytes nobody can read: a
  * builder run with a different [SkyGrid.BANDS] produces a file that decodes perfectly and puts every
  * star in the wrong part of the sky; a tile whose records are not sorted brightest first makes the
  * reader's binary search cut it short, so stars vanish at one zoom and reappear at another; a
@@ -27,9 +28,25 @@ class SkyCatalogBundleTest {
 
     private val asset = File("../core/sky/src/main/assets/sky/stars.skycat")
 
+    /**
+     * ⚠️ **Memory-MAPPED, not read whole, and at the deep tier that is the difference between this
+     * running and this failing.** At G<15 the catalogue is about 295 MB; `readBytes()` would ask for
+     * a byte array of that size on Gradle's default test heap, nine times over, once per test in
+     * this class. Mapping is also exactly what the application itself does — `SkyCatalogSource`
+     * exists to hand the reader a mapped asset — so the check now exercises the real access path
+     * rather than a convenience that only a small file could afford.
+     */
     private fun reader(): StarCatalogReader {
-        assertTrue("the catalogue is missing: ${asset.absolutePath}", asset.isFile)
-        return when (val outcome = StarCatalogReader.open(ByteBuffer.wrap(asset.readBytes()))) {
+        assertTrue(
+            "the catalogue is missing: ${asset.absolutePath}. It is no longer committed — CI builds " +
+                "it behind a cache (see .github/actions/star-catalogue), because at G<15 it is far " +
+                "past GitHub's 100 MB file limit.",
+            asset.isFile,
+        )
+        val mapped = RandomAccessFile(asset, "r").use { file ->
+            file.channel.use { it.map(FileChannel.MapMode.READ_ONLY, 0L, file.length()) }
+        }
+        return when (val outcome = StarCatalogReader.open(mapped)) {
             is StarCatalogReader.Outcome.Ready -> outcome.reader
             is StarCatalogReader.Outcome.Unusable ->
                 throw AssertionError("the shipped catalogue will not open: ${outcome.reason}")
@@ -39,12 +56,24 @@ class SkyCatalogBundleTest {
     @Test
     fun `the shipped decoder reads the shipped file`() {
         val reader = reader()
-        // Measured from the file itself, not recalled. A rebuild that changes any of these is a
-        // deliberate act and should have to come here and say so.
-        assertEquals(3_087_821, reader.starCount)
+        // ⚠️ **The star count and the depth are deliberately NOT pinned here, and the split is the
+        // point.** They belong to whichever depth the build asked for, which lives in exactly one
+        // place — the `magnitude` input of `.github/actions/star-catalogue` — and
+        // `tools/sky/check_packaged.py` checks the file against it, twice, once per build workflow.
+        // Restating the number in Kotlin would make this the third and fourth copy of a fact that
+        // changes whenever the depth does, and a stale copy here would fail a perfectly good build.
+        //
+        // What this test owns instead is COHERENCE: that the file is internally consistent and was
+        // built by the tiling this application reads with. That is the half a packaging gate cannot
+        // see, and it is the half that fails silently.
         assertEquals(SkyGrid.tileCount, reader.tileCount)
         assertEquals(2016.0, reader.epochYear, 1e-9)
-        assertEquals(12.0, reader.deepestMagnitude, 1e-9)
+        assertTrue(
+            "the catalogue claims a depth of G < ${reader.deepestMagnitude}, which is not a " +
+                "magnitude any build of this would ask for",
+            reader.deepestMagnitude in 6.0..17.0,
+        )
+        assertTrue("the catalogue is empty", reader.starCount > 1_000_000)
         assertEquals(
             StarCatalogFormat.expectedBytes(reader.tileCount, reader.starCount),
             asset.length(),
@@ -66,12 +95,26 @@ class SkyCatalogBundleTest {
         }
         assertEquals("the index does not add up to the header's star count", reader.starCount, total)
         // ⚠️ An empty tile would be a hole in the sky — a patch of a few square degrees with nothing
-        // in it — and at this depth there is no such patch anywhere. Measured: the thinnest tile
-        // holds 135 stars and the thickest 3,638, which is also the evidence that the band-and-column
-        // tiling really does keep tiles comparable rather than leaving polar slivers.
+        // in it — and at no depth is there such a patch anywhere.
         assertTrue("some tile is empty — the sky has a hole in it", smallest > 0)
-        assertTrue("the thinnest tile holds only $smallest stars", smallest >= 100)
-        assertTrue("the thickest tile holds $largest stars", largest < 20_000)
+        // ⚠️ **Relative to the mean rather than absolute, because the absolute numbers belong to a
+        // depth this test deliberately does not know.** Measured at G<12: thinnest 135, thickest
+        // 3,638, mean 575 — so 0.23x and 6.3x. Measured live against the archive at G<15: tile 372
+        // holds 54,097 against a mean of 6,873, so 7.9x. An absolute ceiling of 20,000 was correct
+        // for the shallow tier and would fail the deep one, while proving nothing extra.
+        //
+        // What the ratio is really guarding is the band-and-column tiling keeping tiles comparable
+        // rather than leaving polar slivers, and that a file built under some other geometry — where
+        // the distribution would be wildly different — cannot pass unnoticed.
+        val mean = reader.starCount.toDouble() / reader.tileCount
+        assertTrue(
+            "the thinnest tile holds $smallest stars against a mean of ${mean.toInt()}",
+            smallest > mean / 16,
+        )
+        assertTrue(
+            "the thickest tile holds $largest stars against a mean of ${mean.toInt()}",
+            largest < mean * 12,
+        )
     }
 
     @Test
@@ -85,7 +128,7 @@ class SkyCatalogBundleTest {
         var checked = 0
         var filedNextDoor = 0
         // Every eleventh tile, so the sample crosses every band including both poles, without
-        // decoding three million records in a unit test.
+        // decoding the whole catalogue in a unit test.
         for (tile in 0 until reader.tileCount step 11) {
             sink.clear()
             reader.read(intArrayOf(tile), reader.deepestMagnitude, sink)
@@ -150,12 +193,12 @@ class SkyCatalogBundleTest {
         val tiles = SkyGrid.tilesInCone(83.0, -5.0, 6.0)   // Orion, a rich field
         val sink = StarCatalogReader.Sink()
 
-        sink.clear(); reader.read(tiles, 12.0, sink); val deep = sink.count
+        sink.clear(); reader.read(tiles, reader.deepestMagnitude, sink); val deep = sink.count
         sink.clear(); reader.read(tiles, 9.0, sink); val middling = sink.count
         sink.clear(); reader.read(tiles, 6.5, sink); val nakedEye = sink.count
 
         assertTrue("nothing came back at all", deep > 10_000)
-        assertTrue("the cut did nothing: $deep at 12, $middling at 9", middling < deep / 4)
+        assertTrue("the cut did nothing: $deep at the floor, $middling at 9", middling < deep / 4)
         assertTrue("the cut did nothing: $middling at 9, $nakedEye at 6.5", nakedEye < middling / 4)
         // And it cuts in the right direction — everything returned is at least as bright as asked.
         for (i in 0 until sink.count) {
@@ -281,7 +324,7 @@ class SkyCatalogBundleTest {
     fun `colour is present for almost every star, and absent where Gaia measured none`() {
         val reader = reader()
         val sink = StarCatalogReader.Sink()
-        reader.read(SkyGrid.tilesInCone(150.0, 20.0, 5.0), 12.0, sink)
+        reader.read(SkyGrid.tilesInCone(150.0, 20.0, 5.0), reader.deepestMagnitude, sink)
         assertTrue("no stars to check", sink.count > 1000)
         var withColour = 0
         for (i in 0 until sink.count) {
@@ -303,7 +346,7 @@ class SkyCatalogBundleTest {
     @Test
     fun `the catalogue says where it came from`() {
         // Gaia's data licence asks for the acknowledgement; a copy step that dropped the notice would
-        // leave twenty-five megabytes of somebody's work unattributed, and nothing would complain.
+        // leave a great deal of somebody's work unattributed, and nothing would complain.
         val notice = File("../core/sky/src/main/assets/sky/NOTICE.txt")
         assertTrue("the NOTICE is missing", notice.isFile)
         // ⚠️ Whitespace-normalised, because the NOTICE is wrapped prose and the acknowledgement ESA

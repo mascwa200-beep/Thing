@@ -42,8 +42,13 @@ sys.path.insert(0, HERE)
 # layout would.
 from build_catalogue import Format, Grid, _kotlin, _const  # noqa: E402
 
-DEFAULT_CATALOGUE = os.path.join(ROOT, "app", "src", "main", "assets", "sky", "stars.skycat")
-DEFAULT_OUT = os.path.join(ROOT, "app", "src", "main", "assets", "sky", "milkyway.bin")
+# ⚠️ **`core/sky`, not `app`, and these were STALE.** Both assets moved into the library that reads
+# them when `:core:sky` was carved out, so every default here has pointed at a directory that does
+# not exist since then — a `--catalogue`-less invocation would have failed with a file-not-found
+# rather than doing anything wrong, but it made the script unrunnable as documented.
+_ASSETS = os.path.join(ROOT, "core", "sky", "src", "main", "assets", "sky")
+DEFAULT_CATALOGUE = os.path.join(_ASSETS, "stars.skycat")
+DEFAULT_OUT = os.path.join(_ASSETS, "milkyway.bin")
 
 
 # --------------------------------------------------------------------------------------------
