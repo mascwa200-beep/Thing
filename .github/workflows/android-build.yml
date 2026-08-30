@@ -47,6 +47,12 @@ on:
       # an application cannot depend on an application.
       - "sky/**"
       - ".github/workflows/sky-build.yml"
+      # ⚠️ The manual catalogue warmer, for the same reason and with one wrinkle worth stating:
+      # it does touch something this build reads — it fills the shared Actions cache entry the
+      # star-catalogue action restores. But that is the only thing it does, and a miss simply
+      # means this build fills the entry itself. So editing the warmer can make this build
+      # slower on a cold cache and can never make it wrong, which is the bar for this list.
+      - ".github/workflows/sky-catalogue.yml"
       # ⚠️ The session scratchpad — probes and measurement harnesses, kept beside the work they
       # justify. Checked before listing it rather than assumed: it is referenced by NO build script
       # at all (`settings.gradle.kts`, the root script and every module's), so nothing here can

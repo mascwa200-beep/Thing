@@ -1,0 +1,149 @@
+name: Star catalogue
+description: Restore the packed Gaia catalogue from cache, or build it, and prove it is the right one.
+
+# ⚠️ **THIS FILE IS THE ONE DEFINITION OF THE CATALOGUE'S DEPTH AND ITS CACHE KEY, and it is a
+# composite action rather than three copies of the same block for exactly that reason.** Three
+# workflows want this asset — the LCARS build, the standalone star map's build, and the manual
+# warmer beside them — and a cache key that drifted by one character between two of them would not
+# fail: each would simply never find the other's entry and rebuild for the best part of an hour,
+# for ever, with nothing on screen to say why. That is the duplicated-definition drift this
+# repository has corrected seven times, in the shape where it is hardest to notice.
+#
+# ## Why it is built here and not committed
+#
+# At G<15 the catalogue is about 295 MB. `.gitignore` already states the rule in this repository's
+# own words about the food database: GitHub hard-rejects files over 100 MB and there is no LFS. So
+# it is built in CI behind a cache, which is the pattern the food database already proves.
+#
+# ## ⚠️ It is a HARD gate, unlike the food database
+#
+# The food database is one optional feature and its step is `continue-on-error` on purpose: the app
+# falls back to the network and says so. This is not that. The star map IS the standalone
+# application and a major part of LCARS, and an APK that shipped without the catalogue would install
+# perfectly and show an empty sky. There is no honest degraded state, so a failure here fails the
+# build.
+#
+# ## ⚠️ What a cold run costs, measured rather than guessed
+#
+# The archive caps a sync query at 50,000 rows, so 36.9 million stars is at least 738 leaf requests
+# and realistically 1,100–1,900 after adaptive splitting. Measured locally at G<12 (3.09M stars):
+# about five minutes and roughly 150 requests, four at a time. Scaling that gives roughly 45–60
+# minutes and about 3.5 GB fetched for a cold G<15 build, plus a few minutes of packing.
+#
+# That is why `sky-catalogue.yml` exists: run it once by hand after changing the depth or the
+# builder and both build workflows find the entry already warm. It is a warmer, never a
+# replacement — the build step below still runs on a miss, so nothing depends on anyone having
+# remembered.
+#
+# ⚠️ **The faster shape, priced and NOT taken.** Gaia also offers an ASYNC TAP endpoint whose row
+# limit is in the millions, which would turn ~1,900 requests into ~64 and the step into perhaps
+# fifteen minutes. It is a genuinely better fetch and it is also a new subsystem — submit, poll,
+# collect — with its own failure modes, validatable only against a live service. The sync path is
+# proven and its output is byte-identical to the builder that came before it. If cold builds become
+# painful, that is the next lever, and this paragraph is the measurement to act on.
+
+inputs:
+  magnitude:
+    description: >-
+      Faintest Gaia G magnitude to include. ⚠️ THE DEFAULT HERE IS THE PROJECT'S SETTING — every
+      caller leaves it alone, and changing it changes the cache key, so a new depth rebuilds rather
+      than silently restoring the old file. Each magnitude buys exactly 0.238 decades of usable
+      zoom (`SkyProjection.magnitudeLimit` is linear in log-field) and costs about 2.2x the last.
+    required: false
+    default: "15"
+
+outputs:
+  stars:
+    description: How many stars the catalogue on disk actually holds.
+    value: ${{ steps.check.outputs.stars }}
+  magnitude:
+    description: >-
+      The depth this build used. ⚠️ Exists so the APK gate downstream can check the PACKAGED file
+      against the same number without restating it — a literal `--magnitude 15` in each workflow
+      would be a third and fourth copy of the one thing this action exists to own, and the drift
+      would be silent: the gate would happily pass a catalogue built to a depth nobody asked for.
+    value: ${{ inputs.magnitude }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the star catalogue
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: core/sky/src/main/assets/sky/stars.skycat
+        # ⚠️ The magnitude is IN THE KEY. The food database's own comment records what happens
+        # without that: a change to *what* is fetched that does not move the builder's hash restores
+        # the stale artefact and the change does nothing at all, silently. Here the stale artefact
+        # would be a shallower sky that looks entirely correct.
+        #
+        # ⚠️ The two Kotlin files are in the hash because the builder READS them — the record
+        # layout out of `StarCatalogFormat.kt` and the tiling out of `SkyGrid.kt`. That is what
+        # stops the builder and the reader drifting; with only the builder hashed, a change to the
+        # magnitude scale or the number of bands would restore a catalogue laid out to the old rules
+        # and every star would decode into slightly the wrong place.
+        #
+        # The trailing salt is a manual rebuild switch, exactly as the food database's is. Gaia DR3
+        # is a frozen release so its contents cannot move underneath us; bump the salt only to force
+        # a rebuild for some other reason.
+        key: >-
+          star-catalogue-g${{ inputs.magnitude }}-${{ hashFiles('tools/sky/build_catalogue.py',
+          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/StarCatalogFormat.kt',
+          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyGrid.kt')
+          }}-dr3-v1
+
+    - name: Build the star catalogue
+      shell: bash
+      # ⚠️ Gated on THE FILE ON DISK BEING THE RIGHT ONE, not on `steps.cache.outputs.cache-hit`.
+      # Two separate traps, and the first has bitten this repository already:
+      #
+      #   * a cache archive records the paths it was saved from, so an entry saved from a different
+      #     path reports a HIT and leaves nothing behind — which is exactly how the nutrition
+      #     workflow once skipped its build and shipped an APK with no database, greenly;
+      #   * and a file being PRESENT is not it being the right DEPTH. A checkout can hand this step
+      #     a catalogue from some other tier — that is precisely what happens the first time the
+      #     warmer runs against a tree where the shallow one is still committed — and a guard that
+      #     only asked "does it exist" would cache the wrong file under the right key, permanently,
+      #     with every build after it drawing a sky that simply stops early.
+      #
+      # So the header is read, and anything that is not what was asked for is deleted and rebuilt.
+      run: |
+        set -euo pipefail
+        out=core/sky/src/main/assets/sky/stars.skycat
+        if [ -s "$out" ] && python3 tools/sky/check_packaged.py \
+              --catalogue "$out" --magnitude ${{ inputs.magnitude }} >/dev/null 2>&1; then
+          echo "restored from cache: $(du -h "$out" | cut -f1)"
+          exit 0
+        fi
+        if [ -e "$out" ]; then
+          echo "a catalogue is present but is not the one this build asked for:"
+          python3 tools/sky/check_packaged.py --catalogue "$out" \
+            --magnitude ${{ inputs.magnitude }} 2>&1 | sed 's/^/    /' || true
+          rm -f "$out"
+        fi
+        echo "fetching Gaia DR3 down to G < ${{ inputs.magnitude }}"
+        echo "--- before ---"; df -h / | tail -1; free -m | sed 's/^/    /'
+        # ⚠️ Guarded, because a diagnostic that can break the build is worse than none: /usr/bin/time
+        # is a package rather than the shell builtin and a future runner image could drop it. The
+        # same guard is on the food database's build for the same reason.
+        TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+        $TIMER python3 tools/sky/build_catalogue.py \
+          --magnitude ${{ inputs.magnitude }} \
+          --out "$out" 2> >(tee /tmp/skycat-time.log >&2)
+        echo "--- after ---"; df -h / | tail -1; free -m | sed 's/^/    /'
+        grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/skycat-time.log | sed 's/^/    /' || true
+
+    - name: Check the catalogue on disk is the one that was asked for
+      id: check
+      shell: bash
+      # ⚠️ Belt and braces over the cache key. The key already carries the magnitude, so a stale
+      # catalogue at the wrong depth should be impossible — but "should be impossible" is how the
+      # food database shipped 48.8% coverage while reporting PASSED, and reading eight bytes of a
+      # header costs nothing. This checks the file we are about to compile against; the APK gates in
+      # the two build workflows separately check the file that actually got packaged.
+      run: |
+        set -euo pipefail
+        python3 tools/sky/check_packaged.py \
+          --catalogue core/sky/src/main/assets/sky/stars.skycat \
+          --magnitude ${{ inputs.magnitude }} \
+          --github-output "$GITHUB_OUTPUT"

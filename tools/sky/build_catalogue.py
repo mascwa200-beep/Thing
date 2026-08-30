@@ -20,6 +20,26 @@ Measured, not assumed: `MAXREC=200000` and `MAXREC=1000000` both return exactly 
 CSV carries no overflow marker of any kind. A truncated chunk is byte-for-byte the shape of a
 complete one. So **a chunk that comes back with exactly the cap is treated as truncated and split**,
 never as finished — that rule is the whole reason this fetches adaptively instead of by a fixed grid.
+
+## ⚠️ Nothing ever holds the whole catalogue in memory
+
+A 6-float Python tuple is roughly 250 bytes, so the 36.9 million stars of a G<15 cut would be about
+9 GB as one list — and the first version of this script built exactly that, then re-bucketed it into
+a dict of lists so both lived at once. On a CI runner already hosting Gradle that is not a slow
+build, it is a dead one. The food-database builder hit the same wall and its fix is recorded in
+CLAUDE.md (`dict` 2,535 MB -> `array("i")` 968 MB).
+
+The fix here is cheaper than typed arrays and needs no new dependency, because of one property of
+the tiling that was **checked rather than assumed**: `SkyGrid` divides declination into bands and
+each band into whole RA columns, so **a tile never straddles a band**. Every band is therefore an
+independent packing problem. Each worker fetches its band, buckets the rows by tile as the chunks
+arrive, writes that band's records to a part file and returns nothing but a list of per-tile counts;
+the rows are freed when it returns. Peak memory is the densest band times the number of workers —
+measured, the densest band at G<15 holds 1,159,100 stars, so about 4 x 290 MB.
+
+`BandPacker.add` re-derives each row's tile with the shipped `Grid.tile_of` and **requires it to land
+inside that band's own tile range**. That is not defensive noise: it is what turns "the fetch bands
+and the grid bands line up" from a claim in a comment into something the build fails on.
 """
 
 from __future__ import annotations
@@ -28,8 +48,11 @@ import argparse
 import concurrent.futures
 import hashlib
 import math
+import mmap
+import operator
 import os
 import re
+import shutil
 import struct
 import sys
 import time
@@ -57,6 +80,16 @@ PAUSE_SECONDS = 0.25
 # --------------------------------------------------------------------------------------------
 # reading the Kotlin, so there is one definition of the format
 # --------------------------------------------------------------------------------------------
+
+def _peak_rss_mb() -> str:
+    """Peak resident memory, so a build that is quietly heading for an OOM says so before it gets there."""
+    try:
+        import resource                                   # POSIX only; absent on Windows
+    except ImportError:                                   # pragma: no cover — not a supported host
+        return "unknown (no resource module)"
+    kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return f"{kb / 1024:.0f} MB"                           # Linux reports kilobytes
+
 
 def _kotlin(name: str) -> str:
     with open(os.path.join(KOTLIN, name), encoding="utf-8") as fh:
@@ -246,13 +279,17 @@ def _cache_path(cache_dir: str, query: str) -> str:
     return os.path.join(cache_dir, hashlib.sha256(query.encode()).hexdigest()[:24] + ".csv")
 
 
-def fetch_chunk(magnitude, dec_lo, dec_hi, ra_lo, ra_hi, cache_dir, depth=0):
+def fetch_chunk(magnitude, dec_lo, dec_hi, ra_lo, ra_hi, cache_dir, sink, depth=0):
     """
-    One chunk, split until it is provably complete.
+    One chunk, split until it is provably complete, handed to `sink` a chunk at a time.
 
     ⚠️ **A result of exactly [SERVER_ROW_CAP] rows is treated as TRUNCATED**, because the archive
     silently caps and says nothing. On the vanishingly rare occasion that a chunk really does hold
     exactly fifty thousand stars, splitting it costs one extra request and loses nothing.
+
+    ⚠️ It hands each leaf chunk to `sink` and returns only a COUNT. The recursion used to concatenate
+    its children's lists, which meant a whole band existed twice at the moment the last child
+    returned; a sink lets each chunk's rows be bucketed and released as they arrive.
     """
     query = _query(magnitude, dec_lo, dec_hi, ra_lo, ra_hi)
     path = _cache_path(cache_dir, query)
@@ -277,7 +314,8 @@ def fetch_chunk(magnitude, dec_lo, dec_hi, ra_lo, ra_hi, cache_dir, depth=0):
 
     rows = _rows(text)
     if len(rows) < SERVER_ROW_CAP:
-        return rows
+        sink(rows)
+        return len(rows)
 
     if depth > 12:
         raise SystemExit(
@@ -291,48 +329,132 @@ def fetch_chunk(magnitude, dec_lo, dec_hi, ra_lo, ra_hi, cache_dir, depth=0):
     else:
         mid = (dec_lo + dec_hi) / 2.0
         halves = [(dec_lo, mid, ra_lo, ra_hi), (mid, dec_hi, ra_lo, ra_hi)]
-    out = []
+    got = 0
     for d0, d1, r0, r1 in halves:
-        out += fetch_chunk(magnitude, d0, d1, r0, r1, cache_dir, depth + 1)
-    return out
+        got += fetch_chunk(magnitude, d0, d1, r0, r1, cache_dir, sink, depth + 1)
+    return got
 
 
 # --------------------------------------------------------------------------------------------
 # writing
 # --------------------------------------------------------------------------------------------
 
-def pack(rows, grid: Grid, fmt: Format, magnitude: float, out_path: str) -> dict:
-    buckets: dict[int, list] = {}
-    for ra, dec, mag, bp_rp, pmra, pmdec in rows:
-        buckets.setdefault(grid.tile_of(ra, dec), []).append((mag, ra, dec, bp_rp, pmra, pmdec))
+class BandPacker:
+    """
+    One declination band's rows, bucketed by tile as the chunks arrive and written out on its own.
 
-    # ⚠️ Brightest first WITHIN a tile, which is what lets the reader stop early at the view's
-    # magnitude cut instead of decoding the whole tile.
-    for tile in buckets:
-        buckets[tile].sort(key=lambda r: r[0])
+    ⚠️ **This is only correct because a tile never straddles a band**, which is a property of
+    `SkyGrid` rather than a hope: bands are cut first and each is divided into a whole number of RA
+    columns, so `Grid.start[band] .. Grid.start[band + 1]` is exactly the tiles a band can hold.
+    `add` re-derives every row's tile through the shipped `Grid.tile_of` — the same function the
+    parity fixture pins against the Kotlin — and refuses anything landing outside that range, so the
+    alignment between the fetch's declination bounds and the grid's is checked on every star rather
+    than asserted in prose.
+    """
 
-    total = sum(len(v) for v in buckets.values())
+    def __init__(self, band: int, grid: Grid, fmt: Format) -> None:
+        self.band = band
+        self.grid = grid
+        self.fmt = fmt
+        self.lo = grid.start[band]
+        self.hi = grid.start[band + 1]
+        self.buckets: list[list] | None = [[] for _ in range(self.hi - self.lo)]
+        self.rows = 0
+
+    def add(self, rows: list[tuple]) -> None:
+        lo, hi = self.lo, self.hi
+        tile_of = self.grid.tile_of
+        buckets = self.buckets
+        for row in rows:
+            tile = tile_of(row[0], row[1])
+            if not lo <= tile < hi:
+                raise SystemExit(
+                    f"band {self.band} fetched a star at ra={row[0]} dec={row[1]} which the grid "
+                    f"places in tile {tile}, outside this band's tiles {lo}..{hi - 1} — the fetch "
+                    f"bands and SkyGrid's bands have stopped lining up"
+                )
+            buckets[tile - lo].append(row)
+        self.rows += len(rows)
+
+    def write(self, path: str) -> list[int]:
+        """Write this band's records in tile order and return the per-tile counts."""
+        buckets = self.buckets
+        counts = [0] * len(buckets)
+        pack_record = struct.Struct("<HHBBbb").pack
+        # ⚠️ **Magnitude, THEN position, and the tiebreak is what makes a build reproducible.**
+        # The archive is asked a query with no ORDER BY, so a parallel execution plan may return the
+        # same rows in a different order between identical runs — measured, not assumed: the same
+        # small query answered twice differed at row 0, with an identical multiset. `list.sort` is
+        # stable, so without a tiebreak that upstream order leaks straight into the file and two
+        # builds of one frozen catalogue differ byte for byte. It was found exactly that way: a
+        # rebuild of G<12 matched the committed catalogue in size, star count and tile index, and
+        # differed in 190 of 5,370 tiles — every one of them holding precisely the same records in a
+        # different order. Sorting on the server instead would mean an ORDER BY over a 36.9-million
+        # row scan, which is a far worse thing to ask of a research archive. The keys are built per
+        # TILE rather than per band, so the cost is a few megabytes at the very largest tile.
+        by_magnitude = operator.itemgetter(2, 0, 1)
+        fmt = self.fmt
+        with open(path, "wb") as fh:
+            out = bytearray()
+            for i, bucket in enumerate(buckets):
+                # ⚠️ Brightest first WITHIN a tile, which is what lets the reader stop early at the
+                # view's magnitude cut instead of decoding the whole tile.
+                bucket.sort(key=by_magnitude)
+                ra_lo, ra_hi, dec_lo, dec_hi = self.grid.bounds(self.lo + i)
+                ra_span = ra_hi - ra_lo
+                dec_span = dec_hi - dec_lo
+                for ra, dec, mag, bp_rp, pmra, pmdec in bucket:
+                    out += pack_record(
+                        fmt.fraction(((ra % 360.0) - ra_lo) / ra_span),
+                        fmt.fraction((dec - dec_lo) / dec_span),
+                        fmt.magnitude(mag),
+                        fmt.colour(bp_rp),
+                        fmt.proper_motion(pmra),
+                        fmt.proper_motion(pmdec),
+                    )
+                counts[i] = len(bucket)
+                buckets[i] = []                    # release this tile's rows as we pass it
+                if len(out) >= 1 << 22:
+                    fh.write(out)
+                    out = bytearray()
+            fh.write(out)
+        self.buckets = None
+        total = sum(counts)
+        if total != self.rows:
+            raise SystemExit(f"band {self.band} packed {total} records from {self.rows} rows")
+        return counts
+
+
+def fetch_and_pack(magnitude: float, band: int, grid: Grid, fmt: Format,
+                   cache_dir: str, parts_dir: str) -> tuple[int, list[int]]:
+    """
+    A whole band, fetched and packed inside one worker.
+
+    ⚠️ Fetching and packing are ONE task on purpose. A `Future` holds its result until the future
+    itself is collected, so a worker that returned rows would keep every completed band's stars alive
+    for the length of the run — which is the memory this whole rewrite exists to avoid. Nothing
+    leaves here but a list of per-tile counts.
+    """
+    lo = -90.0 + band * grid.band_height
+    hi = lo + grid.band_height
+    packer = BandPacker(band, grid, fmt)
+    fetch_chunk(magnitude, lo, hi, 0.0, 360.0, cache_dir, packer.add)
+    return band, packer.write(os.path.join(parts_dir, f"band{band:03d}.bin"))
+
+
+def assemble(per_band_counts: list[list[int]], parts_dir: str, grid: Grid, fmt: Format,
+             magnitude: float, out_path: str) -> dict:
+    """Header, index and every band's part file concatenated in band order."""
     index = []
-    records = bytearray()
     running = 0
-    for tile in range(grid.tile_count):
-        index.append(running)
-        ra_lo, ra_hi, dec_lo, dec_hi = grid.bounds(tile)
-        ra_span = ra_hi - ra_lo
-        dec_span = dec_hi - dec_lo
-        for mag, ra, dec, bp_rp, pmra, pmdec in buckets.get(tile, ()):
-            records += struct.pack(
-                "<HHBBbb",
-                fmt.fraction(((ra % 360.0) - ra_lo) / ra_span),
-                fmt.fraction((dec - dec_lo) / dec_span),
-                fmt.magnitude(mag),
-                fmt.colour(bp_rp),
-                fmt.proper_motion(pmra),
-                fmt.proper_motion(pmdec),
-            )
-            running += 1
+    for band in range(grid.bands):
+        for count in per_band_counts[band]:
+            index.append(running)
+            running += count
     index.append(running)
-    assert running == total, f"packed {running} records but bucketed {total}"
+    if len(index) != grid.tile_count + 1:
+        raise SystemExit(f"index has {len(index)} entries, expected {grid.tile_count + 1}")
+    total = running
 
     header = bytearray(fmt.header_bytes)
     header[0:4] = b"SKYC"
@@ -348,47 +470,55 @@ def pack(rows, grid: Grid, fmt: Format, magnitude: float, out_path: str) -> dict
     with open(out_path, "wb") as fh:
         fh.write(header)
         fh.write(struct.pack(f"<{len(index)}I", *index))
-        fh.write(records)
+        for band in range(grid.bands):
+            with open(os.path.join(parts_dir, f"band{band:03d}.bin"), "rb") as part:
+                shutil.copyfileobj(part, fh, 1 << 20)
 
     return {"stars": total, "tiles": grid.tile_count, "bytes": os.path.getsize(out_path)}
 
 
 def verify(out_path: str, grid: Grid, fmt: Format, expected_stars: int) -> None:
-    """Read back what was written, because a builder that cannot be checked is not a build step."""
-    with open(out_path, "rb") as fh:
-        raw = fh.read()
-    assert raw[0:4] == b"SKYC", "magic is wrong"
-    version, bands = struct.unpack_from("<HH", raw, 4)
-    tiles, stars = struct.unpack_from("<II", raw, 8)
-    record_bytes = struct.unpack_from("<H", raw, 16)[0]
-    assert version == fmt.version, f"version {version}"
-    assert bands == grid.bands, f"bands {bands} != {grid.bands}"
-    assert tiles == grid.tile_count, f"tiles {tiles} != {grid.tile_count}"
-    assert stars == expected_stars, f"stars {stars} != {expected_stars}"
-    assert record_bytes == fmt.record_bytes
+    """
+    Read back what was written, because a builder that cannot be checked is not a build step.
 
-    index_at = fmt.header_bytes
-    index = struct.unpack_from(f"<{tiles + 1}I", raw, index_at)
-    assert index[0] == 0 and index[-1] == stars, "the index does not span the records"
-    assert all(index[i] <= index[i + 1] for i in range(tiles)), "the index goes backwards"
-    expected = index_at + (tiles + 1) * 4 + stars * record_bytes
-    assert len(raw) == expected, f"file is {len(raw)} bytes, expected {expected}"
+    ⚠️ Memory-mapped rather than read whole: at G<15 the file is ~295 MB and this runs on the same
+    machine that has just finished packing it. Mapping is also what the app itself does, so the check
+    exercises the real access pattern.
+    """
+    with open(out_path, "rb") as fh, mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as raw:
+        assert raw[0:4] == b"SKYC", "magic is wrong"
+        version, bands = struct.unpack_from("<HH", raw, 4)
+        tiles, stars = struct.unpack_from("<II", raw, 8)
+        record_bytes = struct.unpack_from("<H", raw, 16)[0]
+        assert version == fmt.version, f"version {version}"
+        assert bands == grid.bands, f"bands {bands} != {grid.bands}"
+        assert tiles == grid.tile_count, f"tiles {tiles} != {grid.tile_count}"
+        assert stars == expected_stars, f"stars {stars} != {expected_stars}"
+        assert record_bytes == fmt.record_bytes
 
-    # Spot-check: every record of a busy tile decodes inside that tile's bounds and in magnitude order.
-    busiest = max(range(tiles), key=lambda t: index[t + 1] - index[t])
-    ra_lo, ra_hi, dec_lo, dec_hi = grid.bounds(busiest)
-    base = index_at + (tiles + 1) * 4
-    previous = -1
-    for i in range(index[busiest], index[busiest + 1]):
-        ra_raw, dec_raw, mag, _colour, _pmra, _pmdec = struct.unpack_from(
-            "<HHBBbb", raw, base + i * record_bytes
-        )
-        ra = (ra_lo + ra_raw / 65535.0 * (ra_hi - ra_lo)) % 360.0
-        dec = dec_lo + dec_raw / 65535.0 * (dec_hi - dec_lo)
-        assert grid.tile_of(ra, dec) == busiest, f"record {i} decoded outside tile {busiest}"
-        assert mag >= previous, f"tile {busiest} is not sorted by magnitude at record {i}"
-        previous = mag
-    print(f"  verified: busiest tile {busiest} holds {index[busiest + 1] - index[busiest]} stars, in order")
+        index_at = fmt.header_bytes
+        index = struct.unpack_from(f"<{tiles + 1}I", raw, index_at)
+        assert index[0] == 0 and index[-1] == stars, "the index does not span the records"
+        assert all(index[i] <= index[i + 1] for i in range(tiles)), "the index goes backwards"
+        expected = index_at + (tiles + 1) * 4 + stars * record_bytes
+        assert len(raw) == expected, f"file is {len(raw)} bytes, expected {expected}"
+
+        # Spot-check: every record of a busy tile decodes inside that tile's bounds, in magnitude order.
+        busiest = max(range(tiles), key=lambda t: index[t + 1] - index[t])
+        ra_lo, ra_hi, dec_lo, dec_hi = grid.bounds(busiest)
+        base = index_at + (tiles + 1) * 4
+        previous = -1
+        for i in range(index[busiest], index[busiest + 1]):
+            ra_raw, dec_raw, mag, _colour, _pmra, _pmdec = struct.unpack_from(
+                "<HHBBbb", raw, base + i * record_bytes
+            )
+            ra = (ra_lo + ra_raw / 65535.0 * (ra_hi - ra_lo)) % 360.0
+            dec = dec_lo + dec_raw / 65535.0 * (dec_hi - dec_lo)
+            assert grid.tile_of(ra, dec) == busiest, f"record {i} decoded outside tile {busiest}"
+            assert mag >= previous, f"tile {busiest} is not sorted by magnitude at record {i}"
+            previous = mag
+        held = index[busiest + 1] - index[busiest]
+    print(f"  verified: busiest tile {busiest} holds {held} stars, in order")
 
 
 def write_parity(path: str, grid: Grid) -> None:
@@ -427,6 +557,8 @@ def main() -> int:
     ap.add_argument("--magnitude", type=float, default=12.0, help="faintest G magnitude to include")
     ap.add_argument("--out", default="core/sky/src/main/assets/sky/stars.skycat")
     ap.add_argument("--cache", default=os.path.join(ROOT, "build/skycat-cache"))
+    ap.add_argument("--parts", default=os.path.join(ROOT, "build/skycat-parts"),
+                    help="scratch directory for the per-band record files; cleared on every run")
     # ⚠️ A TEST RESOURCE, not a file beside this script: loaded from the classpath, the Kotlin side
     # needs no path walking and cannot be broken by whichever directory Gradle runs a test from.
     ap.add_argument("--parity", default=os.path.join(
@@ -443,39 +575,50 @@ def main() -> int:
         return 0
 
     os.makedirs(args.cache, exist_ok=True)
-    bands = [
-        (-90.0 + b * grid.band_height, -90.0 + (b + 1) * grid.band_height)
-        for b in range(grid.bands)
-    ]
-    print(f"fetching G < {args.magnitude} in {len(bands)} declination bands, {CONCURRENCY} at a time")
+    # ⚠️ Cleared rather than reused. A part file left by an interrupted run is indistinguishable
+    # from one this run wrote, and concatenating a stale band would produce a catalogue that
+    # verifies perfectly and holds last time's stars in that strip of sky.
+    parts_dir = args.parts if os.path.isabs(args.parts) else os.path.join(ROOT, args.parts)
+    shutil.rmtree(parts_dir, ignore_errors=True)
+    os.makedirs(parts_dir, exist_ok=True)
 
-    rows: list[tuple] = []
+    print(f"fetching G < {args.magnitude} in {grid.bands} declination bands, {CONCURRENCY} at a time")
+
+    per_band_counts: list[list[int] | None] = [None] * grid.bands
+    fetched = 0
     started = time.time()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-        futures = {
-            pool.submit(fetch_chunk, args.magnitude, lo, hi, 0.0, 360.0, args.cache): (lo, hi)
-            for lo, hi in bands
-        }
-        done = 0
-        for future in concurrent.futures.as_completed(futures):
-            lo, hi = futures[future]
-            got = future.result()
-            rows += got
-            done += 1
-            print(f"  [{done}/{len(bands)}] dec {lo:+06.2f}..{hi:+06.2f}: {len(got):>7} stars "
-                  f"({len(rows):>9} total, {time.time() - started:.0f}s)")
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+            futures = [
+                pool.submit(fetch_and_pack, args.magnitude, band, grid, fmt, args.cache, parts_dir)
+                for band in range(grid.bands)
+            ]
+            done = 0
+            for future in concurrent.futures.as_completed(futures):
+                band, counts = future.result()
+                per_band_counts[band] = counts
+                got = sum(counts)
+                fetched += got
+                done += 1
+                lo = -90.0 + band * grid.band_height
+                print(f"  [{done}/{grid.bands}] dec {lo:+06.2f}..{lo + grid.band_height:+06.2f}: "
+                      f"{got:>8} stars ({fetched:>9} total, {time.time() - started:.0f}s)")
 
-    print(f"fetched {len(rows)} stars in {time.time() - started:.0f}s")
-    if not rows:
-        raise SystemExit("no stars came back — refusing to write an empty catalogue")
+        print(f"fetched and packed {fetched} stars in {time.time() - started:.0f}s")
+        if not fetched:
+            raise SystemExit("no stars came back — refusing to write an empty catalogue")
 
-    out_path = args.out if os.path.isabs(args.out) else os.path.join(ROOT, args.out)
-    info = pack(rows, grid, fmt, args.magnitude, out_path)
+        out_path = args.out if os.path.isabs(args.out) else os.path.join(ROOT, args.out)
+        info = assemble(per_band_counts, parts_dir, grid, fmt, args.magnitude, out_path)
+    finally:
+        shutil.rmtree(parts_dir, ignore_errors=True)
+
     verify(out_path, grid, fmt, info["stars"])
     print(f"wrote {out_path}")
     print(f"  {info['stars']} stars, {info['tiles']} tiles, "
           f"{info['bytes'] / 1_000_000:.1f} MB "
           f"({info['bytes'] / max(1, info['stars']):.2f} bytes a star)")
+    print(f"  peak memory: {_peak_rss_mb()}")
     return 0
 
 
