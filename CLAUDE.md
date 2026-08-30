@@ -11223,9 +11223,22 @@ depth the build asked for, the Python gate checks them twice, and a stale copy i
 perfectly good build. What the test owns is COHERENCE — the half a packaging gate cannot see.
 
 ⚠️ Its tile-balance bounds are ratios now. Measured at G<12: thinnest 135, thickest 3,638, mean 575.
-Measured live at G<15: tile 372 holds 54,097 against a mean of 6,873. The absolute ceiling of 20,000
-was right for the shallow tier and would have failed the deep one while proving nothing extra. Colour
-completeness was measured too, before trusting the existing 90% assertion: **99.619% at G<15**.
+The absolute ceiling of 20,000 was right for the shallow tier and would have failed the deep one while
+proving nothing extra. Colour completeness was measured too, before trusting the existing 90%
+assertion: **99.619% at G<15**.
+
+⚠️ **CORRECTION: the G<15 figure first recorded here — "tile 372 holds 54,097 against a mean of
+6,873", i.e. 7.9x — was WRONG, and it is the recurring mistake in its usual shape.** Tile 372 is the
+busiest at G<12 and I assumed it stayed busiest; it does not. The real busiest at G<15 is **tile 1416,
+toward the galactic CENTRE, holding 129,280 — 18.81x the mean**, measured from the first green build's
+own verifier line and confirmed against the archive. The ceiling of `mean * 12` that the wrong figure
+justified would have failed a perfectly good LCARS build. It is `mean * 30` now.
+
+⚠️ **And the two bounds move with depth in OPPOSITE directions**, which is what makes a fixed multiple
+a coarse instrument: a deeper cut gains disproportionately toward the galactic centre and
+disproportionately little at the poles, so the thickest pulls away from the mean while the thinnest
+sinks toward it. Measured — thinnest 0.235x at G<12 against **0.155x** at G<15 (floor is 0.0625x, so
+2.5x of headroom); thickest 6.33x against **18.81x**. A new depth means re-measuring both.
 
 #### ⚠️ Not committed, and untracking saves nothing retroactively
 
@@ -11342,12 +11355,27 @@ allowlist and is not in `android-build.yml`'s ignore list. One of them must be c
 two 100-minute crawls hit a research archive at once, which is the exact discourtesy the warmer
 exists to prevent.
 
-**STATE AT HANDOFF: the deep catalogue has NEVER been built successfully.** Sky #18 (run
-`33310557054`, commit `c03c883`) is the sole crawler and is expected to land around 13:55Z; LCARS
-(`33310557005`) was cancelled deliberately and must be **re-run once Sky's cache post-step saves**.
-Nutrition and Desktop were already green at `677c92d`. Until a green Sky run exists, no APK has ever
-carried the G<15 catalogue and none of the packaged-size or on-device claims in the section above
-have been observed.
+**THE DEEP CATALOGUE NOW EXISTS AND IS CACHED. Sky #18 (`33310557054`) went fully green**, and
+every number below is from its own log rather than an estimate:
+
+    fetching Gaia DR3 down to G < 15
+    fetched and packed 36909335 stars in 6077s          (101 min, sole crawler)
+    verified: busiest tile 1416 holds 129280 stars, in order, 2 on the tile's upper edge
+    36909335 stars, 5370 tiles, 295.3 MB (8.00 bytes a star)
+    APK: size: 304486113 bytes (291M)
+    every native library is present for all four architectures
+    sky assets packaged: NOTICE.txt constellations.json deepsky.tsv milkyway.bin stars.skycat stars.tsv
+    == the star map stands alone ==
+    Cache saved with key: star-catalogue-g15-e597a88d…-dr3-v1     (267,320,289 bytes compressed)
+
+⚠️ **`busiest tile 1416 … 2 on the tile's upper edge` is the fix vindicated on the same tile that
+killed the previous run** — `record 14007680 decoded outside tile 1416`. Two boundary records; the
+old assertion rejected the first, the new one reports both and passes.
+
+**The Star Map APK is 304,486,113 bytes (291 MB)**, up from 33 MB, and one universal APK still covers
+all four architectures. ⚠️ **LCARS has NOT been built with the deep tier yet** — run `33310557005` was
+cancelled by hand to keep a single crawler on the archive and must be re-run against the warm cache;
+until it is, the ~642 MB LCARS figure remains an estimate and no LCARS APK has carried the catalogue.
 
 **Item G (the Milky Way) is now baselined rather than blocked.** `build_milkyway.py`'s corrected
 default paths had never been run; they work, take 6.6 s over 3.09M stars, and produce a raster

@@ -98,22 +98,38 @@ class SkyCatalogBundleTest {
         // in it — and at no depth is there such a patch anywhere.
         assertTrue("some tile is empty — the sky has a hole in it", smallest > 0)
         // ⚠️ **Relative to the mean rather than absolute, because the absolute numbers belong to a
-        // depth this test deliberately does not know.** Measured at G<12: thinnest 135, thickest
-        // 3,638, mean 575 — so 0.23x and 6.3x. Measured live against the archive at G<15: tile 372
-        // holds 54,097 against a mean of 6,873, so 7.9x. An absolute ceiling of 20,000 was correct
-        // for the shallow tier and would fail the deep one, while proving nothing extra.
+        // depth this test deliberately does not know** — and ⚠️ **the ratios themselves MOVE with
+        // depth, in opposite directions, which is the part that is easy to get wrong.** Deeper cuts
+        // gain disproportionately toward the galactic centre and disproportionately little at the
+        // poles, so the busiest tile pulls away from the mean while the thinnest sinks toward it:
         //
-        // What the ratio is really guarding is the band-and-column tiling keeping tiles comparable
-        // rather than leaving polar slivers, and that a file built under some other geometry — where
-        // the distribution would be wildly different — cannot pass unnoticed.
+        //     depth   mean    thinnest              thickest
+        //     G<12     575    135    (0.235x)       3,638    ( 6.33x)   measured, shipped file
+        //     G<15   6,873    ~1,066 (0.155x)     129,280    (18.81x)   measured, live archive
+        //
+        // ⚠️ An earlier version of this comment said the G<15 thickest was 54,097 (7.9x). That was
+        // WRONG and it was the recurring mistake in its usual shape: I measured tile 372 — which is
+        // the busiest at G<12 — and assumed it stayed busiest. It does not. At G<15 the busiest is
+        // tile 1416, toward the galactic CENTRE, and it holds nearly two and a half times as many.
+        // The ceiling of 12x that figure justified would have failed a perfectly good build, after
+        // a hundred minutes of crawling, which is exactly what the builder's own verifier had just
+        // done for a different reason.
+        //
+        // So the bounds are calibrated against the extremes actually measured at the depths this
+        // project has built, with headroom, and a NEW depth means re-measuring rather than trusting
+        // the multiple. What this is really guarding is that the band-and-column tiling keeps tiles
+        // comparable rather than leaving polar slivers, and that a file built under some other
+        // geometry cannot pass unnoticed — and it is the weaker of the two guards for that. The
+        // strong one is `every star sits inside the tile it was filed under`, which checks the
+        // geometry directly rather than inferring it from a distribution.
         val mean = reader.starCount.toDouble() / reader.tileCount
         assertTrue(
             "the thinnest tile holds $smallest stars against a mean of ${mean.toInt()}",
-            smallest > mean / 16,
+            smallest > mean / 16,          // 0.0625x — measured 0.155x at G<15, 2.5x of headroom
         )
         assertTrue(
             "the thickest tile holds $largest stars against a mean of ${mean.toInt()}",
-            largest < mean * 12,
+            largest < mean * 30,           // measured 18.81x at G<15, 6.33x at G<12
         )
     }
 
