@@ -10710,6 +10710,13 @@ at `MIN_FOV_DEG` needs magnitude **17.7**, on the order of a billion stars.
 size-versus-depth trade with no engineering answer, on artefacts the owner downloads to their own
 phone. What shipped instead is the half that has an answer.
 
+⚠️ **SUPERSEDED — the owner made that decision, twice, and S11 IS BUILT.** Everything above is a
+dated record of the measurement that put the choice to them and is correct as of when it was
+written; the heading is not, and a future session grepping for S11 lands here first. **The built
+state is the "S11 — THE DEEP TIER: G<15, 36.9 million stars, built in CI" section further down.**
+Left standing rather than rewritten for the reason the log is always left standing — but flagged,
+because unlike an ordinary stale record this one names a conclusion the owner has since overruled.
+
 ### What DID ship: the map stops lying about its own ceiling (`b2ff8cb`)
 
 Over **48.6% of the zoom range** the shipped catalogue draws everything it has, and both readouts
@@ -11261,11 +11268,11 @@ not something `UpdateInfo` carries and adding it would be a second thing to keep
 
 The whole point is visible only past 5.6° of field: zoom well in and stars should keep appearing
 where the map used to go empty, with the depth line falling silent until much further in. **And the
-one to watch is that a ~642 MB update installs at all** on the budget phone rather than failing for
+one to watch is that a 612 MB update installs at all** on the budget phone rather than failing for
 space — that is what the new updater sentences are for, and only a device can settle it.
 
 ⚠️ The recurring auto-update cost does not go away and cannot be mitigated within this design: every
-LCARS build republishes ~642 MB and the phone pulls it in full. If it becomes tiresome, the shape
+LCARS build republishes 612 MB and the phone pulls it in full. If it becomes tiresome, the shape
 that fixes it is the deep tier as a **downloaded pack** rather than a bundled asset — but
 `PackArchive` takes only `*.json`, caps entries at 32 MB and merges through the guide index, so that
 is a rewrite of the pack format rather than a switch to flip.
@@ -11373,9 +11380,34 @@ killed the previous run** — `record 14007680 decoded outside tile 1416`. Two b
 old assertion rejected the first, the new one reports both and passes.
 
 **The Star Map APK is 304,486,113 bytes (291 MB)**, up from 33 MB, and one universal APK still covers
-all four architectures. ⚠️ **LCARS has NOT been built with the deep tier yet** — run `33310557005` was
-cancelled by hand to keep a single crawler on the archive and must be re-run against the warm cache;
-until it is, the ~642 MB LCARS figure remains an estimate and no LCARS APK has carried the catalogue.
+all four architectures.
+
+**LCARS #2143 (`33315488303`) then went fully green against that warm cache, and S11 is finished.**
+Every figure here is from its own log:
+
+    Cache hit for: star-catalogue-g15-e597a88d…-dr3-v1
+    Received 267320289 of 267320289 (100.0%), 260.1 MBs/sec      <- restore, 1762 ms
+    core/sky/src/main/assets/sky/stars.skycat: v1, 5,370 tiles, 36,909,335 stars, built for G < 15.0
+    assets/sky/stars.skycat: v1, 5,370 tiles, 36,909,335 stars, built for G < 15.0   <- read from the APK
+    APK: 612 MB (641994673 bytes)
+      444657664  assets/food/food.db
+      295296196  assets/sky/stars.skycat
+      940108809  1214 files          <- uncompressed total
+
+⚠️ **The two-second catalogue step is explained rather than assumed: 260.1 MB/s.** 267 MB compressed
+lands in 1,762 ms, the build step then skips in 56 ms and the header check takes 52 ms. A cold crawl
+is a hundred minutes, so that timing was the one thing worth confirming before believing the round.
+
+⚠️ **The gate reads the header OUT OF THE APK, not off the file that was written.** Both lines above
+are real: one is `check_packaged.py` against the working copy, the other against the packaged asset.
+A build that restored the right catalogue and then packaged something else would pass the first and
+fail the second, which is the whole reason the second exists.
+
+**The measured LCARS APK is 641,994,673 bytes — 612 MiB, and 642 MB decimal**, so the estimate this
+section was written against was right to within rounding. ⚠️ It is stated as **612 MB** everywhere
+now because that is the number the build itself prints and the number a phone's storage screen shows;
+the two food and sky assets are 740 MB of the 940 MB uncompressed total, and `stars.skycat` is
+packaged at its exact on-disk size, which is `noCompress` working.
 
 **Item G (the Milky Way) is now baselined rather than blocked.** `build_milkyway.py`'s corrected
 default paths had never been run; they work, take 6.6 s over 3.09M stars, and produce a raster
