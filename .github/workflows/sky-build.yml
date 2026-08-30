@@ -40,6 +40,13 @@ on:
       # which IS listed, so the laxer direction rebuilds anyway. Listing `app/**` would rebuild and
       # republish a 33 MB artifact on every news-screen commit for a verdict that cannot flip.
       - "tools/check_sky_standalone.py"
+      # ⚠️ **The composite action, which this workflow runs and which was NOT listed.** It owns the
+      # catalogue's depth, its cache key, and now the rebuild-and-compare of the Milky Way raster —
+      # so a change to any of those gates that touched only the action would have rebuilt LCARS
+      # (whose filter is `paths-ignore` and so catches everything not named) and quietly not this
+      # app, leaving the new gate unexercised on the workflow it matters most to. That is the same
+      # hand-maintained-list drift the desktop filter had over `data/live`.
+      - ".github/actions/star-catalogue/**"
       # ⚠️ The five root files that change what Gradle does, all of them. The desktop workflow's
       # filter once did not name a directory it genuinely read, and the nutrition one missed
       # `gradle.properties` — where the heap ceiling lives — so the fix for a heap failure would not

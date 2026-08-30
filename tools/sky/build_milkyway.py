@@ -69,6 +69,12 @@ class Raster:
         self.pole_ra = _const(src, "POLE_RA_DEG")
         self.pole_dec = _const(src, "POLE_DEC_DEG")
         self.node_l = _const(src, "NODE_L_DEG")
+        # ⚠️ The renderer's two ABSOLUTE thresholds, read for the same reason every other number
+        # here is read rather than restated: they are stars per square degree, they are properties
+        # of the raster this script writes, and nothing downstream can tell when they stop matching
+        # it. See `report_thresholds`.
+        self.faintest = _const(src, "FAINTEST_DENSITY")
+        self.brightest = _const(src, "BRIGHTEST_DENSITY")
         # `const val MAGIC = 0x4D574159` is hex, which _const's decimal pattern cannot read.
         m = re.search(r"const val MAGIC\s*=\s*(0x[0-9A-Fa-f]+)", src)
         if not m:
@@ -212,7 +218,58 @@ def build(catalogue: str, out_path: str) -> int:
     verify(out_path, raster, density, peak)
     size = os.path.getsize(out_path)
     print(f"  wrote {out_path} — {size:,} bytes, peak {peak:.1f} stars/deg^2")
+    report_thresholds(raster, density, peak)
     return 0
+
+
+def report_thresholds(raster: Raster, density: list[float], peak: float) -> None:
+    """Say what the renderer's two absolute thresholds should be for THIS raster.
+
+    ⚠️ **`MilkyWay.FAINTEST_DENSITY` and `BRIGHTEST_DENSITY` are absolute stars per square degree,
+    and nothing else in the build can notice when they stop matching the raster.** They were chosen
+    against a G<12 sky — a floor of 40 against a median cell of 38, a ceiling of 400 at the 99.9th
+    percentile — and at G<15 the poles alone measure 164 and the plane 2,844. Left alone against a
+    deeper raster the whole sky glows and the band saturates flat, while every gate here passes:
+    `verify` below would read a 17x contrast and be delighted. Only a person looking at a phone
+    would see it.
+
+    So the two numbers the constants are DEFINED as, in their own KDocs, are printed here from the
+    raster that was actually built. Both are statistics of the density field rather than free
+    choices: the floor is the median cell, which is what makes roughly half the sky black, and the
+    ceiling is the 99.9th percentile, so the brightest tenth of a per cent saturates and everything
+    else keeps the full range.
+
+    ⚠️ They do not scale together, which is why this reports rather than multiplying. Between G<12
+    and G<15 the plane grows 15.5x and the poles only 7.1x — measured against the archive — so the
+    field changes SHAPE, and a single factor applied to both constants would be wrong in opposite
+    directions at the two ends.
+    """
+    ordered = sorted(density)
+    median = ordered[len(ordered) // 2]
+    p999 = ordered[min(len(ordered) - 1, int(round(0.999 * (len(ordered) - 1))))]
+
+    def band(lo_lat: float, hi_lat: float) -> float:
+        rows_in = [r for r in range(raster.rows)
+                   if lo_lat <= abs(-90.0 + (r + 0.5) * raster.step) <= hi_lat]
+        vals = [density[r * raster.columns + c] for r in rows_in for c in range(raster.columns)]
+        return sum(vals) / len(vals)
+
+    print("  --- what MilkyWay.kt's thresholds should be for this raster ---")
+    print(f"    peak cell            {peak:10.1f} /deg^2")
+    print(f"    99.9th percentile    {p999:10.1f} /deg^2   <- BRIGHTEST_DENSITY")
+    print(f"    median cell          {median:10.1f} /deg^2   <- FAINTEST_DENSITY")
+    print(f"    plane |b| <= 5       {band(0.0, 5.0):10.1f} /deg^2")
+    print(f"    poles |b| >= 75      {band(75.0, 90.0):10.1f} /deg^2")
+    print(f"    MilkyWay.kt says     FAINTEST {raster.faintest:g}, BRIGHTEST {raster.brightest:g}")
+
+    # ⚠️ The property the floor exists to give: the empty sky must stay empty. If the polar band is
+    # at or above the floor then high latitudes are drawn as glow, which is the exact failure this
+    # whole function is here to prevent — so it is called out by name rather than left to be read
+    # off the two numbers above.
+    poles = band(75.0, 90.0)
+    if poles >= raster.faintest:
+        print(f"    ⚠️  THE POLES ({poles:.1f}) ARE AT OR ABOVE THE FLOOR ({raster.faintest:g}) — "
+              f"the high-latitude sky would be drawn as glow")
 
 
 def verify(path: str, raster: Raster, density: list[float], peak: float) -> None:

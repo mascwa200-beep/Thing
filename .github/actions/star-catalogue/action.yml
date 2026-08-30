@@ -1,5 +1,7 @@
 name: Star catalogue
-description: Restore the packed Gaia catalogue from cache, or build it, and prove it is the right one.
+description: >-
+  Restore the packed Gaia catalogue from cache, or build it, prove it is the right one, and prove the
+  Milky Way raster committed beside it is still what that catalogue implies.
 
 # ⚠️ **THIS FILE IS THE ONE DEFINITION OF THE CATALOGUE'S DEPTH AND ITS CACHE KEY, and it is a
 # composite action rather than three copies of the same block for exactly that reason.** Three
@@ -147,3 +149,77 @@ runs:
           --catalogue core/sky/src/main/assets/sky/stars.skycat \
           --magnitude ${{ inputs.magnitude }} \
           --github-output "$GITHUB_OUTPUT"
+
+    # ⚠️ **The raster lives here rather than in each build workflow for the reason this file's
+    # header gives about the cache key: the two build workflows and the warmer all want it, and a
+    # definition that drifted between two of them would not fail — it would quietly check something
+    # different in each.** The raster's only input is the catalogue the steps above just produced,
+    # so "the sky's derived data is right" is one gate with one definition.
+    #
+    # ⚠️ Unlike the catalogue this asset IS committed. It is 64,816 bytes rather than 295 MB, and it
+    # is the only SHIPPED PICTURE in the sky feature — nothing in CI can draw it, so keeping it in
+    # the repository is what allows anyone to look at it before it goes out. What CI can do is prove
+    # it still matches the catalogue, which is exactly what a rebuild-and-compare is.
+    #
+    # ⚠️ The comparison is sound because the build is deterministic in the strong sense: the raster
+    # depends only on the MULTISET of star positions — `counts[cell] += 1` is order-independent — so
+    # even a catalogue refetched cold in a different row order yields identical bytes. A G<12
+    # reproduction has already been confirmed byte-identical, twice.
+    #
+    # ROUND 1 — REPORT ONLY. This step currently rebuilds and reports; it does not fail on a
+    # mismatch, because the committed raster is still the G<12 one and the whole point of this round
+    # is to obtain the deep one and the statistics its thresholds derive from. The next commit turns
+    # the comparison into a hard gate.
+    - name: Rebuild the Milky Way raster from that catalogue
+      shell: bash
+      run: |
+        set -euo pipefail
+        committed=core/sky/src/main/assets/sky/milkyway.bin
+        out="${RUNNER_TEMP:-/tmp}/milkyway.rebuilt.bin"
+
+        # ⚠️ `|| true` is load-bearing and only for this round. `build()` WRITES the file before
+        # `verify()` runs, so even a failed gate leaves the bytes and the numbers on disk — and this
+        # round exists to obtain them. A builder that fell over silently and emitted nothing would
+        # cost a whole extra round for no reason.
+        #
+        # The timer is guarded and uses `-v` rather than a format string, matching the catalogue
+        # step above: /usr/bin/time is a package rather than the shell builtin, and a diagnostic
+        # that can break the build is worse than no diagnostic.
+        TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+        $TIMER python3 tools/sky/build_milkyway.py \
+          --catalogue core/sky/src/main/assets/sky/stars.skycat \
+          --out "$out" 2> >(tee /tmp/milkyway-time.log >&2) \
+          || echo "::warning::the raster builder did not finish cleanly — read its output above"
+        grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/milkyway-time.log \
+          | sed 's/^/    /' || true
+
+        if [ ! -s "$out" ]; then
+          echo "FAIL: the builder produced no raster at all."
+          exit 1
+        fi
+
+        echo "--- committed vs rebuilt ---"
+        if cmp -s "$out" "$committed"; then
+          echo "  identical — the committed raster is what this catalogue implies"
+        else
+          echo "  DIFFERENT — committed $(stat -c%s "$committed") bytes, rebuilt $(stat -c%s "$out")"
+          echo "  (expected while the committed raster is still the shallow one)"
+        fi
+
+        # The bytes, so they can be adopted without a second round. The artifact below is the
+        # primary route; this is the fallback that cannot fail, since a job log is always readable.
+        # ⚠️ Deliberately wrapped at the default 76 columns rather than `-w0`: one 86,000-character
+        # line is at the mercy of whatever truncates long log lines, and nothing is gained by it.
+        echo "--- rebuilt raster, base64 (between the markers) ---"
+        echo "BEGIN_MILKYWAY_BASE64"
+        base64 "$out"
+        echo "END_MILKYWAY_BASE64"
+
+    - name: Keep the rebuilt raster
+      uses: actions/upload-artifact@v4
+      with:
+        name: milkyway-rebuilt-${{ github.run_id }}-${{ github.job }}
+        path: ${{ runner.temp }}/milkyway.rebuilt.bin
+        # 64 KB, and its only purpose is to be collected in the round that adopts it.
+        retention-days: 7
+        if-no-files-found: error
