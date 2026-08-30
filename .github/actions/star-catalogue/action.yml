@@ -166,8 +166,11 @@ runs:
     # even a catalogue refetched cold in a different row order yields identical bytes. A G<12
     # reproduction has already been confirmed byte-identical, twice.
     #
-    # ⚠️ **It costs about a minute of every round in three workflows, and that was measured rather
-    # than assumed: 56.1 s wall and 305 MB peak over 36.9 million stars.** If it ever hurts, the
+    # ⚠️ **It costs about a minute of every round in three workflows, and that is measured on real
+    # runners rather than assumed: 56.1 s and 72.6 s wall over two rounds, 305 MB peak, over 36.9
+    # million stars.** Quoted as the range it is: the two rounds differ by 30% for runner variance
+    # and for the linear-cost comparison the second one also computes, and a single figure here
+    # would read as more precise than the thing being measured. If it ever hurts, the
     # lever is a cache keyed on exactly (this catalogue's key, `build_milkyway.py`, `MilkyWay.kt`)
     # holding a stamp, so the rebuild is skipped when none of its inputs moved. Named, not built —
     # caching a gate is how gates go stale, and it should only be done against a measured need.

@@ -330,8 +330,15 @@ object MilkyWay {
      * square-root scaled**. `tools/sky/build_milkyway.py` now prints both at whatever depth it is
      * building, so that comparison stays a live measurement rather than a remembered one.
      *
-     * On the shipped G<15 raster, whose densities run from 0 to 21,947 stars per square degree, the
-     * square-root cost is **5.4%**.
+     * On the shipped G<15 raster, whose densities run from 0 to 21,947 stars per square degree, that
+     * same pair measures **33.3% linear against 5.4% square-root scaled**.
+     *
+     * ⚠️ Both halves are quoted at both depths on purpose. The argument is the RATIO, and it moved:
+     * 15.3x at G<12 and 6.2x at G<15. Quoting the new square-root cost beside the old linear one
+     * would have implied 10x — a number neither raster ever produced, and the "two different sums"
+     * mistake this file warns about two paragraphs up in [MilkyWay]'s own header. The square root is
+     * still decisive; it is simply less decisive than it was, because a deeper catalogue fills in
+     * the faint end that linear scaling handles worst.
      *
      * ⚠️ **That 5.4% is no longer under the counting noise, and it used to be.** The 3.6% figure sat
      * comfortably beneath the 7.9% Poisson noise of the counting itself, which is where an encoding
