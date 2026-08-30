@@ -11277,6 +11277,11 @@ that fixes it is the deep tier as a **downloaded pack** rather than a bundled as
 `PackArchive` takes only `*.json`, caps entries at 32 MB and merges through the guide index, so that
 is a rewrite of the pack format rather than a switch to flip.
 
+⚠️ **ITEM G IS ANSWERED — see "THE RIFT QUESTION, MEASURED" at the end of this file.** The framing
+below is what was true before it was asked properly: the question does NOT need the catalogue on
+disk, because a density map can be got from the archive with a `GROUP BY`. Left standing as the
+record of the open item; the answer supersedes it.
+
 **Open, deliberately:** the Milky Way raster is still derived from the G<12 catalogue and is
 unchanged and correct as it stands. Whether rebuilding it from G<15 **strengthens or weakens** the
 Great Rift is a real question — the rift exists *because* extinction pushes stars below the cut — and
@@ -11426,3 +11431,60 @@ That made every faint star three magnitudes too bright and was one commit from b
 per cent, so **the docstring is NOT stale and there is nothing to correct.** The figure to carry into
 a deep-tier comparison is the **local trough depth (2.01×)**, not the global 5.00× ratio, whose
 minimum is the anticentre — thin because the line of sight leaves the galaxy, not because of dust.
+
+### THE RIFT QUESTION, MEASURED — item G answered, and the rebuild it argues for (this session)
+
+The last open item of the sky plan. It had been recorded twice as blocked on "needs the 295 MB
+G<15 catalogue locally", and **that framing was the thing standing in the way, not the data.** The
+Milky Way raster is a DENSITY map, `gaiadr3.gaia_source` carries galactic `l`/`b` as columns, and a
+`GROUP BY` therefore answers it directly — **four requests instead of the ~2,200 a crawl costs**,
+which also keeps faith with the politeness reasoning `sky-catalogue.yml` is built on. Tool:
+`scratchpad/sky/measure_rift_depth.py`. **Zero subagent and zero workflow spend.**
+
+⚠️ **VALIDATED BY A COMPLETELY DIFFERENT ROUTE BEFORE ANY OF IT WAS BELIEVED.**
+`measure_milkyway.py` runs the shipped raster over the packed catalogue and banked a G<12 rift
+depth of **2.01x** and a plane-to-pole contrast of **7.93x**. This reads raw Gaia through the
+archive and gets **2.01x and 7.93x**. Two independent paths, same numbers — which is the only
+reason the deeper comparison is worth anything.
+
+| | G<12 | G<15 |
+|---|---|---|
+| plane-to-pole contrast | 7.93x | **17.38x** |
+| rift, min-based (the banked method) | 2.01x | 2.05x |
+| rift, mean of the three trough bins | 1.65x | 1.56x |
+| rift, min-based, centre bin excluded | 1.96x | 1.63x |
+
+⚠️ **THE THREE RIFT MEASURES DISAGREE AND THE CAUSE IS IDENTIFIABLE RATHER THAN NOISE: `l = 0-9`
+IS THE GALACTIC CENTRE, NOT A FLANK.** It grows **30.3x** between the two cuts against the plane's
+overall 15.5x — the centre emerging from its own extinction, which is the same phenomenon the rift
+is made of, happening somewhere else and dragging the flank average up with it. That is what props
+the min-based ratio flat. Exclude it and the min-based measure agrees with the mean-based one.
+
+**So: the band gets much stronger, and the rift fills in somewhat.** A likely mechanism, offered as
+reasoning and NOT as something measured here: extinction is a fixed magnitude penalty, so a dust
+lane admits stars to `L-A` where clear sky admits them to `L`, and `N(L-A)/N(L)` tends toward 1 as
+`L` moves into the range where disc counts flatten. In a Euclidean universe that ratio would not
+move with depth at all; the galaxy is not Euclidean, and it runs out.
+
+⚠️ **THE TRAP I WALKED INTO, and it is the recurring one wearing a new coat.** I chose a
+mean-of-three-bins aggregation, got 1.65x -> 1.56x, and was one sentence from reporting "the rift
+weakens" — when the **like-for-like** comparison against the banked method says 2.01x -> 2.05x,
+essentially flat. Neither number is wrong; they are different questions. **Match the banked
+method before comparing to a banked number**, then report the others beside it. Nineteenth or so
+appearance of this habit in the arc-series.
+
+**The verdict this argues for: REBUILD the raster from G<15.** The band more than doubles in
+contrast and the rift survives as a visible trough at 1.6-2x by every measure, so the structure is
+not lost and the picture gains a great deal. ⚠️ **NOT DONE HERE, deliberately**: `build_milkyway.py`
+reads the packed catalogue, which this container does not have and should not crawl for; and it
+regenerates a shipped visual asset that nothing here can look at. It wants the catalogue in hand —
+a CI step beside the builder is the obvious shape — and `measure_milkyway.py` re-run against the
+old raster before it ships, because the raster adds its own binning and smoothing on top of what
+was measured here.
+
+⚠️ **Two ADQL notes, both of which cost a round.** The parser rejects an EXPRESSION in `GROUP BY`
+outright — `GROUP BY FLOOR(l/10)` answers 400 with *"Was expecting ... &lt;REGULAR_IDENTIFIER&gt; ...
+&lt;UNSIGNED_INTEGER&gt;"* — so the alias or the column position is the only form it takes. And a 400
+from this endpoint carries the real complaint in the body, which `urllib` puts on the exception
+rather than raising with it: `except HTTPError as e: e.read()`. Guessing at the cause instead
+would have taken several attempts.
