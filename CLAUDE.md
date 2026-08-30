@@ -11262,3 +11262,107 @@ unchanged and correct as it stands. Whether rebuilding it from G<15 **strengthen
 Great Rift is a real question — the rift exists *because* extinction pushes stars below the cut — and
 it cannot be answered until the deep catalogue exists. Measure both and keep the one with more
 structure; do not guess, which is the trap this file records eighteen times.
+
+### S11 continued — the first cold build, and the verifier that rejected a correct catalogue
+
+The deep tier's first real crawl ran, and everything about it is now measured rather than estimated.
+**Zero subagent and zero workflow spend**, as with every arc since the credit directive.
+
+**The crawl works and the memory rewrite was the right size.** All 64 bands fetched and packed,
+**36,909,335 stars in 6,021 s (100 minutes)**, peak RSS **1.29 GB** against the 2.2 GB the local
+G<12 measurement extrapolated to — comfortably inside a 16 GB runner. The count matches the archive's
+own `COUNT(*)` exactly.
+
+⚠️ **AND THEN IT FAILED ON ITS OWN SPOT-CHECK, after a hundred minutes, on a catalogue that was
+entirely correct:** `AssertionError: record 14007680 decoded outside tile 1416`.
+
+`verify()` asserted `grid.tile_of(ra, dec) == busiest` with **no tolerance**. A position is stored as
+a fraction of its own tile, so a star hard against the top quantises to 65535 and decodes to EXACTLY
+the upper bound — and tile bounds are half-open, so `tile_of` correctly answers the tile above.
+Nothing was mis-filed. Measured over the shipped G<12 catalogue rather than reasoned about:
+
+    records at a quantisation maximum:                    51
+      of those, tile_of answers a different tile:         50
+      largest quantum involved:                     0.1545 arcsec
+      how many landed in the BUSIEST tile:                 0     <- the only tile verify() inspects
+
+⚠️ **It passed at G<12 by luck.** None of the fifty happened to fall in the one tile the loop checks.
+At G<15 there are ~12× as many such records and the busiest tile holds ~15× as many stars.
+
+⚠️ **`SkyCatalogBundleTest` has documented and tolerated this exact case since it was written** — "a
+handful of stars decode into the NEXT tile along, and that is the format working rather than failing…
+measured: 3 stars in 281,625". Two independent statements of one fact, disagreeing, in the shape
+where the disagreement only surfaces after an hour of work. The fix states the format's own
+condition rather than a threshold: an out-of-tile record is permitted **only** when its raw
+coordinate is at the quantisation maximum, because a decode is always inside the closed bounds
+(`lo + f*(hi-lo)`, f in [0,1]) and the half-open tie-break is the only thing that can disagree.
+Negative-tested three ways against the real file — baseline green first, tile forced to one that
+holds a boundary record (passes, reports it), then the exception removed (fails with the original
+message) — source restored byte-identical.
+
+**What the failure cost, and the two mitigations that were considered and REJECTED.** `actions/cache`
+is `post-if: success()`, so nothing saved: `Restore the star catalogue … outcome=skipped`. The
+hundred minutes are gone.
+- ⚠️ **Persisting the chunk cache would not work**: 36.9M rows of CSV at ~90 bytes is about **3 GB**,
+  which would swamp the 10 GB repository cache and evict the food database.
+- ⚠️ **Saving the catalogue on failure is worse than the disease**: it would cache an unverified
+  295 MB file under the right key, permanently, with every later build drawing a sky built from it —
+  precisely the trap `action.yml`'s own comment warns about for the wrong-depth case.
+
+**Measurements worth not re-deriving.**
+- ⚠️ **A cold crawl is `2L − 1` requests, not `L`.** Every interior node of the binary split fetches
+  a full 50,000-row page and then **throws it away** (`os.remove(path)` on a truncated chunk). The
+  action's "1,100–1,900 requests" counted leaves only and undercounts by roughly half; the real range
+  is **~2,200–3,000**, which is what 100 minutes at 4 concurrent × ~9.25 s actually reflects. **The
+  lever, if cold builds ever need to be cheaper: an interior node only needs to know WHETHER it
+  exceeds the cap, so a `SELECT COUNT(*)` there would replace a discarded 50k-row fetch.**
+- ⚠️ **The reading path has a hard ceiling, measured: `FileChannel.map` throws
+  `IllegalArgumentException: Size exceeds Integer.MAX_VALUE` at exactly 2,147,483,648.** With
+  `HEADER_BYTES = 32`, `RECORD_BYTES = 8` and 5,370 tiles that caps a catalogue at **268,432,766
+  stars (2.00 GiB)**. G<12 uses 1.15% of it, G<14 6.27%, **G<15 13.75%**. Nothing stated this
+  anywhere before.
+- ⚠️ **The cache key hashes `StarCatalogFormat.kt` and `SkyGrid.kt` by CONTENT**, so editing either —
+  *even a comment* — forces a fresh ~100-minute crawl. That is exactly where a note about the format
+  wants to go, so such notes belong in `action.yml`, which is not in the hash.
+- The eager assertion messages in `SkyCatalogBundleTest`'s two hot tests cost **2.8 s** at G<15
+  scale, measured with a real JVM program. Not worth changing; my instinct said "tens of seconds".
+- Verified safe at the deeper tier, each by running code rather than reading it: `Sink` grows rather
+  than truncating; the `MappedByteBuffer` survives closing both the channel and the
+  `RandomAccessFile`; and `StarCatalogReader` has no `.array()`/`hasArray`/`arrayOffset`, so handing
+  it a direct mapped buffer instead of a heap one cannot throw.
+
+⚠️ **Operational: `get_job_logs` returns 404 for an IN-PROGRESS job.** A running job's progress cannot
+be watched through the MCP tools at all — the log archive does not exist until the job finishes
+uploading. The only instrument is the step status, and a frozen `in_progress` is normal rather than
+evidence of a stall. (Same family as the recorded `BlobNotFound` trap on a job that has only just
+finished.)
+
+⚠️ **A push touching `tools/sky/**` starts TWO cold crawlers** — that path is in `sky-build.yml`'s
+allowlist and is not in `android-build.yml`'s ignore list. One of them must be cancelled by hand, or
+two 100-minute crawls hit a research archive at once, which is the exact discourtesy the warmer
+exists to prevent.
+
+**STATE AT HANDOFF: the deep catalogue has NEVER been built successfully.** Sky #18 (run
+`33310557054`, commit `c03c883`) is the sole crawler and is expected to land around 13:55Z; LCARS
+(`33310557005`) was cancelled deliberately and must be **re-run once Sky's cache post-step saves**.
+Nutrition and Desktop were already green at `677c92d`. Until a green Sky run exists, no APK has ever
+carried the G<15 catalogue and none of the packaged-size or on-device claims in the section above
+have been observed.
+
+**Item G (the Milky Way) is now baselined rather than blocked.** `build_milkyway.py`'s corrected
+default paths had never been run; they work, take 6.6 s over 3.09M stars, and produce a raster
+**byte-identical** to the committed `milkyway.bin`. New `scratchpad/sky/measure_milkyway.py` measures
+density, flux and the plane profile under one band definition:
+
+    DENSITY  plane 183.80  poles 22.86    -> 8.04x   (docstring says 7.93x)
+    FLUX     plane 0.01645 poles 0.003694 -> 4.45x   (docstring says 4.52x)
+    l  20- 49   137.2, 105.9, 143.0   <- a trough 2.01x below both its flanks
+
+⚠️ **My first flux figure was 5.42× and it was wrong**: I decoded magnitude as
+`MAG_OFFSET + raw/255*MAG_SCALE` when the shipped `decodeMagnitude` is `raw/MAG_SCALE + MAG_OFFSET` —
+MAG_SCALE is *steps per magnitude*, not a span, which is why a full byte reaches 16.21 and not 12.
+That made every faint star three magnitudes too bright and was one commit from being written up as
+"the docstring has gone stale". With the shipped decode all three figures reproduce to within a few
+per cent, so **the docstring is NOT stale and there is nothing to correct.** The figure to carry into
+a deep-tier comparison is the **local trough depth (2.01×)**, not the global 5.00× ratio, whose
+minimum is the anticentre — thin because the line of sight leaves the galaxy, not because of dust.
