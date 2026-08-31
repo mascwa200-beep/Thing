@@ -21,6 +21,7 @@ import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
 import dev.mascwa.pulse.core.telemetry.Stardate
 import dev.mascwa.pulse.core.telemetry.TaskBoard
+import dev.mascwa.pulse.core.telemetry.WeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.WatchType
@@ -136,8 +137,8 @@ class LockWidgetProvider : AppWidgetProvider() {
         val route: String? = null,
     )
 
-    /** The weather, in the three lengths the widget needs it at. */
-    private data class Wx(val head: String, val detail: String, val compact: String)
+    /** The weather, in the lengths the widget needs it at, plus the air as its own reading. */
+    private data class Wx(val head: String, val detail: String, val compact: String, val air: String?)
 
     /** The market read: the mover line, the breadth line, and the instruments themselves. */
     private data class Mkt(
@@ -383,7 +384,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         var skyLine: String? = null
         var spaceLine: String? = null
         var fuelLine: String? = null
-        var econLine: String? = null
+        var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
         var leadArgb: Int? = null
@@ -424,10 +425,18 @@ class LockWidgetProvider : AppWidgetProvider() {
                         } else ""
                         val rh = cur.humidity?.let { "${it.toInt()}% RH" }.orEmpty()
                         val aqi = wd.airQuality?.usAqi?.let { "AQI ${it.toInt()}" }.orEmpty()
+                        // The air, in words as well as a number. ⚠️ Through the CI-tested explainer
+                        // the WEATHER screen already uses, so the widget and the screen cannot end
+                        // up disagreeing about where "unhealthy" starts.
+                        val air = wd.airQuality?.usAqi?.let { v ->
+                            WeatherExplainers.airQuality(v, wd.airQuality?.europeanAqi)?.headline
+                                ?.let { "AIR  ${v.toInt()} US AQI · ${it.uppercase()}" }
+                        }
                         Wx(
                             head = head,
                             detail = listOf(hilo, rh, aqi).filter { it.isNotBlank() }.joinToString("  ·  "),
                             compact = "${Formatters.number(cur.temperature, 0)}$u ${WeatherCode.describe(cur.weatherCode).uppercase()}",
+                            air = air,
                         )
                     }
                 }
@@ -532,13 +541,24 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val econ = async {
-                    widgetSource<String>(Source.ECONOMY, outcomes) {
-                        c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
-                            .firstOrNull { it.latest != null }?.let { series ->
-                                series.latest?.let {
-                                    "ECON  ${series.indicatorTitle.take(24)}: ${"%.1f".format(it.value)} ${series.unit}".trim()
-                                }
+                    widgetSource<List<String>>(Source.ECONOMY, outcomes) {
+                        // ⚠️ The dashboard was fetched whole and all but its FIRST usable series
+                        // thrown away. The board has a column for it, so take the three that answer
+                        // "how is the economy" — prices, growth, jobs — in that order, and keep
+                        // whatever else is there behind them rather than inventing a ranking.
+                        val series = c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
+                            .filter { it.latest != null }
+                        if (series.isEmpty()) return@widgetSource null
+                        val wanted = listOf("FP.CPI.TOTL.ZG", "NY.GDP.MKTP.KD.ZG", "SL.UEM.TOTL.ZS")
+                        val ordered = wanted.mapNotNull { id -> series.firstOrNull { it.indicatorId == id } } +
+                            series.filter { it.indicatorId !in wanted }
+                        ordered.take(3).mapNotNull { s2 ->
+                            s2.latest?.let { p ->
+                                // ⚠️ These are World Bank ANNUAL series, so the year is not
+                                // decoration — "2.9%" without it reads as this month's print.
+                                "${s2.indicatorTitle.take(18)} ${Formatters.number(p.value, 1)}${s2.unit.take(10)} · ${p.year}"
                             }
+                        }.ifEmpty { null }
                     }
                 }
 
@@ -584,7 +604,10 @@ class LockWidgetProvider : AppWidgetProvider() {
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
                 space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
                 fuel.await()?.let { fuelLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
-                econ.await()?.let { econLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
+                econ.await()?.let {
+                    econLines = it
+                    rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
+                }
             }
         }
 
@@ -598,8 +621,17 @@ class LockWidgetProvider : AppWidgetProvider() {
         // ── the same reading, as a board ────────────────────────────────────────────────────────
         // Nothing here fetches: every value was loaded once, above. A field left null is a region
         // the board simply will not draw.
-        val econColumn = WidgetBoard.Column("ECONOMY", listOfNotNull(econLine, fuelLine))
-        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine))
+        // Free space, through the one accessor. Null means the volume could not be read, which is
+        // a different fact from "full" and must not render as zero.
+        val storageLine = runCatching {
+            c.deviceContextProvider.storage()?.let {
+                "STORAGE  ${Formatters.number(it.freeBytes / 1_000_000_000.0, 1)} GB free"
+            }
+        }.getOrNull()
+
+        val econColumn = WidgetBoard.Column("ECONOMY", econLines)
+        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine))
+        val resourceColumn = WidgetBoard.Column("RESOURCES", listOfNotNull(fuelLine, storageLine))
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
@@ -623,11 +655,14 @@ class LockWidgetProvider : AppWidgetProvider() {
             stocksLabel = "KEY STOCKS · % TODAY, LINE 30 DAYS",
             breadth = mkt?.breadth,
             breadthPct = mkt?.upPct,
-            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, spaceLine, skyLine),
+            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, spaceLine),
             // ⚠️ Only pairs that have something go in. The second slot stays deliberately empty
             // here — water, fuel detail, data use and comms fill it in later slices, and an empty
             // labelled column would read as a feed that failed rather than one not built yet.
-            pairs = listOf(econColumn to dayColumn),
+            pairs = listOf(
+                econColumn to dayColumn,
+                resourceColumn to WidgetBoard.Column("", emptyList()),
+            ),
             foot = sysLine,
         )
         return Loaded(rows, board)

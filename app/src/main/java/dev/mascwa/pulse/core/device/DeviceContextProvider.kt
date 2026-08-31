@@ -75,6 +75,28 @@ class DeviceContextProvider(context: Context) {
      * build, memory, storage, power and network. Best-effort — any field that can't be read is omitted, so
      * it never throws. This is the "what device am I on / deeper phone integration" surface.
      */
+    /** How much room is left, in bytes. */
+    data class Storage(val freeBytes: Long, val totalBytes: Long) {
+        /** 0..100, or null when the volume reports no size at all. */
+        val freePct: Int? get() = if (totalBytes > 0L) ((freeBytes * 100.0) / totalBytes).toInt() else null
+    }
+
+    /**
+     * Free and total bytes on the volume this app's own files live on.
+     *
+     * ⚠️ **The one place that reads it.** There were two `StatFs` calls in the app and neither gave
+     * a caller bytes: this class formatted them straight into a human-readable report string, and
+     * the Oracle kept only a percentage. Anything wanting the actual number had to open a third —
+     * which is how a duplicated definition starts, a mistake this project has corrected repeatedly.
+     *
+     * Null when the volume cannot be read at all, which is a different fact from "no space left"
+     * and must not render as zero.
+     */
+    fun storage(): Storage? = runCatching {
+        val stat = StatFs(appContext.filesDir.path)
+        Storage(freeBytes = stat.availableBytes, totalBytes = stat.totalBytes)
+    }.getOrNull()
+
     fun deviceReport(): String {
         val c = snapshot()
         val lines = ArrayList<String>()
@@ -101,10 +123,7 @@ class DeviceContextProvider(context: Context) {
             val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
             lines += "Memory: ${gb(mi.availMem)} free of ${gb(mi.totalMem)}" + if (mi.lowMemory) " (low)" else ""
         }
-        runCatching {
-            val stat = StatFs(appContext.filesDir.path)
-            lines += "Storage: ${gb(stat.availableBytes)} free of ${gb(stat.totalBytes)}"
-        }
+        storage()?.let { lines += "Storage: ${gb(it.freeBytes)} free of ${gb(it.totalBytes)}" }
 
         val battery = if (c.batteryPct >= 0)
             "${c.batteryPct}%" + (if (c.isCharging) " (charging · ${c.powerSource})" else " · ${c.powerSource}") else "unknown"
