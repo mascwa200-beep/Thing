@@ -39,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.Collections
@@ -367,6 +368,13 @@ class LockWidgetProvider : AppWidgetProvider() {
         // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
         // only falls back to the device's own — nothing here may ever name a fixed town.
         val boardSubhead = listOf(greeting, stardate).filter { it.isNotBlank() }.joinToString(" · ")
+        // ⚠️ The SAME preference the header clock follows, so the agenda cannot print 14:00
+        // beside a header reading 2:00 PM. Locale.US on the PATTERN only — the pattern is a
+        // format string, while the rendered digits still come out in the device's own locale.
+        val clock = SimpleDateFormat(
+            if (s?.use24HourClock != false) "HH:mm" else "h:mm a",
+            Locale.getDefault(),
+        )
 
         if (s == null) {
             return Loaded(rows, WidgetBoard.Board(header = date.ifBlank { greeting }, subhead = boardSubhead))
@@ -390,6 +398,14 @@ class LockWidgetProvider : AppWidgetProvider() {
         val usageAccess = runCatching { c.mobileData.hasUsageAccess() }.getOrDefault(false)
         if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted")
 
+        // ⚠️ Same reasoning, and the calendar needs it more than most: `upcoming` returns an empty
+        // list for a refused permission, an unavailable provider AND a genuinely clear diary, so
+        // without asking first the widget would quietly tell someone their week is free when it was
+        // never allowed to look. Asked here rather than inside the source for the reason above —
+        // null from inside `widgetSource` is recorded as Empty.
+        val canReadCalendar = runCatching { c.calendarRepository.canRead() }.getOrDefault(false)
+        if (!canReadCalendar) outcomes[Source.CALENDAR] = Outcome.Skipped("calendar permission not granted")
+
         // ⚠️ Captured out of the parallel block so the board can be assembled from the SAME pass
         // that fills the rows. Building it from a second read would let the two forms of the widget
         // disagree about what it knows — and they are meant to be one reading at two lengths.
@@ -404,6 +420,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         var fuelLines: List<String> = emptyList()
         var dataLine: String? = null
         var commsLines: List<String> = emptyList()
+        var agendaLines: List<String> = emptyList()
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
@@ -597,6 +614,29 @@ class LockWidgetProvider : AppWidgetProvider() {
                         c.waterRepository.cached(place.latitude, place.longitude)?.line
                     }
                 }
+                // The next few things actually in the diary. No network and no cache — a direct
+                // Instances query, which expands recurrences for us.
+                //
+                // ⚠️ `upcoming` is NOT a suspend function and does its ContentProvider query on
+                // whatever thread calls it, so it is dispatched explicitly. It happens to be called
+                // from an IO dispatcher here already, but relying on that would make this correct by
+                // where it sits rather than by what it says.
+                //
+                // ⚠️ Deliberately not `CalendarObjectivesRepository.upcoming`, which geocodes each
+                // event's location string over the network.
+                val calendar = async {
+                    if (!canReadCalendar) null else widgetSource<List<String>>(Source.CALENDAR, outcomes) {
+                        withContext(Dispatchers.IO) {
+                            c.calendarRepository
+                                .upcoming(System.currentTimeMillis(), CALENDAR_HORIZON_MS, WidgetBoard.COLUMN_LINES)
+                                .map { ev ->
+                                    val whenIt = if (ev.allDay) "ALL DAY" else clock.format(Date(ev.startMs))
+                                    "$whenIt  ${ev.title.ifBlank { "(untitled)" }}".take(40)
+                                }
+                                .ifEmpty { null }
+                        }
+                    }
+                }
                 val comms = async {
                     widgetSource<List<String>>(Source.COMMS, outcomes) {
                         // ⚠️ `cached`, never `refresh`. Each mailbox is a TLS round trip and the
@@ -731,6 +771,10 @@ class LockWidgetProvider : AppWidgetProvider() {
                     econLines = it
                     rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
                 }
+                // ⚠️ Board only, and no row. The row list already builds more entries than
+                // MAX_ROWS can draw, so adding one here would push something else off the
+                // bottom in silence rather than adding anything.
+                calendar.await()?.let { agendaLines = it }
             }
         }
 
@@ -760,6 +804,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
         val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(dataLine, storageLine))
         val commsColumn = WidgetBoard.Column("WAITING", commsLines)
+        // ⚠️ This slot has been drawn half-blank since the board was built —
+        // `commsColumn to Column("", emptyList())` — so the region has always cost its full height
+        // for one column of content. Nothing had to grow to hold the agenda; it just had to be put
+        // where the empty half already was.
+        val agendaColumn = WidgetBoard.Column("AGENDA", agendaLines)
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
@@ -805,7 +854,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             pairs = listOf(
                 econColumn to dayColumn,
                 fuelColumn to phoneColumn,
-                commsColumn to WidgetBoard.Column("", emptyList()),
+                commsColumn to agendaColumn,
             ).take(WidgetBoard.MAX_PAIRS),
             foot = sysLine,
         )
@@ -859,6 +908,16 @@ class LockWidgetProvider : AppWidgetProvider() {
 
         /** Nothing further away than this is "near you" on a home-screen row. */
         const val SAFETY_RADIUS_M = 150_000.0
+
+        /**
+         * How far ahead the agenda looks.
+         *
+         * A day and a half, so that late one evening the column is showing tomorrow rather than
+         * running out — but not so far that the four lines fill with things you cannot act on
+         * today. The column holds [WidgetBoard.COLUMN_LINES] entries and the query is capped there,
+         * so a busy diary is truncated by the layout's own capacity rather than by the horizon.
+         */
+        const val CALENDAR_HORIZON_MS = 36L * 60 * 60 * 1000
 
         /** The station. Home propagates the same object from the same cached element set. */
         const val ISS_NORAD_ID = 25544

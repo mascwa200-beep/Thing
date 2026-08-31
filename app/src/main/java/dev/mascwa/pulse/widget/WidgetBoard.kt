@@ -58,6 +58,15 @@ internal object WidgetBoard {
     internal data class Column(val label: String, val lines: List<String>)
 
     /**
+     * How many lines one column of a two-column region can draw.
+     *
+     * ⚠️ Exposed for the same reason as [MAX_SOURCES], [MAX_READOUTS] and [MAX_PAIRS]: [column]
+     * fills these with `getOrNull(i)`, so a fifth line is dropped with nothing said. A caller should
+     * ask the layout how much room it has rather than pick a number that happens to fit today.
+     */
+    const val COLUMN_LINES = 4
+
+    /**
      * Everything the board can draw. Every field is optional because every field is a feed that can
      * fail, and the board's whole contract is that a missing one costs its own block.
      */
