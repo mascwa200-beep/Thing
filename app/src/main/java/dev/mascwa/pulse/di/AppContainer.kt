@@ -578,7 +578,10 @@ class AppContainer(private val appContext: Context) {
      */
     val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
         dev.mascwa.pulse.data.health.FoodRepository(
-            appContext, openFoodFacts, customFoodStore, offlineFoodStore,
+            // ⚠️ A supplier because the standalone nutrition application downloads its corpus while
+            // running; this one bundles it, so the answer never changes and `by lazy` behind the
+            // lambda means it is still opened exactly once.
+            appContext, openFoodFacts, customFoodStore, { offlineFoodStore },
         )
     }
 

@@ -13,13 +13,19 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteQuery
 
 /**
- * The bundled barcode database: ~4.4 million retail products, answerable with no network at all.
+ * The barcode database: ~4.5 million retail products, answerable with no network at all.
  *
  * ## ⚠️ This is the project's first PREBUILT database, and it is unlike the other two
  *
  * `JarvisDatabase` and `TranscriptDatabase` are both built empty and filled at runtime. This one
- * ships with its content already inside it, as an asset, and is never written to — so a schema
- * change means a **new asset** rather than a migration.
+ * arrives with its content already inside it and is never written to by the app — so a schema
+ * change means a **new file** rather than a migration.
+ *
+ * ⚠️ **It arrives two ways now, and the older half of this file's comments only knew about one.**
+ * The LCARS application still bundles it as an asset; the standalone nutrition application
+ * **downloads it as a pack** (`FoodPack` / `FoodPackRepository`), because at 425 MB it was almost the
+ * whole of that APK and the in-app updater re-downloads the entire APK on every published build.
+ * [open] handles both, and everything below about `createFromAsset` applies only to the bundled one.
  *
  * ⚠️ **CORRECTION to what this paragraph used to say.** It claimed this database "must not copy
  * either habit" and in particular must not use `fallbackToDestructiveMigration`. That was wrong,
@@ -280,11 +286,29 @@ abstract class FoodDatabase : RoomDatabase() {
     abstract fun dao(): FoodDao
 
     companion object {
-        /** The asset CI drops into place before packaging. */
+        /**
+         * The asset CI drops into place before packaging, where an application still bundles one.
+         *
+         * ⚠️ **The standalone nutrition application no longer does, and that is the point of the
+         * pack.** Its APK was 189,972,281 bytes of which the overwhelming majority was this file, and
+         * the in-app updater re-downloads the WHOLE APK on every published build — so adding barcodes
+         * meant re-downloading the entire corpus every time a line of UI changed. The LCARS
+         * application still bundles it, deliberately untouched: this change was asked for on the
+         * nutrition app and moving both at once would be a behaviour change on a daily driver for no
+         * reason anybody asked for. [open] handles both, and which one a build is is decided by
+         * whether the asset is there.
+         */
         const val ASSET = "food/food.db"
 
-        /** The file Room unpacks the asset into. Named here so the space guard and Room agree. */
-        private const val DB_NAME = "food.db"
+        /**
+         * The file the database lives in.
+         *
+         * ⚠️ Named here so that three things agree: the space guard, Room, and
+         * `FoodPackRepository`, which downloads a pack and writes it **to this path directly**
+         * rather than through an asset. A fourth spelling of this name anywhere is a database the
+         * app writes and never reads.
+         */
+        const val DB_NAME = "food.db"
 
         /**
          * What the first open needs on disk, in bytes.
@@ -317,6 +341,56 @@ abstract class FoodDatabase : RoomDatabase() {
         private var instance: FoodDatabase? = null
 
         /**
+         * Is the file on disk a database this build can actually open — and DELETE it if not.
+         *
+         * ⚠️ **Without this, `fallbackToDestructiveMigration()` is a loaded gun pointed at a
+         * download the person waited several minutes for.** It exists so that a bumped schema
+         * replaces a stale *asset*; on a file the app fetched itself it means Room silently deletes
+         * several hundred megabytes and creates an EMPTY database in its place, and the scanner then
+         * recognises nothing at all with no error anywhere. That fallback stays — it is what makes a
+         * bundled asset's version bump work — and this is what stops it ever seeing a file it would
+         * destroy without the app knowing.
+         *
+         * Deleting here rather than merely refusing is deliberate: a stale or truncated file is not
+         * a thing to preserve, and leaving it would make the repository's free-space check fail
+         * against the room already taken by a database nobody can read.
+         *
+         * ⚠️ It also catches a **half-written download** — an interrupted fetch leaves a file that
+         * exists and has a length, and handing that to Room is an exception at the first query
+         * rather than at open.
+         */
+        private fun usable(file: java.io.File): Boolean {
+            val version = runCatching {
+                android.database.sqlite.SQLiteDatabase.openDatabase(
+                    file.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+                ).use { it.version }
+            }.getOrNull()
+            if (version == SCHEMA) return true
+            lastOpenNote = if (version == null) {
+                "the downloaded database was damaged and has been removed; download it again"
+            } else {
+                "the downloaded database is for an older version of this app; download it again"
+            }
+            runCatching { file.delete() }
+            // ⚠️ Room's own sidecars, or the next open finds a journal describing a file that has
+            // gone. `-wal` and `-shm` are absent under TRUNCATE journalling and deleting a file that
+            // is not there costs nothing, so this is unconditional rather than conditional.
+            runCatching { java.io.File(file.path + "-journal").delete() }
+            runCatching { java.io.File(file.path + "-wal").delete() }
+            runCatching { java.io.File(file.path + "-shm").delete() }
+            return false
+        }
+
+        /**
+         * The Room version, restated as a constant so the guard above can compare against it.
+         *
+         * ⚠️ It must equal the `version` in the `@Database` annotation and `FoodPack.SCHEMA`. Three
+         * numbers that have to agree is two too many, and the annotation is the one that cannot be
+         * read back at runtime — hence a constant beside it rather than a fourth spelling.
+         */
+        const val SCHEMA: Int = 2
+
+        /**
          * Open the bundled database, or null if it is not there.
          *
          * ⚠️ **Null is a real answer and callers must handle it.** The asset is fetched by CI rather
@@ -330,19 +404,35 @@ abstract class FoodDatabase : RoomDatabase() {
             synchronized(this) {
                 instance?.let { return it }
                 val app = context.applicationContext
-                val present = runCatching {
+                val dbFile = runCatching { app.getDatabasePath(DB_NAME) }.getOrNull()
+                // ⚠️ `usable` sets [lastOpenNote] when it rejects a file, and that note is more
+                // specific than the generic one below — "the download was damaged" against "there is
+                // no database". Held here so the general case cannot overwrite the particular one.
+                var rejected: String? = null
+                val onDisk = dbFile != null && dbFile.exists() && dbFile.length() > 0 &&
+                    usable(dbFile).also { if (!it) rejected = lastOpenNote }
+                val bundled = runCatching {
                     app.assets.open(ASSET).use { it.read() >= 0 }
                 }.getOrDefault(false)
-                if (!present) {
-                    lastOpenNote = "the database asset is not in this build"
+
+                // ⚠️ **This is the single most dangerous branch in the file, and it is a REFUSAL.**
+                // With neither a downloaded database nor a bundled asset, `databaseBuilder` would
+                // happily create an EMPTY one — Room runs `onCreate`, emits the schema, and every
+                // barcode from then on answers "no such product" from a table that is genuinely
+                // empty. No error, no exception, nothing in a log: a scanner that reads every packet
+                // perfectly and recognises none of them, permanently. Returning null is what makes
+                // the surface say "the food database has not been downloaded yet" instead.
+                if (!onDisk && !bundled) {
+                    lastOpenNote = rejected ?: "the food database has not been downloaded yet"
                     return null
                 }
-                // ⚠️ Only the FIRST open needs the room: once the file exists Room opens it in place
-                // and copies nothing. Checking unconditionally would refuse to open a database that is
-                // already sitting on the disk, on a phone that is merely full — which would take the
-                // feature away at exactly the wrong moment.
-                val dbFile = runCatching { app.getDatabasePath(DB_NAME) }.getOrNull()
-                if (dbFile != null && !dbFile.exists()) {
+
+                // ⚠️ Only the first unpack needs the room, and only from an asset: a downloaded pack
+                // is already written to this exact path by `FoodPackRepository`, so there is nothing
+                // left to copy. Checking unconditionally would refuse to open a database already
+                // sitting on the disk on a phone that is merely full, which takes the feature away
+                // at exactly the wrong moment.
+                if (bundled && !onDisk && dbFile != null) {
                     val free = runCatching { (dbFile.parentFile ?: app.filesDir).usableSpace }.getOrDefault(-1L)
                     if (free in 0 until FIRST_OPEN_BYTES) {
                         lastOpenNote = "unpacking it needs about ${FIRST_OPEN_BYTES / (1024 * 1024)} MB " +
@@ -352,7 +442,11 @@ abstract class FoodDatabase : RoomDatabase() {
                 }
                 val db = runCatching {
                     Room.databaseBuilder(app, FoodDatabase::class.java, DB_NAME)
-                        .createFromAsset(ASSET)
+                        // ⚠️ Conditional, and harmless either way once the file exists — Room's
+                        // `SQLiteCopyOpenHelper` copies only when the destination is absent. A build
+                        // with no asset must NOT name one: `createFromAsset` on a missing asset
+                        // throws at open time rather than falling back.
+                        .apply { if (bundled) createFromAsset(ASSET) }
                         // ⚠️ **This is what makes a version bump WORK, and without it the bump
                         // crashes every phone that already unpacked the asset.** Read out of the
                         // shipped room-runtime 2.6.1 bytecode rather than recalled, because the

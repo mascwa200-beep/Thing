@@ -33,14 +33,21 @@ class FoodRepository(
     private val off: OpenFoodFactsRepository,
     private val custom: CustomFoodStore,
     /**
-     * The bundled barcode database, or null on a build where the asset never arrived.
+     * The barcode database, or null when there is not one.
      *
-     * ⚠️ Null is a real state, not a defensive one. The 240 MB database is fetched by CI rather than
-     * committed — GitHub rejects files that size — so a local developer build genuinely has no
-     * bundle, and every path here has to work without it. What that costs is offline scanning; what
-     * it must never cost is the app starting.
+     * ⚠️ Null is a real state, not a defensive one. The 425 MB database is fetched rather than
+     * committed — GitHub rejects files that size — so a local developer build genuinely has none,
+     * and every path here has to work without it. What that costs is offline scanning; what it must
+     * never cost is the app starting.
+     *
+     * ⚠️ **A supplier and not a value, and that is a correctness change rather than a style one.**
+     * The standalone nutrition application now DOWNLOADS the corpus on first run instead of shipping
+     * it, so the answer changes while the process is alive. Held as a value, whatever this resolved
+     * to at construction — null, on the run where somebody first downloads it — would be the answer
+     * for the rest of the process, and the person would finish waiting several minutes for a
+     * database the app then went on insisting it did not have until they killed it and came back.
      */
-    private val offline: OfflineFoodStore? = null,
+    private val offline: () -> OfflineFoodStore? = { null },
 ) {
 
     /** What a search turned up, and honestly what it could not reach. */
@@ -140,12 +147,12 @@ class FoodRepository(
         // foods are scored by `FoodSearch`, which needs whole words and so cannot rank a fragment —
         // so putting 4.4 million packaged rows above them would bury a lab analysis of "Egg, whole,
         // raw" under every product whose name starts "Egg".
-        val bundled = offline?.searchByName(query).orEmpty()
+        val bundled = offline()?.searchByName(query).orEmpty()
         val seen = (mine + seed).mapTo(HashSet()) { it.id }
         val local = mine + seed + bundled.filterNot { it.id in seen }
         // ⚠️ Read AFTER the queries, not before: the bundle is unpacked lazily on its first query,
         // so asking beforehand always says "fine" on the very run where it is about to fail.
-        val bundleFailure = offline?.unavailable
+        val bundleFailure = offline()?.unavailable
         if (!online) return Results(query, local, bundleFailure = bundleFailure)
         return try {
             val page = off.search(query, limit = OFF_LIMIT)
@@ -190,7 +197,7 @@ class FoodRepository(
      */
     suspend fun withExtras(food: Food): Food {
         if (food.extras.isNotEmpty()) return food
-        val store = offline ?: return food
+        val store = offline() ?: return food
         val fetched = store.extrasFor(food.id).values
         if (fetched.isEmpty()) return food
         return food.copy(extras = fetched.mapKeys { (n, _) -> n.name })
@@ -208,7 +215,7 @@ class FoodRepository(
      * path here returns for that case.
      */
     suspend fun searchAllBundled(query: String): OfflineFoodStore.Scan =
-        offline?.searchAllProducts(query) ?: OfflineFoodStore.Scan(emptyList(), false)
+        offline()?.searchAllProducts(query) ?: OfflineFoodStore.Scan(emptyList(), false)
 
     /**
      * A barcode, answered from the bundle first and the network only if the bundle cannot.
@@ -235,7 +242,7 @@ class FoodRepository(
      * later still reaches the network.
      */
     suspend fun byBarcode(barcode: String): FoodLookup {
-        val local = offline?.byBarcode(barcode)
+        val local = offline()?.byBarcode(barcode)
         // The whole point: a complete bundled row answers with no request at all.
         if (local != null && local.per100g.kcal > 0.0) return FoodLookup.Found(local)
 
@@ -250,7 +257,7 @@ class FoodRepository(
         // opened it was not, so the reason travels with the answer — the network's verdict still
         // stands (retrying it will not help), and the offline half's silence gets named rather than
         // passed off as an absent product.
-        val bundleFailure = offline?.unavailable
+        val bundleFailure = offline()?.unavailable
         return when {
             bundleFailure != null && online is FoodLookup.NotInDatabase ->
                 online.copy(offlineUnavailable = bundleFailure)

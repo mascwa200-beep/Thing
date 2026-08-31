@@ -8,6 +8,7 @@ import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.crash.CrashUploader
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.reader.ReaderRepository
+import dev.mascwa.pulse.data.update.FoodPackRepository
 import dev.mascwa.pulse.data.update.SelfUpdate
 import dev.mascwa.pulse.data.update.UpdateRepository
 import dev.mascwa.pulse.device.DeviceProbeReader
@@ -138,6 +139,26 @@ class NutritionContainer(context: Context) {
         )
     }
 
+    /**
+     * The food database, fetched rather than bundled.
+     *
+     * ⚠️ **This application no longer ships the corpus inside its APK**, which was 189,972,281 bytes
+     * of which almost all was one 425 MB asset. The in-app updater above downloads the WHOLE APK on
+     * every published build, so adding barcodes meant re-downloading every product each time a line
+     * of interface code changed. Now the app is small and this fetches the corpus once.
+     *
+     * ⚠️ The consequence, stated because it is a real cost: **the first run needs a network**, and a
+     * private repository needs the same token the updater does. `TodayScreen` says so rather than
+     * showing an empty database.
+     */
+    val foodPack: FoodPackRepository by lazy {
+        FoodPackRepository(
+            http,
+            databaseFile = appContext.getDatabasePath(FoodDatabase.DB_NAME),
+            token = { settings.currentUpdateToken() },
+        )
+    }
+
     private val http: HttpClient by lazy {
         HttpClient(
             OkHttpClient.Builder()
@@ -164,41 +185,80 @@ class NutritionContainer(context: Context) {
     }.getOrDefault(false)
 
     /**
-     * The bundled barcode database, or null.
+     * The barcode database, or null.
      *
-     * ⚠️ Null is a real state and the whole app has to work through it — a build where CI could not
-     * fetch the database still installs and still logs food, it simply cannot recognise a barcode
-     * without a network. [FoodRepository] takes it as nullable for exactly that reason.
+     * ⚠️ Null is a real state and the whole app has to work through it — a phone that has not
+     * downloaded the corpus yet still installs and still logs food, it simply cannot recognise a
+     * barcode without a network. [FoodRepository] takes a supplier of it for exactly that reason.
      */
-    private val offline: OfflineFoodStore? by lazy {
+    @Volatile
+    private var offlineMemo: OfflineFoodStore? = null
+
+    /**
+     * The last open failure already reported.
+     *
+     * ⚠️ **A report per FAILED OPEN would now be a report per query.** While this was a `by lazy` the
+     * open happened once ever, so filing a non-fatal beside it cost one report; as a supplier called
+     * from every scan and every keystroke of a search, the same line would file hundreds. Reporting
+     * only a reason that has CHANGED keeps the diagnostic and drops the flood.
+     */
+    @Volatile
+    private var reportedOpenNote: String? = null
+
+    /**
+     * The barcode database, opened on demand and memoised only once it works.
+     *
+     * ⚠️ **NOT `by lazy`, and the difference is the whole first-run experience.** This app downloads
+     * the corpus rather than bundling it, so on the run where somebody first fetches it the answer
+     * changes from null to a database while the process is alive. A `lazy` resolves once: it would
+     * have latched on null, and the person would finish waiting several minutes for a download the
+     * app then went on insisting it did not have until they killed it and came back.
+     *
+     * Memoised on SUCCESS only, so a retry after a download is a real retry. `FoodDatabase.open` has
+     * the same shape for the same reason, and this is cheap when it fails — a file check.
+     */
+    private fun offlineStore(): OfflineFoodStore? {
+        offlineMemo?.let { return it }
+        return openOfflineStore().also { offlineMemo = it }
+    }
+
+    private fun openOfflineStore(): OfflineFoodStore? {
         val db = FoodDatabase.open(appContext)
         if (db == null) {
-            // ⚠️ **The single most valuable non-fatal report this app can file.** A database that
-            // will not open makes every barcode miss and every offline search return nothing, and
-            // there is no screen anywhere that could tell you that is what happened — a scan that
-            // finds no product and a scan that could not look identical. Nothing crashes, so
-            // without this the app is simply "not working" with no evidence at all.
-            crashReporter.reportNonFatal(
-                "food.db.open",
-                note = "The bundled barcode database did not open — every scan falls back to the " +
-                    "network. Reason: " + (FoodDatabase.lastOpenNote ?: "not stated"),
-            )
+            val note = FoodDatabase.lastOpenNote ?: "not stated"
+            // ⚠️ **"Not downloaded yet" is the ORDINARY first-run state and must not be reported as a
+            // fault.** Since the corpus became a download rather than an asset, a fresh install has
+            // no database by design; filing a non-fatal for it would report the app working correctly
+            // as a defect, on every single install, and bury the reports that mean something.
+            val ordinary = note.contains("has not been downloaded")
+            if (!ordinary && note != reportedOpenNote) {
+                reportedOpenNote = note
+                // ⚠️ **The single most valuable non-fatal report this app can file.** A database that
+                // will not open makes every barcode miss and every offline search return nothing, and
+                // there is no screen anywhere that could tell you that is what happened — a scan that
+                // finds no product and a scan that could not look identical. Nothing crashes, so
+                // without this the app is simply "not working" with no evidence at all.
+                crashReporter.reportNonFatal(
+                    "food.db.open",
+                    note = "The barcode database did not open — every scan falls back to the " +
+                        "network. Reason: $note",
+                )
+            }
         }
         db?.let {
             OfflineFoodStore(it) { op, t ->
                 // ⚠️ **The other half of the report above, and the half that actually fires on a
-                // cheap phone.** `open` returning null is the asset never having shipped; THIS is
-                // the asset shipping and the unpack failing — Room copies 424 MB out of the APK on
-                // the first query, and the ordinary way that fails is a phone with no room left. It
-                // throws from then on, every scan reported "not in the database", every offline
-                // search returned nothing, and the network path covered for it well enough that
-                // nobody would ever have found out.
+                // cheap phone.** `open` returning null is there being no database; THIS is one that
+                // opened and then could not answer — a download truncated by a lost network, or a
+                // phone that filled up while unpacking 425 MB. It throws from then on, every scan is
+                // reported "not in the database", every offline search returns nothing, and the
+                // network path covers for it well enough that nobody would ever find out.
                 crashReporter.reportNonFatal(
                     "food.db.$op",
                     t,
-                    note = "The bundled barcode database could not answer a '$op' query. Scanning " +
-                        "and offline search fall back to the network until this is fixed; the usual " +
-                        "cause is no room left on the phone to unpack the database.",
+                    note = "The barcode database could not answer a '$op' query. Scanning and " +
+                        "offline search fall back to the network until this is fixed; the usual " +
+                        "cause is no room left on the phone, or a download that was interrupted.",
                 )
             }
         }
@@ -281,7 +341,7 @@ class NutritionContainer(context: Context) {
     private val openFoodFacts: OpenFoodFactsRepository by lazy { OpenFoodFactsRepository(http, cache) }
 
     val foodRepository: FoodRepository by lazy {
-        FoodRepository(appContext, openFoodFacts, customFoodStore, offline)
+        FoodRepository(appContext, openFoodFacts, customFoodStore, ::offlineStore)
     }
 
     private val exporter: HealthExporter by lazy { HealthExporter(appContext, foodLogStore, bodyStore) }

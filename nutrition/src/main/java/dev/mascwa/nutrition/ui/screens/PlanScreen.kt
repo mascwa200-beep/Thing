@@ -276,6 +276,8 @@ fun PlanScreen(vm: HealthViewModel, container: NutritionContainer) {
 
     UpdateCard(container.updates)
 
+    FoodPackCard(container)
+
     AboutCard()
 
     DiagnosticsCard(container)

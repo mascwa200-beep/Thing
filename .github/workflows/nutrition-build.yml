@@ -162,20 +162,108 @@ jobs:
           echo "--- after ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
           grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/fooddb-time.log 2>/dev/null | sed "s/^/    /" || true
 
-      - name: Put the database where this module packages it
-        # ⚠️ Runs whether the step above built it or the cache restored it, because both leave it at
-        # the same `app/…` path and neither leaves it here. A copy rather than a move: the cache's
-        # post-run save reads the original, and moving it would store an empty entry under a key the
-        # LCARS workflow then trusts.
+      # ⚠️ **The step that used to sit here copied the 425 MB database into this module's assets, and
+      # deleting it is the point of the change.** The APK was 189,972,281 bytes and almost all of it
+      # was that one file — and the in-app updater downloads the WHOLE APK on every published build,
+      # so adding barcodes meant re-downloading the entire corpus every time a line of interface code
+      # changed. It is published as a separate pack below and fetched once by the app.
+      #
+      # ⚠️ The LCARS application still bundles it, deliberately: the cache path IS its asset directory
+      # and nothing here touches that. Moving both at once would be a behaviour change on a daily
+      # driver that nobody asked for. `FoodDatabase.open` handles either.
+
+      - name: Prepare the food-database pack
+        id: pack
+        if: hashFiles('app/src/main/assets/food/food.db') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          src=app/src/main/assets/food/food.db
-          if [ -f "$src" ]; then
-            mkdir -p nutrition/src/main/assets/food
-            cp "$src" nutrition/src/main/assets/food/food.db
-            echo "packaged: $(du -h nutrition/src/main/assets/food/food.db | cut -f1)"
-          else
-            echo "::warning::no food database to package — this APK ships without offline barcodes"
+          set -uo pipefail
+          db=app/src/main/assets/food/food.db
+          api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+
+          # ⚠️ **Gated on the CONTENT, not on the run number.** The database is rebuilt only when the
+          # builder or a source date changes — every other run restores a byte-identical file from the
+          # cache — so publishing per run would upload 160 MB and mint a new version for a corpus that
+          # had not moved, and every phone would then download it again for nothing.
+          sha=$(sha256sum "$db" | cut -d" " -f1)
+          short=${sha:0:16}
+          published=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$api/releases/tags/food-db-latest" 2>/dev/null | jq -r ".name // \"\"" 2>/dev/null || true)
+          echo "database content: $short"
+          echo "published:        ${published:-(nothing yet)}"
+          if printf "%s" "$published" | grep -q "content $short"; then
+            echo "the published pack already holds this database — nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # ⚠️ Read out of the Kotlin source rather than written here, so the number the app checks
+          # and the number the pack declares cannot drift. A pack whose schema does not match is
+          # refused by `FoodPack.plan`, which is exactly the silent-mismatch this prevents.
+          schema=$(grep -oP "const val SCHEMA: Int = \K[0-9]+" \
+            core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/FoodPack.kt)
+          if [ -z "$schema" ]; then
+            echo "::error::could not read FoodPack.SCHEMA — refusing to publish a pack with a guessed one"
+            exit 1
+          fi
+
+          # ⚠️ **python3, not `sqlite3`, and the count is a HARD requirement.** Running this step
+          # against a throwaway database found that `sqlite3` is not installed everywhere and the
+          # `|| echo 0` that used to be here swallowed it — producing a manifest that said "0
+          # products" for a corpus of four and a half million, which the app renders as the sentence
+          # asking somebody to allow a 160 MB download. python3 carries the sqlite3 module and is
+          # already what builds this database, so the count is now testable off the runner too.
+          rows=$(python3 -c "
+          import sqlite3, sys
+          print(sqlite3.connect(sys.argv[1]).execute('SELECT COUNT(*) FROM food').fetchone()[0])
+          " "$db" 2>/dev/null || echo 0)
+          if [ "${rows:-0}" -le 0 ]; then
+            echo "::error::could not count the products in $db — refusing to publish a pack that " \
+                 "would tell people it holds none"
+            exit 1
+          fi
+          mkdir -p /tmp/pack
+          # ⚠️ A STABLE asset name, so each publish replaces the last rather than leaving a release
+          # holding every 160 MB pack ever built. The version lives in the manifest, which is what the
+          # app reads. Deltas, when they exist, will be versioned — they are additive by nature.
+          gzip -c "$db" > /tmp/pack/food.db.gz
+          gzbytes=$(stat -c%s /tmp/pack/food.db.gz)
+          gzsha=$(sha256sum /tmp/pack/food.db.gz | cut -d" " -f1)
+          dbbytes=$(stat -c%s "$db")
+          v=${{ github.run_number }}
+
+          jq -n \
+            --argjson schema "$schema" --argjson version "$v" \
+            --arg builtAt "$(date -u +%Y-%m-%d)" --argjson rows "$rows" \
+            --argjson bytes "$gzbytes" --arg sha "$gzsha" --argjson unpacked "$dbbytes" \
+            '{schema:$schema, version:$version, builtAt:$builtAt, rows:$rows,
+              full:{name:"food.db.gz", bytes:$bytes, sha256:$sha, unpackedBytes:$unpacked,
+                    from:0, to:$version, rows:$rows},
+              deltas:[]}' > /tmp/pack/food-pack.json
+          cat /tmp/pack/food-pack.json
+
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "name=Food database — pack #$v · $rows products · content $short" >> "$GITHUB_OUTPUT"
+          echo "pack: $(numfmt --to=iec "$gzbytes") compressed, $(numfmt --to=iec "$dbbytes") unpacked"
+
+      - name: Publish the food-database pack
+        if: steps.pack.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ **Its OWN tag.** This action rewrites a release's NAME on every publish, and the name is
+          # where each updater reads its identity — so sharing `nutrition-latest` would have each
+          # publish overwrite the other's. The desktop companion has `desktop-latest` for exactly this.
+          tag_name: food-db-latest
+          name: ${{ steps.pack.outputs.name }}
+          body: |
+            The offline barcode database, downloaded by the nutrition app on first run.
+
+            This is not an application. `food-pack.json` describes it; `food.db.gz` is the database.
+          prerelease: true
+          files: |
+            /tmp/pack/food.db.gz
+            /tmp/pack/food-pack.json
 
       - name: Build the release APK
         run: |
@@ -241,13 +329,20 @@ jobs:
             echo "$libs" | sed 's/^/    /'
           fi
 
-          # And that the database really is inside it. An asset placed and then not packaged is the
-          # silent failure this whole module's first screen exists to catch on the device; catching
-          # it here is better.
+          # ⚠️ **The check INVERTED, and the inversion is the change.** It used to insist the 425 MB
+          # database was inside the APK; it now insists it is NOT. The corpus is published as a pack
+          # and fetched once, and an asset that crept back in would silently put the APK from roughly
+          # forty megabytes back to two hundred — green, installable, and re-downloaded in full by the
+          # in-app updater on every published build, which is the whole thing this change was for.
+          #
+          # A stale `nutrition/src/main/assets/food/` left on a developer machine is exactly how that
+          # happens, so this is an ERROR rather than a warning.
           if unzip -l "$apk" | grep -q "assets/food/food.db"; then
             unzip -l "$apk" | grep "assets/food/food.db"
+            echo "::error::the food database is INSIDE this APK — it is meant to be a downloaded pack"
+            exit 1
           else
-            echo "::warning::no food database in this APK — barcodes will not be recognised offline"
+            echo "no bundled food database, as intended — the app fetches the pack on first run"
           fi
 
           # ⚠️ And the generic-food seed, which is a HARD failure rather than a warning. The database

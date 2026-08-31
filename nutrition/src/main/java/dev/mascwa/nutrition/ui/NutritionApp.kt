@@ -133,7 +133,7 @@ fun NutritionApp(vm: HealthViewModel, container: NutritionContainer) {
             // until it has something to draw, rather than an entry that renders a blank page.
             when (tab) {
                 Tab.TODAY -> TodayScreen(vm)
-                Tab.LOG -> LogScreen(vm)
+                Tab.LOG -> LogScreen(vm, container)
                 Tab.BODY -> BodyScreen(vm)
                 Tab.PLAN -> PlanScreen(vm, container)
                 Tab.RECIPES -> RecipesScreen(vm)

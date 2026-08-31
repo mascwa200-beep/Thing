@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.SectionCard
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Decimals
@@ -45,8 +46,14 @@ import dev.mascwa.pulse.feature.health.HealthViewModel
  * should say "lunch" once.
  */
 @Composable
-fun LogScreen(vm: HealthViewModel) {
+fun LogScreen(vm: HealthViewModel, container: NutritionContainer) {
     var meal by remember { mutableStateOf(NutritionDay.Meal.SNACK) }
+
+    // ⚠️ **Only when there is no database, and here rather than only on the Plan tab.** This is the
+    // screen a barcode is scanned from, so it is where "every scan will say unknown" has to be
+    // visible; finding out on a settings tab is finding out after the scan that failed. With a
+    // database present this is not drawn at all — the card on the Plan tab is where an update lives.
+    if (remember { container.foodPack.installed() } == null) FoodPackCard(container)
 
     MealPicker(meal) { meal = it }
     PlateCard(vm)
