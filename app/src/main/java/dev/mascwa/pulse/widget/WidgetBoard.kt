@@ -38,12 +38,20 @@ import dev.mascwa.pulse.R
  */
 internal object WidgetBoard {
 
-    /** One instrument in a strip: what it is, what it did, and (later) how it got there. */
+    /**
+     * One instrument in a strip: what it is, what it did, and how it got there.
+     *
+     * ⚠️ [chart] is a BUILT bitmap rather than the series it came from, and that is load-bearing.
+     * The two size variants share one `BitmapCache` which de-duplicates on identity, so the same
+     * instance reaching both costs one copy — but only if it IS the same instance. Drawing inside
+     * the render pass would make two and pay twice. See [WidgetCharts].
+     */
     internal data class Cell(
         val label: String,
         val value: String,
         val colorRes: Int,
         val series: List<Double> = emptyList(),
+        val chart: android.graphics.Bitmap? = null,
     )
 
     /** One side of a two-column region. */
@@ -64,7 +72,9 @@ internal object WidgetBoard {
         val leadRoute: String? = null,
         val sources: List<String> = emptyList(),
         val indices: List<Cell> = emptyList(),
+        val indicesLabel: String = "",
         val stocks: List<Cell> = emptyList(),
+        val stocksLabel: String = "",
         val breadth: String? = null,
         val breadthPct: Int? = null,
         val readouts: List<String> = emptyList(),
@@ -109,9 +119,15 @@ internal object WidgetBoard {
         val topShown = alertShown || leadShown || detailShown || sourcesShown
 
         // ── the instruments ─────────────────────────────────────────────────────────────────────
-        val idxShown = strip(context, v, board.indices, R.id.widget_board_idx_strip, R.id.widget_board_sec_idx, INDEX_CELLS)
+        val idxShown = strip(
+            context, v, board.indices, board.indicesLabel,
+            R.id.widget_board_idx_strip, R.id.widget_board_sec_idx, INDEX_CELLS,
+        )
         if (idxShown) v.setOnClickPendingIntent(R.id.widget_board_sec_idx, intent(MARKETS_ROUTE, RC_INDICES))
-        val stkShown = strip(context, v, board.stocks, R.id.widget_board_stk_strip, R.id.widget_board_sec_stk, STOCK_CELLS)
+        val stkShown = strip(
+            context, v, board.stocks, board.stocksLabel,
+            R.id.widget_board_stk_strip, R.id.widget_board_sec_stk, STOCK_CELLS,
+        )
         if (stkShown) v.setOnClickPendingIntent(R.id.widget_board_sec_stk, intent(MARKETS_ROUTE, RC_STOCKS))
 
         // ── breadth ─────────────────────────────────────────────────────────────────────────────
@@ -182,6 +198,7 @@ internal object WidgetBoard {
         context: Context,
         v: RemoteViews,
         cells: List<Cell>,
+        label: String,
         stripId: Int,
         labelId: Int,
         slots: List<CellIds>,
@@ -199,12 +216,27 @@ internal object WidgetBoard {
             v.setViewVisibility(ids.value, View.VISIBLE)
             v.setTextViewText(ids.value, cell.value)
             v.setTextColor(ids.value, ContextCompat.getColor(context, cell.colorRes))
-            // The chart stays hidden until there is something to draw into it.
-            v.setViewVisibility(ids.chart, View.GONE)
+            val chart = cell.chart
+            if (chart == null) {
+                // No chart is not an empty chart: a blank strip of space under the value would read
+                // as a feed that failed, where nothing at all reads as a cell reporting a number.
+                v.setViewVisibility(ids.chart, View.GONE)
+            } else {
+                v.setViewVisibility(ids.chart, View.VISIBLE)
+                v.setImageViewBitmap(ids.chart, chart)
+            }
         }
         val any = cells.isNotEmpty()
         v.setViewVisibility(stripId, if (any) View.VISIBLE else View.GONE)
-        v.setViewVisibility(labelId, if (any) View.VISIBLE else View.GONE)
+        // ⚠️ The label must be WRITTEN, not merely shown. The layout deliberately carries no
+        // `android:text` — `WidgetLinkageTest` fails the build on static text nothing replaces —
+        // so making it visible without setting it renders an empty row.
+        if (any) {
+            v.setViewVisibility(labelId, View.VISIBLE)
+            v.setTextViewText(labelId, label)
+        } else {
+            v.setViewVisibility(labelId, View.GONE)
+        }
         return any
     }
 

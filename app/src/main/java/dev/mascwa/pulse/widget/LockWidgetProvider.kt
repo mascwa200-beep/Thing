@@ -171,6 +171,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         val degraded = WidgetDiagnostics.degradedLine(outcomes)
         val all = if (degraded.isBlank()) rows else rows + Row(degraded, Role.DEGRADED, route = Routes.HOME)
         val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
+        // ⚠️ Drawn ONCE, here, and the same instances go to both board variants. They share a
+        // `BitmapCache` that de-duplicates on identity, so reusing the instances costs one copy of
+        // each chart instead of two — but only because they are the same objects. Drawing inside
+        // `WidgetBoard.render` would quietly double the parcel.
+        val board = withCharts(context, loaded.board)
 
         // ⚠️ The host picks. Each entry is the SAME layout with a different number of rows, so a
         // bigger widget genuinely shows more instead of the same lines with more air between them.
@@ -194,8 +199,8 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // be picked. Compact carries header + lead + both instrument strips + breadth +
                 // readouts (~305dp of content, declared at 420); full adds the two-column regions
                 // and the footer (~505dp, declared at 540). Both sit under `maxResizeHeight`.
-                SizeF(300f, 420f) to WidgetBoard.render(context, loaded.board, full = false, open),
-                SizeF(300f, 540f) to WidgetBoard.render(context, loaded.board, full = true, open),
+                SizeF(300f, 420f) to WidgetBoard.render(context, board, full = false, open),
+                SizeF(300f, 540f) to WidgetBoard.render(context, board, full = true, open),
             ),
         )
         manager.updateAppWidget(id, views)
@@ -220,6 +225,33 @@ class LockWidgetProvider : AppWidgetProvider() {
             v.setOnClickPendingIntent(viewId, openIntent(context, row.route ?: Routes.HOME, i))
         }
         return v
+    }
+
+    /**
+     * Draw the strips' sparklines, or leave the board as text.
+     *
+     * ⚠️ The budget is ARITHMETIC, not an estimate. `RemoteViews.estimateMemoryUsage()` exists on
+     * the platform but is not something to lean on here — this module allocated the bitmaps and
+     * therefore knows exactly what they cost, and a number we computed cannot disagree with what we
+     * actually attached. Over the budget the charts are simply dropped: the label and the value are
+     * the reading, and the line is context that is not worth a widget that fails to draw at all.
+     */
+    private fun withCharts(context: Context, board: WidgetBoard.Board): WidgetBoard.Board {
+        fun draw(cells: List<WidgetBoard.Cell>): List<Pair<WidgetBoard.Cell, android.graphics.Bitmap?>> =
+            cells.map { cell ->
+                cell to runCatching {
+                    WidgetCharts.sparkline(cell.series, ContextCompat.getColor(context, cell.colorRes))
+                }.getOrNull()
+            }
+
+        val indices = draw(board.indices)
+        val stocks = draw(board.stocks)
+        val bytes = WidgetCharts.bytesOf(indices.map { it.second } + stocks.map { it.second })
+        if (bytes > WidgetCharts.BUDGET_BYTES) return board
+        return board.copy(
+            indices = indices.map { (cell, chart) -> cell.copy(chart = chart) },
+            stocks = stocks.map { (cell, chart) -> cell.copy(chart = chart) },
+        )
     }
 
     private fun openIntent(context: Context, route: String, requestCode: Int): PendingIntent {
@@ -579,8 +611,16 @@ class LockWidgetProvider : AppWidgetProvider() {
             leadArgb = leadArgb,
             leadRoute = leadRoute,
             sources = listOfNotNull(headline),
+            // ⚠️ The label states the horizon because the two numbers in a cell are not the same
+            // span: the percentage is TODAY's move, and the line is `Quote.sparkline` — about a
+            // month of daily closes. Intraday bars exist but are memory-cached only, so a restarted
+            // widget process would pay a network fetch per instrument inside a four-second budget,
+            // through a semaphore that allows five at a time. Daily closes are the honest choice;
+            // letting the line imply intraday would not be.
             indices = mkt?.indices.orEmpty(),
+            indicesLabel = "MAJOR INDICES · % TODAY, LINE 30 DAYS",
             stocks = mkt?.stocks.orEmpty(),
+            stocksLabel = "KEY STOCKS · % TODAY, LINE 30 DAYS",
             breadth = mkt?.breadth,
             breadthPct = mkt?.upPct,
             readouts = listOfNotNull(wx?.detail?.ifBlank { null }, spaceLine, skyLine),
