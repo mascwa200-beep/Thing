@@ -32,6 +32,14 @@ include(":core:health")
 // green gate, and the PackageInstaller ladder. Two copies of either would be two chances to
 // disagree about when a build is safe to install.
 include(":core:update")
+
+// The camera and the two barcode decoders, shared by both Android applications. It exists because
+// the two had a near-verbatim copy each — each with a header saying in writing that they must be
+// changed together, and each carrying the same rotation defect that made the scanner unable to read
+// a barcode held upright. It is deliberately NOT depended on by `:core:health`, which every consumer
+// of the health data layer pulls in and none of which wants CameraX.
+include(":core:scan")
+
 include(":core:sky")
 
 // The standalone nutrition app: the health half of :app with none of its novelty, its device gate

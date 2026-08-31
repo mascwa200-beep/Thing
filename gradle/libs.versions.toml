@@ -95,6 +95,9 @@ mediapipeGenai = "0.10.27"
 mediapipeTasks = "0.10.21"
 camerax = "1.4.1"
 zxing = "3.5.3"
+# The barcode decoder the scanner leads with. See the library entry below for what it costs and why
+# ZXing is still there behind it.
+mlkitBarcode = "17.3.0"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -188,6 +191,19 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+# ⚠️ **The BUNDLED variant, and the distinction is the whole reason it is usable here.** The
+# unbundled `play-services-mlkit-barcode-scanning` downloads its model through Play Services, which
+# the phone this repository targets does not have; the bundled one carries `libbarhopper_v3.so` and
+# needs no Play Services at runtime. Measured from the published artifact rather than recalled: the
+# AAR is 9.9 MB and its native decoder is **20.2 MB across the four architectures** a universal APK
+# ships, which is what it actually costs. It declares no `aar-metadata` toolchain floor (checked with
+# `tools/check_aar_metadata.py` on it and all five of its transitives), and its own manifest declares
+# minSdk 21.
+#
+# ⚠️ It depends on the unbundled artifact for the API surface — `BarcodeScanning`, `BarcodeScanner`
+# and `BarcodeScannerOptions` all live there — so seeing that coordinate in a dependency tree is
+# expected and is NOT evidence that Play Services is in the runtime path.
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 # The one Guava class CameraX's public API returns. See the note at its use in :nutrition.
 guava = { group = "com.google.guava", name = "guava", version = "31.1-android" }
 

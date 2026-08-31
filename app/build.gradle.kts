@@ -372,14 +372,22 @@ dependencies {
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
-    // The viewfinder for the barcode scanner. A scanner that cannot show what it is aimed at
-    // is not usable, and PreviewView owns the surface lifecycle and transform that doing this
-    // by hand over a raw SurfaceView gets wrong. 111 kB.
-    implementation(libs.androidx.camera.view)
-    // ⚠️ ZXing core, NOT ML Kit. The unbundled ML Kit variant needs Play Services, which is the
-    // wrong bet on GrapheneOS, and the bundled one adds 2-3 MB to an APK the auto-updater
-    // re-downloads in full on every build. This is pure JVM and 608 kB.
-    implementation(libs.zxing.core)
+
+    // The barcode scanner: the camera, both decoders, the rotation and the viewfinder, all in
+    // `:core:scan` and shared with the standalone nutrition application.
+    //
+    // ⚠️ **The note that used to be here rejected ML Kit "because the bundled one adds 2-3 MB". That
+    // figure was wrong by an order of magnitude** — measured from the published artifact, the AAR is
+    // 9.9 MB and its native decoder is 20.2 MB across four architectures. The rest of the reasoning
+    // was sound and is why ZXing is still in the graph behind it: the bundled model working without
+    // Play Services is strong evidence rather than proof, and cannot be established from a build
+    // machine. What it buys is a trained detector that reads curved, crinkled, angled and dim
+    // barcodes a scanline reader cannot. ⚠️ This APK is arm64-only, so it carries 4.9 MB of that
+    // 20.2, not all of it.
+    //
+    // ⚠️ It brings `androidx.appcompat` transitively, through `com.google.mlkit:common`. Unwanted and
+    // unavoidable; recorded so a future dependency audit does not go hunting for who asked for it.
+    implementation(project(":core:scan"))
 
     // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
     implementation(libs.maplibre.android)

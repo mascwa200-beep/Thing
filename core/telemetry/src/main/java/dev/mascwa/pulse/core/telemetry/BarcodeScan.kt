@@ -85,6 +85,51 @@ object BarcodeScan {
     }
 
     /**
+     * A UPC-E code written out as the UPC-A it stands for.
+     *
+     * ⚠️ **Without this, every UPC-E scan misses, and it misses silently.** UPC-E is not a short
+     * barcode — it is a twelve-digit UPC-A with a run of zeros squeezed out, and the decoder hands
+     * back the *compressed* eight digits. Read as a number that is 1,234,565; the product it names is
+     * 12,345,000,065. Those are different keys, so the lookup finds nothing and the app reports an
+     * unknown product for a barcode it read perfectly. UPC-E is what small packets carry — gum,
+     * cosmetics, single-serve drinks — so the failure is concentrated on exactly the items a phone
+     * scanner is most often pointed at.
+     *
+     * ⚠️ **Only the caller can know to call this**, and that is why it is not folded into [normalize].
+     * EAN-8 is also eight digits and is a product code in its own right; expanding one would invent a
+     * twelve-digit number that names nothing. The two are told apart by the symbology the decoder
+     * reports, not by the digits, so the expansion belongs at the scan site where the format is known.
+     *
+     * The rule is the GS1 one, keyed on the last data digit: 0–2 move two digits and open four zeros,
+     * 3 moves three and opens five, 4 moves four and opens five, 5–9 move five and open four with the
+     * digit itself at the end.
+     *
+     * ⚠️ **Checked exhaustively against ZXing's own `UPCEReader.convertUPCEtoUPCA`** over all
+     * 2,000,000 number-system-0-and-1 codes: zero disagreements. Worked examples, from that run:
+     * `01234565` → `012345000065`, `04252614` → `042100005264`, `00123457` → `001234000057`.
+     *
+     * ⚠️ Number system 0 and 1 only. Those are the two GS1 assigns to UPC-E, and a code carrying
+     * anything else is not one — returning null beats expanding it into a plausible-looking number.
+     *
+     * @return the twelve-digit UPC-A, or null if [raw] is not a UPC-E code.
+     */
+    fun expandUpcE(raw: String): String? {
+        val e = raw.filter { it.isDigit() }
+        if (e.length != 8) return null
+        val ns = e[0]
+        if (ns != '0' && ns != '1') return null
+        val d = e.substring(1, 7)
+        val check = e[7]
+        val body = when (d[5]) {
+            '0', '1', '2' -> "${d[0]}${d[1]}${d[5]}0000${d[2]}${d[3]}${d[4]}"
+            '3' -> "${d[0]}${d[1]}${d[2]}00000${d[3]}${d[4]}"
+            '4' -> "${d[0]}${d[1]}${d[2]}${d[3]}00000${d[4]}"
+            else -> "${d[0]}${d[1]}${d[2]}${d[3]}${d[4]}0000${d[5]}"
+        }
+        return "$ns$body$check"
+    }
+
+    /**
      * Does this code satisfy the GS1 mod-10 check digit?
      *
      * ⚠️ **One rule covers every length, and it is worth knowing why.** Taking the weights from the
@@ -93,6 +138,14 @@ object BarcodeScan {
      * the weights it would have had anyway. So EAN-8, UPC-A, EAN-13 and ITF-14 need no special
      * cases, and the version of this that switches on length is a version with four places to get
      * it wrong.
+     *
+     * ⚠️ **UPC-E is the one exception, and the original wording of this note did not admit it.** A
+     * UPC-E's check digit is the check digit of the twelve-digit code it *expands to* — see
+     * [expandUpcE] — so applying the weighting to the compressed eight digits is not a weaker check,
+     * it is a check of a different number. Measured on five genuine codes: four fail here and all
+     * five of their expansions pass. Nothing rejects on the strength of this anywhere, so no product
+     * is lost to it; what a caller must not do is read `false` on an eight-digit code as evidence
+     * that somebody mistyped it. Expand first, then ask.
      *
      * Advisory only — see [normalize] for why nothing is rejected on the strength of it.
      */
@@ -105,6 +158,37 @@ object BarcodeScan {
             sum += (ch - '0') * if (fromRight % 2 == 0) 3 else 1
         }
         return (10 - sum % 10) % 10 == digits.last() - '0'
+    }
+
+    /**
+     * The symbologies a decoder can report, as far as anything downstream needs to care.
+     *
+     * ⚠️ This exists so that the rule below can be tested. Both scanners run two decoders — ML Kit
+     * and ZXing — each with its own constants for the same five symbologies, and the mapping from
+     * either one is a two-line `when` in the module that owns that decoder. What must NOT be
+     * duplicated is what to *do* with the answer.
+     */
+    enum class Symbology { EAN_13, EAN_8, UPC_A, UPC_E, OTHER }
+
+    /**
+     * What a decode of [text] in [symbology] means, as one code the rest of the application can use.
+     *
+     * ⚠️ **This is the whole reason the symbology is carried out of the decoder at all.** Every other
+     * format is already the number it prints, and passing them through is the entire job; UPC-E is
+     * not, and the digits alone cannot say which of the two eight-digit symbologies produced them.
+     * A scanner that drops the format on the floor has no way back to the product — see [expandUpcE].
+     *
+     * ⚠️ **Both applications must call this and neither may improvise**, which is the point of it
+     * being here rather than in either scanner. They are near-verbatim twins and have already drifted
+     * once; one of them expanding UPC-E while the other did not would be the same barcode resolving
+     * in one app and not in the other, on the same phone.
+     *
+     * @return the code to look up, or null if this decode is not a product barcode.
+     */
+    fun canonical(text: String, symbology: Symbology): String? {
+        val trimmed = text.trim()
+        val code = if (symbology == Symbology.UPC_E) expandUpcE(trimmed) ?: return null else trimmed
+        return if (plausible(code)) code else null
     }
 
     /**

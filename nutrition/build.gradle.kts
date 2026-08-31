@@ -134,46 +134,30 @@ dependencies {
     // `:core:health` already use, so there is still one copy of it in the APK.
     implementation(libs.androidx.datastore.preferences)
 
-    // The barcode scanner. ⚠️ **CameraX is the one dependency here that could have undone the
-    // module's whole point, and it was checked before a line was written**: `camera-core` packages
+    // The barcode scanner — the camera, both decoders and the rotation, all in `:core:scan`.
+    //
+    // ⚠️ **CameraX is the one dependency here that could have undone the module's whole point, and
+    // it was checked before a line was written**: `camera-core` packages
     // `libimage_processing_util_jni.so` and `libsurface_util_jni.so`, and it packages both for
     // arm64-v8a, armeabi-v7a, x86 AND x86_64 — read out of the 1.4.1 AAR, not assumed. So one
     // universal APK still covers every architecture, which is exactly what the CI check asserts.
+    // The same is true of ML Kit's bundled decoder: `libbarhopper_v3.so` ships for all four.
     //
-    // ⚠️ ZXing core, NOT ML Kit, for the same two reasons `:app` gives: the unbundled ML Kit variant
-    // needs Play Services, and the bundled one adds two or three megabytes to an APK that is already
-    // mostly database. This is pure JVM.
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.zxing.core)
-    // ⚠️ **`ProcessCameraProvider.getInstance()` returns a Guava `ListenableFuture`, and full Guava
-    // is what has to be declared here — the 3 kB `com.google.guava:listenablefuture` artifact cannot
-    // work, and trying it first cost a CI round.** Measured from the published metadata rather than
-    // reasoned about:
-    //
-    //   - `camera-core` declares `listenablefuture:1.0` in its **api** variant, so it does reach a
-    //     consumer's compile classpath on its own.
-    //   - `connect-client` (via `:core:health`) declares `guava:31.1-android` in its **runtime**
-    //     variant, and full Guava's own POM declares `listenablefuture:9999.0-empty-to-avoid-
-    //     conflict-with-guava`. That version sorts higher, so it wins the conflict and the artifact
-    //     that wins is **empty** — the mechanism exists precisely to stop two copies of the class
-    //     being packaged.
-    //   - Guava carries `ListenableFuture` itself, so on the runtime side nothing is missing. But it
-    //     arrives runtime-only, so the compile classpath ends up with the empty jar and no class:
-    //     "Cannot access class ... check your module classpath for missing or conflicting
-    //     dependencies", seven times.
-    //
-    // ⚠️ **This costs the APK nothing.** Guava is already packaged here through Health Connect's
-    // runtime dependency; declaring it only makes an already-present class visible at compile time.
-    // The version is the one that graph already resolves, so nothing moves. And this is exactly the
-    // shape `:app` has by accident — `media3-common` declares `guava` in its **api** variant, which
-    // is the whole reason the identical scanner code compiles there with no line like this one.
-    //
-    // ⚠️ Do **not** "fix" a future recurrence by forcing `listenablefuture` to 1.0. With Guava in the
-    // graph that packages the class twice, which is the outcome the 9999.0 artifact prevents.
-    implementation(libs.guava)
+    // ⚠️ **The note that used to be here said ZXing rather than ML Kit "because the bundled one adds
+    // two or three megabytes". That figure was wrong by an order of magnitude and the conclusion it
+    // supported no longer holds.** Measured from the published artifact: the bundled AAR is 9.9 MB
+    // and its native decoder is 20.2 MB across the four architectures a universal APK ships. What
+    // changed the answer is not the number but what it is being weighed against — the database is
+    // leaving the APK, so twenty megabytes is no longer a rounding error inside four hundred, and the
+    // scanner it buys reads curved, crinkled, angled and dim barcodes that a scanline reader cannot.
+    // ZXing is still in the graph, behind it, because ML Kit's bundled model working without Play
+    // Services is strong evidence rather than proof and cannot be established from a build machine.
+    implementation(project(":core:scan"))
+    // ⚠️ **Guava is no longer declared here, and the hard-won note about why it had to be moved
+    // with the scanner rather than being deleted — it is `ProcessCameraProvider.getInstance()` that
+    // returns a `ListenableFuture`, and that call now lives in `:core:scan`. The full account of why
+    // the 3 kB `listenablefuture` artifact cannot stand in for full Guava is in that module's build
+    // script; it cost a CI round to establish and is exactly the shape of thing somebody re-derives.
 
     // ⚠️ Coil for the progress-photograph thumbnails, and it earns its place rather than being a
     // habit: a 96dp thumbnail of a full-resolution camera capture is a bitmap decode that has to be

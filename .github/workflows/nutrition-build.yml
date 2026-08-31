@@ -34,6 +34,9 @@ on:
       # installer ladder that did not rebuild this app would leave the two disagreeing about
       # when a build is safe to install, which is the exact thing sharing the module prevents.
       - "core/update/**"
+      # ⚠️ The camera and both barcode decoders. A change to the decode path that did not rebuild
+      # this app would leave the scanner it belongs to on the previous one.
+      - "core/scan/**"
       - "tools/food/**"
       - "gradle/libs.versions.toml"
       - "settings.gradle.kts"
