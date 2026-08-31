@@ -99,6 +99,20 @@ done
 # is a "Conflicting overloads" compile error. Neither the parse gate (no name resolution) nor the
 # resolve gate (differences UNRESOLVED names, and this name resolved at HEAD) can see it.
 echo
+echo "== missing-return gate =="
+# ⚠️ The one defect class no other gate here can see — see the script's own header. It cost a CI
+# round on the day it was added, on a `by lazy` that became a block-bodied function.
+if [ -n "$CHANGED" ]; then
+    # shellcheck disable=SC2086
+    if OUT=$(python3 tools/kotlin_missing_return.py $CHANGED 2>&1); then
+        echo "   ok    every function with a return type returns"
+    else
+        echo "$OUT" | sed 's/^/   /'
+        FAIL=1
+    fi
+fi
+
+echo
 echo "== duplicate top-level declarations =="
 DUP=$(python3 tools/kotlin_dup_decl_check.py $PKGS 2>&1)
 if echo "$DUP" | grep -q "^no colliding"; then

@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mascwa.pulse.core.telemetry.MacroTargets
 import dev.mascwa.pulse.core.telemetry.TypedNumber
@@ -68,25 +73,71 @@ fun SectionCard(
     }
 }
 
-/** A label on the left, a value on the right — the workhorse of every panel here. */
+/**
+ * A label on the left, a value on the right — the workhorse of every panel here.
+ *
+ * ⚠️ **Neither side was bounded, and a `Row` neither wraps nor shrinks its children.** A long label
+ * beside a long value measured past the card and the value — the half somebody is actually reading —
+ * was the one pushed off the edge, because it is laid out second. It shows on exactly the rows worth
+ * seeing: a product with a real brand name, a figure with a unit and an "over" note beside it.
+ *
+ * The label takes the room it needs up to about half, ellipsising past that; the value gets the rest
+ * and is allowed to wrap onto a second line rather than be cut. Which way round that goes is the
+ * decision: a truncated LABEL is still a readable row, and a truncated VALUE is a number that means
+ * something else.
+ */
 @Composable
 fun StatRow(label: String, value: String, emphasis: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.SpaceBetween),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         Text(
             value,
             style = if (emphasis) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
             fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Medium,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
+}
+
+/**
+ * A row of controls that WRAPS rather than running off the edge.
+ *
+ * ⚠️ **The failure it fixes is silent and total.** A `Row` does not wrap and does not shrink its
+ * children: whatever does not fit is simply not drawn, with no scrollbar, no fade and nothing to
+ * suggest there is more. `RepeatADay`'s three buttons — "Yesterday", "Two days back", "A week back" —
+ * needed more width than a card has on any phone, so the third option did not exist as far as anyone
+ * could tell.
+ *
+ * ⚠️ **Wrapping rather than [ChipRow]'s sideways scroll, and the two are not interchangeable.** A
+ * scroll is right for chips, where a person can see they are in a rail and push it. It is wrong for
+ * buttons: nothing about a cut-off button says there is another one, so the affordance has to be
+ * visible rather than discoverable.
+ *
+ * ⚠️ **The content takes a `RowScope`, not a `FlowRowScope`, and that is deliberate.** `FlowRowScope`
+ * extends `RowScope`, so a `RowScope`-receiver lambda can be used where the flow layout wants one —
+ * which keeps `weight()` available to callers (two of the rows converted to this rely on it) without
+ * `@ExperimentalLayoutApi` leaking into a signature every screen would then have to opt in to.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WrapRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) { content() }
 }
 
 /**

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.nutrition.ui.WrapRow
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.rememberTypedNumber
 import dev.mascwa.nutrition.ui.round
@@ -57,7 +58,7 @@ fun RecipesScreen(vm: HealthViewModel) {
     }
 
     SectionCard("New") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             Button(onClick = { vm.newRecipe(Recipes.Kind.RECIPE) }, modifier = Modifier.weight(1f)) {
                 Text("A recipe")
             }
@@ -267,7 +268,7 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onT
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             NutritionDay.Meal.entries.forEach { m ->
                 FilterChip(selected = meal == m, onClick = { meal = m }, label = { Text(m.label) })
             }
@@ -287,7 +288,7 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onT
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Log every food in it") }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WrapRow {
                 // ⚠️ "By portion" is offered only when the recipe declares how many it makes AND has
                 // a weight to divide — `servingGrams` returns null otherwise, and the shared log call
                 // then returns without doing anything. A control that appears to work and does not is
@@ -330,7 +331,7 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onT
             ) { Text("Log a helping") }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             TextButton(onClick = { vm.editRecipe(r) }) { Text("Edit") }
             TextButton(onClick = { vm.deleteRecipe(r.id) }) { Text("Delete") }
         }
@@ -357,7 +358,7 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             FilterChip(selected = !meal, onClick = { vm.draftKind(Recipes.Kind.RECIPE) }, label = { Text("Recipe") })
             FilterChip(selected = meal, onClick = { vm.draftKind(Recipes.Kind.MEAL) }, label = { Text("Meal") })
         }
@@ -411,7 +412,7 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             Button(onClick = { vm.saveDraft() }, enabled = r.components.isNotEmpty()) { Text("Save") }
             TextButton(onClick = { vm.closeDraft() }) { Text("Cancel") }
         }
@@ -532,13 +533,13 @@ private fun IngredientWeight(vm: HealthViewModel, food: Food, seedGrams: Double?
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         usable.forEach { u ->
             FilterChip(selected = unit == u, onClick = { unit = u }, label = { Text(u.label) })
         }
     }
     val n = Decimals.parse(amount)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         Button(
             onClick = { if (n != null) vm.draftAdd(food, n, unit) },
             enabled = n != null && FoodPortion.gramsFor(FoodPortion.Portion(n, unit), food.sizes) != null,

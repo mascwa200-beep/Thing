@@ -245,7 +245,12 @@ class NutritionContainer(context: Context) {
                 )
             }
         }
-        db?.let {
+        // ⚠️ `return`, and its absence is what broke the build when this stopped being a `lazy`
+        // initializer and became a block-bodied function. A lazy's last expression IS its value; a
+        // block body's is discarded. None of the local gates can see that — the parse pass does not
+        // type-check and the resolve check differences unresolved NAMES — so the rule is to read the
+        // tail of anything converted this way.
+        return db?.let {
             OfflineFoodStore(it) { op, t ->
                 // ⚠️ **The other half of the report above, and the half that actually fires on a
                 // cheap phone.** `open` returning null is there being no database; THIS is one that

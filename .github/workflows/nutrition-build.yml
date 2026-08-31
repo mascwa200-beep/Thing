@@ -50,6 +50,19 @@ on:
       - "gradle.properties"
       - "gradle/wrapper/**"
       - ".github/workflows/nutrition-build.yml"
+
+  # ⚠️ **Without this the corpus only grows when somebody happens to push in a new month.** The cache
+  # key expires monthly (see "Stamp the source window"), but an expired key rebuilds nothing until a
+  # run starts — so on a quiet month the newest barcodes would simply never be fetched. This is what
+  # makes "keep adding barcodes" a property of the calendar rather than of the commit log.
+  #
+  # ⚠️ The 4th rather than the 1st, and a minute that is not zero: the Open Food Facts export is
+  # rebuilt daily and a job starting the instant a month turns over is a job racing whatever is
+  # regenerating it. A scheduled run fires on the DEFAULT branch only, which is where a published
+  # pack should come from anyway.
+  schedule:
+    - cron: "17 5 4 * *"
+
   workflow_dispatch:
 
 permissions:
@@ -77,6 +90,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Stamp the source window
+        id: sources
+        # ⚠️ **This is what makes new barcodes actually arrive, and without it nothing ever changes.**
+        # The Open Food Facts export at that URL is rebuilt daily, but the cache key hashed only the
+        # BUILDER — so once a database was cached it was restored for ever and the corpus was frozen
+        # at whatever day it was first built. "Keep adding barcodes" was structurally impossible.
+        #
+        # A calendar month in the key is what expires it. ⚠️ Monthly rather than weekly, deliberately
+        # and only for now: until the publisher emits deltas, every rebuild that changes the content
+        # means a fresh ~160 MB download offered to the phone, and a card asking for that every week
+        # is a card people learn to dismiss. Weekly becomes the right answer the day deltas land.
+        run: echo "window=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
       - name: Restore the food database
         id: fooddb
         uses: actions/cache@v4
@@ -99,7 +125,7 @@ jobs:
           key: >-
             food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py',
             'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt')
-            }}-off20260824-usda20260430
+            }}-${{ steps.sources.outputs.window }}-usda20260430
 
       - name: Build the food database
         # ⚠️ Gated on the FILE existing, not on `steps.fooddb.outputs.cache-hit`. A restore that

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.nutrition.ui.WrapRow
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.rememberTypedNumber
 import dev.mascwa.nutrition.ui.round
@@ -73,7 +74,7 @@ fun TrainingCard(vm: HealthViewModel) {
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WrapRow {
                 Button({ vm.startSession() }) { Text("Start a session") }
                 val last = sessions.firstOrNull()
                 if (last != null) {
@@ -118,7 +119,7 @@ private fun OpenSession(vm: HealthViewModel, session: Training.Session) {
         modifier = Modifier.fillMaxWidth(),
     )
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         Button({ vm.saveSession(); vm.closeSession() }) { Text("Done") }
         // ⚠️ Deletes rather than merely closing, and only because the session has nothing in it —
         // an empty record is not something anybody meant to keep, and leaving it would put a blank
@@ -145,7 +146,7 @@ private fun MovementRows(vm: HealthViewModel, index: Int, movement: Training.Mov
         SetRow(movement, set, setIndex) { vm.updateSet(index, setIndex, it); vm.saveSession() }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         OutlinedButton({ vm.addSet(index); vm.saveSession() }) { Text("Add a set") }
         if (movement.sets.isNotEmpty()) {
             TextButton({ vm.removeSet(index, movement.sets.lastIndex); vm.saveSession() }) {

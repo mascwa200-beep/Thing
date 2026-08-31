@@ -342,6 +342,19 @@ jobs:
       #
       # ⚠️ Placed AFTER the unit tests on purpose. A cold cache spends about a quarter of an hour
       # downloading 1.7 GB and merging it; a failing test should not have to wait for that first.
+      - name: Stamp the source window
+        id: sources
+        # ⚠️ **This is what makes new barcodes actually arrive, and without it nothing ever changes.**
+        # The Open Food Facts export at that URL is rebuilt daily, but the cache key hashed only the
+        # BUILDER — so once a database was cached it was restored for ever and the corpus was frozen
+        # at whatever day it was first built. "Keep adding barcodes" was structurally impossible.
+        #
+        # A calendar month in the key is what expires it. ⚠️ Monthly rather than weekly, deliberately
+        # and only for now: until the publisher emits deltas, every rebuild that changes the content
+        # means a fresh ~160 MB download offered to the phone, and a card asking for that every week
+        # is a card people learn to dismiss. Weekly becomes the right answer the day deltas land.
+        run: echo "window=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
       - name: Restore the food database
         id: fooddb
         uses: actions/cache@v4
@@ -375,7 +388,7 @@ jobs:
           key: >-
             food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py',
             'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt')
-            }}-off20260824-usda20260430
+            }}-${{ steps.sources.outputs.window }}-usda20260430
 
       - name: Build the food database
         if: steps.fooddb.outputs.cache-hit != 'true'

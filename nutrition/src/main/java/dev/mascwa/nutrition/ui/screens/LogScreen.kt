@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.nutrition.ui.WrapRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPhrase
@@ -188,7 +189,7 @@ private fun PlateCard(vm: HealthViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             Button(onClick = { vm.commitPlate() }, enabled = staged.isNotEmpty()) {
                 Text("Log the plate")
             }
@@ -219,7 +220,7 @@ private fun RepeatADay(vm: HealthViewModel) {
         "Or repeat a day",
         subtitle = "Copies everything logged that day onto this one. Nothing is removed.",
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             listOf(1L to "Yesterday", 2L to "Two days back", 7L to "A week back").forEach { (back, label) ->
                 // ⚠️ Through `dayPlus`, never `day - back * 86_400_000`. A local day is 23 hours on
                 // one night of the year and 25 on another, and the arithmetic version silently
@@ -234,7 +235,7 @@ private fun RepeatADay(vm: HealthViewModel) {
 @Composable
 private fun MealPicker(meal: NutritionDay.Meal, onPick: (NutritionDay.Meal) -> Unit) {
     SectionCard("Adding to", subtitle = "Everything below goes here until you change it.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             NutritionDay.Meal.entries.forEach { m ->
                 FilterChip(
                     selected = meal == m,
@@ -279,7 +280,7 @@ private fun DescribeCard(vm: HealthViewModel, meal: NutritionDay.Meal) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             Button(
                 onClick = { vm.describeMeal(text) },
                 enabled = text.isNotBlank() && !state.busy,
@@ -521,7 +522,7 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
         modifier = Modifier.fillMaxWidth(),
     )
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         usable.forEach { u ->
             FilterChip(selected = unit == u, onClick = { unit = u }, label = { Text(u.label) })
         }
@@ -545,7 +546,7 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
     // the person deliberately turned on and can see standing at the top of this screen; offering
     // both would make the choice ambiguous on every single food and the mode meaningless.
     val building by vm.buildingPlate.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    WrapRow {
         Button(
             onClick = { if (n != null) vm.logPortion(food, n, unit, meal, toPlate = building) },
             enabled = grams != null,

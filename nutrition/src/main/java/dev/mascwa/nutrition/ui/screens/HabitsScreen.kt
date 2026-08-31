@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.nutrition.ui.WrapRow
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.feature.health.HealthViewModel
@@ -240,7 +241,7 @@ private fun RecordCard(vm: HealthViewModel) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             Button(
                 onClick = { save.launch("nutrition.zip") },
                 enabled = !busy,
