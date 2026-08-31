@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The board: what the widget becomes once it has been given real room.
+
+  ⚠️ **This is a SECOND layout, not a replacement.** `widget_lock.xml` and its root id are identity
+  — renaming either orphans every instance already placed on a home screen — so it keeps serving
+  the four small sizes exactly as it does today, and the two new tall breakpoints draw this
+  instead. A fault in the board therefore cannot break the sizes people already have placed.
+
+  ⚠️ **Named regions here, generic slots there, and the difference is deliberate.** `widget_lock.xml`
+  records why its rows must be anonymous: it renders a RANKED LIST whose length and order change
+  with the data, so named rows would freeze the running order at every size. A dashboard is the
+  other kind of thing. Its regions are a designed arrangement — a header is never a cell value and
+  they never trade places — so naming them lets the XML hold the design instead of the Kotlin
+  rebuilding it on every render.
+
+  Every region defaults to GONE and is switched on only when it has something to say, so a feed
+  that failed costs its own block and leaves no gap. No `addView` anywhere: the whole board is
+  pre-declared and the render is `setViewVisibility` + `setTextViewText`, which keeps the parcel to
+  a few kilobytes of actions rather than nested RemoteViews.
+
+  No background plate — like the small widget, this sits on the user's own wallpaper, so every line
+  carries the drop shadow from `WidgetLine`.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_board_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+        <TextView
+            android:id="@+id/widget_board_header"
+            style="@style/WidgetLine.Board.Header" />
+
+        <TextView
+            android:id="@+id/widget_board_subhead"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <ImageView
+            android:id="@+id/widget_board_rule_0"
+            style="@style/WidgetBoardRule" />
+
+        <TextView
+            android:id="@+id/widget_board_alert"
+            style="@style/WidgetLine.Board" />
+
+        <TextView
+            android:id="@+id/widget_board_lead"
+            style="@style/WidgetLine.Board" />
+
+        <TextView
+            android:id="@+id/widget_board_lead_detail"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <TextView
+            android:id="@+id/widget_board_src_0"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <TextView
+            android:id="@+id/widget_board_src_1"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <TextView
+            android:id="@+id/widget_board_src_2"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <ImageView
+            android:id="@+id/widget_board_rule_1"
+            style="@style/WidgetBoardRule" />
+
+        <TextView
+            android:id="@+id/widget_board_sec_idx"
+            style="@style/WidgetLine.Board.Section" />
+
+        <LinearLayout
+            android:id="@+id/widget_board_idx_strip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c0_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c0_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c0_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c1_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c1_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c1_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c2_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c2_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c2_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c3_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c3_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c3_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_board_rule_2"
+            style="@style/WidgetBoardRule" />
+
+        <TextView
+            android:id="@+id/widget_board_sec_stk"
+            style="@style/WidgetLine.Board.Section" />
+
+        <LinearLayout
+            android:id="@+id/widget_board_stk_strip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c4_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c4_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c4_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c5_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c5_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c5_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c6_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c6_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c6_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_board_c7_label"
+                    style="@style/WidgetLine.Board.CellLabel" />
+
+                <TextView
+                    android:id="@+id/widget_board_c7_value"
+                    style="@style/WidgetLine.Board.CellValue" />
+
+                <ImageView
+                    android:id="@+id/widget_board_c7_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="22dp"
+                    android:layout_marginTop="1dp"
+                    android:adjustViewBounds="false"
+                    android:scaleType="fitXY"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_board_rule_3"
+            style="@style/WidgetBoardRule" />
+
+        <TextView
+            android:id="@+id/widget_board_breadth"
+            style="@style/WidgetLine.Board.Dim" />
+
+        <ProgressBar
+            android:id="@+id/widget_board_meter"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="2dp"
+            android:max="100"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/widget_board_rule_4"
+            style="@style/WidgetBoardRule" />
+
+        <TextView
+            android:id="@+id/widget_board_read_0"
+            style="@style/WidgetLine.Board" />
+
+        <TextView
+            android:id="@+id/widget_board_read_1"
+            style="@style/WidgetLine.Board" />
+
+        <TextView
+            android:id="@+id/widget_board_read_2"
+            style="@style/WidgetLine.Board" />
+
+        <ImageView
+            android:id="@+id/widget_board_rule_5"
+            style="@style/WidgetBoardRule" />
+
+        <LinearLayout
+            android:id="@+id/widget_board_pair_0"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_board_p0l_label"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_marginTop="0dp" />
+
+            <TextView
+                android:id="@+id/widget_board_p0l_0"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0l_1"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0l_2"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0l_3"
+                style="@style/WidgetLine.Board.Dim" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_board_p0r_label"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_marginTop="0dp" />
+
+            <TextView
+                android:id="@+id/widget_board_p0r_0"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0r_1"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0r_2"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p0r_3"
+                style="@style/WidgetLine.Board.Dim" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_board_rule_6"
+            style="@style/WidgetBoardRule" />
+
+        <LinearLayout
+            android:id="@+id/widget_board_pair_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_board_p1l_label"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_marginTop="0dp" />
+
+            <TextView
+                android:id="@+id/widget_board_p1l_0"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1l_1"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1l_2"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1l_3"
+                style="@style/WidgetLine.Board.Dim" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_board_p1r_label"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_marginTop="0dp" />
+
+            <TextView
+                android:id="@+id/widget_board_p1r_0"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1r_1"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1r_2"
+                style="@style/WidgetLine.Board.Dim" />
+
+            <TextView
+                android:id="@+id/widget_board_p1r_3"
+                style="@style/WidgetLine.Board.Dim" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_board_foot"
+            style="@style/WidgetLine.Board.Dim" />
+</LinearLayout>

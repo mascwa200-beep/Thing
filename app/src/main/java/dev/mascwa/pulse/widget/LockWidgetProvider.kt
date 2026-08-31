@@ -23,6 +23,7 @@ import dev.mascwa.pulse.core.telemetry.Stardate
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
+import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.weather.WeatherCode
@@ -91,13 +92,13 @@ class LockWidgetProvider : AppWidgetProvider() {
             try {
                 val started = System.currentTimeMillis()
                 val outcomes = Collections.synchronizedMap(LinkedHashMap<Source, Outcome>())
-                val rows = runCatching { build(context, outcomes) }.getOrElse { err ->
+                val loaded = runCatching { build(context, outcomes) }.getOrElse { err ->
                     // The load itself blew up. Fall through to the fault card with the reason.
                     fail(context, manager, ids, WidgetDiagnostics.describe(err), outcomes, started)
                     return@launch
                 }
                 ids.forEach { id ->
-                    runCatching { render(context, manager, id, rows, outcomes) }.onFailure { err ->
+                    runCatching { render(context, manager, id, loaded, outcomes) }.onFailure { err ->
                         // ⚠️ The rich RemoteViews could not be applied — too large for the binder
                         // transaction, an un-whitelisted view, a resource gone missing. This is the
                         // exact case that ends in "Can't load widget", so apply the small card.
@@ -135,17 +136,41 @@ class LockWidgetProvider : AppWidgetProvider() {
         val route: String? = null,
     )
 
+    /** The weather, in the three lengths the widget needs it at. */
+    private data class Wx(val head: String, val detail: String, val compact: String)
+
+    /** The market read: the mover line, the breadth line, and the instruments themselves. */
+    private data class Mkt(
+        val head: String,
+        val headArgb: Int,
+        val breadth: String,
+        val upPct: Int?,
+        val indices: List<WidgetBoard.Cell>,
+        val stocks: List<WidgetBoard.Cell>,
+    )
+
+    /**
+     * One load, two renderings.
+     *
+     * The small sizes draw [rows] exactly as they always have; the tall ones draw [board]. Both come
+     * from the same pass over the feeds, so the two forms can never disagree about what the widget
+     * knows — and a size that shows less is showing less of the same reading, not a different one.
+     */
+    private data class Loaded(val rows: List<Row>, val board: WidgetBoard.Board)
+
     private fun render(
         context: Context,
         manager: AppWidgetManager,
         id: Int,
-        rows: List<Row>,
+        loaded: Loaded,
         outcomes: Map<Source, Outcome>,
     ) {
+        val rows = loaded.rows
         // Degradation is reported as its own row rather than hidden, and it goes last so it never
         // pushes real content off a small widget.
         val degraded = WidgetDiagnostics.degradedLine(outcomes)
         val all = if (degraded.isBlank()) rows else rows + Row(degraded, Role.DEGRADED, route = Routes.HOME)
+        val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
 
         // ⚠️ The host picks. Each entry is the SAME layout with a different number of rows, so a
         // bigger widget genuinely shows more instead of the same lines with more air between them.
@@ -160,6 +185,17 @@ class LockWidgetProvider : AppWidgetProvider() {
                 SizeF(180f, 165f) to viewsFor(context, all, MEDIUM_ROWS),
                 SizeF(250f, 275f) to viewsFor(context, all, LARGE_ROWS),
                 SizeF(300f, 385f) to viewsFor(context, all, MAX_ROWS),
+                // ⚠️ The two entries the widget was missing, and their absence WAS the sparseness:
+                // the resize range reaches 640dp while the tallest variant stopped at 385, so above
+                // that the host had nothing richer to pick and stretched twenty rows instead.
+                //
+                // Both heights are derived from the board's own content, under the same rule as the
+                // row variants above — a breakpoint below its content clips, one above it can never
+                // be picked. Compact carries header + lead + both instrument strips + breadth +
+                // readouts (~305dp of content, declared at 420); full adds the two-column regions
+                // and the footer (~505dp, declared at 540). Both sit under `maxResizeHeight`.
+                SizeF(300f, 420f) to WidgetBoard.render(context, loaded.board, full = false, open),
+                SizeF(300f, 540f) to WidgetBoard.render(context, loaded.board, full = true, open),
             ),
         )
         manager.updateAppWidget(id, views)
@@ -249,9 +285,12 @@ class LockWidgetProvider : AppWidgetProvider() {
     private suspend fun build(
         context: Context,
         outcomes: MutableMap<Source, Outcome>,
-    ): List<Row> {
+    ): Loaded {
         val app = context.applicationContext as? PulseApplication
-            ?: return listOf(Row("Application not ready", Role.PRIMARY))
+            ?: return Loaded(
+                listOf(Row("Application not ready", Role.PRIMARY)),
+                WidgetBoard.Board(header = "APPLICATION NOT READY"),
+            )
         val c = app.container
         val s = widgetSource<dev.mascwa.pulse.data.settings.AppSettings>(Source.DEVICE, outcomes) { c.settingsRepository.current() }
         val ctx = runCatching { c.deviceContextProvider.snapshot() }.getOrNull()
@@ -282,8 +321,14 @@ class LockWidgetProvider : AppWidgetProvider() {
             Role.HEADER,
             argb = ContextCompat.getColor(context, widgetAccentRes()),
         )
+        // The board says where you are and what it is like there; the stardate drops to the line
+        // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
+        // only falls back to the device's own — nothing here may ever name a fixed town.
+        val boardSubhead = listOf(greeting, stardate).filter { it.isNotBlank() }.joinToString(" · ")
 
-        if (s == null) return rows
+        if (s == null) {
+            return Loaded(rows, WidgetBoard.Board(header = date.ifBlank { greeting }, subhead = boardSubhead))
+        }
 
         // ⚠️ Resolved ONCE, and on its own budget. Three feeds need a coordinate, and the fallback
         // branch can touch the location provider — doing that three times would triple the slowest
@@ -294,6 +339,24 @@ class LockWidgetProvider : AppWidgetProvider() {
             outcomes[Source.SAFETY] = Outcome.Skipped("no saved location")
             outcomes[Source.SKY] = Outcome.Skipped("no saved location")
         }
+
+        // ⚠️ Captured out of the parallel block so the board can be assembled from the SAME pass
+        // that fills the rows. Building it from a second read would let the two forms of the widget
+        // disagree about what it knows — and they are meant to be one reading at two lengths.
+        var wx: Wx? = null
+        var mkt: Mkt? = null
+        var headline: String? = null
+        var taskLine: String? = null
+        var studyLine: String? = null
+        var skyLine: String? = null
+        var spaceLine: String? = null
+        var fuelLine: String? = null
+        var econLine: String? = null
+        var leadTitle: String? = null
+        var leadDetail: String? = null
+        var leadArgb: Int? = null
+        var leadRoute: String? = null
+        var alertLine: String? = null
 
         // Everything network-capable runs in parallel, each on its own budget.
         withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
@@ -311,7 +374,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val weather = async {
-                    widgetSource<Pair<String, String>>(Source.WEATHER, outcomes) {
+                    widgetSource<Wx>(Source.WEATHER, outcomes) {
                         val wd = resolveWeather(c, place) ?: return@widgetSource null
                         val cur = wd.current ?: return@widgetSource null
                         val u = wd.tempUnitSymbol
@@ -329,11 +392,15 @@ class LockWidgetProvider : AppWidgetProvider() {
                         } else ""
                         val rh = cur.humidity?.let { "${it.toInt()}% RH" }.orEmpty()
                         val aqi = wd.airQuality?.usAqi?.let { "AQI ${it.toInt()}" }.orEmpty()
-                        head to listOf(hilo, rh, aqi).filter { it.isNotBlank() }.joinToString("  ·  ")
+                        Wx(
+                            head = head,
+                            detail = listOf(hilo, rh, aqi).filter { it.isNotBlank() }.joinToString("  ·  "),
+                            compact = "${Formatters.number(cur.temperature, 0)}$u ${WeatherCode.describe(cur.weatherCode).uppercase()}",
+                        )
                     }
                 }
                 val markets = async {
-                    widgetSource<Triple<String, Int, String>>(Source.MARKETS, outcomes) {
+                    widgetSource<Mkt>(Source.MARKETS, outcomes) {
                         val quotes = c.marketsRepository.fetchWatchlist(force = false).data
                             .orEmpty().filter { it.changePercent != null }
                         if (quotes.isEmpty()) return@widgetSource null
@@ -341,10 +408,21 @@ class LockWidgetProvider : AppWidgetProvider() {
                         val pct = mover?.changePercent ?: 0.0
                         val head = mover?.let { "MKT  ${it.label}  ${signedPercent(pct)}%" }.orEmpty()
                         val colour = if (pct >= 0) R.color.nw_positive else R.color.nw_negative
-                        val breadth = MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let {
+                        val mood = MarketMood.summarize(quotes.mapNotNull { it.changePercent })
+                        val breadth = mood?.let {
                             "${it.headline.uppercase()}  ·  NET ${signedPercent(it.netChangePct)}%  ·  ${it.up}▲ ${it.down}▼"
                         }.orEmpty()
-                        Triple(head, ContextCompat.getColor(context, colour), breadth)
+                        // ⚠️ `Quote.type` carries the WatchType NAME, so the strips are a filter on
+                        // data already in hand rather than a second fetch. The cells are capped at
+                        // four because the strip has four slots — more would be silently dropped.
+                        Mkt(
+                            head = head,
+                            headArgb = ContextCompat.getColor(context, colour),
+                            breadth = breadth,
+                            upPct = mood?.let { m -> if (m.total > 0) (m.upShare * 100).toInt() else null },
+                            indices = quotes.filter { it.type == WatchType.INDEX.name }.take(4).map { cellFor(it) },
+                            stocks = quotes.filter { it.type == WatchType.STOCK.name }.take(4).map { cellFor(it) },
+                        )
                     }
                 }
                 val news = async {
@@ -434,6 +512,10 @@ class LockWidgetProvider : AppWidgetProvider() {
 
                 // The Oracle leads: it is the only row that weighs several feeds against each other.
                 oracle.await()?.let { insight ->
+                    leadTitle = insight.title
+                    leadDetail = insight.detail
+                    leadArgb = Oracle.urgencyArgb(insight.urgency).toInt()
+                    leadRoute = insight.actionRoute ?: Routes.ORACLE
                     rows += Row(
                         insight.title,
                         Role.LEAD,
@@ -446,6 +528,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 departure.await()?.let { rows += Row("▸ $it", Role.PRIMARY, route = Routes.NAV) }
                 // Then the only other row that is about right now and about where you are.
                 safety.await()?.let {
+                    alertLine = it
                     rows += Row(it, Role.PRIMARY, argb = ContextCompat.getColor(context, R.color.nw_negative), route = Routes.SAFETY)
                 }
 
@@ -453,30 +536,72 @@ class LockWidgetProvider : AppWidgetProvider() {
                 s.waypoints.firstOrNull { it.id == s.activeWaypointId }?.label
                     ?.let { rows += Row("◎ ${it.take(40)}", Role.PRIMARY, route = Routes.NAV) }
 
-                weather.await()?.let { (head, detail) ->
-                    rows += Row(head, Role.PRIMARY, route = Routes.WEATHER)
-                    if (detail.isNotBlank()) rows += Row(detail, Role.SECONDARY, route = Routes.WEATHER)
+                weather.await()?.let {
+                    wx = it
+                    rows += Row(it.head, Role.PRIMARY, route = Routes.WEATHER)
+                    if (it.detail.isNotBlank()) rows += Row(it.detail, Role.SECONDARY, route = Routes.WEATHER)
                 }
-                markets.await()?.let { (head, colour, breadth) ->
-                    if (head.isNotBlank()) rows += Row(head, Role.PRIMARY, argb = colour, route = Routes.MARKETS)
-                    if (breadth.isNotBlank()) rows += Row(breadth, Role.SECONDARY, route = Routes.MARKETS)
+                markets.await()?.let {
+                    mkt = it
+                    if (it.head.isNotBlank()) rows += Row(it.head, Role.PRIMARY, argb = it.headArgb, route = Routes.MARKETS)
+                    if (it.breadth.isNotBlank()) rows += Row(it.breadth, Role.SECONDARY, route = Routes.MARKETS)
                 }
-                news.await()?.let { rows += Row(it, Role.PRIMARY, route = Routes.NEWS) }
-                task.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
-                study.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.STUDY) }
-                sky.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
-                space.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
-                fuel.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
-                econ.await()?.let { rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
+                news.await()?.let { headline = it; rows += Row(it, Role.PRIMARY, route = Routes.NEWS) }
+                task.await()?.let { taskLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
+                study.await()?.let { studyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.STUDY) }
+                sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
+                space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
+                fuel.await()?.let { fuelLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
+                econ.await()?.let { econLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
             }
         }
 
-        ctx?.let {
+        val sysLine = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
-            rows += Row("SYS  PWR $batt$chg  ·  ${it.network.name}", Role.FOOTNOTE)
+            "SYS  PWR $batt$chg  ·  ${it.network.name}"
         }
-        return rows
+        sysLine?.let { rows += Row(it, Role.FOOTNOTE) }
+
+        // ── the same reading, as a board ────────────────────────────────────────────────────────
+        // Nothing here fetches: every value was loaded once, above. A field left null is a region
+        // the board simply will not draw.
+        val econColumn = WidgetBoard.Column("ECONOMY", listOfNotNull(econLine, fuelLine))
+        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine))
+        val board = WidgetBoard.Board(
+            header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
+                .joinToString("  ·  "),
+            subhead = boardSubhead,
+            alert = alertLine,
+            alertRoute = Routes.SAFETY,
+            lead = leadTitle,
+            leadDetail = leadDetail,
+            leadArgb = leadArgb,
+            leadRoute = leadRoute,
+            sources = listOfNotNull(headline),
+            indices = mkt?.indices.orEmpty(),
+            stocks = mkt?.stocks.orEmpty(),
+            breadth = mkt?.breadth,
+            breadthPct = mkt?.upPct,
+            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, spaceLine, skyLine),
+            // ⚠️ Only pairs that have something go in. The second slot stays deliberately empty
+            // here — water, fuel detail, data use and comms fill it in later slices, and an empty
+            // labelled column would read as a feed that failed rather than one not built yet.
+            pairs = listOf(econColumn to dayColumn),
+            foot = sysLine,
+        )
+        return Loaded(rows, board)
+    }
+
+    /** One instrument, as the board draws it: what it is, what it did, and which way. */
+    private fun cellFor(q: dev.mascwa.pulse.data.markets.Quote): WidgetBoard.Cell {
+        val pct = q.changePercent ?: 0.0
+        return WidgetBoard.Cell(
+            label = q.label.take(9).uppercase(),
+            value = "${signedPercent(pct)}%",
+            colorRes = if (pct >= 0) R.color.nw_positive else R.color.nw_negative,
+            series = q.sparkline,
+        )
     }
 
     private companion object {
