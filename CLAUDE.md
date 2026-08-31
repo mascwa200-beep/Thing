@@ -11636,3 +11636,178 @@ washed. That is the reason the raster stays committed and reviewable.
 **Open, unchanged by this arc:** nothing on the Milky Way. The sky plan's remaining item is still the
 owner-facing one — a screenshot would settle both the aesthetic and whether `MAX_OPACITY` wants
 tuning, and it is one constant.
+
+### THE NUTRITION APP — scanner, database and layout (this session, PR #464)
+
+Owner: the barcode scanner *"doesn't actually work… it can't even figure out what the barcode is…
+it doesn't even quickly search through the barcodes"*, the data behind it *"doesn't give the correct
+amount of information"*, and *"a lot of the stuff looks wonky on the phone… not formatted
+correctly"*. It should work like MacroFactor's, hold effectively every food barcode, be continuously
+topped up, and *"not be so slow or so shit as it is right now"*.
+
+⚠️ **The target is the STANDALONE `:nutrition` app, not the HEALTH tab in LCARS** — the owner said
+so explicitly after I planned against the wrong one. ⚠️ **And this container's checkout was 866
+commits behind**, so `nutrition/`, `:core:health`, `:core:update` and three workflows did not exist
+locally; three Explore agents had already been dispatched against the stale tree and their findings
+were discarded. **`git log --oneline -1` against the remote before planning.**
+
+Owner's three binding decisions: **ML Kit *and* fix ZXing**; **a downloadable data pack**, not APK
+payload; **both** scheduled rebuilds and on-demand lookup.
+
+#### The scanner (`2f47cac`) — the defect was one omission, proven not guessed
+
+An `ImageProxy` arrives in the **sensor's** orientation and reports how far that is from upright in
+`imageInfo.rotationDegrees`. Neither scanner read it. ZXing's one-dimensional readers scan **rows**,
+so a barcode lined up horizontally on screen lies **vertically** in the buffer — perpendicular to
+every line the decoder looks along. It cannot decode. It succeeds only when the phone or the packet
+happens to be turned, which is exactly the intermittency reported.
+
+⚠️ **And the retry that looks like it covers this is dead code.** `OneDReader.decode` tries a rotated
+copy only `if (tryHarder && image.isRotateSupported())`, and `PlanarYUVLuminanceSource` never
+overrides `isRotateSupported`, so it inherits `false` from `LuminanceSource`. Read out of the shipped
+3.5.3 classes. `TRY_HARDER` was buying nothing on this path, which is why the code read as though the
+case were handled.
+
+⚠️ **A second, silent defect: a UPC-E decode yields a key the database can never match.** UPC-E is a
+twelve-digit UPC-A with a run of zeros squeezed out and the decoder returns the **compressed eight**
+(`convertUPCEtoUPCA` is called only inside `checkChecksum` — confirmed by disassembling
+`UPCEReader`). Read as a number that is 1,234,565 where the product is 12,345,000,065, so the app
+reports an unknown product for a barcode it read perfectly. UPC-E is what small packets carry.
+
+- **New `:core:scan`**, because the two applications had a near-verbatim copy of the camera and
+  decode layer each, both with a header saying in writing they must be changed together, and both
+  carrying this bug. Not depended on by `:core:health`.
+- **Bundled ML Kit leads, rotation-corrected ZXing behind it.** ⚠️ Both build scripts said the
+  bundled variant "adds two or three megabytes" — wrong by an order of magnitude. Measured from the
+  published artifact: **9.9 MB AAR, 20.2 MB of native across four ABIs**, and the shipped APK went
+  189,972,281 → 211,834,953 bytes, +20.8 MB, exactly as predicted. It needs no Play Services; that
+  is strong evidence rather than proof from a build machine, which is why the ZXing fallback is live.
+- **`BarcodeScan.expandUpcE` + `canonical`** in the shared pure core so the two apps cannot drift.
+  ⚠️ Checked **exhaustively against ZXing's own `convertUPCEtoUPCA` over all 2,000,000
+  number-system-0-and-1 codes: zero disagreements.**
+- **`LumaRotate`**, pure and JVM-testable, checked against an independent reference over 1,600 random
+  shapes. ⚠️ **My first draft was wrong twice at once** — 90° and 270° swapped, and both multiplying
+  by a dimension that goes negative whenever a frame is wider than it is tall, i.e. always.
+- 1280×960 analysis instead of the default VGA (an EAN-13 module is about three pixels at VGA and
+  arm's length), a torch, tap-to-focus, a centre-band retry, and six honest states where a camera
+  that never opened and a room too dark to read both said *"Line the barcode up in the frame."*
+- **ITF dropped**: variable-length, no enforced check digit, and with TRY_HARDER it reads a run of
+  bars off a folded label and hands back fourteen plausible digits that confirm and find nothing.
+
+#### The database leaves the APK (`841029a`)
+
+Measured: the APK was 189,972,281 bytes of which the overwhelming majority was ONE 425 MB asset
+holding 4,524,449 products — and the in-app updater downloads the **entire APK on every published
+build**, so adding barcodes meant re-downloading the whole corpus every time a line of UI changed.
+
+- `FoodPack` (pure, 18 tests) decides: never downgrade (a rolled-back release leaves a phone
+  **ahead**, not stale); never offer a pack whose schema this build cannot read, and say which
+  direction the mismatch runs; prefer a delta chain only when the saving is real.
+- `FoodPackRepository` carries it out — verify the checksum **before** unpacking, work in temporaries
+  beside the destination, replace by rename **last**, so an interruption leaves the existing database
+  exactly as it was.
+- ⚠️ **Deltas are NOT implemented and the code says so** rather than quietly doing a full download.
+- ⚠️ **`FoodDatabase.open` gained a REFUSAL that is the most dangerous branch in the file.** With no
+  database and no asset, `databaseBuilder` would happily create an **empty** one — schema emitted, no
+  error anywhere, every barcode from then on answering "no such product" from a genuinely empty
+  table, permanently.
+- ⚠️ **And a second:** `fallbackToDestructiveMigration` is what makes an *asset's* version bump work,
+  and on a file the app **downloaded** it means Room silently deletes several hundred megabytes
+  somebody waited for. A version check ahead of Room deletes a stale or truncated file and names it.
+- ⚠️ **`FoodRepository` takes a SUPPLIER of the store, not a value.** Held as a value, whatever it
+  resolved to at construction — null, on the run where somebody first downloads it — is the answer
+  for the rest of the process, and the person finishes a ten-minute download the app then insists did
+  not happen. Same reason the container's memo is not `by lazy`.
+- ⚠️ **The LCARS app is deliberately untouched and still bundles the asset.** `open` handles both.
+- ⚠️ Honest cost: the first run needs a network, and a private repo needs the updater's token.
+
+#### CI: the corpus can finally grow (`2b43c5d`)
+
+⚠️ **The cache key hashed only the BUILDER, so once a database was cached it was restored for ever
+and the corpus was frozen at whatever day it was first built.** "Keep adding barcodes" was
+structurally impossible. The key now carries a **monthly window** and a `schedule:` fires on the 4th,
+so it does not depend on somebody happening to push. Monthly rather than weekly only until deltas
+exist: each content change means a fresh ~160 MB download offered to the phone.
+
+The publish step is **content-gated** (the release name carries the database's SHA-256 prefix), so a
+run whose corpus has not moved uploads nothing. ⚠️ **Both workflows' keys had to move together** —
+they deliberately share one cached database — which costs one full rebuild.
+
+#### Layout: `Row` does not wrap, and 19 of 23 held controls that cannot shrink
+
+⚠️ **A `Row` neither wraps nor shrinks its children: whatever does not fit is simply not drawn.** No
+scrollbar, no fade, nothing to suggest there is more. Classified every fixed-arrangement row in the
+app by whether its children can shrink — **19 hold buttons or chips, which cannot.** `RepeatADay`'s
+three ("Yesterday", "Two days back", "A week back") need more width than a card has on any phone, so
+the third option did not exist as far as anyone could tell. New shared `WrapRow`; 18 converted.
+
+⚠️ Its content takes a **`RowScope`, not a `FlowRowScope`** — the latter extends the former, so
+callers keep `weight()` (two converted rows rely on it) without `@ExperimentalLayoutApi` leaking into
+a signature every screen would have to opt in to.
+
+Also: `StatRow` bounded both sides (a long label pushed the **value** off the edge, the half being
+read, because it is laid out second); the weekday strip's seven equal weights left **18.7 dp for a
+three-letter label** (379 dp card ÷ 7 minus a chip's own 32 dp padding), so it wraps at content size
+now; `SetRow`'s 268 dp of hard-coded width in a ~296 dp card became weights; **20 of 24 text fields
+declared no keyboard type**, and every numeric one (marked by `Decimals.keep`) now asks for the
+number keyboard; the GitHub token field gets `KeyboardType.Password` — the masking beside it is a
+different thing, and without this a soft keyboard is free to "correct" a pasted token invisibly; and
+the **viewfinder became a full-screen window** instead of a 4:3 box a third of the way down a
+scrolling page.
+
+#### ⚠️ New gate: `tools/kotlin_missing_return.py`
+
+A CI failure, and no local gate could have caught it: a `by lazy` became a block-bodied function, and
+a lazy initializer's last expression IS its value where a block body's is discarded. The parse pass
+does not type-check, `android_resolve_check.sh` differences unresolved NAMES, and that file pulls in
+half the application so `android_compile_check.sh` cannot reach it.
+
+⚠️ **Its first version reported a confident zero across the whole repository and did NOT catch the
+defect it was written for** — it looked for the substring `return` in the body, and the body contains
+the word *"returning"* in a **comment**. Comments and string literals are stripped before anything is
+searched and `return` is matched as a whole word. Negative-tested against the real defect first.
+
+#### Verification, and two more of the recurring habit
+
+Zero subagents. Local kotlinc + JUnit, exhaustive cross-checks against reference implementations,
+`javap` against real published jars, the gate chain, and CI. **12 rules negative-tested** across the
+arc against baselines asserted green first.
+
+⚠️ **Two predictions of mine were wrong where the code was right**, and one produced a finding worth
+keeping: the four-quarter-turn round trip **cannot detect a turn going the wrong way** (four
+anti-clockwise turns also return to the start), so direction is held only by the fixed examples —
+that is documented on the test now. The other was a fixture list that claimed to cover all four
+branches of the UPC-E rule while covering three; deleting the missing branch failed nothing.
+
+⚠️ **A verification technique that paid twice: extract a workflow step and RUN it.** The pack-publish
+step was pulled out of the YAML and run against a throwaway database, which found a real defect —
+`sqlite3` is not installed everywhere and the `|| echo 0` beside it swallowed that, producing a
+manifest saying "0 products" for a corpus of four and a half million, which is the sentence asking
+somebody to allow a 160 MB download. It counts with python3 now and refuses to publish rather than
+claiming none. All three of that step's guards were then confirmed to fire.
+
+⚠️ **And a near-miss of the class this file keeps recording**: I read "0 ExperimentalLayoutApi" off a
+`javap` that had **failed to find the class at all** — `FlowRow` lives in `foundation-layout`, not
+`foundation`. An empty grep over a failed command is indistinguishable from a clean answer.
+
+#### Open
+
+- **Deltas.** The format, `FoodPack.plan` and the install branch are in place; the builder does not
+  emit them. Until it does, every content change is a full ~160 MB fetch, which is why the schedule
+  is monthly rather than weekly.
+- **⚠️ The recorded reason for rejecting an FTS index is now OBSOLETE and worth re-deciding.**
+  `FoodDao.searchByNamePrefix` documents an FTS5 index at ~107 MB, rejected because that was "on an
+  APK the in-app updater re-downloads in full on every build". The database is no longer in the APK,
+  so the cost is a one-time download rather than a per-build one — and name search is still a full
+  scan of 4.5 million rows. Doing it means bumping `FoodPack.SCHEMA`, and **now is the cheapest
+  possible moment**, because no phone has downloaded a pack yet.
+- **Remembering a network-found product.** `FoodRepository.byBarcode` already falls back to Open Food
+  Facts and already distinguishes `NoNutrition` from `NotInDatabase` — but nothing writes the result
+  into the local database, so the same product is fetched again tomorrow.
+- Whether the LCARS app should also stop bundling the corpus (its APK is 285 MB and its updater
+  re-downloads all of it on every build). Deliberately not done: a behaviour change on a daily driver.
+
+⚠️ **Everything here is owner-verify on the Pixel.** CI compiles a scanner; it cannot point one at a
+packet. In order: **scan a curved can, a crinkly bag and a small cosmetic barcode in PORTRAIT**,
+which is the case that could not work at all before; then the first-run database download (Log tab,
+or Plan ▸ Food database); then whether the app still looks cramped anywhere.

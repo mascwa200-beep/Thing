@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -13,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,8 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.SectionCard
@@ -390,17 +396,42 @@ private fun FindAFood(vm: HealthViewModel, meal: NutritionDay.Meal) {
     // a camera left open behind a screen nobody is looking at.
     var scanning by remember { mutableStateOf(false) }
     if (scanning) {
-        BarcodeScanner(
-            onCode = { code ->
-                scanning = false
-                vm.searchFor(HealthViewModel.PickFor.LOG)
-                // ⚠️ The digits go to `lookUpBarcode`, not into the search box. A barcode is an
-                // exact key — the bundled database is indexed on it — and running it through the
-                // name search would turn a certain answer into a ranked guess.
-                vm.lookUpBarcode(code)
-            },
-            onCancel = { scanning = false },
-        )
+        // ⚠️ **A window of its own, because a viewfinder in a scrolling page is not usable.** It sat
+        // as a card in the middle of the Log tab: a 4:3 box a third of the way down, with other cards
+        // above and below, so lining a packet up meant holding the phone at an angle that pointed the
+        // camera somewhere other than where the person was looking — and scrolling took the
+        // viewfinder off screen while the camera stayed open behind it. Every scanning application
+        // fills the screen for this reason.
+        //
+        // ⚠️ `usePlatformDefaultWidth = false` is what makes it full-screen rather than an inset
+        // dialog. Without it the box is the same shape it always was, just floating.
+        //
+        // ⚠️ Dismissing the dialog and cancelling are the same thing, so the back gesture puts the
+        // camera down. `BarcodeScanner`'s own `DisposableEffect` releases it when this leaves the
+        // composition, which a dialog does on dismissal.
+        Dialog(
+            onDismissRequest = { scanning = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    BarcodeScanner(
+                        onCode = { code ->
+                            scanning = false
+                            vm.searchFor(HealthViewModel.PickFor.LOG)
+                            // ⚠️ The digits go to `lookUpBarcode`, not into the search box. A
+                            // barcode is an exact key — the database is indexed on it — and running
+                            // it through the name search turns a certain answer into a ranked guess.
+                            vm.lookUpBarcode(code)
+                        },
+                        onCancel = { scanning = false },
+                    )
+                }
+            }
+        }
         return
     }
 
@@ -518,6 +549,7 @@ private fun PortionBox(vm: HealthViewModel, food: Food, meal: NutritionDay.Meal)
         value = amount,
         onValueChange = { amount = Decimals.keep(it, 7) },
         label = { Text("How much") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )

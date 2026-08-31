@@ -1,5 +1,7 @@
 package dev.mascwa.nutrition.ui.screens
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -186,6 +188,7 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
         value = value,
         onValueChange = { onChange(Decimals.keep(it, 7)) },
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = modifier,
     )
@@ -274,6 +277,7 @@ private fun MoreFromTheLabel(typed: androidx.compose.runtime.snapshots.SnapshotS
                 value = typed[n.key].orEmpty(),
                 onValueChange = { typed[n.key] = Decimals.keep(it, 8) },
                 label = { Text("${n.label} (${n.unit})", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )

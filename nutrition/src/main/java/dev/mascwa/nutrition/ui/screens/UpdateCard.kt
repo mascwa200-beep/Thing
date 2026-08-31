@@ -1,5 +1,7 @@
 package dev.mascwa.nutrition.ui.screens
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -125,6 +127,12 @@ fun UpdateCard(updates: SelfUpdate) {
             value = token,
             onValueChange = { token = it },
             label = { Text("GitHub token") },
+            // ⚠️ **`Password`, and the masking beside it is not the same thing.** The transformation
+            // hides the characters; the keyboard TYPE is what turns off autocorrect and suggestions.
+            // Without it a soft keyboard is free to "correct" a pasted token — and because the text
+            // is masked, there is no way to see that it did. The failure then reads as a rejected
+            // token rather than as a mangled one.
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),

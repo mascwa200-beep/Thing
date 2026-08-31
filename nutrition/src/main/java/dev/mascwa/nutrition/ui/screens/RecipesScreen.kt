@@ -1,5 +1,7 @@
 package dev.mascwa.nutrition.ui.screens
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -97,6 +99,8 @@ private fun ImportFromLink(vm: HealthViewModel) {
             value = url,
             onValueChange = { url = it.take(300) },
             label = { Text("Address of a recipe page") },
+            // A web address: no autocorrect, and the keyboard puts "/" and "." on the front row.
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             singleLine = true,
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth(),
@@ -279,6 +283,7 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onT
                 value = amount,
                 onValueChange = { amount = Decimals.keep(it, 5) },
                 label = { Text("How many times over") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -309,6 +314,7 @@ private fun SavedCard(vm: HealthViewModel, r: Recipes.Recipe, open: Boolean, onT
                 value = amount,
                 onValueChange = { amount = Decimals.keep(it, 6) },
                 label = { Text(if (byServings && servingG != null) "How many portions" else "How many grams") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -380,6 +386,7 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
                     vm.draftYield(Decimals.parse(v))
                 },
                 label = { Text("Weight after cooking (g), if you weighed it") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -395,6 +402,10 @@ private fun Builder(vm: HealthViewModel, r: Recipes.Recipe) {
                     servingsText.value = s
                     s.toIntOrNull()?.let { vm.draftServings(it) }
                 },
+                // ⚠️ `Number`, not `Decimal`: portions is a whole count and the model reads it with
+                // `toIntOrNull`, so offering a decimal separator offers a character that is silently
+                // discarded — the field accepts "4.5" and the recipe stays at four.
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 label = { Text("How many portions it makes") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -530,6 +541,7 @@ private fun IngredientWeight(vm: HealthViewModel, food: Food, seedGrams: Double?
         value = amount,
         onValueChange = { amount = Decimals.keep(it, 7) },
         label = { Text("How much of it") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )

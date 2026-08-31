@@ -193,15 +193,20 @@ private fun SetRow(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(16.dp),
         )
-        NumberBox("Reps", set.reps.takeIf { it > 0 }?.toString().orEmpty(), Modifier.width(72.dp)) {
+        // ⚠️ **Weights, not fixed widths, and it is not cosmetic.** The three boxes were 72, 84 and
+        // 72 dp beside a 16 dp number and three 8 dp gaps — 268 dp of hard-coded width in a card that
+        // is about 296 dp on a 360 dp phone. It fitted, with 28 dp to spare, until anything moved:
+        // a larger system font, a narrower phone, a fourth column. Weights cannot overflow, and the
+        // kg box keeps a little more room because a load carries a decimal where reps never do.
+        NumberBox("Reps", set.reps.takeIf { it > 0 }?.toString().orEmpty(), Modifier.weight(1f)) {
             onChange(set.copy(reps = it?.toInt() ?: 0))
         }
         if (movement.exercise.loaded) {
-            NumberBox("kg", set.loadKg?.let { trim(it) }.orEmpty(), Modifier.width(84.dp)) {
+            NumberBox("kg", set.loadKg?.let { trim(it) }.orEmpty(), Modifier.weight(1.2f)) {
                 onChange(set.copy(loadKg = it))
             }
         }
-        NumberBox("RPE", set.rpe?.let { trim(it) }.orEmpty(), Modifier.width(72.dp)) {
+        NumberBox("RPE", set.rpe?.let { trim(it) }.orEmpty(), Modifier.weight(1f)) {
             onChange(set.copy(rpe = it))
         }
     }

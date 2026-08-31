@@ -24,6 +24,7 @@ import dev.mascwa.nutrition.data.NutritionContainer
 import dev.mascwa.nutrition.ui.ChipRow
 import dev.mascwa.nutrition.ui.EnergyChart
 import dev.mascwa.nutrition.ui.SectionCard
+import dev.mascwa.nutrition.ui.WrapRow
 import dev.mascwa.nutrition.ui.StatRow
 import dev.mascwa.nutrition.ui.round
 import dev.mascwa.pulse.core.telemetry.BmrEquations
@@ -403,15 +404,20 @@ private fun ProgramCard(vm: HealthViewModel, state: HealthViewModel.State) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+            // ⚠️ **Seven equal weights left 18.7 dp for a three-letter label.** A card is about
+            // 379 dp wide on a 411 dp phone; take six 4 dp gaps and divide by seven and each chip is
+            // 50.7 dp, of which a `FilterChip`'s own padding takes 32. "Wed" does not fit in what is
+            // left, so every day was ellipsised or clipped — on the one control whose whole job is
+            // to be read at a glance.
+            //
+            // Sized to their content and allowed to wrap instead: they fit on one line on an ordinary
+            // phone and fall onto a second on a narrow one, which is legible where a clipped row is
+            // not. `WrapRow` gives the same 8 dp rhythm as every other control row here.
+            WrapRow {
                 // ⚠️ The names live here and not in the core: which index is Monday is a calendar
                 // question, and `WeeklyPlan` deliberately has no calendar in it.
                 DAY_NAMES.forEachIndexed { index, name ->
                     FilterChip(
-                        modifier = Modifier.weight(1f),
                         selected = index in state.profile.heavyDays,
                         onClick = { vm.toggleHeavyDay(index) },
                         label = { Text(name) },
