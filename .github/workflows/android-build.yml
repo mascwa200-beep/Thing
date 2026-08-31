@@ -353,11 +353,30 @@ jobs:
         # and only for now: until the publisher emits deltas, every rebuild that changes the content
         # means a fresh ~160 MB download offered to the phone, and a card asking for that every week
         # is a card people learn to dismiss. Weekly becomes the right answer the day deltas land.
-        run: echo "window=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+        #
+        # ⚠️ **The whole cache key is emitted here, so the restore and the save cannot drift.** They
+        # have to be two separate steps — see the save step below — and two copies of a three-file
+        # `hashFiles` plus a salt is a key that will one day differ by a character, at which point
+        # every run rebuilds from 1.7 GB and reports success while doing it.
+        run: |
+          w=$(date -u +%Y-%m)
+          echo "window=$w" >> "$GITHUB_OUTPUT"
+          # ⚠️ ONE line, and it has to be. This is a literal block scalar, so a newline inside the
+          # `${{ }}` would be a real newline in the value written to $GITHUB_OUTPUT — which is a
+          # line-oriented file, so the key would arrive truncated and every run would miss the cache.
+          echo "key=food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py', 'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt') }}-$w-usda20260430" >> "$GITHUB_OUTPUT"
 
       - name: Restore the food database
         id: fooddb
-        uses: actions/cache@v4
+        # ⚠️ **`cache/restore` rather than `cache`, and the save is a separate step below.** The
+        # composite action declares `post-if: success()` — read out of its own `action.yml`, not
+        # recalled — so a job that fails ANY later step never saves. The nutrition workflow's run 134
+        # built the database in eight minutes after a quarter of an hour of downloading and then threw
+        # the file away because a one-line Kotlin error failed the APK four minutes later; the two
+        # workflows share this cache, so the loss is shared too. Splitting the two banks the artefact
+        # the moment it exists, which is the only moment its correctness has anything to do with the
+        # rest of the job.
+        uses: actions/cache/restore@v4
         with:
           path: app/src/main/assets/food/food.db
           # ⚠️ The salt at the end is a MANUAL rebuild switch. The builder's own hash covers a code
@@ -385,10 +404,10 @@ jobs:
           # would restore the STALE database and the change would do nothing at all, silently. That
           # is the same trap the paragraph above records about a URL correction, and this one would
           # be worse: a scale correction that never takes effect leaves a wrong number on screen.
-          key: >-
-            food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py',
-            'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt')
-            }}-${{ steps.sources.outputs.window }}-usda20260430
+          #
+          # The expression itself is in the stamp step above, so this and the save below read one
+          # value rather than two copies that can differ by a character.
+          key: ${{ steps.sources.outputs.key }}
 
       - name: Build the food database
         if: steps.fooddb.outputs.cache-hit != 'true'
@@ -466,6 +485,20 @@ jobs:
           echo "--- after ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
           grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/fooddb-time.log 2>/dev/null | sed "s/^/    /" || true
           echo "disk after:"; df -h / | tail -1
+
+      - name: Bank the food database
+        # ⚠️ **Immediately after it is built, not at the end of the job.** See the restore step for
+        # what the composite action's `post-if: success()` costs; this is the half that fixes it.
+        #
+        # ⚠️ Gated on the FILE rather than on the cache action's opinion of itself — and `always()` so
+        # a save still happens if something between here and the end fails, which is the entire point.
+        # A save on a key that already exists logs a warning and carries on, so a restored-then-
+        # re-saved database is noisy rather than broken.
+        if: always() && hashFiles('app/src/main/assets/food/food.db') != '' && steps.fooddb.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: app/src/main/assets/food/food.db
+          key: ${{ steps.sources.outputs.key }}
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
