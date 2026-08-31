@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -138,7 +139,17 @@ private fun MovementRows(vm: HealthViewModel, index: Int, movement: Training.Mov
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(movement.exercise.name, style = MaterialTheme.typography.titleSmall)
+        // ⚠️ Same shape as the picker below and the same reason: a movement name has no length
+        // limit — anybody can add one — and an unweighted `Text` beside an unweighted button in a
+        // `Row` measures at its full intrinsic width, so a long one pushes "Remove" out of the row
+        // and it is simply not drawn.
+        Text(
+            movement.exercise.name,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
         TextButton({ vm.removeMovement(index); vm.saveSession() }) { Text("Remove") }
     }
 
@@ -296,8 +307,23 @@ private fun AddMovement(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            TextButton({ onPick(e); open = false; query = "" }) {
-                Text("${e.name}  ·  ${e.pattern.label}")
+            // ⚠️ **Weighted, and the "Forget" button beside it is not — otherwise it is not drawn
+            // at all.** Both children used to be unweighted, so a `Row` measured each at its
+            // intrinsic width and whatever did not fit was simply not laid out: no clipping, no
+            // scrollbar, nothing to suggest a second control was ever there. "Bulgarian split squat
+            // · Squat" is thirty-one characters, about 240 of the 296 dp a card has on a 360 dp
+            // phone, which leaves less than a "Forget" — and a movement somebody added themselves
+            // has no length limit at all. `fill = false` so a short name still hugs its text rather
+            // than leaving the button stretched across the row.
+            TextButton(
+                onClick = { onPick(e); open = false; query = "" },
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
+                Text(
+                    "${e.name}  ·  ${e.pattern.label}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             // ⚠️ Only a movement somebody ADDED can be removed. The catalogue ships with the build
             // and deleting from it would be a per-install edit to shared content — and the id would
