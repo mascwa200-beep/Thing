@@ -12050,3 +12050,177 @@ at a packet.** In order: **scan a curved can, a crinkly bag and a small cosmetic
 PORTRAIT**, which is the case that could not work at all before; then the first-run pack download and
 **that it survives a restart** (that is the `user_version` defect not happening); then type a few
 letters into food search and check it answers immediately rather than after a pause.
+
+### THE WIDGET BECOMES THE MOCKUP — six slices (this session, PR on `claude/loving-edison-bd65oa`)
+
+Owner sent a screenshot of the current widget and a dense concept mockup: *"nice and a good start,
+but it's still very sparse … Whatever it takes to make it, it is ok, as long as you don't use all
+our plan usage in the process."* Then, interrupting, a binding correction: **the mockup is
+illustrative and every value in it is filler** — they live in **Holland, Michigan**, not Trenton NJ,
+and *"it shouldn't be dependent on a specific location it should be dependent on the current
+location."* Three AskUserQuestion decisions: COMMS = **READ_SMS plus multi-account email**; build
+**all four** missing blocks (water, petrol, data used, free storage); keep the panel **transparent**.
+
+**Zero subagent and zero workflow spend for the whole arc**, per the standing plan-usage constraint,
+which overrides the ultracode reminder as it has for every arc since. Every check was local kotlinc
++ JUnit, a live endpoint probe, `javap` against the real platform jar, or CI.
+
+**⚠️ THE SPARSENESS HAD A MEASURABLE CAUSE, and finding it is what made the plan small.**
+`lock_widget_info.xml` allows `maxResizeHeight="640dp"` and the tallest `SizeF` breakpoint was
+**300×385dp** — so above 385 the host had nothing richer to pick and stretched the same twenty rows.
+That gap *was* the complaint. Two new breakpoints and a board vocabulary, not a rewrite.
+
+Six slices, each its own CI-green commit: S1 block vocabulary + `widget_board.xml` · S2 sparklines +
+meter · S3 data already fetched and unsurfaced · S4 water · S5 petrol + data used · S6 texts + mail.
+
+#### Platform facts, read out of `android-all` rather than recalled
+
+| fact | value | consequence |
+|---|---|---|
+| `MAX_NESTED_VIEWS` / `MAX_INIT_VIEW_COUNT` | 10 / 16 | used only in `initializeFrom` — caps nested **RemoteViews objects**, NOT XML depth. A deep static layout is fine. |
+| `MAX_SINGLE_PARCEL_SIZE` | 800000 | the budget bitmaps eat into |
+| size variants share one `BitmapCache` | de-duped on **identity** | one Bitmap instance costs ONE copy however many variants draw it — so the provider builds each chart once and passes it around |
+| `@RemoteView` whitelist | includes GridLayout, **ProgressBar**, TextClock; **bare `View` is absent** | a real breadth bar with no bitmap; hairlines must be ImageView |
+
+Charts render at a **fixed pixel size independent of density** (~132×44 px, ~23 KB each). A
+sparkline is low-frequency so upscaling is invisible, and 3× density would have made seven charts
+~706 KB against the 800 KB ceiling.
+
+#### The water block, and why probing first changed the design
+
+⚠️ **There are ZERO tide-prediction stations in Michigan** — the Great Lakes are not tidal, so the
+nearest to the owner is **879 km** away in Washington DC. A tides block would have sat permanently
+empty where they live. NOAA publishes water **levels** for the lakes and there is a gauge **8.6 km**
+from them. So `core:telemetry/WaterStations.kt` carries which product each station supports and the
+reading follows the coast or the lake.
+
+⚠️ **The two reaches differ and that is the rule the whole design turns on.** High water travels
+along a coast, so a distant tide gauge is right about the height and wrong about the hour — the half
+anybody acts on. A lake's level is basin-wide. `TIDE_REACH_KM = 90`, `LEVEL_REACH_KM = 220`, tested
+against each candidate's OWN kind: one shared limit would either discard the good lake gauge or
+admit the bad tide one.
+
+⚠️ **Twelve water-level stations are deliberately NOT bundled**, and the measurement is what decided
+it. The app asks for **IGLD**, correct for the Great Lakes–St. Lawrence system and meaningless
+elsewhere; NOAA also publishes levels for Mississippi river stages, the Texas Laguna Madre and six
+in Puerto Rico. **Every one of the twelve has a tide station within 37 km, and four of the six PR
+ones are the SAME station publishing both products, at 0.0 km.** An asset test holds the rule.
+
+⚠️ Worth recording because it is the OPPOSITE of what this app usually finds: asking a Great Lakes
+station for predictions answers **HTTP 400** with its own explanation, not a 200 carrying an error
+object. So the client throws and nothing has to sniff a body for the word "error".
+
+`tools/water/build_stations.py` reproduces the bundled list from the two endpoints, and `--check`
+found the committed asset had **154 names truncated mid-word** by the ad-hoc script that first made
+it ("Gardiners B", "Little ", "Ne"). The builder's output replaced it and now matches byte for byte.
+
+#### Petrol, data used, and a cycle day that is not a day every month has
+
+**The pump price was already being fetched and drawn nowhere.** `FuelRepository.fetchEiaUsRetail`
+has returned `usRetail` whenever an EIA key is set, and the widget showed only the crude benchmark
+beside it — the computed-and-never-used class, in a feed the widget already paid for. One fetch now
+returns both lines. US-only and key-gated, because the World Bank retired both pump-price indicators
+and there is no free worldwide equivalent.
+
+`core:telemetry/BillingCycle.kt` is pure and clock-free like every other date core in that module.
+⚠️ **A cycle starting on the 31st has to start somewhere in April**, and the 30th is the only
+defensible answer — the alternative is a month with no cycle, or one that rolls into May and reports
+six weeks as a month's usage. Comparing the date against the RAW setting gets that wrong in a way
+that hides: on 30 April it says the cycle is still March's, and on 1 May it says so again, so April
+never rolls over at all. ⚠️ **Nor is a cycle as long as its month**: 31 March → 30 April is thirty
+days, 28 February → 31 March is thirty-one, and **31 May → 30 June is thirty** — my own expectation
+there said 31 and the code was right.
+
+**Cross-checked against `datetime` over 56,606 cases across five years — every date, every cycle
+day — with zero disagreements.**
+
+⚠️ Wi-Fi is deliberately not counted: a cap applies to the radio. `MobileData.Reading` is sealed
+because there are four answers and one is a number — used, no Usage Access, no radio, or the query
+threw. Zero for the last three is the recurring defect: zero on a tablet with no SIM looks frugal,
+and on a refused permission looks broken. Usage Access is asked once up front the way `place` is,
+because a source returning null from inside `widgetSource` is recorded as **Empty** — "asked,
+nothing to report" — which is the wrong thing to say about a permission nobody granted.
+
+#### Texts and mail, and the credential gate that did not exist
+
+Three IMAP commands over TLS; the parsing is `core:telemetry/ImapProtocol.kt` and the socket around
+it is a dozen lines. ⚠️ **`quote` escapes backslashes BEFORE quotes** or the escape added in front
+of a quote is itself doubled and the quote goes out bare, ending the argument early and leaving the
+rest of the password read as further IMAP arguments. A value carrying CR or LF is refused outright.
+
+⚠️ **HOSTNAME VERIFICATION IS NOT AUTOMATIC ON A RAW `SSLSocket` AND ITS ABSENCE IS SILENT.** Without
+`endpointIdentificationAlgorithm = "HTTPS"` the certificate CHAIN is validated and the NAME is not,
+so anybody holding a valid certificate for any domain could answer for this one — no error, no
+warning, a password handed over. `HttpsURLConnection` sets it for you; a socket does not. ("HTTPS"
+names the RFC 2818 verification rules, not the protocol; there is no "IMAPS" algorithm.)
+
+⚠️ **THE THREE CREDENTIAL INVARIANTS AND WHY THEY LAND IN ONE COMMIT.** At rest is free — the whole
+settings blob goes through `SecretCrypto`. `allSecretValues()` must name the password, because a
+password has no shape a pattern scrubber could find and the exact-match pass is the only thing that
+can keep it out of a debug report. And `redactSecrets` must blank it while **`merge` puts the
+device's own back** — the export half ALONE is a data-loss bug, not an incomplete feature: restoring
+a backup would write blanks over working credentials and sign you out of everything.
+
+**Nothing guarded any of that, so `CredentialCoverageTest` now does** — textual, like
+`WidgetLinkageTest`, so it cannot fail for an environmental reason. It reads the whole `data/settings`
+**package** (not one file: `EmailAccount` moved to its own file mid-slice, and a single-path gate
+would have stopped seeing its password and gone on passing) and carries a self-check, because with
+its regex broken every "nothing is missing" assertion passes trivially.
+
+⚠️ **TWO DEFECTS IN THAT GATE, BOTH FOUND ONLY BY RUNNING IT, and the second is a new lesson.** Its
+brace matcher took each function's own PARAMETER list as the body — `()` for `allSecretValues` — and
+reported every credential in the app as uncovered, a harness declaring the thing it checks broken.
+Then a negative test showed **the gate could be satisfied by a COMMENT**: deleting the real
+registration left the paragraph explaining it behind, and the substring match found the word there.
+**Comments are stripped before matching now — the comment documenting a rule must not stand in for
+the rule.**
+
+⚠️ **READ_SMS bars an app from Google Play** outside a few declared categories, none of which this
+is. Sideloaded and private, so it costs nothing — but it is a decision, named in the manifest.
+
+#### Two silent-truncation defects I introduced, and the fix
+
+The board draws a fixed number of readout slots and `getOrNull` past the last is **silent** — so the
+water line vanished whenever the weather detail, the air quality and space weather were all present.
+`pairs` had the same shape and two slots while S6 wanted three. Same trap CLAUDE.md already records
+for the one notification's five row slots. The layout grew by a readout and a region,
+`MAX_READOUTS`/`MAX_PAIRS` are constants the caller `take()`s **knowingly**, and the full breakpoint
+moved 540 → 610dp — a breakpoint below its content clips, which is the rule governing that whole list.
+
+#### Method notes worth reusing
+
+- ⚠️ **`tools/android_compile_check.sh`'s `-m` classes go stale the moment a core file is added.**
+  Three times this arc a "defect" was a `:core:telemetry` class written after the last
+  `compileKotlin`. Rebuild first; the script documents this for `:core:feeds` and it applies equally.
+- ⚠️ **A file that cannot be type-checked locally is one only CI can gate**, and that is worth
+  designing for: `CommsRepository` took the whole `AppSettings` for one field, which dragged in two
+  unbuildable modules; narrowing it to `List<EmailAccount>` (and moving that type to its own file)
+  made the entire comms layer locally verifiable.
+- **The resolve gate's cascade was proven, never shrugged at** — by planting `safetyRadiusKm` and
+  `period`, both in shipping CI-green code, and watching them report identically; and by typed
+  probes of the exact expressions.
+- ⚠️ **Check every Compose call site against the REAL declaration.** `PrefInfo`'s second positional
+  parameter is `value` — short, right-aligned, two lines — not `subtitle`; a paragraph there would
+  have been truncated and right-aligned.
+- ⚠️ **A python edit script writes at the END**, so an assertion failing on the third replacement
+  means NONE were written. That fired once here and the file was correctly untouched.
+
+**Verified across the arc:** 21 + 14 + 15 core tests, 9 asset tests, 9 IMAP client tests (end to end
+against a fake in-process server, since port 993 is blocked here and there is no account), 4
+credential-gate tests and 7 linkage tests, all run locally. **35 load-bearing rules negative-tested**
+against baselines asserted green first, each perturbation asserted to have matched the source and
+each restore byte-compared. Both NOAA products and both EIA/NOAA error shapes probed live.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a widget and never draws one.** In order: **resize the
+widget to full height** and check it shows genuinely more rather than the same rows stretched; the
+water line should read **lake level for Holland**, not tides; Settings → Data & refresh → "Data
+allowance resets on" and then whether the DATA line matches your carrier's own figure; Settings →
+Texts & mail → grant the texts permission and add a mailbox (**Gmail needs an app password** — the
+dialog says so before you try). Sparklines should be crisp rather than blurry, and the clock should
+tick without the widget refreshing.
+
+**Open / steerable:** whether the board is now too dense at full height (every region is a
+`Column` the provider fills, so trimming is a call-site change); the EIA key is the owner's to add,
+without which the pump line is absent by design; and `safetyRadiusKm` was found to have **no Settings
+control at all** — a pre-existing dead setting read by `RefreshWorker`, recorded rather than fixed
+here.
