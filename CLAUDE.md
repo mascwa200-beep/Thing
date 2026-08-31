@@ -11997,13 +11997,35 @@ release step found the same SHA already published.
 #### ⚠️ A cost to be deliberate about before touching the builder
 
 `hashFiles('tools/food/build_food_db.py', …)` is part of the food-database cache key, so **editing
-that file — even a comment — forces a full rebuild**: roughly six minutes and ~1.7 GB fetched from
-Open Food Facts and USDA, on both workflows. The same shape as the star catalogue's key, where the
-recorded remedy is to put such notes somewhere outside the hash. Here the note belongs in the builder
-and the rebuild was accepted knowingly, with one consequence worth stating: **the OFF export is
-rebuilt daily, so a forced rebuild fetches a newer dump, publishes a new pack, and offers the phone a
-fresh ~213 MB download.** That is more barcodes, which is what was asked for — but it is a
-consequence, not a side effect to discover.
+that file — even a comment — forces a full rebuild**: **8m36s on one runner and 9m23s on the other**,
+plus ~1.7 GB fetched from Open Food Facts and USDA, on each. The same shape as the star catalogue's key, where the
+recorded remedy is to put such notes somewhere outside the hash. Here the note belongs with the code
+that produces the number, so the rebuild was accepted knowingly.
+
+⚠️ **I predicted that rebuild would publish a fresh ~213 MB pack, and it did NOT — the measurement
+refuted me and established something better.** The reasoning was that the OFF export is rebuilt
+daily, so a rebuild fetches a newer dump; what it misses is that the previous build was *the same
+day*, so the dump had not rolled over. Nutrition #140 printed:
+
+    database content: 3589a76e7649d636
+    published:        Food database — pack #138 · 4523700 products · content 3589a76e7649d636
+    the published pack already holds this database — nothing to publish
+
+⚠️ **So the builder is DETERMINISTIC over identical sources — byte-identical output from two
+different runners forty minutes apart — which is the property that makes content gating mean
+anything and which I had not established.** The honest statement of the cost is therefore: a rebuild
+on the SAME day is pure waste (CI time and 1.7 GB from two third-party servers, for a file already
+held); a rebuild on a LATER day fetches a newer dump and does offer the phone a fresh download. Both
+are reasons to keep such edits off that file's content when they are only comments.
+
+⚠️ **And the cost is DOUBLE, not single, because the two workflows race rather than share.** The
+cache entry is shared on purpose so that whichever builds it first saves it for the other — but a
+change to a file both build fires both at once, and here LCARS reached `Restore the food database`
+at 09:25:18 while nutrition was still building until 09:29:12. Both missed, both rebuilt, and both
+banked the identical result. **The sharing only pays when the runs are staggered; on the push that
+invalidates the key it never can be.** So the real price of touching that file is ~3.4 GB from Open
+Food Facts and USDA and about eighteen runner-minutes, which is worth knowing before spending it on
+a comment.
 
 #### Open
 
