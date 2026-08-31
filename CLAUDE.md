@@ -12224,3 +12224,35 @@ tick without the widget refreshing.
 without which the pump line is absent by design; and `safetyRadiusKm` was found to have **no Settings
 control at all** — a pre-existing dead setting read by `RefreshWorker`, recorded rather than fixed
 here.
+
+#### The station list is now proven to reach the phone (`ceb0aac4`, run 2161 green)
+
+⚠️ **The water block is DESIGNED to go quiet, which is what made this worth a gate.** No gauge
+within reach draws nothing at all — honest for somebody far from one, and byte-for-byte the same
+answer as an asset that never shipped. `WaterStationsAssetTest` reads the file on DISK and proves it
+correct; nothing proved the file the phone opens is that file. A new `Verify the water stations
+packaged` step closes it, mirroring the sky-asset check beside it.
+
+⚠️ **The size floor is load-bearing, and a control proved it rather than reasoning about it.** An
+empty or truncated list parses to zero stations, `nearest` returns null, and the block goes quiet in
+exactly the same way — so presence alone would pass on a file carrying nothing. Removing the floor
+makes a 400-byte asset pass.
+
+Negative-tested by extracting the shipped shell out of the YAML and running it against five states:
+real asset (0), absent (1), truncated (1), an APK carrying the sentinel (1, so the check *can*
+fail), and the floor removed (0). ⚠️ Case 1 also proves an `assets/water/` **directory entry** does
+not satisfy the filename grep — `zip` writes those where AGP does not, which is the trap the
+nutrition arch-check hit once.
+
+**Measured, from the two runs' own logs rather than asserted:** run 2160 (S6) published at
+**694,050,252 bytes (661 MB)**; run 2161 (the gate, a workflow-only change) at **694,049,880** — a
+delta of **−372 bytes**, the version code and nothing else, which independently confirms the step
+added no payload. The step's own line reads `stations.tsv: 189028 bytes`, matching the file on disk
+exactly. ⚠️ Note this APK figure supersedes the 693,876,801 recorded earlier in this file, and the
+delta between them is **not attributed** — many commits landed in between.
+
+⚠️ **A gap this did NOT close, recorded rather than left to be rediscovered:** the equivalent
+question is unanswered for every other asset the app opens by name. The sky and food checks exist
+because those paths are fragile; this one exists because its consumer is silent. Nothing
+systematically asks "does every `assets.open(...)` reach the APK", and deriving that list from the
+source is the obvious shape if it is ever worth doing.
