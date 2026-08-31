@@ -288,10 +288,11 @@ class OfflineFoodStore(
      *   - **The database is no longer in the APK.** It is fetched once as its own pack, so the cost
      *     is a one-time download rather than one paid again on every build of the interface.
      *
-     * What is there instead is FTS4, contentless, `matchinfo=fts3`, measured on 70,415 real names at
-     * **28.8 bytes a row and falling with scale** — 33.3 at ten thousand rows, 30.4 at fifty, 28.8 at
-     * seventy, as the term dictionary amortises. The build logs the true figure at four and a half
-     * million every run rather than leaving this comment to claim it.
+     * What is there instead is FTS4, contentless, `matchinfo=fts3`. Sized on 70,415 real names it came
+     * to 28.8 bytes a row and was still falling with scale — 33.3 at ten thousand rows, 30.4 at fifty,
+     * 28.8 at seventy, as the term dictionary amortises — so that was recorded as a ceiling. The real
+     * build settled it lower still: **24.1 bytes a row, 58 MB over 2,541,457 products, built in seven
+     * seconds.** The build logs it every run rather than leaving this comment to claim it.
      *
      * And the speed, the same ten realistic queries at that size: **18.9 ms scanning, 0.7 ms through
      * `MATCH`**. The scan is linear in the table, so at 4.5 million rows it is past a second on a warm

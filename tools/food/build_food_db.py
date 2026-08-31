@@ -734,10 +734,14 @@ def build_search_index(cur, log) -> int:
     scan is linear in the table, so at 4.5 million rows it is over a second on a warm desktop SSD
     and worse on a phone reading a 425 MB file cold from flash. `MATCH` barely moves.
 
-    ⚠️ **What it costs, measured the same way: 28.8 bytes per indexed row**, and FALLING with scale
-    (33.3 B/row at ten thousand, 30.4 at fifty, 28.8 at seventy) as the term dictionary amortises —
-    so that figure is a ceiling rather than a mid-point. Against the rows that carry nutrition that
-    is of the order of seventy megabytes on four hundred and twenty-five.
+    ⚠️ **What it costs — and the small-sample estimate was PESSIMISTIC, which the real build settled.**
+    Sized on 70,415 names it came to 28.8 bytes per indexed row and was FALLING with scale (33.3 at
+    ten thousand, 30.4 at fifty, 28.8 at seventy) as the term dictionary amortises, so that was
+    recorded as a ceiling rather than a mid-point. At full scale it is **24.1 bytes a row: 58 MB over
+    2,541,457 products**, against the 74 MB the extrapolation implied — the trend held further than
+    the sample could show. Build time is five to seven seconds; the two runners disagree by that much
+    on identical input, which is why it is quoted as a range rather than as whichever figure happened
+    to be read. All of it is logged every run rather than left to a comment to claim.
 
     ⚠️ `content=''` — contentless. Without it FTS keeps its own copy of every name and brand, which
     is the table again. `matchinfo=fts3` drops the per-row `%_docsize` table, which nothing here
@@ -754,7 +758,7 @@ def build_search_index(cur, log) -> int:
     each spend a quarter of an hour downloading 1.7 GB to build a byte-identical file — so whichever
     builds it first saves it for the other. The nutrition app fetches it as a pack, where the index
     is a one-time download; the LCARS application still bundles it in its APK, which its own updater
-    pulls in full on every build, so this adds of the order of seventy megabytes to each of those.
+    pulls in full on every build, so this adds the measured 58 MB to each of those.
     It buys that application the same search, and the real answer to the download is to move it onto
     the pack as well — which is a change to a daily driver that nobody has asked for.
 

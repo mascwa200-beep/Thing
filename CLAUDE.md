@@ -11811,3 +11811,218 @@ claiming none. All three of that step's guards were then confirmed to fire.
 packet. In order: **scan a curved can, a crinkly bag and a small cosmetic barcode in PORTRAIT**,
 which is the case that could not work at all before; then the first-run database download (Log tab,
 or Plan ▸ Food database); then whether the app still looks cramped anywhere.
+
+### THE NUTRITION APP, CONTINUED — the pack that deleted itself, and the search that never was (this session, PR #464)
+
+The section above left three items open; this closes two of them (the FTS index, which its own Open
+list called *"worth re-deciding"*, and search speed), and along the way found a defect that would
+have made the whole pack mechanism useless on a real phone. **Zero subagent and zero workflow spend**,
+per the standing plan-usage constraint, which overrides the ultracode reminder as it has for every
+arc since. Every check below is local kotlinc + JUnit, a live measurement, a read of Android's own
+source, or CI.
+
+**⚠️ THE DEFECT THAT MATTERED MOST: NOTHING EVER SET `user_version`, SO A DOWNLOADED PACK DELETED
+ITSELF ON FIRST OPEN.** `FoodDatabase.usable` deletes any file whose version is not the schema — the
+guard written a few commits earlier precisely so Room could not destructively migrate several hundred
+megabytes somebody had waited for. The builder never stamped one, so every pack was version 0,
+and the guard fired on it: 170 MB and several minutes of somebody's time, deleted, permanently,
+with *"this is for an older version of this app; download it again"*.
+
+⚠️ **The bundled asset survived only by taking a completely different route, which is why nothing
+caught it.** A version-0 file makes Android's `SQLiteOpenHelper` call `onCreate`; Room's
+`createAllTables` is `IF NOT EXISTS`, so the populated tables are left alone and Room stamps the
+version itself — and `usable` never sees that file until after Room has already fixed it. Both paths
+validate (verified by `javap` on room-runtime 2.6.1: version-0 → `onCreate` → `createAllTables` →
+`onValidateSchema` → `updateIdentity`; matching version → `onOpen` → `checkIdentity` → no master
+table → `onValidateSchema`). **Nothing in CI could see it**: the file builds, packages, publishes and
+verifies, and the deletion happens on the phone. The builder now stamps it, **reading the number out
+of `FoodDatabase.kt` rather than restating it**, and `verify` asserts it.
+
+**⚠️ FTS5 WAS NOT THE MORE EXPENSIVE OPTION, IT WAS AN IMPOSSIBLE ONE — and the note rejecting it had
+that wrong.** Android builds its own SQLite with `SQLITE_ENABLE_FTS3`, `FTS3_BACKWARDS` and `FTS4`
+and **no FTS5** — read out of `platform/external/sqlite`'s `dist/Android.bp`, not recalled. SQLite
+parses the WHOLE schema when it prepares its first statement, so a database carrying an `fts5` table
+would have failed **every query on every device**, not merely queries against it. The other half of
+that note is gone too: it weighed the cost against *"an APK the updater re-downloads on every
+build"*, and the database had already left the APK.
+
+So: **contentless FTS4**, `content=''`, `matchinfo=fts3`. Measured on 70,415 real Open Food Facts
+names over ten realistic queries — **18.9 ms scanning against 0.7 ms through MATCH**. The scan is
+linear in the table, so at four and a half million rows it is past a second on a warm desktop SSD and
+worse on a phone reading a 489 MB file cold from flash.
+
+⚠️ **The small-sample size estimate was PESSIMISTIC and the real build settled it.** Sized on 70,415
+names it came to 28.8 bytes a row and was *falling* with scale (33.3 at ten thousand, 30.4 at fifty,
+28.8 at seventy) as the term dictionary amortises, so it was recorded as a ceiling. At full scale it
+is **24.1 bytes a row — 58 MB over 2,541,457 products** against the 74 MB the extrapolation implied.
+The trend held further than the sample could show. Build time is **five to seven seconds**, and the
+two runners disagree by that much on identical input, which is why it is quoted as a range rather
+than as whichever figure happened to be read.
+
+⚠️ **Every term carries a trailing `*`, and dropping it would silently break the scorer.**
+`FoodSearch.wordMatch` accepts a corpus word up to three characters longer than the query token —
+cook/cooked, roast/roasted — while a bare `MATCH 'roast'` is exact-token only, so it would lose every
+inflection that function exists to allow. A prefix query over-admits and `score` refuses the excess,
+which is the split the rest of that file already uses. What a prefix query cannot reach is a match in
+the MIDDLE of a word, and nothing is lost there: `wordMatch` scores those zero, so they were being
+read and thrown away.
+
+⚠️ **Detected, not assumed** — the database is downloaded independently of the app now, so a phone can
+hold a corpus built last month and an app built today, and a hard dependency would turn that into a
+search that throws. The detector is the builder's own recorded row count, which is also the **only**
+way to count a contentless FTS4 table: `SELECT COUNT(*)` on one is a *"SQL logic error"*, which is
+how the check that tried it found out.
+
+#### ⚠️ AN EMPTY EXPRESSION IN A COMMENT, AND THE TWO RUNS IT COST
+
+**A `#` line inside a `run:` block is a comment to the SHELL and not to GitHub.** Expressions are
+substituted before the script exists, so a comment written to explain that a newline must not appear
+inside `${{ … }}` contained a literal empty one — and an empty expression is a syntax error in the
+workflow itself. Both workflows carried it.
+
+⚠️ **The failure gives you nothing at all to read.** An invalid workflow never reaches the point of
+creating a job, so the run completes in **under a second with ZERO jobs**: no log, no failing step,
+no annotation, just "failure". The only way to tell it from a runner that vanished is that
+`created_at`, `run_started_at` and `updated_at` are the same second and `list_workflow_jobs` returns
+an empty array.
+
+⚠️ **`yaml.safe_load` passes the broken file, which is why loading it is not a gate** — expressions
+are opaque strings to YAML and a separate language to GitHub. I loaded both files, they parsed, and I
+reported that as verification; it proved the indentation and nothing else.
+
+`tools/workflow_expr_check.py` checks the four delimiter mistakes that produce a run with nothing in
+it to diagnose — an empty expression, an unclosed `${{`, a stray `}}`, and an expression spanning
+lines inside a literal block (where the substitution puts a real newline into whatever the script was
+building, which is how a value written to the line-oriented `$GITHUB_OUTPUT` arrives truncated). All
+four negative-tested, the first against the exact text that broke the build. It deliberately does NOT
+validate the expression *language* — an unknown function still only fails on GitHub.
+
+⚠️ **And wiring it in found a hole in `tools/check_changed.sh` immediately: it exited early when no
+KOTLIN file changed.** So a commit touching only a workflow ran no gates at all — which is exactly
+the commit that broke the build. The early exit now requires *nothing* to have changed, the
+Kotlin-only gates skip explicitly rather than being handed an empty file list (kotlinc and the
+duplicate-declaration checker each print their own usage text when given no arguments, which reads as
+a finding), and the whole-tree file list is computed above the exit rather than inside the gate that
+used it.
+
+#### ⚠️ `actions/cache` DECLARES `post-if: success()` — a failed job never banks its work
+
+Run 134 downloaded 1.7 GB from two servers, built the database in eight minutes, published a pack
+from it, and then threw the file away because a one-line Kotlin error failed the APK four minutes
+later. That is the documented behaviour of the combined action, read out of its own `action.yml`
+rather than recalled: the save runs in a post step gated on the job succeeding.
+
+⚠️ **And a claim I nearly recorded here was WRONG — checking it is the only reason I know.** I wrote
+that the next run therefore rebuilt from scratch. It did not: run 135's `Build the food database` is
+`skipped`, because the sibling LCARS workflow shares that cache entry on purpose and had banked it.
+So the loss was real and was **covered by the shared cache rather than paid for**, which is the
+sharing working rather than a mitigation of the bug. The bug is still worth fixing — the two
+workflows can and do fail together, which is precisely when nothing would be banked. Both now use
+`actions/cache/restore@v4` plus an explicit `actions/cache/save@v4` step guarded on
+`always() && the file exists && it was not a cache hit`. Confirmed firing: LCARS #2153's
+`Bank the food database`, two seconds, and the next run restored from it.
+
+⚠️ **The whole key is emitted once from the stamp step and read by both**, because `hashFiles` plus a
+salt written out twice is a key that will one day differ by a character — at which point each half
+silently rebuilds for ever and neither ever finds the other's entry.
+
+#### ⚠️ `tools/nutrition_compile_check.sh` — the gate the CI failure named
+
+The failure was `Unresolved reference 'SpaceBetween'`: I wrote `Arrangement.SpaceBetween` from memory
+in a shared UI helper. **No existing gate could reach it** — the parse pass does not type-check,
+`android_resolve_check.sh` differences unresolved *names* against a baseline and a brand-new one has
+nothing to cancel against, and `android_compile_check.sh` stops where a file pulls in the app's own
+kit. The new gate compiles **all 57 module files** plus `:core:scan`, `:core:update` and
+`:core:health` sources against the real platform classes and the real AARs in about thirty seconds,
+and is negative-tested against the exact failure.
+
+⚠️ **`:core:telemetry` and `:core:feeds` go on as COMPILED CLASSES, never as sources.** Passing them
+as sources folds them into one compilation unit, which makes them one module, which makes a
+cross-module smart-cast error vanish — so the gate would pass on code CI rejects. That trap has cost
+this project four CI rounds already.
+
+⚠️ **Its success check first accepted only the string `compiles clean`** — but a clean Compose run
+reports `frontend clean` (a `@Composable` cannot be *lowered* without the Compose plugin, so reaching
+IR lowering is what a passing Compose file looks like), so it would have called a passing tree a
+failure. Accepts both now.
+
+#### ⚠️ A `Row` NEITHER WRAPS NOR SHRINKS: whatever does not fit is simply not drawn
+
+No clipping, no scrollbar, nothing to suggest a control was ever there. Two rows in the training card
+put an unweighted `Text` beside an unweighted `TextButton` under `SpaceBetween`, so each was measured
+at its full intrinsic width and the button lost. The content is user-supplied with no length limit,
+and even the bundled catalogue reaches it: *"Bulgarian split squat · Squat"* is thirty-one characters,
+about 240 of the 296 dp a card has on a 360 dp phone, which leaves less than a "Forget". Fixed with
+`weight(1f, fill = false)` — hugs its text when short, ellipsises when long — leaving the unweighted
+button measured first and always given its width.
+
+⚠️ **Found by re-running the audit with the RIGHT rule, after the first one missed one of the two.**
+The rule I started with was *"a Row holding two or more controls"*; the actual defect is *"unweighted
+flexible content beside any fixed control"*, and the second row has only one button. Worth recording
+because **the wrong rule looked like it was working** — it found the first row and reported the file
+clean of anything else.
+
+⚠️ **Deliberately NOT turned into a gate.** The corrected sweep returns seven rows of that shape and
+only two are defects; the other five hold fixed strings (a date, "Send reports automatically",
+"Earlier"/"Later") whose widths are bounded and measured to fit. At five false positives in seven it
+is a report people would learn to skim, which this project has repeatedly found worse than no gate.
+
+Also checked and sound while sweeping: no `LazyColumn` nested inside the outer vertical scroll (both
+mentions are comments explaining why not), every scrolling child is bounded by a `heightIn`, and every
+text field without a declared keyboard is a name, note or search box where the default is right — so
+the numeric sweep is genuinely complete rather than merely finished.
+
+#### Measured, from the two green runs
+
+| | measured |
+|---|---|
+| products indexed | **2,541,457** of 2,541,457 searchable, in 5–7 s |
+| search index | **58 MB (24.1 bytes/row)** |
+| database | **489 MB (113.3 bytes/row)**, packaged 488 MB uncompressed |
+| pack | **213 MB compressed, 489 MB unpacked** |
+| nutrition APK | **35,247,288 bytes (34 MB)** — *"no bundled food database, as intended"* |
+| LCARS APK | **693,876,425 bytes (661 MB)** |
+
+⚠️ **The LCARS APK figure is the current one and the delta is NOT attributed.** Many commits landed
+between it and the 612 MB recorded earlier in this file; that earlier figure is a dated record of
+what a particular build measured and stays as written. What is certain is that this application still
+bundles the corpus while its updater pulls the whole APK on every build, so it pays the index in
+full. The real answer is to move it onto the pack as well — a change to a daily driver nobody asked
+for, and still the largest open item here.
+
+⚠️ **Nutrition #139 SKIPPED both the database build and the pack publish**, which is the content
+gating working rather than a failure: the corpus had not changed, so the cache restored and the
+release step found the same SHA already published.
+
+#### ⚠️ A cost to be deliberate about before touching the builder
+
+`hashFiles('tools/food/build_food_db.py', …)` is part of the food-database cache key, so **editing
+that file — even a comment — forces a full rebuild**: roughly six minutes and ~1.7 GB fetched from
+Open Food Facts and USDA, on both workflows. The same shape as the star catalogue's key, where the
+recorded remedy is to put such notes somewhere outside the hash. Here the note belongs in the builder
+and the rebuild was accepted knowingly, with one consequence worth stating: **the OFF export is
+rebuilt daily, so a forced rebuild fetches a newer dump, publishes a new pack, and offers the phone a
+fresh ~213 MB download.** That is more barcodes, which is what was asked for — but it is a
+consequence, not a side effect to discover.
+
+#### Open
+
+- **Deltas** — the format, `FoodPack.plan` and the install branch exist; the builder does not emit
+  them. Until it does, every content change is a full ~213 MB fetch, which is why the schedule is
+  monthly rather than weekly.
+- **Remembering a network-found product** — `FoodRepository.byBarcode` falls back to Open Food Facts
+  and distinguishes `NoNutrition` from `NotInDatabase`, but nothing writes the result into the local
+  database, so the same product is fetched again tomorrow.
+- **Whether LCARS should stop bundling the corpus too** (see the APK figure above).
+- ⚠️ **The as-you-type path still ranks by name length rather than by `FoodSearch.score`**, and
+  deliberately, for the reason its own KDoc gives: the last word of a half-typed query is a fragment,
+  and scoring "cho" against "chocolate" returns zero. Every *other* limitation that KDoc describes —
+  a whole-name anchor that could not find "Coca-Cola Zero Sugar" from "coke zero", a 400-row cap, and
+  that cap's country-prefix bias from reading in rowid order — was a consequence of having no index
+  and is gone. What changed is which candidates get ranked.
+
+⚠️ **Owner-verify on the Pixel, unchanged and unavoidable — CI compiles a scanner and cannot point one
+at a packet.** In order: **scan a curved can, a crinkly bag and a small cosmetic barcode in
+PORTRAIT**, which is the case that could not work at all before; then the first-run pack download and
+**that it survives a restart** (that is the `user_version` defect not happening); then type a few
+letters into food search and check it answers immediately rather than after a pause.
