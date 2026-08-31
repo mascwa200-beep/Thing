@@ -361,9 +361,15 @@ jobs:
         run: |
           w=$(date -u +%Y-%m)
           echo "window=$w" >> "$GITHUB_OUTPUT"
-          # ⚠️ ONE line, and it has to be. This is a literal block scalar, so a newline inside the
-          # `${{ }}` would be a real newline in the value written to $GITHUB_OUTPUT — which is a
+          # ⚠️ ONE line, and it has to be. This is a literal block scalar, so a newline inside an
+          # expression would be a real newline in the value written to $GITHUB_OUTPUT — which is a
           # line-oriented file, so the key would arrive truncated and every run would miss the cache.
+          #
+          # ⚠️ **And this comment may not SHOW an empty expression either, which cost two runs.** A
+          # `#` line inside a `run:` block is a comment to the SHELL and not to GitHub: expressions
+          # are substituted before the script exists, so an empty one here is a syntax error in the
+          # workflow itself. Both runs that carried it produced zero jobs — no log, no failing step,
+          # nothing to read but "failure" — which is what an invalid workflow looks like.
           echo "key=food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py', 'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt') }}-$w-usda20260430" >> "$GITHUB_OUTPUT"
 
       - name: Restore the food database
