@@ -58,4 +58,75 @@ class BreakingNewsTest {
         val items = (1..50).map { Item("i$it", now - it) }
         assertEquals(10, pick(items, now, minRecent = 1, cap = 10).size)
     }
+
+    // ── perOutlet ────────────────────────────────────────────────────────────────────────────────
+
+    private data class Story(val outlet: String, val headline: String, val t: Long)
+
+    private fun spread(
+        items: List<Story>,
+        max: Int = 3,
+        prefer: (String) -> Boolean = { false },
+    ) = BreakingNews.perOutlet(items, outlet = { it.outlet }, timeMs = { it.t }, max = max, prefer = prefer)
+
+    @Test
+    fun `one story per outlet, and it is that outlet's newest`() {
+        // ⚠️ THE RULE THAT `select` CANNOT PROVIDE. Its dedupe keeps the FIRST occurrence in input
+        // order and sorts afterwards, so keying it on the outlet would pick "bbc-old" here. The
+        // input is deliberately ordered oldest-first so that a first-wins implementation is visibly
+        // wrong rather than accidentally right.
+        val out = spread(
+            listOf(
+                Story("BBC", "bbc-old", 100),
+                Story("BBC", "bbc-new", 900),
+                Story("Reuters", "reuters", 500),
+            ),
+        )
+        assertEquals(listOf("bbc-new", "reuters"), out.map { it.headline })
+    }
+
+    @Test
+    fun `outlets are ordered newest first`() {
+        val out = spread(
+            listOf(Story("A", "a", 100), Story("B", "b", 300), Story("C", "c", 200)),
+        )
+        assertEquals(listOf("b", "c", "a"), out.map { it.headline })
+    }
+
+    @Test
+    fun `preferred outlets take the slots first, even when a stranger is fresher`() {
+        // Trust is a BUCKET, not a tiebreak: "aggregator" is the newest thing here and still loses,
+        // because three slots are better spent on newsrooms than on whoever reposted last.
+        val out = spread(
+            listOf(
+                Story("Aggregator", "agg", 9_000),
+                Story("BBC", "bbc", 100),
+                Story("Reuters", "reuters", 200),
+            ),
+            max = 2,
+            prefer = { it == "BBC" || it == "Reuters" },
+        )
+        assertEquals(listOf("reuters", "bbc"), out.map { it.headline })
+    }
+
+    @Test
+    fun `an unpreferred outlet is still shown rather than leaving the block empty`() {
+        // The failure this guards: treating `prefer` as a filter, so a morning when no known
+        // newsroom has published renders nothing at all.
+        val out = spread(listOf(Story("Stranger", "s", 100)), prefer = { it == "BBC" })
+        assertEquals(listOf("s"), out.map { it.headline })
+    }
+
+    @Test
+    fun `an outlet that cannot be named is dropped`() {
+        val out = spread(listOf(Story("  ", "anon", 900), Story("BBC", "bbc", 100)))
+        assertEquals(listOf("bbc"), out.map { it.headline })
+    }
+
+    @Test
+    fun `max bounds the result and zero asks for nothing`() {
+        val many = (1..10).map { Story("outlet$it", "h$it", it.toLong()) }
+        assertEquals(3, spread(many, max = 3).size)
+        assertEquals(emptyList<Story>(), spread(many, max = 0))
+    }
 }

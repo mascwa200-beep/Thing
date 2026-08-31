@@ -299,6 +299,18 @@ internal object WidgetBoard {
     )
 
     /**
+     * How many headlines the board can draw.
+     *
+     * ⚠️ Public for the same reason as [MAX_READOUTS] and [MAX_PAIRS]: [render] fills these slots
+     * with `getOrNull(i)`, which drops anything past the end **in silence**. A caller that asks for
+     * four headlines does not get an error, or a truncation notice — it gets three, and no way to
+     * tell that from a feed which only had three. Ask for this many knowingly.
+     *
+     * There were three slots here from the day the board was built and exactly one was ever filled.
+     */
+    const val MAX_SOURCES = 3
+
+    /**
      * The header clock's patterns.
      *
      * ⚠️ These are `SimpleDateFormat` patterns, which is what TextClock takes — not `java.time`

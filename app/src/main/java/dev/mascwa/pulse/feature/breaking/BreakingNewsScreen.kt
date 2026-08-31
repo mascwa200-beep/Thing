@@ -230,8 +230,10 @@ private fun LiveTakeover() {
     }
 }
 
-private fun isTrusted(source: String): Boolean =
-    BreakingCoverageRepository.TRUSTED.any { source.lowercase().contains(it) }
+// ⚠️ This file used to restate the trust rule itself — `TRUSTED.any { source.lowercase()... }` —
+// alongside an identical copy in the repository. Two statements of one rule is how they drift, so
+// the judgement now lives once, on the companion, and this is a delegation rather than a copy.
+private fun isTrusted(source: String): Boolean = BreakingCoverageRepository.isTrusted(source)
 
 @Composable
 private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {

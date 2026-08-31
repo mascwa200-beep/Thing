@@ -14,6 +14,7 @@ import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.device.MobileData
+import dev.mascwa.pulse.core.telemetry.BreakingNews
 import dev.mascwa.pulse.core.telemetry.DayPart
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.MarketMood
@@ -24,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.Stardate
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.WeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
@@ -393,7 +395,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // disagree about what it knows — and they are meant to be one reading at two lengths.
         var wx: Wx? = null
         var mkt: Mkt? = null
-        var headline: String? = null
+        var headlines: List<String> = emptyList()
         var taskLine: String? = null
         var studyLine: String? = null
         var skyLine: String? = null
@@ -484,10 +486,26 @@ class LockWidgetProvider : AppWidgetProvider() {
                         )
                     }
                 }
+                // ⚠️ Three lines for the price of the one fetch that was already happening. The
+                // provider asked for the whole TOP list and then threw all but `.firstOrNull()`
+                // away, so spending it on three DIFFERENT newsrooms costs no network at all.
+                //
+                // ⚠️ Not `fetchBreaking`, tempting though it is: a 5-minute TTL that `RefreshWorker`
+                // does not warm on the same key, inside a four-second budget. And emphatically not
+                // `BreakingCoverageRepository.coverage`, which calls the uncached, always-network
+                // `news.search()`.
                 val news = async {
-                    widgetSource<String>(Source.NEWS, outcomes) {
-                        c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data
-                            ?.firstOrNull()?.let { "NEWS  ${it.source.uppercase()} · ${it.title}".take(110) }
+                    widgetSource<List<String>>(Source.NEWS, outcomes) {
+                        val articles = c.newsRepository
+                            .fetchCategory(NewsCategory.TOP, force = false).data.orEmpty()
+                        BreakingNews.perOutlet(
+                            articles,
+                            outlet = { it.source },
+                            timeMs = { it.publishedEpochMs },
+                            max = WidgetBoard.MAX_SOURCES,
+                            prefer = { BreakingCoverageRepository.isTrusted(it) },
+                        ).map { "NEWS  ${it.source.uppercase()} · ${it.title}".take(110) }
+                            .ifEmpty { null }
                     }
                 }
                 val task = async {
@@ -688,7 +706,13 @@ class LockWidgetProvider : AppWidgetProvider() {
                     if (it.head.isNotBlank()) rows += Row(it.head, Role.PRIMARY, argb = it.headArgb, route = Routes.MARKETS)
                     if (it.breadth.isNotBlank()) rows += Row(it.breadth, Role.SECONDARY, route = Routes.MARKETS)
                 }
-                news.await()?.let { headline = it; rows += Row(it, Role.PRIMARY, route = Routes.NEWS) }
+                // ⚠️ The ROW form still takes ONE headline, deliberately. Rows are the scarce
+                // resource here — the list already overruns its own cap — so the extra outlets
+                // are spent on the board, which has three slots sitting empty.
+                news.await()?.let {
+                    headlines = it
+                    it.firstOrNull()?.let { top -> rows += Row(top, Role.PRIMARY, route = Routes.NEWS) }
+                }
                 task.await()?.let { taskLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
                 study.await()?.let { studyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.STUDY) }
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
@@ -751,7 +775,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             leadDetail = leadDetail,
             leadArgb = leadArgb,
             leadRoute = leadRoute,
-            sources = listOfNotNull(headline),
+            sources = headlines,
             // ⚠️ The label states the horizon because the two numbers in a cell are not the same
             // span: the percentage is TODAY's move, and the line is `Quote.sparkline` — about a
             // month of daily closes. Intraday bars exist but are memory-cached only, so a restarted
