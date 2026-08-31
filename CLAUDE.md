@@ -11981,7 +11981,7 @@ the numeric sweep is genuinely complete rather than merely finished.
 | database | **489 MB (113.3 bytes/row)**, packaged 488 MB uncompressed |
 | pack | **213 MB compressed, 489 MB unpacked** |
 | nutrition APK | **35,247,288 bytes (34 MB)** — *"no bundled food database, as intended"* |
-| LCARS APK | **693,876,425 bytes (661 MB)** |
+| LCARS APK | **693,876,801 bytes (661 MB)** |
 
 ⚠️ **The LCARS APK figure is the current one and the delta is NOT attributed.** Many commits landed
 between it and the 612 MB recorded earlier in this file; that earlier figure is a dated record of
@@ -12013,7 +12013,9 @@ day*, so the dump had not rolled over. Nutrition #140 printed:
 
 ⚠️ **So the builder is DETERMINISTIC over identical sources — byte-identical output from two
 different runners forty minutes apart — which is the property that makes content gating mean
-anything and which I had not established.** The honest statement of the cost is therefore: a rebuild
+anything and which I had not established.** Corroborated from an entirely independent direction:
+the LCARS APK went **693,876,425 → 693,876,801 bytes across #2153 and #2154, a delta of 376 bytes**,
+which is the version code and nothing else. The 488 MB of database inside it did not move a byte. The honest statement of the cost is therefore: a rebuild
 on the SAME day is pure waste (CI time and 1.7 GB from two third-party servers, for a file already
 held); a rebuild on a LATER day fetches a newer dump and does offer the phone a fresh download. Both
 are reasons to keep such edits off that file's content when they are only comments.
