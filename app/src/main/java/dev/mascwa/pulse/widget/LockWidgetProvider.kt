@@ -383,6 +383,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         var studyLine: String? = null
         var skyLine: String? = null
         var spaceLine: String? = null
+        var waterLine: String? = null
         var fuelLine: String? = null
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
@@ -511,6 +512,20 @@ class LockWidgetProvider : AppWidgetProvider() {
                         "⚠ ${near.title.take(52)}  ${km}km ${Geodesy.cardinal(near.bearing)}$more"
                     }
                 }
+                val water = async {
+                    if (place == null) null else widgetSource<String>(Source.WATER, outcomes) {
+                        // ⚠️ `cached`, never `fetch`. This is a network source, and a widget must
+                        // not start a NOAA request on a half-hourly schedule inside a four-second
+                        // budget; `RefreshWorker` fills the cache and this reads what it left.
+                        // Nothing held is genuinely nothing to report, which is what the row's
+                        // absence then means.
+                        //
+                        // ⚠️ Null is also the ordinary answer for most of the world: NOAA measures
+                        // American water, and there are no tide-prediction stations in Michigan at
+                        // all, which is why the reading follows the LAKE where the owner lives.
+                        c.waterRepository.cached(place.latitude, place.longitude)?.line
+                    }
+                }
                 val study = async {
                     widgetSource<String>(Source.STUDY, outcomes) {
                         // No network and no coordinate — the cheapest feed on the widget.
@@ -603,6 +618,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 study.await()?.let { studyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.STUDY) }
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
                 space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
+                water.await()?.let { waterLine = it; rows += Row(it, Role.SECONDARY, route = Routes.WEATHER) }
                 fuel.await()?.let { fuelLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
                 econ.await()?.let {
                     econLines = it
@@ -655,7 +671,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             stocksLabel = "KEY STOCKS · % TODAY, LINE 30 DAYS",
             breadth = mkt?.breadth,
             breadthPct = mkt?.upPct,
-            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, spaceLine),
+            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, spaceLine, waterLine),
             // ⚠️ Only pairs that have something go in. The second slot stays deliberately empty
             // here — water, fuel detail, data use and comms fill it in later slices, and an empty
             // labelled column would read as a feed that failed rather than one not built yet.

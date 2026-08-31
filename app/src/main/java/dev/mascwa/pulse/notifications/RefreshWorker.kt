@@ -291,9 +291,27 @@ class RefreshWorker(
             runCatching { container.spaceWeatherRepository.fetch(force = forceFetch, heavy = false) }
         }
 
+        // ⚠️ Read ONCE and shared by the two passes below. `current()` is a last-known fix rather
+        // than a GPS wake, but it is still a permission-checked binder call, and asking twice for
+        // one number is the shape that quietly doubles a background pass's cost.
+        val here = runCatching { container.locationProvider.current() }.getOrNull()
+
+        // --- The water where you are: tides on a coast, lake level on the Great Lakes. ---
+        // ⚠️ Warmed HERE and never in the widget. The widget has four seconds a source and reads
+        // `cached()`, which cannot touch the network; this is the only thing that fills it. A tide
+        // prediction is computed months ahead so it keeps for a day, and a lake level is a live
+        // observation so it keeps for an hour — the repository decides which, by station.
+        //
+        // ⚠️ `force = false`, deliberately, where the rows above use `forceFetch`. Those are hourly
+        // or better and their whole point is to be current; this worker runs every fifteen minutes,
+        // and forcing here would ask NOAA ninety-six times a day for a tide table that changes once.
+        if (here != null) {
+            runCatching { container.waterRepository.fetch(here.latitude, here.longitude, force = false) }
+        }
+
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---
         runCatching {
-            val loc = container.locationProvider.current()
+            val loc = here
             if (loc != null) {
                 val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = forceFetch).data
                 val radiusM = settings.safetyRadiusKm * 1000.0

@@ -311,6 +311,15 @@ class AppContainer(private val appContext: Context) {
     val cometRepository: dev.mascwa.pulse.data.orbital.CometRepository by lazy {
         dev.mascwa.pulse.data.orbital.CometRepository(http, diskCache)
     }
+    /**
+     * The water where you are — tides on a coast, lake level on the Great Lakes.
+     *
+     * ⚠️ Takes the context because the station list is a bundled asset, which is also why it lives
+     * in `:app` rather than beside the other keyless feeds in `:core:feeds`.
+     */
+    val waterRepository: dev.mascwa.pulse.data.water.WaterRepository by lazy {
+        dev.mascwa.pulse.data.water.WaterRepository(appContext, http, diskCache)
+    }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     /**

@@ -43,6 +43,7 @@ object WidgetDiagnostics {
         STUDY("study"),
         SPACE("space wx"),
         SKY("sky"),
+        WATER("water"),
         FUEL("fuel"),
         ECONOMY("economy"),
         SAFETY("safety"),
