@@ -85,12 +85,22 @@ fun SectionCard(
  * and is allowed to wrap onto a second line rather than be cut. Which way round that goes is the
  * decision: a truncated LABEL is still a readable row, and a truncated VALUE is a number that means
  * something else.
+ *
+ * ⚠️ **`SpaceBetween` rather than `spacedBy`, and the first version of this row did not compile.**
+ * `Arrangement.spacedBy(space, alignment)` takes an `Alignment.Horizontal` — Start, End,
+ * CenterHorizontally — and `SpaceBetween` is an `Arrangement.Horizontal`, a different type
+ * altogether; I wrote the call from memory instead of from the declaration. It matters beyond the
+ * compile error: with both children weighted and `fill = false` they each shrink to their content,
+ * so a plain `spacedBy` would leave the value sitting wherever the label happened to end rather than
+ * against the right edge. The minimum gap that `spacedBy` would have given is the `start` padding on
+ * the value, because `SpaceBetween` distributes only the space that is left over — and on a row
+ * where both halves are long there is none.
  */
 @Composable
 fun StatRow(label: String, value: String, emphasis: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.SpaceBetween),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -106,7 +116,7 @@ fun StatRow(label: String, value: String, emphasis: Boolean = false) {
             style = if (emphasis) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
             fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Medium,
             textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
         )
     }
 }

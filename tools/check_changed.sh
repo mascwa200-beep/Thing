@@ -252,6 +252,27 @@ if [ -n "$HEALTH_CHANGED" ]; then
     fi
 fi
 
+# ---- 5. the nutrition application, compiled in full ---------------------------------------------
+# ⚠️ The same shape as the gate above and for the same reason: its absence cost a CI round.
+# `Arrangement.spacedBy(space, alignment)` takes an `Alignment.Horizontal` and I passed
+# `Alignment.SpaceBetween`, which is an `Arrangement.Horizontal`. Every gate above passed it — the
+# import gate saw `Alignment` imported and used, the enum-constant check judges only names declared
+# in this repository, the parse gate does not resolve names, and the resolve gate reads `app/`.
+#
+# ⚠️ Triggered by the module's OWN files and by the three Android library modules it compiles with,
+# because a change to any of them can break it and none of them can be built on its own here.
+NUT_CHANGED=$(echo "$CHANGED" | grep -E '^(nutrition|core/scan|core/update)/src/main/' || true)
+if [ -n "$NUT_CHANGED" ] || [ -n "$HEALTH_CHANGED" ]; then
+    echo
+    echo "== nutrition full compile =="
+    if OUT=$(bash tools/nutrition_compile_check.sh 2>&1); then
+        echo "   ok    $(echo "$OUT" | head -1)"
+    else
+        echo "$OUT" | tail -12 | sed 's/^/   /'
+        FAIL=1
+    fi
+fi
+
 echo
 [ "$FAIL" = 0 ] && echo "gates clean — CI is still the compile gate" || echo "REVIEW THE ABOVE"
 exit "$FAIL"
