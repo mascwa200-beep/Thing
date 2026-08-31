@@ -730,6 +730,56 @@ jobs:
           # stops early. Everything the old block explained about `noCompress` is in that script.
           python3 tools/sky/check_packaged.py --apk "$apk" --magnitude ${{ steps.skycat.outputs.magnitude }}
 
+      - name: Verify the water stations packaged
+        # ⚠️ This one is here because the block it feeds is DESIGNED to go quiet, which makes a
+        # missing asset invisible. `WaterRepository` opens `water/stations.tsv` by name, and when no
+        # station is within reach the widget shows nothing at all rather than an empty row — the
+        # honest answer for somebody far from any gauge, and byte-for-byte the same answer as an
+        # asset that never shipped. The JVM test beside it (`WaterStationsAssetTest`) reads the file
+        # on DISK and proves it is correct; nothing proved the file the phone opens is that file.
+        #
+        # This is a plainer path than the sky merge above — the assets are this module's own, and
+        # nothing in `androidResources` excludes them — so the odds are low. The cost of the check
+        # is one `unzip -l` and the cost of being wrong is a feature that looks like it is working.
+        #
+        # ⚠️ The size floor is not decoration. A truncated or empty file parses to zero stations,
+        # `nearest` returns null, and the block goes quiet in exactly the same way — so "present"
+        # alone would pass on a file carrying nothing. The real list is ~189 kB; the floor is well
+        # under that so a legitimate trim of the station list does not fail the build.
+        run: |
+          set -e
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          dir=app/src/main/assets/water
+          missing=0
+          for f in "$dir"/*; do
+            name=$(basename "$f")
+            line=$(unzip -l "$apk" | grep "assets/water/$name" || true)
+            if [ -z "$line" ]; then
+              echo "FAIL: $name is in $dir but NOT in the APK."
+              missing=1
+              continue
+            fi
+            bytes=$(echo "$line" | awk '{print $1}')
+            if [ "$bytes" -lt 100000 ]; then
+              echo "FAIL: $name packaged at only $bytes bytes — too small to be the station list."
+              missing=1
+            else
+              echo "  $name: $bytes bytes"
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Water assets that DID make it:"
+            unzip -l "$apk" | grep "assets/water/" || echo "(none at all)"
+            exit 1
+          fi
+          # ⚠️ The sentinel, for the reason every other gate here carries one: a grep that matches
+          # anything, or one that silently matches nothing, proves exactly as much as no gate.
+          if unzip -l "$apk" | grep -q "assets/water/this-must-not-exist.tsv"; then
+            echo "FAIL: the sentinel matched — this check cannot tell present from absent."
+            exit 1
+          fi
+          echo "water stations packaged (sentinel correctly absent)"
+
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
         # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64
