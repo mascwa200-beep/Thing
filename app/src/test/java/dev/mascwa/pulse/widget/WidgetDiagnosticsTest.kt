@@ -133,6 +133,50 @@ class WidgetDiagnosticsTest {
     }
 
     @Test
+    fun `the failure notice keeps its place when every slot is already spoken for`() {
+        // ⚠️ THE regression, and it fails against the code this replaced. The renderer ended in a
+        // bare `rows.take(limit)` with the notice appended to the END of the list, so on a busy
+        // widget — twenty-one `rows +=` sites against twenty slots — the notice was the first thing
+        // dropped. `(rows + notice).take(20)` here would return twenty rows of content and no
+        // notice, which is exactly what shipped.
+        val rows = (1..20).map { "row $it" }
+        val fitted = WidgetDiagnostics.fit(rows, cap = 20, notice = NOTICE)
+
+        assertEquals("the widget still draws exactly what it has room for", 20, fitted.size)
+        assertEquals("the notice is drawn, not shed", NOTICE, fitted.last())
+        assertTrue("a real row is shed to make room, from the tail", "row 20" !in fitted)
+        assertTrue("and the most consequential rows survive", "row 1" in fitted)
+    }
+
+    @Test
+    fun `a healthy widget loses nothing to a notice that is not there`() {
+        // The trade only applies when there is something to say. With every feed answering, the cap
+        // is the only thing shortening the list.
+        val rows = (1..25).map { "row $it" }
+        assertEquals(rows.take(20), WidgetDiagnostics.fit(rows, cap = 20, notice = null))
+        assertEquals(rows, WidgetDiagnostics.fit(rows, cap = 40, notice = null))
+    }
+
+    @Test
+    fun `a short widget shows the notice rather than filling up and hiding it`() {
+        // The small breakpoints are where slots are scarcest and where this went wrong, so the rule
+        // has to hold at four rows as well as at twenty.
+        val fitted = WidgetDiagnostics.fit((1..9).map { "row $it" }, cap = 4, notice = NOTICE)
+        assertEquals(4, fitted.size)
+        assertEquals(NOTICE, fitted.last())
+    }
+
+    @Test
+    fun `a widget with no room draws nothing rather than crashing`() {
+        // ⚠️ `List.take` throws on a negative count, so a cap of zero with a notice to place would
+        // otherwise ask for `take(-1)`. A crash here is precisely the condition that makes the
+        // launcher print "Can't load widget" — the one string this file exists to prevent — so the
+        // guard is load-bearing rather than defensive tidiness.
+        assertEquals(emptyList<String>(), WidgetDiagnostics.fit(listOf("a", "b"), cap = 0, notice = NOTICE))
+        assertEquals(emptyList<String>(), WidgetDiagnostics.fit(listOf("a", "b"), cap = 0, notice = null))
+    }
+
+    @Test
     fun `every source has a label a reader can act on`() {
         // The report is read by a person with no source open, so a bare enum name is not enough.
         Source.entries.forEach {
@@ -140,5 +184,9 @@ class WidgetDiagnosticsTest {
             assertFalse("${it.name}'s label is the enum name", it.label == it.name)
         }
         assertEquals("labels must be unique or a report is ambiguous", Source.entries.size, Source.entries.map { it.label }.toSet().size)
+    }
+
+    private companion object {
+        const val NOTICE = "⚠ no answer from weather, markets — tap for why"
     }
 }

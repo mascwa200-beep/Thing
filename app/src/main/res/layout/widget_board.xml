@@ -436,10 +436,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <ImageView
-            android:id="@+id/widget_board_rule_6"
-            style="@style/WidgetBoardRule" />
-
         <LinearLayout
             android:id="@+id/widget_board_pair_1"
             android:layout_width="match_parent"
@@ -572,7 +568,33 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!--
+          ⚠️ This rule was declared between pair_0 and pair_1, while `render` has always drawn it
+          with `rule(rule_6, before = pairShown, after = footShown)` — the separator between the
+          two-column block and the footer. So the hairline appeared in the MIDDLE of the columns,
+          the footer had none above it, and neither was a compile error or a crash: a line in the
+          wrong place is only ever visible on a phone. The id is unchanged, so nothing that names
+          it has to move with it.
+        -->
+        <ImageView
+            android:id="@+id/widget_board_rule_6"
+            style="@style/WidgetBoardRule" />
+
         <TextView
             android:id="@+id/widget_board_foot"
             style="@style/WidgetLine.Board.Dim" />
+
+        <!--
+          ⚠️ The board could not say a feed had failed. `degradedLine` was folded only into the ROW
+          list, so on BOTH tall sizes — the ones this board exists for — a dead source reported
+          nothing at all and simply looked like a quiet day.
+
+          It is its own view rather than part of the footer because the footer draws only on the
+          full size, and a failure notice that appears at one height and not the other is half a
+          diagnostic. This one draws whenever there is something to say, at every size, and is
+          invisible the rest of the time.
+        -->
+        <TextView
+            android:id="@+id/widget_board_degraded"
+            style="@style/WidgetLine.Board.Degraded" />
 </LinearLayout>

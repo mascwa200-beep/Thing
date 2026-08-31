@@ -95,6 +95,14 @@ internal object WidgetBoard {
         val readouts: List<String> = emptyList(),
         val pairs: List<Pair<Column, Column>> = emptyList(),
         val foot: String? = null,
+        /**
+         * "some feeds could not answer", or null when they all did.
+         *
+         * ⚠️ Drawn at BOTH tall sizes, unlike [foot]. Until this existed the board had no way to
+         * report a failure at all: `degradedLine` was folded into the row list only, so a dead
+         * source on the tall widget was indistinguishable from a quiet day.
+         */
+        val degraded: String? = null,
     )
 
     /**
@@ -194,6 +202,9 @@ internal object WidgetBoard {
             if (shown) pairShown = true
         }
         val footShown = full && text(v, R.id.widget_board_foot, board.foot)
+        // ⚠️ NOT gated on `full`. A failure notice that shows at one height and not the other is
+        // half a diagnostic, and the shorter board is no less capable of having a dead feed.
+        text(v, R.id.widget_board_degraded, board.degraded)
 
         // A rule earns its place only between two things that are both there. Otherwise it is a
         // line under nothing, which reads as a region that failed rather than one that is absent.

@@ -171,16 +171,27 @@ class LockWidgetProvider : AppWidgetProvider() {
         outcomes: Map<Source, Outcome>,
     ) {
         val rows = loaded.rows
-        // Degradation is reported as its own row rather than hidden, and it goes last so it never
-        // pushes real content off a small widget.
-        val degraded = WidgetDiagnostics.degradedLine(outcomes)
-        val all = if (degraded.isBlank()) rows else rows + Row(degraded, Role.DEGRADED, route = Routes.HOME)
+        // ⚠️ THE COMMENT THAT USED TO BE HERE WAS EXACTLY BACKWARDS. It read "it goes last so it
+        // never pushes real content off a small widget" — but `viewsFor` ends in `rows.take(limit)`,
+        // so going last is precisely what made this THE FIRST ROW DROPPED. A fully-populated widget
+        // builds 21 rows against a cap of 20, so the one line whose entire job is to say a feed had
+        // failed was the one thing guaranteed to be missing exactly when it was true.
+        //
+        // It is now passed separately and given a RESERVED slot, so it displaces a content row
+        // instead of being displaced by one. That is the right way round: the notice exists to say
+        // the content is incomplete, so spending one row on it costs nothing that was not already
+        // in doubt.
+        val degradedRow = WidgetDiagnostics.degradedLine(outcomes)
+            .takeIf { it.isNotBlank() }
+            ?.let { Row(it, Role.DEGRADED, route = Routes.HOME) }
         val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
         // ⚠️ Drawn ONCE, here, and the same instances go to both board variants. They share a
         // `BitmapCache` that de-duplicates on identity, so reusing the instances costs one copy of
         // each chart instead of two — but only because they are the same objects. Drawing inside
         // `WidgetBoard.render` would quietly double the parcel.
-        val board = withCharts(context, loaded.board)
+        // ⚠️ The board could not report a failure AT ALL until now — `degradedLine` was folded
+        // only into the row list, so on both tall sizes a dead source looked like a quiet day.
+        val board = withCharts(context, loaded.board.copy(degraded = degradedRow?.text))
 
         // ⚠️ The host picks. Each entry is the SAME layout with a different number of rows, so a
         // bigger widget genuinely shows more instead of the same lines with more air between them.
@@ -191,10 +202,10 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // own content clips; one above it means the variant can never be picked and the
                 // rows it adds are unreachable — invisibly, since the widget would simply look as
                 // though it had one layout.
-                SizeF(120f, 90f) to viewsFor(context, all, SMALL_ROWS),
-                SizeF(180f, 165f) to viewsFor(context, all, MEDIUM_ROWS),
-                SizeF(250f, 275f) to viewsFor(context, all, LARGE_ROWS),
-                SizeF(300f, 385f) to viewsFor(context, all, MAX_ROWS),
+                SizeF(120f, 90f) to viewsFor(context, rows, degradedRow, SMALL_ROWS),
+                SizeF(180f, 165f) to viewsFor(context, rows, degradedRow, MEDIUM_ROWS),
+                SizeF(250f, 275f) to viewsFor(context, rows, degradedRow, LARGE_ROWS),
+                SizeF(300f, 385f) to viewsFor(context, rows, degradedRow, MAX_ROWS),
                 // ⚠️ The two entries the widget was missing, and their absence WAS the sparseness:
                 // the resize range reaches 640dp while the tallest variant stopped at 385, so above
                 // that the host had nothing richer to pick and stretched twenty rows instead.
@@ -217,9 +228,21 @@ class LockWidgetProvider : AppWidgetProvider() {
         manager.updateAppWidget(id, views)
     }
 
-    private fun viewsFor(context: Context, rows: List<Row>, limit: Int): RemoteViews {
+    /**
+     * One size of the row form.
+     *
+     * ⚠️ [degradedRow] is a separate parameter rather than the last element of [rows] because
+     * the cut below is a plain `take`, and anything appended past the cap is dropped in silence.
+     * Reserving it a slot is what makes the notice survive the case it exists to report.
+     */
+    private fun viewsFor(
+        context: Context,
+        rows: List<Row>,
+        degradedRow: Row?,
+        limit: Int,
+    ): RemoteViews {
         val v = RemoteViews(context.packageName, R.layout.widget_lock)
-        val shown = rows.take(limit.coerceAtMost(ROW_IDS.size))
+        val shown = WidgetDiagnostics.fit(rows, limit.coerceAtMost(ROW_IDS.size), degradedRow)
         ROW_IDS.forEachIndexed { i, viewId ->
             val row = shown.getOrNull(i)
             if (row == null) {
@@ -785,6 +808,26 @@ class LockWidgetProvider : AppWidgetProvider() {
         }
         sysLine?.let { rows += Row(it, Role.FOOTNOTE) }
 
+        // ⚠️ The board splits what the row form combines, and the split is the point rather than a
+        // difference of taste. The battery belongs in THIS PHONE beside the data and the storage —
+        // every fact about this handset in one block — while the footer keeps the connection. Both
+        // regions draw only at full height, so leaving the combined line in the footer as well
+        // would print the same percentage a couple of centimetres below itself on every full
+        // render. The row form is untouched: on a short widget one combined line is right, and
+        // there is no column there for it to move into.
+        //
+        // `isPowerSave` is read by `snapshot()` on every load and has never been drawn anywhere in
+        // the widget. It earns the space because it changes what the phone will DO — it defers the
+        // background work this very board is fed by — so a stale reading and a saver-mode reading
+        // look identical without it.
+        val powerLine = ctx?.let {
+            val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
+            val chg = if (it.isCharging) " ⚡" else ""
+            val saver = if (it.isPowerSave) "  ·  saver" else ""
+            "POWER  $batt$chg$saver"
+        }
+        val netLine = ctx?.let { "SYS  ${it.network.name}" }
+
         // ── the same reading, as a board ────────────────────────────────────────────────────────
         // Nothing here fetches: every value was loaded once, above. A field left null is a region
         // the board simply will not draw.
@@ -802,7 +845,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // benchmark and the pump price answer a different question from what this handset has
         // spent. The second slot of the pair was left empty in the last slice for exactly this.
         val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
-        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(dataLine, storageLine))
+        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine))
         val commsColumn = WidgetBoard.Column("WAITING", commsLines)
         // ⚠️ This slot has been drawn half-blank since the board was built —
         // `commsColumn to Column("", emptyList())` — so the region has always cost its full height
@@ -856,7 +899,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 fuelColumn to phoneColumn,
                 commsColumn to agendaColumn,
             ).take(WidgetBoard.MAX_PAIRS),
-            foot = sysLine,
+            foot = netLine,
         )
         return Loaded(rows, board)
     }

@@ -86,6 +86,17 @@
         <item name="android:layout_marginStart">8dp</item>
     </style>
 
+    <!--
+      "some feeds could not answer". Small, so it never competes with the reading — but in the
+      negative colour, because it is the one line on the board that is about the widget itself
+      rather than about the world.
+    -->
+    <style name="WidgetLine.Board.Degraded">
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textColor">@color/nw_negative</item>
+        <item name="android:textSize">9sp</item>
+    </style>
+
     <!-- MAJOR INDICES, KEY STOCKS, ECON… — small, spaced, and never the point. -->
     <style name="WidgetLine.Board.Section">
         <item name="android:layout_marginTop">4dp</item>
