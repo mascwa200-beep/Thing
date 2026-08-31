@@ -199,10 +199,16 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // Both heights are derived from the board's own content, under the same rule as the
                 // row variants above — a breakpoint below its content clips, one above it can never
                 // be picked. Compact carries header + lead + both instrument strips + breadth +
-                // readouts (~305dp of content, declared at 420); full adds the two-column regions
-                // and the footer (~505dp, declared at 540). Both sit under `maxResizeHeight`.
+                // readouts (~319dp of content, declared at 420); full adds the three two-column
+                // regions and the footer (~589dp, declared at 610).
+                //
+                // ⚠️ Both grew with the board: a fourth readout is ~14dp and the third pair region
+                // is a label plus four lines, ~70dp. A breakpoint left where it was would be BELOW
+                // its content, which clips — the rule governing every entry in this list. 610 still
+                // sits under the 640dp `maxResizeHeight` in `lock_widget_info.xml`, which is what
+                // makes it reachable at all.
                 SizeF(300f, 420f) to WidgetBoard.render(context, board, full = false, open),
-                SizeF(300f, 540f) to WidgetBoard.render(context, board, full = true, open),
+                SizeF(300f, 610f) to WidgetBoard.render(context, board, full = true, open),
             ),
         )
         manager.updateAppWidget(id, views)
@@ -395,6 +401,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         var waterLine: String? = null
         var fuelLines: List<String> = emptyList()
         var dataLine: String? = null
+        var commsLines: List<String> = emptyList()
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
@@ -572,6 +579,28 @@ class LockWidgetProvider : AppWidgetProvider() {
                         c.waterRepository.cached(place.latitude, place.longitude)?.line
                     }
                 }
+                val comms = async {
+                    widgetSource<List<String>>(Source.COMMS, outcomes) {
+                        // ⚠️ `cached`, never `refresh`. Each mailbox is a TLS round trip and the
+                        // worker is what pays for them; this reads what it left. The SMS half IS
+                        // re-read here, because it is a local query costing nothing and a cached
+                        // value could be half an hour behind an answer that is on the phone now.
+                        val c2 = c.commsRepository.cached() ?: return@widgetSource null
+                        buildList {
+                            // ⚠️ Null is not zero. "No unread texts" is a fact about the inbox and
+                            // "this app may not look" is a fact about the app, so a missing
+                            // permission draws nothing rather than a reassuring 0.
+                            c2.sms?.let { add("TEXTS  $it unread") }
+                            c2.mailboxes.take(2).forEach { box ->
+                                val label = box.label.take(12).uppercase()
+                                // A mailbox that could not answer says so rather than vanishing —
+                                // a row that disappears reads as a feature that broke.
+                                add(box.unread?.let { "$label  $it unread" }
+                                    ?: "$label  ${box.problem.orEmpty().take(28)}")
+                            }
+                        }.ifEmpty { null }
+                    }
+                }
                 val study = async {
                     widgetSource<String>(Source.STUDY, outcomes) {
                         // No network and no coordinate — the cheapest feed on the widget.
@@ -670,6 +699,10 @@ class LockWidgetProvider : AppWidgetProvider() {
                     rows += Row(it.first(), Role.SECONDARY, route = Routes.MARKETS)
                 }
                 data.await()?.let { dataLine = it; rows += Row(it, Role.SECONDARY, route = Routes.SETTINGS) }
+                comms.await()?.let {
+                    commsLines = it
+                    rows += Row(it.first(), Role.SECONDARY, route = Routes.SETTINGS)
+                }
                 econ.await()?.let {
                     econLines = it
                     rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
@@ -702,6 +735,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // spent. The second slot of the pair was left empty in the last slice for exactly this.
         val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
         val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(dataLine, storageLine))
+        val commsColumn = WidgetBoard.Column("WAITING", commsLines)
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
@@ -725,14 +759,25 @@ class LockWidgetProvider : AppWidgetProvider() {
             stocksLabel = "KEY STOCKS · % TODAY, LINE 30 DAYS",
             breadth = mkt?.breadth,
             breadthPct = mkt?.upPct,
-            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, spaceLine, waterLine),
-            // ⚠️ Only pairs that have something go in, and an EMPTY labelled column is never
-            // passed — it would read as a feed that failed rather than one this phone cannot
-            // answer. Comms fills the remaining slot in the next slice.
+            // ⚠️ TRIMMED here rather than left to fall off the end. The board draws a fixed
+            // number of readout slots and `getOrNull` past the last one is silent — which is how
+            // the water line came to vanish whenever the weather detail, the air quality and space
+            // weather were all present. Ordered most-consequential first, so what is shed is the
+            // least useful line rather than whichever happened to be last.
+            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, waterLine, spaceLine)
+                .take(WidgetBoard.MAX_READOUTS),
+            // ⚠️ Only pairs that have something GO in — `pairs` drops an empty column rather than
+            // drawing a labelled blank, which would read as a feed that failed rather than one
+            // this phone cannot answer. WAITING is empty until a mailbox is added or the texts
+            // permission is granted, so on a fresh install that row is simply absent.
+            // The board already hides a region whose two columns are both empty, so a column with
+            // nothing in it costs nothing — but the LIST is still capped, and past the cap a whole
+            // region would disappear without a word. Trimmed knowingly, same as the readouts.
             pairs = listOf(
                 econColumn to dayColumn,
                 fuelColumn to phoneColumn,
-            ),
+                commsColumn to WidgetBoard.Column("", emptyList()),
+            ).take(WidgetBoard.MAX_PAIRS),
             foot = sysLine,
         )
         return Loaded(rows, board)

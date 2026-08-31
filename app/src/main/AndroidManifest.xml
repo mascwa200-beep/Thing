@@ -107,6 +107,18 @@
     <!-- Optional: read calendar events with a location to show them as NAV objectives (opt-in). -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!--
+      Optional: count unread texts for the widget's comms line. Nothing is read but the number of
+      rows in the inbox with read = 0 — no addresses, no bodies, and nothing leaves the device.
+
+      ⚠️ Holding READ_SMS bars an app from Google Play outside a few declared categories, none of
+      which this is. That costs nothing here — the app is sideloaded and private and always has
+      been — but it is a decision taken deliberately rather than an oversight, and worth naming so
+      a later session does not discover it as a surprise. Asked for at the point the feature is
+      switched on; without it the count is simply absent, never a zero.
+    -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SEND_SMS" />

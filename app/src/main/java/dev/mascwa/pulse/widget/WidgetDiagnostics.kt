@@ -45,6 +45,7 @@ object WidgetDiagnostics {
         SKY("sky"),
         WATER("water"),
         DATA("data used"),
+        COMMS("texts & mail"),
         FUEL("fuel"),
         ECONOMY("economy"),
         SAFETY("safety"),

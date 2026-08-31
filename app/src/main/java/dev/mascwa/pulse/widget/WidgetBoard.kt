@@ -278,8 +278,24 @@ internal object WidgetBoard {
     )
 
     private val READ_IDS = listOf(
-        R.id.widget_board_read_0, R.id.widget_board_read_1, R.id.widget_board_read_2,
+        R.id.widget_board_read_0, R.id.widget_board_read_1,
+        R.id.widget_board_read_2, R.id.widget_board_read_3,
     )
+
+    /**
+     * How many plain readouts the board can draw.
+     *
+     * ⚠️ Public because the caller must TRIM rather than discover the limit by having a line
+     * vanish. `getOrNull(i)` over a fixed list of slots drops anything past the end in silence —
+     * exactly the defect the one notification already carries a guard against, and exactly what
+     * happened here: the water line was added as a fourth readout and disappeared whenever the
+     * weather detail, the air quality and space weather were all present. The region grew by one
+     * and the caller now takes this many knowingly, shedding what it can most afford to lose.
+     */
+    const val MAX_READOUTS = 4
+
+    /** How many two-column regions the full board can draw. Same reasoning as [MAX_READOUTS]. */
+    const val MAX_PAIRS = 3
 
     /** The four cells of the index strip. */
     private val INDEX_CELLS = listOf(
@@ -322,6 +338,19 @@ internal object WidgetBoard {
             rightLines = listOf(
                 R.id.widget_board_p1r_0, R.id.widget_board_p1r_1,
                 R.id.widget_board_p1r_2, R.id.widget_board_p1r_3,
+            ),
+        ),
+        PairSpec(
+            container = R.id.widget_board_pair_2,
+            leftLabel = R.id.widget_board_p2l_label,
+            leftLines = listOf(
+                R.id.widget_board_p2l_0, R.id.widget_board_p2l_1,
+                R.id.widget_board_p2l_2, R.id.widget_board_p2l_3,
+            ),
+            rightLabel = R.id.widget_board_p2r_label,
+            rightLines = listOf(
+                R.id.widget_board_p2r_0, R.id.widget_board_p2r_1,
+                R.id.widget_board_p2r_2, R.id.widget_board_p2r_3,
             ),
         ),
     )

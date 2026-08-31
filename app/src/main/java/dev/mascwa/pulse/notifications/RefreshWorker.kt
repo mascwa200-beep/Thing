@@ -309,6 +309,14 @@ class RefreshWorker(
             runCatching { container.waterRepository.fetch(here.latitude, here.longitude, force = false) }
         }
 
+        // --- Unread texts and mail for the widget's comms line. ---
+        // ⚠️ Warmed HERE for the same reason the water is: each mailbox is a TLS round trip, and
+        // the widget reads `cached()`, which never touches the network. Costs nothing when no
+        // account has been added — the mailbox list is simply empty.
+        if (settings.emailAccounts.isNotEmpty() || container.commsRepository.canReadSms()) {
+            runCatching { container.commsRepository.refresh(settings.emailAccounts) }
+        }
+
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---
         runCatching {
             val loc = here

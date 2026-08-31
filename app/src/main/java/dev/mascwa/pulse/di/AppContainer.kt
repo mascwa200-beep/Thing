@@ -329,6 +329,15 @@ class AppContainer(private val appContext: Context) {
     val mobileData: dev.mascwa.pulse.core.device.MobileData by lazy {
         dev.mascwa.pulse.core.device.MobileData(appContext)
     }
+    /**
+     * Unread texts and unread mail.
+     *
+     * ⚠️ The mail half is one TLS round trip per account and must never sit in the widget's
+     * four-second budget: `RefreshWorker` calls `refresh` and the widget reads `cached`.
+     */
+    val commsRepository: dev.mascwa.pulse.data.comms.CommsRepository by lazy {
+        dev.mascwa.pulse.data.comms.CommsRepository(appContext, diskCache)
+    }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     /**

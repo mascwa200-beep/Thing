@@ -468,6 +468,13 @@ data class AppSettings(
     // LAN remote control from a paired desktop
     val remote: RemoteSettings = RemoteSettings(),
 
+    /**
+     * Mailboxes to count unread messages in. Empty = the widget's comms line asks nothing.
+     *
+     * ⚠️ Each carries a password. See [EmailAccount] for the three places that must know.
+     */
+    val emailAccounts: List<EmailAccount> = emptyList(),
+
     // On-device assistant
     val health: HealthSettings = HealthSettings(),
 
@@ -560,6 +567,10 @@ fun AppSettings.allSecretValues(): List<String> = listOf(
     apiKeys.brave,
     jarvis.githubToken, jarvis.modelToken, jarvis.cloudApiKey,
     spotify.accessToken, spotify.refreshToken, spotify.pendingVerifier,
+    // ⚠️ A mail password has no recognisable shape — it is whatever somebody typed — so the
+    // exact-match pass this list feeds is the ONLY thing that can keep one out of a debug report.
+    // A pattern scrubber cannot help here at all.
+    *emailAccounts.map { it.password }.toTypedArray(),
 ).map { it.trim() }.filter { it.isNotBlank() }
 
 /** Sensible International defaults for first launch. */

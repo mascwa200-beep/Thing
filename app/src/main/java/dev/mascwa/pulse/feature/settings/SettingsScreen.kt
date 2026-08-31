@@ -125,6 +125,19 @@ fun SettingsScreen(
         if (!granted) dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
     }
 
+    // ⚠️ Read into state rather than called at each recomposition: `checkSelfPermission` is a
+    // binder call, and the Security Audit screen froze outright doing exactly that per frame.
+    var smsGranted by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_SMS,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val smsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> smsGranted = granted }
+
     // Lets the Appearance section sound a cue on demand. Gated by the Interface-sounds switch like
     // every other cue, which is what makes it a useful test of the switch.
     val soundTest = rememberLcarsCue()
@@ -685,6 +698,53 @@ fun SettingsScreen(
                         checked = s.showNewsCoverageStrip,
                         onChange = { v -> vm.update { it.copy(showNewsCoverageStrip = v) } },
                     )
+                }
+            }
+
+            // ----- What is waiting for you: unread texts and unread mail -----
+            if (vis(SettingsCategory.CONTENT, "unread texts sms email imap mail inbox accounts")) item {
+                PrefSection("Texts & mail", initiallyExpanded = false) {
+                    PrefInfo(
+                        "Unread counts",
+                        // ⚠️ `subtitle`, not the positional second parameter — that one is `value`,
+                        // the short right-aligned accent text, capped at two lines. A paragraph
+                        // there is truncated and right-aligned, which is not what it is for.
+                        subtitle = "The widget can show how many texts and emails are waiting. " +
+                            "Nothing is read but the counts — no addresses, no subjects, no message " +
+                            "text — and nothing leaves this phone except the sign-in to your own " +
+                            "mail server.",
+                    )
+                    // ⚠️ Asked here, at the point the feature is switched on, rather than at launch.
+                    // Without it the count is simply absent; it is never shown as a zero, which
+                    // would be a claim about the inbox rather than about the permission.
+                    if (!smsGranted) {
+                        PrefClickable(
+                            "Count unread texts",
+                            subtitle = "Needs permission to read the SMS inbox",
+                            onClick = { smsLauncher.launch(android.Manifest.permission.READ_SMS) },
+                        )
+                    } else {
+                        PrefInfo("Unread texts", "Counting")
+                    }
+                    s.emailAccounts.forEachIndexed { i, acct ->
+                        PrefClickable(
+                            acct.display,
+                            subtitle = when {
+                                !acct.enabled -> "Switched off — tap to remove"
+                                acct.password.isBlank() ->
+                                    "Needs its password — a backup never carries one. Tap to remove and add it again."
+                                else -> "${acct.host}:${acct.port} — tap to remove"
+                            },
+                            onClick = {
+                                vm.update { st ->
+                                    st.copy(emailAccounts = st.emailAccounts.filterIndexed { j, _ -> j != i })
+                                }
+                            },
+                        )
+                    }
+                    AddMailboxRow { account ->
+                        vm.update { st -> st.copy(emailAccounts = st.emailAccounts + account) }
+                    }
                 }
             }
 
@@ -1632,6 +1692,67 @@ private fun androidx.compose.foundation.lazy.LazyListScope.watchlistEditor(
             }
             IconButton(onClick = { onRemove(item) }) { Icon(LcarsIcons.Delete, "Remove") }
         }
+    }
+}
+
+/**
+ * Add a mailbox.
+ *
+ * ⚠️ The password field is a real credential going into `AppSettings`. Three things already know
+ * that and had to before this row existed: the settings blob is encrypted at rest, `allSecretValues`
+ * carries it so a debug report cannot, and `SettingsBackup` blanks it on export and restores the
+ * device's own on import. `CredentialCoverageTest` fails the build if any of that is undone.
+ */
+@Composable
+private fun AddMailboxRow(onAdd: (dev.mascwa.pulse.data.settings.EmailAccount) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    PrefClickable("Add a mailbox", subtitle = "IMAP over TLS, e.g. imap.gmail.com", onClick = { show = true })
+    if (show) {
+        var host by remember { mutableStateOf("") }
+        var user by remember { mutableStateOf("") }
+        var pass by remember { mutableStateOf("") }
+        var label by remember { mutableStateOf("") }
+        LcarsDialog(
+            title = "Add a mailbox",
+            onDismiss = { show = false },
+            content = {
+                Column {
+                    OutlinedTextField(host, { host = it }, label = { Text("IMAP server") }, singleLine = true)
+                    OutlinedTextField(user, { user = it }, label = { Text("Username") }, singleLine = true)
+                    OutlinedTextField(
+                        pass, { pass = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                        ),
+                    )
+                    OutlinedTextField(label, { label = it }, label = { Text("What to call it") }, singleLine = true)
+                    // ⚠️ Said before the attempt, not after it fails. Gmail, Outlook and Yahoo all
+                    // answer "authentication failed" whether the password is wrong or merely the
+                    // wrong KIND, so somebody pasting their website password has no way to tell.
+                    DialogBody(
+                        "Gmail, Outlook and Yahoo need an app-specific password rather than the one " +
+                            "you sign into the website with.",
+                    )
+                }
+            },
+            confirmText = "ADD",
+            confirmEnabled = host.isNotBlank() && user.isNotBlank() && pass.isNotBlank(),
+            onConfirm = {
+                onAdd(
+                    dev.mascwa.pulse.data.settings.EmailAccount(
+                        label = label.trim(),
+                        host = host.trim(),
+                        username = user.trim(),
+                        password = pass,
+                    ),
+                )
+                show = false
+            },
+            dismissText = "CANCEL",
+        )
     }
 }
 
