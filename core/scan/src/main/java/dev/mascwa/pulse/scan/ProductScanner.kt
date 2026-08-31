@@ -109,7 +109,13 @@ class ProductScanner(
         // the trained detector reads curved, crinkled, angled and dim barcodes that a scanline
         // reader cannot, and the scanline reader is what answers if the trained one is unavailable
         // on a phone with no Play Services — which cannot be established from a build machine.
-        val chain = listOf(MlKitDecoder(), ZxingDecoder())
+        //
+        // ⚠️ **`listOfNotNull` and a factory, because the previous `listOf(MlKitDecoder(), …)` made
+        // that fallback impossible.** `BarcodeScanning.getClient` ran in a property initialiser, so a
+        // device where it throws did not fall back to ZXing — the throw came out of the list, out of
+        // `bind`, and the scanner did not start at all. The sentence above described behaviour the
+        // code could not produce, on exactly the phone it was reasoning about.
+        val chain = listOfNotNull(MlKitDecoder.createOrNull(), ZxingDecoder())
 
         val selector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)

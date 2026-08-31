@@ -4,6 +4,7 @@ import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
 import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -61,22 +62,20 @@ internal interface FrameDecoder {
  * analyser thread with it and the viewfinder freezes with no error anywhere, which is the same shape
  * of failure as a frame that is never closed. A second is far longer than a real decode.
  */
-internal class MlKitDecoder : FrameDecoder {
+internal class MlKitDecoder private constructor(private val client: BarcodeScanner) : FrameDecoder {
 
-    private val client = BarcodeScanning.getClient(
-        BarcodeScannerOptions.Builder()
-            // The formats a retail product carries, and nothing else. Narrowing is not only speed:
-            // left open, the decoder happily reads the QR code on a leaflet or the CODE-128 on a
-            // shipping label, and every one of those is a decode the scanner has to recognise and
-            // throw away.
-            .setBarcodeFormats(
-                Barcode.FORMAT_EAN_13,
-                Barcode.FORMAT_EAN_8,
-                Barcode.FORMAT_UPC_A,
-                Barcode.FORMAT_UPC_E,
-            )
-            .build(),
-    )
+    /**
+     * How many times in a row the detector has failed outright, as distinct from finding nothing.
+     *
+     * ⚠️ **Not an optimisation — without it a detector that hangs makes the scanner useless while
+     * still technically working.** [Tasks.await] blocks the analyser thread for [DECODE_TIMEOUT_MS],
+     * so a runtime that accepts the client and then never completes a task costs a full second per
+     * frame before ZXing is even asked. The scanner would preview normally and take many seconds to
+     * read a barcode it can see, which reads as "it does not work" rather than as a diagnosable
+     * fault. A run of failures is not something a real frame produces, so retiring on one is safe.
+     */
+    private var consecutiveFailures = 0
+    private var retired = false
 
     /**
      * ⚠️ **The rotation is handed to the library rather than applied to the pixels**, which is the
@@ -86,13 +85,24 @@ internal class MlKitDecoder : FrameDecoder {
      */
     @OptIn(ExperimentalGetImage::class)
     override fun decode(proxy: ImageProxy): String? {
+        if (retired) return null
         val media = proxy.image ?: return null
         val input = runCatching {
             InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
         }.getOrNull() ?: return null
-        val found = runCatching {
+        val attempt = runCatching {
             Tasks.await(client.process(input), DECODE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        }.getOrNull().orEmpty()
+        }
+        // ⚠️ A FAILED attempt and an empty result are different facts and only one of them counts.
+        // Every ordinary frame of a kitchen table returns an empty list; counting those would retire
+        // the good decoder within a second of opening the scanner.
+        if (attempt.isFailure) {
+            consecutiveFailures++
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) retired = true
+            return null
+        }
+        consecutiveFailures = 0
+        val found = attempt.getOrNull().orEmpty()
         for (barcode in found) {
             val text = barcode.rawValue ?: continue
             val code = BarcodeScan.canonical(text, symbologyOf(barcode.format))
@@ -105,8 +115,48 @@ internal class MlKitDecoder : FrameDecoder {
         runCatching { client.close() }
     }
 
-    private companion object {
+    internal companion object {
         const val DECODE_TIMEOUT_MS = 1_000L
+
+        /**
+         * How many outright failures in a row retire this decoder for the life of the scanner.
+         *
+         * Three rather than one: a single failure can be a frame the camera handed over as it was
+         * being torn down, and retiring the better decoder on one bad frame would be a worse bug
+         * than the one this guards against.
+         */
+        const val MAX_CONSECUTIVE_FAILURES = 3
+
+        /**
+         * The trained decoder, or null if this device cannot make one.
+         *
+         * ⚠️ **A factory rather than a constructor, and the difference is the whole fallback.**
+         * `BarcodeScanning.getClient` runs real initialisation, and it was being called from a
+         * property initialiser inside `listOf(MlKitDecoder(), ZxingDecoder())` — so on a device where
+         * it throws, the list construction throws, `bind()` throws, and the scanner does not start at
+         * all. The comment at that call site said ZXing "is what answers if the trained one is
+         * unavailable on a phone with no Play Services", and as written that could never happen: the
+         * failure took the fallback down with it. The device this is built for runs GrapheneOS, which
+         * is exactly the case being reasoned about, and nothing in CI can open a camera to find out.
+         */
+        fun createOrNull(): MlKitDecoder? = runCatching {
+            MlKitDecoder(
+                BarcodeScanning.getClient(
+                    BarcodeScannerOptions.Builder()
+                        // The formats a retail product carries, and nothing else. Narrowing is not
+                        // only speed: left open, the decoder happily reads the QR code on a leaflet
+                        // or the CODE-128 on a shipping label, and every one of those is a decode
+                        // the scanner has to recognise and throw away.
+                        .setBarcodeFormats(
+                            Barcode.FORMAT_EAN_13,
+                            Barcode.FORMAT_EAN_8,
+                            Barcode.FORMAT_UPC_A,
+                            Barcode.FORMAT_UPC_E,
+                        )
+                        .build(),
+                ),
+            )
+        }.getOrNull()
 
         /**
          * ⚠️ **UPC-E has to survive this mapping or every small packet misses.** It is the one
