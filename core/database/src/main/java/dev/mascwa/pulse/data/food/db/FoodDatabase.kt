@@ -184,10 +184,13 @@ interface FoodDao {
      * 424 MB asset cold from flash is worse, and this app exists to run on the phones where it is
      * worst.
      *
-     * ⚠️ **The index remains rejected, on cost rather than on the mistaken claim above.** Measured on
-     * 113,612 real product names, an FTS5 index with `detail=none` costs 23.8 bytes a row against the
-     * table's 68.7 — about a third of the table, so ~107 MB on an APK the in-app updater re-downloads
-     * in full on every build. That is recorded on `searchAllProducts` and unchanged.
+     * ⚠️ **THE INDEX IS NO LONGER REJECTED, and this note's reason for rejecting it was wrong in a
+     * way worth recording.** It weighed an FTS5 index at 23.8 bytes a row "on an APK the updater
+     * re-downloads on every build". Both halves have since failed: the database left the APK, so the
+     * cost is a one-time download; and FTS5 is not available on Android at all — the platform builds
+     * its SQLite with FTS3 and FTS4 and no FTS5, so a database containing one would fail every query
+     * on every device rather than merely being large. What ships is FTS4, and `OfflineFoodStore`
+     * detects it rather than assuming it, because a pack built before it existed still has to work.
      */
     @Query("SELECT * FROM food WHERE name LIKE :prefix || '%' AND kcal IS NOT NULL LIMIT :limit")
     suspend fun searchByNamePrefix(prefix: String, limit: Int): List<FoodRow>

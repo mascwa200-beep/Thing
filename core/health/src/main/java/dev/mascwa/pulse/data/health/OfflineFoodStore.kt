@@ -98,6 +98,57 @@ class OfflineFoodStore(
     val unavailable: String? get() = broken
 
     /**
+     * Whether this database carries the name index, worked out once and remembered.
+     *
+     * ⚠️ **Detected rather than assumed, because a pack built before the index existed still has to
+     * work.** The database is downloaded separately from the app now, so the two versions are
+     * genuinely independent: a phone can hold a corpus built last month and an app built today. A
+     * hard dependency would turn that ordinary situation into a search that throws.
+     *
+     * ⚠️ **The `meta` row rather than `sqlite_master`, and it is free.** The builder records how
+     * many products it indexed, so one existing typed query answers "is there an index" and "how
+     * big is it" together — no new DAO surface, no raw query, and the answer comes from the step
+     * that actually did the work rather than from the schema's opinion of itself. It is also the
+     * only way to count a contentless FTS4 table: `SELECT COUNT(*)` on one is a "SQL logic error",
+     * which is how the check that tried it found out.
+     *
+     * A plain field rather than a mutex: the worst a race can do is ask the same question twice.
+     */
+    @Volatile
+    private var indexed: Boolean? = null
+
+    private suspend fun hasIndex(): Boolean {
+        indexed?.let { return it }
+        val answer = guard("index", null) { db.dao().meta("search_rows") } != null
+        indexed = answer
+        return answer
+    }
+
+    /**
+     * The MATCH expression for already-tokenised terms.
+     *
+     * ⚠️ **Every term carries a trailing `*`, and that is what keeps this as admissive as the scan
+     * it replaces.** `FoodSearch.wordMatch` accepts a corpus word up to three characters longer than
+     * the query token — cook/cooked, roast/roasted — and a bare `MATCH 'roast'` is exact-token only,
+     * so it would silently lose every inflection the scorer was written to allow. A prefix query
+     * over-admits instead (`roast*` also reaches "roastery"), and `FoodSearch.score` refuses those a
+     * moment later. That is the same "reject cheaply, judge properly" split the rest of this file
+     * uses, with SQLite doing the cheap half.
+     *
+     * ⚠️ What it does NOT reach is a match in the MIDDLE of a word, which `instr` did — and nothing
+     * is lost, because `wordMatch` scores those zero and the row was being read and thrown away.
+     *
+     * ⚠️ Nothing needs escaping and nothing is interpolated: `FoodSearch.tokens` keeps only letters
+     * and digits, and the whole expression is a bound parameter rather than part of the SQL.
+     */
+    private fun matchFor(terms: List<String>): String = terms.joinToString(" ") { "$it*" }
+
+    private fun indexedSql(limit: Int): String =
+        "SELECT f.* FROM food f JOIN food_fts x ON f.barcode = x.docid " +
+            "WHERE x.food_fts MATCH ? AND f.kcal IS NOT NULL AND f.name IS NOT NULL " +
+            "LIMIT $limit"
+
+    /**
      * The product with this barcode, or null if the bundle has never heard of it.
      *
      * ⚠️ **A row with no nutrition is still returned.** Measured on the real export, only about a
@@ -151,9 +202,10 @@ class OfflineFoodStore(
      * word-anywhere matching finds three to ten times as much ("greek yogurt": 48 by prefix against
      * 405 by words) — and [searchAllProducts] is the deliberate one-shot scan that does.
      *
-     * ⚠️ **CORRECTION to what this note used to say.** It claimed a full-text index "would cost more
-     * than the table". Measured, it costs about a third; the real reason there is none is on
-     * [searchAllProducts].
+     * ⚠️ **CORRECTION to what this note used to say, twice over.** It claimed a full-text index
+     * "would cost more than the table"; measured, it costs about a third. And there IS one now — see
+     * [searchAllProducts] for why the argument against it was wrong — so the paragraphs below
+     * describe what this method does only on a database built before the index existed.
      *
      * ⚠️ **SECOND CORRECTION, and this one was costing ~314 ms of a keystroke's answer.** This method
      * used to be described as "a fast indexed prefix scan" — see [searchAllProducts] eleven lines
@@ -180,8 +232,28 @@ class OfflineFoodStore(
         withContext(Dispatchers.IO) {
             val q = query.trim()
             if (q.length < MIN_PREFIX) return@withContext emptyList()
-            guard("prefix", emptyList()) { db.dao().searchByNamePrefix(q, PREFIX_CANDIDATES) }
-                .sortedBy { it.name?.length ?: Int.MAX_VALUE }
+            // ⚠️ **With an index this stops being the weakest path and becomes the best one.** Every
+            // limitation described above is a consequence of having to answer a keystroke without an
+            // index: the whole-name anchor that cannot find "Coca-Cola Zero Sugar" from "coke zero",
+            // the 400-row cap, and the country-prefix bias that cap inherits from reading in rowid
+            // order. A prefix MATCH has none of them and costs about half a millisecond.
+            //
+            // ⚠️ **Still ranked by name length, NOT by `FoodSearch.score`, and the paragraph above
+            // says why**: the last word of a half-typed query is a fragment, `wordMatch` allows only
+            // a three-character stem gap, so scoring "cho" against "chocolate" returns zero and would
+            // drop every row SQLite had legitimately matched. A partial word is not a word. What
+            // changes here is which candidates get ranked, not how.
+            val terms = FoodSearch.tokens(q)
+            val rows = if (terms.isNotEmpty() && hasIndex()) {
+                guard("prefix-indexed", emptyList()) {
+                    db.dao().searchByNameWords(
+                        SimpleSQLiteQuery(indexedSql(PREFIX_CANDIDATES), arrayOf(matchFor(terms))),
+                    )
+                }
+            } else {
+                guard("prefix", emptyList()) { db.dao().searchByNamePrefix(q, PREFIX_CANDIDATES) }
+            }
+            rows.sortedBy { it.name?.length ?: Int.MAX_VALUE }
                 .take(limit)
                 .map { toFood(it, it.barcode.toString()) }
         }
@@ -201,18 +273,30 @@ class OfflineFoodStore(
      * that it stops at [PREFIX_CANDIDATES] instead of reading everything, which this cannot do because
      * a word can appear anywhere in a name and the last row is as likely to match as the first.
      *
-     * ⚠️ **THE MEASUREMENT THAT DECIDED AGAINST AN INDEX, recorded so it is not re-litigated from
-     * intuition.** Sized on 113,612 real product names:
+     * ⚠️ **THERE IS NOW AN INDEX, and the note that used to sit here decided against one for two
+     * reasons that were both wrong.** It is kept in outline because the shape of the argument still
+     * matters, and because being wrong quietly is how a measurement gets re-litigated from intuition.
      *
-     *     FTS5 with detail=none            +23.8 B/row  ->  ~107 MB at 4.45M rows
-     *     (word, barcode) WITHOUT ROWID    +61.4 B/row  ->  ~276 MB
-     *     no index, this scan                       0
+     * It weighed FTS5 at +23.8 B/row against "an APK the updater re-downloads on every build".
      *
-     * The APK already carries 285 MB and the in-app updater re-downloads all of it on **every** build,
-     * so 107 MB in perpetuity buys a lower-latency version of an action somebody deliberately took. The
-     * semantics are identical either way — all words anywhere in the name — so what the index buys is
-     * only speed. If the wait proves intolerable on the device, the index is a builder change plus one
-     * query and the cost above is already known.
+     *   - **FTS5 is not a slower option on Android, it is an impossible one.** The platform's SQLite
+     *     is built with `SQLITE_ENABLE_FTS3`, `FTS3_BACKWARDS` and `FTS4` and no FTS5 — read out of
+     *     `platform/external/sqlite`'s `dist/Android.bp`, not recalled. SQLite parses the whole
+     *     schema when it prepares its first statement, so a database containing an `fts5` table
+     *     would fail EVERY query on EVERY device. Shipping it would have been catastrophic rather
+     *     than merely large.
+     *   - **The database is no longer in the APK.** It is fetched once as its own pack, so the cost
+     *     is a one-time download rather than one paid again on every build of the interface.
+     *
+     * What is there instead is FTS4, contentless, `matchinfo=fts3`, measured on 70,415 real names at
+     * **28.8 bytes a row and falling with scale** — 33.3 at ten thousand rows, 30.4 at fifty, 28.8 at
+     * seventy, as the term dictionary amortises. The build logs the true figure at four and a half
+     * million every run rather than leaving this comment to claim it.
+     *
+     * And the speed, the same ten realistic queries at that size: **18.9 ms scanning, 0.7 ms through
+     * `MATCH`**. The scan is linear in the table, so at 4.5 million rows it is past a second on a warm
+     * desktop SSD; `MATCH` barely moves. That is what the paragraph above is describing when it calls
+     * this a button rather than a keystroke, and it is no longer true of either.
      *
      * ⚠️ **Ranked by the same `FoodSearch.score` as the seed and your own foods**, unlike
      * [searchByName]. Returning 4.4 million rows in table order would bury the right answer under
@@ -228,12 +312,17 @@ class OfflineFoodStore(
         withContext(Dispatchers.IO) {
             val terms = FoodSearch.tokens(query)
             if (terms.isEmpty()) return@withContext Scan(emptyList(), false)
+            val useIndex = hasIndex()
             val hits = guard("scan", null) {
                 db.dao().searchByNameWords(
-                    SimpleSQLiteQuery(
-                        "SELECT * FROM food WHERE kcal IS NOT NULL AND name IS NOT NULL " +
-                            "AND ${sqlFor(terms)} LIMIT $SCAN_CAP",
-                    ),
+                    if (useIndex) {
+                        SimpleSQLiteQuery(indexedSql(SCAN_CAP), arrayOf(matchFor(terms)))
+                    } else {
+                        SimpleSQLiteQuery(
+                            "SELECT * FROM food WHERE kcal IS NOT NULL AND name IS NOT NULL " +
+                                "AND ${sqlFor(terms)} LIMIT $SCAN_CAP",
+                        )
+                    },
                 )
             } ?: return@withContext Scan(emptyList(), false, unavailable = broken)
 

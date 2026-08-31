@@ -50,6 +50,7 @@ import csv
 import gzip
 import io
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -690,6 +691,108 @@ def read_usda(path: Path, limit: int | None, log):
 
 BATCH = 20_000
 
+ROOM_KOTLIN = (
+    Path(__file__).resolve().parents[2]
+    / "core/database/src/main/java/dev/mascwa/pulse/data/food/db/FoodDatabase.kt"
+)
+
+_ROOM_SCHEMA = re.compile(r"^\s*const val SCHEMA: Int = (\d+)\s*$", re.M)
+
+
+def room_schema() -> int:
+    """The `user_version` this database must declare, read from the app rather than restated.
+
+    ⚠️ A hard failure rather than a default. Guessing produces a file that builds, packages and
+    publishes perfectly and is then deleted by the app on the first open — which is exactly the
+    defect this function exists to fix, reintroduced silently.
+    """
+    src = ROOM_KOTLIN.read_text(encoding="utf-8")
+    found = _ROOM_SCHEMA.findall(src)
+    if len(found) != 1:
+        raise SystemExit(
+            f"build_food_db: expected exactly one `const val SCHEMA: Int = N` in {ROOM_KOTLIN.name}, "
+            f"found {len(found)}. Fix this reader rather than the Kotlin — the declaration is the "
+            "source of truth, and a database stamped with the wrong version is deleted on the phone."
+        )
+    return int(found[0])
+
+
+def build_search_index(cur, log) -> int:
+    """The inverted index that makes searching by name instant instead of a full table scan.
+
+    ⚠️ **FTS4, and FTS5 is not merely a worse choice — it cannot work at all.** Android builds its
+    own SQLite with `SQLITE_ENABLE_FTS3`, `SQLITE_ENABLE_FTS3_BACKWARDS` and `SQLITE_ENABLE_FTS4`
+    and no FTS5 — read out of `platform/external/sqlite`'s `dist/Android.bp` on `main`, not
+    recalled. SQLite parses the WHOLE schema when it prepares its first statement, so a database
+    containing an `fts5` virtual table would fail EVERY query on EVERY device, not just queries
+    against that table. The note in `FoodDao` rejecting FTS5 on size was rejecting it for the wrong
+    reason.
+
+    ⚠️ **What it buys, measured on 70,415 real Open Food Facts names rather than estimated.** The
+    scan the app does today — `instr(lower(name), …)` for each term, no index — averaged 18.9 ms
+    over ten realistic queries at that size; the same queries through `MATCH` averaged 0.7 ms. The
+    scan is linear in the table, so at 4.5 million rows it is over a second on a warm desktop SSD
+    and worse on a phone reading a 425 MB file cold from flash. `MATCH` barely moves.
+
+    ⚠️ **What it costs, measured the same way: 28.8 bytes per indexed row**, and FALLING with scale
+    (33.3 B/row at ten thousand, 30.4 at fifty, 28.8 at seventy) as the term dictionary amortises —
+    so that figure is a ceiling rather than a mid-point. Against the rows that carry nutrition that
+    is of the order of seventy megabytes on four hundred and twenty-five.
+
+    ⚠️ `content=''` — contentless. Without it FTS keeps its own copy of every name and brand, which
+    is the table again. `matchinfo=fts3` drops the per-row `%_docsize` table, which nothing here
+    reads: ranking happens in Kotlin, in `FoodSearch.score`, so the index only has to answer which
+    rows contain the words.
+
+    ⚠️ Only rows with an energy figure, matching `FoodDao`'s own `kcal IS NOT NULL` on both search
+    paths. A row with a name and no numbers is worth returning for a SCANNED barcode — that is the
+    "recognised, tap to add the numbers" case — and not for a search somebody expects to log from.
+    Indexing them would make the index larger AND make the two paths disagree.
+
+    ⚠️ **THE COST FALLS ON THE LCARS APK TOO, and there is no way to give one application the index
+    and not the other.** Both workflows share ONE cached database — deliberately, so the two do not
+    each spend a quarter of an hour downloading 1.7 GB to build a byte-identical file — so whichever
+    builds it first saves it for the other. The nutrition app fetches it as a pack, where the index
+    is a one-time download; the LCARS application still bundles it in its APK, which its own updater
+    pulls in full on every build, so this adds of the order of seventy megabytes to each of those.
+    It buys that application the same search, and the real answer to the download is to move it onto
+    the pack as well — which is a change to a daily driver that nobody has asked for.
+
+    ⚠️ Room never sees this table. Its `createAllTables` is `CREATE TABLE IF NOT EXISTS` over the
+    entities it knows, and its validator reads `PRAGMA table_info` per declared entity rather than
+    enumerating what is there — so an extra table is invisible to it. The app reaches this through
+    a raw query, and checks the table exists first rather than assuming, because a pack built
+    before this line still has to work.
+    """
+    log("building the name index…")
+    t0 = time.time()
+    cur.execute(
+        "CREATE VIRTUAL TABLE food_fts USING fts4(text, content='', matchinfo=fts3)"
+    )
+    cur.execute(
+        "INSERT INTO food_fts(docid, text) "
+        "SELECT barcode, name || ' ' || COALESCE(brand, '') FROM food "
+        "WHERE name IS NOT NULL AND kcal IS NOT NULL"
+    )
+    indexed = cur.execute("SELECT changes()").fetchone()[0]
+    # One segment instead of dozens: the merge is what makes a query a single b-tree descent, and
+    # it shrinks the file at the same time.
+    cur.execute("INSERT INTO food_fts(food_fts) VALUES('optimize')")
+
+    # ⚠️ Measured from the index's own shadow tables rather than from a file-size delta, which at
+    # this point is meaningless: the index is built before the VACUUM, so a before-and-after on the
+    # file would be reporting free-page churn as much as content. Every run printing the real number
+    # is what keeps the estimate this was decided on honest — it was 28.8 bytes a row on 70,415 real
+    # names, and if the true figure at four and a half million is much worse than that, the log says
+    # so rather than a comment continuing to claim otherwise.
+    seg = cur.execute("SELECT COALESCE(SUM(LENGTH(block)), 0) FROM food_fts_segments").fetchone()[0]
+    root = cur.execute("SELECT COALESCE(SUM(LENGTH(root)), 0) FROM food_fts_segdir").fetchone()[0]
+    cost = seg + root
+    per = cost / indexed if indexed else 0.0
+    log(f"  {indexed:,} products indexed in {time.time() - t0:.0f}s")
+    log(f"  index size {cost / 1048576:.0f} MB  ({per:.1f} bytes/row)")
+    return indexed
+
 
 def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int | None) -> dict:
     def log(msg):
@@ -811,6 +914,10 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         flag = "   <-- NOTHING" if kept == 0 else ""
         log(f"  {n.id:>2} {n.name:<22} {kept:>10,}  {share:5.2f}%  refused {refused:,}{flag}")
 
+    con.commit()
+    search_rows = build_search_index(cur, log)
+    con.commit()
+
     total = cur.execute("SELECT COUNT(*) FROM food").fetchone()[0]
     with_nut = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL AND kcal > 0").fetchone()[0]
     named = cur.execute("SELECT COUNT(*) FROM food WHERE name IS NOT NULL").fetchone()[0]
@@ -841,6 +948,11 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         "usda_rows": str(stats.get("usda", 0)),
         "extra_rows": str(cur.execute("SELECT COUNT(*) FROM food_extra").fetchone()[0]),
         "extra_nutrients": str(len(EXTRAS)),
+        # ⚠️ Recorded because it CANNOT be read back. `SELECT COUNT(*)` on a contentless FTS4
+        # table is a "SQL logic error" — found by running the check that tried it — so the number
+        # of indexed products only exists at the moment of the INSERT. Without this the verify
+        # step could prove the index answers but not that it covers everything.
+        "search_rows": str(search_rows),
         "sources": "; ".join(contributed) or "none",
         "attribution": attribution + ".",
     }.items():
@@ -849,6 +961,25 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
 
     log("VACUUM…")
     cur.execute("VACUUM")
+
+    # ⚠️ **The version the app checks, and until this line nothing set it.** `FoodDatabase.usable`
+    # deletes any file on disk whose `user_version` is not `FoodDatabase.SCHEMA` — the guard that
+    # stops `fallbackToDestructiveMigration` quietly emptying a database somebody waited minutes to
+    # download. Every database this builder has ever produced carried version 0, so a DOWNLOADED
+    # pack was deleted on the first open with "this is for an older version of this app; download it
+    # again", permanently. Nothing in CI could see it: the file builds, packages, publishes and
+    # verifies, and the deletion happens on a phone.
+    #
+    # The bundled asset survived only because it takes a different route — a version-0 file makes
+    # Android's `SQLiteOpenHelper` call `onCreate`, and Room's `createAllTables` is `IF NOT EXISTS`,
+    # so the populated tables are left alone and Room stamps the version itself. `usable` never sees
+    # that file until after Room has fixed it.
+    #
+    # ⚠️ Read out of the Kotlin rather than written here, for the reason `nutrient_set` gives about
+    # `NutrientSet.kt`: the declaration is the source of truth and this is a reader. A hardcoded 2
+    # here would be a fourth spelling of a number the app already says is one too many.
+    cur.execute(f"PRAGMA user_version = {room_schema()}")
+    con.commit()
     con.close()
 
     size = out.stat().st_size
@@ -950,6 +1081,51 @@ def verify(out: Path) -> bool:
     if orphans:
         print(f"  FAIL: {orphans:,} figures belong to barcodes not in the product table")
         ok = False
+
+    # ⚠️ **The version the app checks, asserted rather than assumed.** Nothing set this for the life
+    # of the builder, and the cost was invisible from here: the file built, packaged, published and
+    # verified perfectly, and `FoodDatabase.usable` then deleted the downloaded copy on the phone
+    # because its `user_version` was 0 rather than the schema. This is the check that would have
+    # caught it, and it compares against the Kotlin rather than a number written here twice.
+    want = room_schema()
+    got = cur.execute("PRAGMA user_version").fetchone()[0]
+    print(f"\nschema version: {got} (the app expects {want})")
+    if got != want:
+        print("  FAIL: the app deletes any database whose user_version is not its own schema")
+        ok = False
+
+    # ⚠️ **A search index that silently failed to build is the worst kind of green.** The app checks
+    # for the table and falls back to the full-table scan when it is missing, so a database without
+    # one works — it just takes over a second per search instead of a few milliseconds, on a phone,
+    # with nothing anywhere saying why. So the index is asserted to exist AND to answer.
+    fts = cur.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='food_fts'"
+    ).fetchone()[0]
+    if not fts:
+        print("\nsearch index: MISSING")
+        print("  FAIL: name search would fall back to a full scan of every product")
+        ok = False
+    else:
+        indexed = int(
+            cur.execute("SELECT value FROM meta WHERE key='search_rows'").fetchone()[0]
+        )
+        searchable = cur.execute(
+            "SELECT COUNT(*) FROM food WHERE name IS NOT NULL AND kcal IS NOT NULL"
+        ).fetchone()[0]
+        print(f"\nsearch index: {indexed:,} of {searchable:,} searchable products")
+        # ⚠️ The count alone is not evidence it WORKS: a contentless FTS table with a broken
+        # tokenizer still holds rows. A word every corpus of retail food contains has to come back.
+        hits = cur.execute(
+            "SELECT COUNT(*) FROM food f JOIN food_fts x ON f.barcode = x.docid "
+            "WHERE x.food_fts MATCH 'chocolate'"
+        ).fetchone()[0]
+        print(f"  'chocolate' matches {hits:,} products")
+        if indexed != searchable:
+            print(f"  FAIL: {searchable - indexed:,} searchable products are not in the index")
+            ok = False
+        if searchable and hits == 0:
+            print("  FAIL: the index answers nothing — it is present but not usable")
+            ok = False
 
     con.close()
     print("\nVERIFY " + ("PASSED" if ok else "FAILED"))
