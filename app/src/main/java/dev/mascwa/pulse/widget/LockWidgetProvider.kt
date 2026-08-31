@@ -739,6 +739,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
+            // ⚠️ This is the ONLY reader of `use24HourClock` in the whole repository. The switch has
+            // existed in Settings and done nothing at all — declared, given a PrefSwitch the user
+            // can flip, and consulted by nobody. Following the DEVICE setting here instead would
+            // have been the easy call and would have left it dead.
+            clock24 = s?.use24HourClock ?: true,
             subhead = boardSubhead,
             alert = alertLine,
             alertRoute = Routes.SAFETY,

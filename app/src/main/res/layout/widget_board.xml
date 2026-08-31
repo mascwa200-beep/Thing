@@ -29,9 +29,30 @@
     android:orientation="vertical"
     android:padding="10dp">
 
-        <TextView
-            android:id="@+id/widget_board_header"
-            style="@style/WidgetLine.Board.Header" />
+        <!--
+          ⚠️ The clock is a TextClock, not a TextView the provider writes, and that is the whole
+          point: `updatePeriodMillis` floors at 30 minutes, so a widget-drawn time would be wrong
+          by up to half an hour. A TextClock ticks itself with no refresh at all.
+
+          It sits in a horizontal row with the header rather than in its own line because the
+          header is already "WHERE · WHEN · WEATHER" and the time belongs with them.
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="true">
+
+            <TextView
+                android:id="@+id/widget_board_header"
+                style="@style/WidgetLine.Board.Header"
+                android:layout_width="0dp"
+                android:layout_weight="1" />
+
+            <TextClock
+                android:id="@+id/widget_board_clock"
+                style="@style/WidgetLine.Board.Header.Clock" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/widget_board_subhead"

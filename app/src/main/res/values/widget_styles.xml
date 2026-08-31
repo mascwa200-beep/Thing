@@ -73,6 +73,19 @@
         <item name="android:visibility">visible</item>
     </style>
 
+    <!--
+      The header's clock. Inherits Header by the dot convention, so the accent colour, the size and
+      — load-bearing on a transparent widget over an unknown wallpaper — the drop shadow all come
+      with it, and cannot drift away from the text it sits beside.
+
+      ⚠️ It overrides `layout_width` because WidgetLine sets `match_parent`, which in a horizontal
+      row would take the whole line and push the header out of view entirely.
+    -->
+    <style name="WidgetLine.Board.Header.Clock">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_marginStart">8dp</item>
+    </style>
+
     <!-- MAJOR INDICES, KEY STOCKS, ECON… — small, spaced, and never the point. -->
     <style name="WidgetLine.Board.Section">
         <item name="android:layout_marginTop">4dp</item>

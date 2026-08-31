@@ -63,6 +63,12 @@ internal object WidgetBoard {
      */
     internal data class Board(
         val header: String,
+        /**
+         * Whether the header clock reads 24-hour. Follows [dev.mascwa.pulse.data.settings.AppSettings]
+         * `use24HourClock`, NOT the system setting — see [render] for why that distinction is the
+         * whole reason this field exists.
+         */
+        val clock24: Boolean = true,
         val subhead: String = "",
         val alert: String? = null,
         val alertRoute: String? = null,
@@ -98,6 +104,21 @@ internal object WidgetBoard {
         val v = RemoteViews(context.packageName, R.layout.widget_board)
 
         v.setTextViewText(R.id.widget_board_header, board.header)
+
+        // ⚠️ BOTH formats are set to the SAME pattern, and that is not redundancy — it is the only
+        // way to honour the app's own preference. A TextClock picks `format24Hour` when the DEVICE
+        // is in 24-hour mode and `format12Hour` otherwise, so setting just one leaves the device
+        // deciding. Writing both makes the choice ours, which matters because `use24HourClock` is a
+        // switch the user can already flip in Settings and this is its only reader.
+        //
+        // ⚠️ `setCharSequence` reaches a view method only if it is @RemotableViewMethod, and a miss
+        // throws ActionException ON THE DEVICE while compiling perfectly — nothing here would catch
+        // it. Read out of the platform: TextClock has exactly three remotable methods, and
+        // setFormat12Hour(CharSequence) and setFormat24Hour(CharSequence) are two of them.
+        val clockPattern = if (board.clock24) CLOCK_24 else CLOCK_12
+        v.setCharSequence(R.id.widget_board_clock, "setFormat12Hour", clockPattern)
+        v.setCharSequence(R.id.widget_board_clock, "setFormat24Hour", clockPattern)
+
         text(v, R.id.widget_board_subhead, board.subhead)
 
         // ── what is happening ───────────────────────────────────────────────────────────────────
@@ -276,6 +297,17 @@ internal object WidgetBoard {
     private val SOURCE_IDS = listOf(
         R.id.widget_board_src_0, R.id.widget_board_src_1, R.id.widget_board_src_2,
     )
+
+    /**
+     * The header clock's patterns.
+     *
+     * ⚠️ These are `SimpleDateFormat` patterns, which is what TextClock takes — not `java.time`
+     * ones. `HH` is 00-23 and `hh` would be 01-12 with a leading zero, so the 12-hour form uses a
+     * bare `h`; `a` is the am/pm marker. No seconds, deliberately: a widget that redrew every second
+     * would be a battery cost for a reading nobody takes to the second.
+     */
+    private const val CLOCK_24 = "HH:mm"
+    private const val CLOCK_12 = "h:mm a"
 
     private val READ_IDS = listOf(
         R.id.widget_board_read_0, R.id.widget_board_read_1,
