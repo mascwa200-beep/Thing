@@ -156,6 +156,15 @@ class NutritionContainer(context: Context) {
             http,
             databaseFile = appContext.getDatabasePath(FoodDatabase.DB_NAME),
             token = { settings.currentUpdateToken() },
+            // ⚠️ Both halves, and each is needed on its own. `FoodDatabase.close` drops the open
+            // SQLite handle so the file can genuinely be replaced rather than merely unlinked from
+            // under a live descriptor; clearing the memo is what makes the NEXT query re-open. Doing
+            // only the first leaves this holding a closed database; only the second leaves the new
+            // file on disk and every query still answering from the old one.
+            beforeReplace = {
+                FoodDatabase.close()
+                offlineMemo = null
+            },
         )
     }
 

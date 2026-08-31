@@ -391,6 +391,29 @@ abstract class FoodDatabase : RoomDatabase() {
         const val SCHEMA: Int = 2
 
         /**
+         * Close whatever is open, so the file underneath can be replaced.
+         *
+         * ⚠️ **Without this, updating the pack leaves the app reading a database that no longer
+         * exists.** [instance] is cached for the life of the process, and SQLite holds an open file
+         * descriptor: deleting and renaming underneath it does not fail on Unix — the old inode
+         * simply stays alive, unreferenced by any name, until the last handle closes. So every query
+         * would keep answering from the OLD corpus, with a new one sitting on disk, until the person
+         * happened to kill the app. And the freed space is not freed either, so the next install's
+         * free-space check would be measuring room that a deleted file is still occupying.
+         *
+         * Nulled as well as closed, so the next [open] genuinely re-opens rather than handing back a
+         * closed handle. Callers holding a `FoodDao` from before this must not be used again — which
+         * is why `NutritionContainer` memoises its store on success only and re-derives it.
+         */
+        fun close() {
+            synchronized(this) {
+                runCatching { instance?.close() }
+                instance = null
+                lastOpenNote = null
+            }
+        }
+
+        /**
          * Open the bundled database, or null if it is not there.
          *
          * ⚠️ **Null is a real answer and callers must handle it.** The asset is fetched by CI rather

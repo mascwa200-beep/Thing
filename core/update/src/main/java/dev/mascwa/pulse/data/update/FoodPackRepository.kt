@@ -36,6 +36,17 @@ class FoodPackRepository(
     /** Where the database file itself lives — `context.getDatabasePath(FoodDatabase.DB_NAME)`. */
     private val databaseFile: File,
     private val token: suspend () -> String?,
+    /**
+     * Called immediately before the downloaded file replaces the live one.
+     *
+     * ⚠️ **The caller has to close whatever has the database open, and nothing here can do it.** This
+     * module deliberately does not depend on `:core:database` — the destination is a path, not a
+     * Room type — so the close has to come back through a callback. Skipping it does not fail
+     * loudly: SQLite holds an open descriptor, deleting and renaming underneath it succeeds on Unix,
+     * the old inode stays alive unreferenced, and every query goes on answering from the OLD corpus
+     * with a new one on disk until somebody kills the app. The freed space is not freed either.
+     */
+    private val beforeReplace: () -> Unit = {},
     private val repo: String = REPO,
     private val tag: String = TAG,
 ) {
@@ -188,6 +199,7 @@ class FoodPackRepository(
             // The old file is deleted first because `File.renameTo` will not replace on every
             // filesystem, and Room's journal has to go with it or the next open finds one describing
             // a database that no longer exists.
+            runCatching { beforeReplace() }
             runCatching { databaseFile.delete() }
             runCatching { File(databaseFile.path + "-journal").delete() }
             runCatching { File(databaseFile.path + "-wal").delete() }
@@ -283,6 +295,7 @@ class FoodPackRepository(
 
     /** Remove the database and its record, so the next check offers the whole thing again. */
     fun clear() {
+        runCatching { beforeReplace() }
         runCatching { databaseFile.delete() }
         runCatching { File(databaseFile.path + "-journal").delete() }
         runCatching { File(databaseFile.path + "-wal").delete() }
