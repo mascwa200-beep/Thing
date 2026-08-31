@@ -426,6 +426,16 @@ data class AppSettings(
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
 
+    /**
+     * Which day of the month the mobile data allowance resets.
+     *
+     * ⚠️ Nothing on the phone knows this — a carrier's billing cycle is not exposed to apps — so it
+     * has to be told, and the 1st is the only defensible default because it is what most accounts
+     * do. A day the month does not have (the 31st in April) resolves to that month's last;
+     * `BillingCycle` decides that once so no caller has to.
+     */
+    val dataCycleDay: Int = 1,
+
     // NAV map view (persisted so the map opens how you left it).
     val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
     val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up

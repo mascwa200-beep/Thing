@@ -44,6 +44,7 @@ object WidgetDiagnostics {
         SPACE("space wx"),
         SKY("sky"),
         WATER("water"),
+        DATA("data used"),
         FUEL("fuel"),
         ECONOMY("economy"),
         SAFETY("safety"),

@@ -667,6 +667,14 @@ fun SettingsScreen(
                     ) { m -> vm.update { it.copy(refreshIntervalMinutes = m) } }
                     PrefSwitch("Refresh on Wi-Fi only", checked = s.refreshOnlyOnWifi,
                         onChange = { v -> vm.update { it.copy(refreshOnlyOnWifi = v) } })
+                    // ⚠️ Nothing on the phone knows a carrier's billing cycle, so the widget's
+                    // "data used" line is only as right as this. A day the month does not have —
+                    // the 31st in April — resolves to that month's last rather than skipping the
+                    // month; `BillingCycle` decides that once, so this is a plain day number.
+                    SingleChoiceRow(
+                        "Data allowance resets on", s.dataCycleDay,
+                        (1..31).map { d -> d to ordinal(d) },
+                    ) { d -> vm.update { it.copy(dataCycleDay = d) } }
                     SingleChoiceRow(
                         "Articles per category", s.newsItemsPerCategory,
                         listOf(15 to "15", 30 to "30", 50 to "50"),
@@ -1488,6 +1496,23 @@ private fun EditableValueRow(title: String, value: String, helpUrl: String? = nu
         TextEditDialog(title, initial = if (value == "Not set" || value.startsWith("••••")) "" else value,
             onDismiss = { show = false }, onConfirm = { onSet(it); show = false })
     }
+}
+
+/**
+ * A day of the month as it is said: 1st, 2nd, 3rd, 21st, but 11th, 12th and 13th.
+ *
+ * ⚠️ The teens are the whole reason this is a function rather than a lookup on the last digit —
+ * eleventh, twelfth and thirteenth break the pattern that 21st, 22nd and 23rd follow. English only,
+ * like the rest of this screen: the app ships `resourceConfigurations += listOf("en")`.
+ */
+private fun ordinal(day: Int): String {
+    val suffix = if (day % 100 in 11..13) "th" else when (day % 10) {
+        1 -> "st"
+        2 -> "nd"
+        3 -> "rd"
+        else -> "th"
+    }
+    return "$day$suffix"
 }
 
 @Composable

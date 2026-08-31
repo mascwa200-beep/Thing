@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
+import dev.mascwa.pulse.core.device.MobileData
 import dev.mascwa.pulse.core.telemetry.DayPart
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.MarketMood
@@ -371,7 +372,15 @@ class LockWidgetProvider : AppWidgetProvider() {
         if (place == null) {
             outcomes[Source.SAFETY] = Outcome.Skipped("no saved location")
             outcomes[Source.SKY] = Outcome.Skipped("no saved location")
+            outcomes[Source.WATER] = Outcome.Skipped("no saved location")
         }
+
+        // ⚠️ Asked once, up front, for the same reason `place` is: the answer decides whether a
+        // source runs at all, and a source that returns null from inside `widgetSource` is recorded
+        // as Empty — "asked, nothing to report" — which is the wrong thing to say about a
+        // permission that was never granted. One cheap AppOps call.
+        val usageAccess = runCatching { c.mobileData.hasUsageAccess() }.getOrDefault(false)
+        if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted")
 
         // ⚠️ Captured out of the parallel block so the board can be assembled from the SAME pass
         // that fills the rows. Building it from a second read would let the two forms of the widget
@@ -384,7 +393,8 @@ class LockWidgetProvider : AppWidgetProvider() {
         var skyLine: String? = null
         var spaceLine: String? = null
         var waterLine: String? = null
-        var fuelLine: String? = null
+        var fuelLines: List<String> = emptyList()
+        var dataLine: String? = null
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
@@ -489,11 +499,47 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val fuel = async {
-                    widgetSource<String>(Source.FUEL, outcomes) {
-                        c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
+                    widgetSource<List<String>>(Source.FUEL, outcomes) {
+                        // ⚠️ ONE fetch for both lines. The pump price rides on the same call as the
+                        // benchmark — `usRetail` was being fetched and thrown away — and asking the
+                        // repository twice inside a four-second budget would pay for it twice.
+                        val d = c.fuelRepository.fetch(force = false).data ?: return@widgetSource null
+                        val crude = d.benchmarks.firstOrNull()?.let { b ->
                             val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
                             val pct = b.changePercent?.let { " ${signedPercent(it)}%" }.orEmpty()
                             "FUEL  ${b.label} $price$pct".trim()
+                        }
+                        // ⚠️ US-only and key-gated, by the repository — EIA is an American agency
+                        // and the World Bank retired both of its pump-price indicators, so there is
+                        // no free worldwide equivalent to fall back to. Absent elsewhere rather
+                        // than blank, which is the honest rendering of "we cannot know this here".
+                        val pump = d.usRetail
+                            .filter { it.usdPerGallon != null }
+                            .take(2)
+                            .joinToString("  ·  ") { rp ->
+                                "${pumpLabel(rp.product)} $${"%.2f".format(rp.usdPerGallon)}"
+                            }
+                            .ifBlank { null }
+                            ?.let { "PUMP  $it /gal" }
+                        listOfNotNull(crude, pump).ifEmpty { null }
+                    }
+                }
+                val data = async {
+                    if (!usageAccess) null else widgetSource<String>(Source.DATA, outcomes) {
+                        // Local, no network, no coordinate — among the cheapest sources here, but
+                        // still inside a budget: the sibling call in the Security Audit is what
+                        // once froze that screen.
+                        when (val r = c.mobileData.sinceCycleStart(s.dataCycleDay)) {
+                            is MobileData.Reading.Used ->
+                                "DATA  ${Formatters.number(r.bytes / 1_000_000_000.0, 2)} GB " +
+                                    "· day ${r.daysInto} of ${r.lengthDays}"
+                            // A phone with no radio has no mobile allowance, so this genuinely is
+                            // "asked, answered, nothing to report" rather than a failure.
+                            is MobileData.Reading.NoRadio -> null
+                            // Cannot happen — `usageAccess` gated the call — but the `when` is
+                            // exhaustive and treating it as absence would hide a real regression.
+                            is MobileData.Reading.NoAccess -> null
+                            is MobileData.Reading.Failed -> throw IllegalStateException(r.reason)
                         }
                     }
                 }
@@ -619,7 +665,11 @@ class LockWidgetProvider : AppWidgetProvider() {
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
                 space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
                 water.await()?.let { waterLine = it; rows += Row(it, Role.SECONDARY, route = Routes.WEATHER) }
-                fuel.await()?.let { fuelLine = it; rows += Row(it, Role.SECONDARY, route = Routes.MARKETS) }
+                fuel.await()?.let {
+                    fuelLines = it
+                    rows += Row(it.first(), Role.SECONDARY, route = Routes.MARKETS)
+                }
+                data.await()?.let { dataLine = it; rows += Row(it, Role.SECONDARY, route = Routes.SETTINGS) }
                 econ.await()?.let {
                     econLines = it
                     rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
@@ -647,7 +697,11 @@ class LockWidgetProvider : AppWidgetProvider() {
 
         val econColumn = WidgetBoard.Column("ECONOMY", econLines)
         val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine))
-        val resourceColumn = WidgetBoard.Column("RESOURCES", listOfNotNull(fuelLine, storageLine))
+        // ⚠️ Split into two rather than grown to four lines: a column holds three, and the crude
+        // benchmark and the pump price answer a different question from what this handset has
+        // spent. The second slot of the pair was left empty in the last slice for exactly this.
+        val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
+        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(dataLine, storageLine))
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
@@ -672,16 +726,34 @@ class LockWidgetProvider : AppWidgetProvider() {
             breadth = mkt?.breadth,
             breadthPct = mkt?.upPct,
             readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, spaceLine, waterLine),
-            // ⚠️ Only pairs that have something go in. The second slot stays deliberately empty
-            // here — water, fuel detail, data use and comms fill it in later slices, and an empty
-            // labelled column would read as a feed that failed rather than one not built yet.
+            // ⚠️ Only pairs that have something go in, and an EMPTY labelled column is never
+            // passed — it would read as a feed that failed rather than one this phone cannot
+            // answer. Comms fills the remaining slot in the next slice.
             pairs = listOf(
                 econColumn to dayColumn,
-                resourceColumn to WidgetBoard.Column("", emptyList()),
+                fuelColumn to phoneColumn,
             ),
             foot = sysLine,
         )
         return Loaded(rows, board)
+    }
+
+    /**
+     * EIA's own product name, short enough for a widget column.
+     *
+     * ⚠️ Matched on a keyword rather than sliced to a fixed length: the feed returns "Regular
+     * Gasoline" and "No 2 Diesel", so taking the first word gives "Regular" and "No" — and "No" is
+     * not a fuel. Anything unrecognised keeps its first word, which is the honest fallback.
+     */
+    private fun pumpLabel(product: String): String {
+        val p = product.lowercase()
+        return when {
+            "diesel" in p -> "diesel"
+            "regular" in p -> "reg"
+            "premium" in p -> "prem"
+            "midgrade" in p || "mid-grade" in p -> "mid"
+            else -> product.substringBefore(' ').lowercase()
+        }
     }
 
     /** One instrument, as the board draws it: what it is, what it did, and which way. */

@@ -320,6 +320,15 @@ class AppContainer(private val appContext: Context) {
     val waterRepository: dev.mascwa.pulse.data.water.WaterRepository by lazy {
         dev.mascwa.pulse.data.water.WaterRepository(appContext, http, diskCache)
     }
+    /**
+     * Mobile data used since the allowance last reset. Local, no network, no coordinate.
+     *
+     * ⚠️ Needs Usage Access, which the user grants in Settings rather than at a runtime prompt —
+     * the same special access the Security Audit's per-app breakdown already asks for.
+     */
+    val mobileData: dev.mascwa.pulse.core.device.MobileData by lazy {
+        dev.mascwa.pulse.core.device.MobileData(appContext)
+    }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     /**
