@@ -23,6 +23,9 @@ on:
       # It bundles the typefaces out of the app's resource directory too, so removing or renaming
       # one there would break the desktop at render time with nothing in this workflow to catch it.
       - "app/src/main/res/font/**"
+      # And the star catalogue, for the same reason: it is bundled out of the app's asset directory,
+      # so a change to it changes what this module ships and what its bundle guard has to check.
+      - "core/sky/src/main/assets/sky/**"
       # The module's own build file too, not just its sources — :desktop depends on this project
       # now, so a dependency change there changes what the desktop compiles against.
       - "core/telemetry/**"
@@ -30,6 +33,11 @@ on:
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle/libs.versions.toml"
+      # ⚠️ The same omission the nutrition workflow had. `gradle.properties` carries the daemon's
+      # memory, parallelism and the build cache, and the wrapper decides which Gradle runs at all —
+      # both apply to this module as much as to the Android ones, and neither would have rebuilt it.
+      - "gradle.properties"
+      - "gradle/wrapper/**"
       - ".github/workflows/desktop-build.yml"
   workflow_dispatch:
 
@@ -62,7 +70,18 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build :desktop
-        run: ./gradlew :desktop:build --stacktrace --no-daemon
+        # ⚠️ `--configure-on-demand`, and it is not an optimisation. Gradle configures EVERY project
+        # by default, so building this plain Kotlin/JVM module was configuring `:app` — which
+        # declares `ndkVersion` and an `externalNativeBuild`, so AGP downloaded the whole ~1 GB NDK
+        # before compiling a line of desktop code. That is a gigabyte of network on every run for a
+        # module that has no native code in it, and on run 236 the download failed and took the
+        # build with it: `InstallFailedException: Failed to install ndk;27.0.12077973`.
+        #
+        # `:desktop` depends only on `:core:telemetry` and `:core:feeds`, both plain Kotlin/JVM, so
+        # `:app` never needs to be configured at all. Measured rather than assumed: this exact
+        # command succeeds in a container with **no Android SDK installed whatsoever**, which it
+        # could not do if `:app` were being configured.
+        run: ./gradlew :desktop:build --configure-on-demand --stacktrace --no-daemon
 
   package-windows:
     # The actual deliverable: an installable Windows app. Only worth spending a Windows runner on once the
@@ -90,7 +109,7 @@ jobs:
         # The build number is this workflow's own run_number, NOT the Android build's — they are separate
         # counters, and the in-app updater looks the run up by number in THIS workflow to decide whether
         # the build finished. Passing the wrong one would have it check an unrelated run.
-        run: .\gradlew.bat :desktop:packageMsi -PdesktopBuild=${{ github.run_number }} --stacktrace --no-daemon
+        run: .\gradlew.bat :desktop:packageMsi -PdesktopBuild=${{ github.run_number }} --configure-on-demand --stacktrace --no-daemon
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -98,6 +117,11 @@ jobs:
           name: lcars-desktop-msi
           path: desktop/build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
+          # ⚠️ The `desktop-latest` release is the durable copy and is always the newest build — it is
+          # what the in-app updater reads — so an artifact older than a few days has no consumer,
+          # while each one is stored for the repository's default 90 days. The cost is that an OLD
+          # run's page stops offering a download after a week.
+          retention-days: 7
 
       - name: Name the installer predictably
         # jpackage names the file after the package and version (LCARS-1.0.19.msi). The in-app updater

@@ -39,7 +39,14 @@ class LuaScriptTool(
     override val name = spec.name
     override val usage = spec.usage
 
-    override suspend fun run(arg: String): String = withContext(Dispatchers.Default) {
+    /**
+     * ⚠️ **[Dispatchers.IO], not `Default`, because what this coroutine does is WAIT.** The script's
+     * CPU work happens on the daemon thread below; this body's whole job is `worker.join`, which
+     * blocks for up to [TIMEOUT_MS] — four seconds. `Default` is sized to the core count, so on a
+     * two-core phone that is half the pool gone, and it is the same pool Compose and every
+     * `flowOn(Default)` share. `IO` exists for exactly this: a thread that is going to sit still.
+     */
+    override suspend fun run(arg: String): String = withContext(Dispatchers.IO) {
         val granted = capImpls.filterKeys { it in spec.caps }
         var out = ""
         val worker = Thread {

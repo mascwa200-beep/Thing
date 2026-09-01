@@ -1,0 +1,199 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+// CI passes -PSKY_VERSION_CODE=<run number> so each published build out-versions the last.
+val skyBuildNumber = (project.findProperty("SKY_VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+
+android {
+    namespace = "dev.mascwa.sky"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+
+    defaultConfig {
+        // ⚠️ A DIFFERENT applicationId from `dev.mascwa.pulse`, which is what lets both live on one
+        // phone at once. They share the renderer and the catalogues and none of the storage.
+        applicationId = "dev.mascwa.sky"
+
+        // ⚠️ **What makes this run on any phone is that no architecture is narrowed, not the API
+        // floor.** `:app` is arm64-only — it compiles whisper.cpp, llama.cpp and QuickJS — and
+        // refuses to start except on one Pixel model. This module compiles no native code of its
+        // own and names no ABI, so ONE universal APK covers arm64, arm32, x86 and x86_64, and
+        // there is no device gate to pass.
+        //
+        // ⚠️ It is not free of native libraries and saying so would be wrong: Compose UI depends
+        // transitively on `androidx.graphics:graphics-path`, whose small `.so` is packaged — for
+        // all four architectures, which is exactly why the property holds. The CI check asserts
+        // that shape, never the absence of `lib/`.
+        //
+        // ⚠️ **No `ndk { abiFilters }` and no `externalNativeBuild`, deliberately.** Naming an ABI
+        // here is the one edit that would undo the point of the module.
+
+        // ⚠️ **Its OWN floor, lower than every other module in the build.** The nutrition app sits
+        // at [minSdkWide] because 26 is where `java.time` arrives on the platform; this one carries
+        // core library desugaring (see `compileOptions` below), so that reason does not apply and it
+        // reaches the further back the owner asked for. See `minSdkSky` in the version catalogue for
+        // why the number is 23 and what was measured to arrive at it.
+        minSdk = libs.versions.minSdkSky.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
+        versionCode = skyBuildNumber
+        versionName = "1.0.$skyBuildNumber"
+
+        vectorDrawables { useSupportLibrary = true }
+        resourceConfigurations += listOf("en")
+    }
+
+    signingConfigs {
+        // ⚠️ The same committed key the other two applications use. Without this a CI runner
+        // generates a throwaway debug key per run, Android reads the next build as a signature
+        // change, and every update becomes "App not installed" followed by an uninstall. The three
+        // package names differ, so sharing one personal sideload key costs nothing.
+        getByName("debug") {
+            storeFile = rootProject.file("app/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        release {
+            // ⚠️ R8 is OFF, and that is a decision. In `:app` it earns its place tree-shaking a
+            // very large icon library, and it also cost that application months of broken video
+            // because a class the bundled Python resolved BY NAME was renamed away — a failure no
+            // build could see. There is no reflection here and no icon library to shake; the size
+            // is the star catalogue, which shrinking cannot touch.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    compileOptions {
+        // ⚠️ **The safety net, and it goes in BEFORE the floor drops rather than after.** Below
+        // API 26 the platform has no `java.time`, and the failure mode without this is the one this
+        // project has already been bitten by twice: the build is green, the APK ships, and the app
+        // throws `NoClassDefFoundError` on the device — a class resolved at runtime that no compiler
+        // could have missed. D8 rewrites those calls against a bundled backport instead.
+        //
+        // ⚠️ It is enabled even though NOTHING in this application's own source uses `java.time`.
+        // The reach is `:core:feeds`, pulled in transitively by `:core:update`'s two imports, and a
+        // future shared core could add one at any time without this module noticing. A safety net
+        // that only covers what is there today is not one.
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions { jvmTarget = "17" }
+
+    // ⚠️ **THE FLOOR CHANGE ABOVE HAD NO AUTOMATED GATE UNTIL THIS BLOCK, AND I BELIEVED IT DID.**
+    // The claim was that lint catches an unguarded newer API at the new minimum. `assembleRelease`
+    // does run `lintVitalRelease` — the log names it — but `lintVital` passes `--fatalOnly`, and
+    // that is a much smaller set than "the errors".
+    //
+    // Measured rather than recalled, from the real jars this build resolves:
+    //
+    //   * `ApiDetector.UNSUPPORTED.defaultSeverity` is **error**, not fatal. Instantiated from
+    //     lint-checks 31.7.3 and printed, because the constant is passed as a local in a static
+    //     initializer and cannot be read off the bytecode directly.
+    //   * `FlagConfiguration.getDefinedSeverity` under `fatalOnly` returns **IGNORE** for any issue
+    //     whose default severity is not FATAL, unless a configuration explicitly makes it FATAL.
+    //
+    // So `NewApi` was being ignored on every release build, and nothing in this repository
+    // configured otherwise: there is no `lint {}` block anywhere else and no workflow runs a full
+    // `lint` task. Promoting the one issue is the whole fix — it costs no new Gradle task and no
+    // extra CI time, because the analysis that ignores it is already running.
+    //
+    // ⚠️ Deliberately `fatal` and NOT `abortOnError` plus a full `lint` task: that would also fail
+    // on every other error-severity issue in the module, which is a different and much larger
+    // decision than "the floor must be honest". Only the check that guards the floor is promoted.
+    //
+    // ⚠️ Deliberately NOT added to `:app` or `:nutrition`. Their minimum did not move, so nothing
+    // here created that risk, and a pre-existing finding in either would turn three workflows red
+    // for a change that is supposed to be about the star map. They are candidates for the same
+    // treatment on their own merits, which is a separate decision with its own blast radius.
+    lint {
+        fatal += "NewApi"
+    }
+
+    buildFeatures {
+        compose = true
+        // `BuildConfig.VERSION_CODE` is how the app knows which build it is running, which is the
+        // whole basis of "is there a newer one". Off by default since AGP 8.
+        buildConfig = true
+    }
+
+    // ⚠️ **The star catalogue must be stored UNCOMPRESSED or it cannot be memory-mapped**, and the
+    // point of its tile index is that a view reads a few kilobytes rather than all twenty-five
+    // megabytes. Deflating it forces the whole file onto the heap — on the phone least able to
+    // hold it, since this is the module built to run anywhere.
+    //
+    // ⚠️ This CANNOT live in `:core:sky` even though the asset does: packaging belongs to whichever
+    // module builds the APK, so every application bundling the catalogue declares it separately.
+    // `:app` has the same three lines and `SkyCatalogSource` reports the mistake at runtime rather
+    // than silently working slowly.
+    androidResources {
+        noCompress += "skycat"
+    }
+
+    packaging {
+        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    }
+}
+
+dependencies {
+    // ⚠️ Its OWN configuration, not `implementation`. This artifact is handed to D8 to rewrite
+    // against, never compiled against, and declaring it as an ordinary dependency compiles
+    // perfectly while desugaring nothing — a silent no-op behind a flag that reads as enabled.
+    coreLibraryDesugaring(libs.android.desugar.jdk.libs)
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // ⚠️ What makes `src/main/baseline-prof.txt` do anything at all — AGP packages the profile
+    // either way, but on a sideloaded APK there is no store to hand it to ART, and this library's
+    // startup initializer is the only thing that writes it. Inert without a profile file, which is
+    // why it can be declared before one exists.
+    implementation(libs.androidx.profileinstaller)
+
+    // The whole star map: catalogues, renderer, view model. Everything this application draws.
+    implementation(project(":core:sky"))
+    implementation(project(":core:telemetry"))
+
+    // Keeping itself current, and saying what went wrong: the GitHub release check with its green
+    // gate, the `PackageInstaller` ladder, and the crash reporter. Shared with the other two
+    // applications so the three cannot come to disagree about when a build is safe to install.
+    //
+    // ⚠️ **It brings a great deal with it: `api(project(":core:feeds"))` — which declares okhttp,
+    // okio and kotlinx-serialization as `api` in turn — plus `api(libs.coil.base)` for an
+    // image-decode interceptor this application will never call, and twenty-two repositories it
+    // will never call either. With R8 off (see the release block above) none of that is shaken.
+    //
+    // ⚠️ **And it costs 1,010,098 bytes, which is a tenth of what the jar sizes suggest.** The APK
+    // went 32,440,206 → 33,450,304 across the commit that added this line, read out of the two
+    // builds' own "Check what actually shipped" lines. An earlier version of this comment quoted
+    // the jars — okhttp 771 kB, okio 351 kB, serialization 646 kB — and implied several megabytes,
+    // which is wrong twice over: a jar is not dex, and the APK is deflated afterwards. Recorded
+    // because an overstated cost is as much a defect here as an overstated benefit.
+    //
+    // ⚠️ It is accepted rather than worked around, and the alternative was worse: a self-contained
+    // updater here would be a third copy of the green gate and the installer ladder, in code that
+    // installs software. `UpdateRepository`'s own KDoc records that it was parameterised for
+    // exactly this — this is the fourth reader of these releases. Splitting `:core:update` so the
+    // updater does not drag coil is a possible follow-up, and at one megabyte it is not urgent.
+    implementation(project(":core:update"))
+}

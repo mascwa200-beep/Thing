@@ -1,0 +1,156 @@
+package dev.mascwa.nutrition
+
+import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.memory.MemoryCache
+import dev.mascwa.pulse.device.DecodeCapInterceptor
+import dev.mascwa.nutrition.data.NutritionContainer
+import dev.mascwa.pulse.crash.Breadcrumbs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/**
+ * The process, and the two things that have to happen before anything else does.
+ *
+ * ⚠️ **This class exists because a crash handler installed from an activity is installed too late.**
+ * Until now the manifest named no application class, so the earliest code this app ran was
+ * `MainActivity.onCreate` — and the failures worth catching most are the ones that happen before a
+ * first frame is ever drawn: a database that will not open, a store whose file is corrupt, a
+ * dependency that throws while it is being constructed. Every one of those killed the app with
+ * nothing recorded and nothing to read afterwards.
+ *
+ * ⚠️ **It also owns the container, and that is not a style choice.** Two `NutritionContainer`s in one
+ * process means two of every store, and several of them hold a DataStore over a fixed file — which
+ * throws outright on a second instance. The activity used to build its own; now it reads this one,
+ * so there is exactly one.
+ */
+class NutritionApplication : Application(), ImageLoaderFactory {
+
+    /**
+     * Built eagerly here, which costs nothing: every member of the container is `by lazy`, so
+     * constructing it allocates one object and opens no file, no database and no socket.
+     */
+    val container: NutritionContainer by lazy { NutritionContainer(this) }
+
+    /**
+     * ⚠️ The application's own scope, not a coroutine tied to a screen. Sending a report that was
+     * recorded last launch has nothing to do with whether anybody is looking at the app, and a
+     * launch dispatched from an activity would be cancelled the moment it was backgrounded — which
+     * is exactly when an upload gets the time to finish.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate() {
+        super.onCreate()
+
+        // ⚠️ FIRST, before anything that could itself fail. A handler installed after the thing it
+        // would have caught is worth nothing, and this is the only ordering that cannot be got wrong
+        // by something added below it later.
+        container.crashReporter.install()
+        Breadcrumbs.drop("app", "process started")
+
+        // Anything recorded before this launch goes now — never at fault time, when the JVM is
+        // unstable and the process is about to be killed. A no-op without a token, and it says so.
+        scope.launch { container.crashUploader.uploadPending() }
+
+        // Give back the disk the last self-update borrowed. ⚠️ Here rather than after the install,
+        // because `PackageInstaller.commit()` usually kills this process on a successful update, so
+        // any line written after it may never run. Launch is the point that is always reached, and
+        // after a successful install there always IS one. 180 MB on a phone that may not have it.
+        scope.launch { dev.mascwa.pulse.data.update.UpdateRepository.pruneCache(this@NutritionApplication) }
+    }
+
+    /**
+     * How much of a cheap phone's heap this app is allowed to spend on pictures.
+     *
+     * ⚠️ **Coil's default is 20% of app memory, and this app has exactly one image on one screen.**
+     * Measured out of the shipped coil-base 2.7.0 bytecode rather than recalled:
+     * `coil.util.-Utils.defaultMemoryCacheSizePercent` returns **0.15 when
+     * `ActivityManager.isLowRamDevice` and 0.20 otherwise**. On a 4 GB phone with a standard heap
+     * that is roughly forty megabytes held back — for a `LazyRow` of 96 dp progress-photograph
+     * thumbnails, which is the only `AsyncImage` in the whole application.
+     *
+     * A 96 dp thumbnail at 3× is 288×288 in ARGB_8888, which is 331 kB. Six per cent of the same
+     * heap is about eleven megabytes, so roughly thirty-five of them — comfortably more than a row
+     * can show, and a quarter of what was reserved. The number is no longer written here: it is
+     * `DeviceClass.Budget.imageCacheShare`, which is 0.06 down to MODEST and lower below that, so
+     * both applications read one definition and a weaker phone gets a smaller share without either
+     * of them deciding it separately.
+     *
+     * ⚠️ **No disk cache at all, and that costs nothing.** Coil's disk cache exists to avoid
+     * re-fetching over the network; every image here is a local file this app wrote itself, so the
+     * cache would be a second copy of a photograph already on the disk, in a directory Android may
+     * clear at any moment. This app makes no image request of any kind.
+     *
+     * ⚠️ Built lazily by Coil on the first image, not during `onCreate`, so it costs nothing at
+     * startup — which is the other half of what this class is for.
+     */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        // ⚠️ The share is the DURABLE budget — hardware only, thermal deliberately excluded. A cache
+        // sized once and kept for the life of the process must not carry a momentary reading, or a
+        // phone that happened to be warm at launch holds a small cache all day. Pressure arriving
+        // later is already handled: onTrimMemory below clears this.
+        //
+        // At every tier down to MODEST that is the measured 0.06 documented above; a LEAN phone gets
+        // 0.04 and a MINIMAL one 0.03. On the 2 GB phone this app exists for, that is the difference
+        // between holding a row of thumbnails and being killed for holding them.
+        .memoryCache {
+            MemoryCache.Builder(this)
+                .maxSizePercent(container.deviceProbe.durableBudget().imageCacheShare)
+                .build()
+        }
+        // Bound the decode itself, re-read per request so a phone that gets hot decodes smaller from
+        // the next thumbnail on. One rule, shared with the LCARS application — see
+        // DecodeCapInterceptor for what Coil's own size resolver already covers and what it cannot.
+        .components {
+            add(DecodeCapInterceptor { container.deviceProbe.budgetCached().imageDecodePx })
+        }
+        .diskCache(null)
+        .build()
+        .also { loader = it }
+
+    /**
+     * The loader Coil actually built, or null if it never asked for one.
+     *
+     * ⚠️ **Held here so [onTrimMemory] can clear a loader that EXISTS without building one that does
+     * not.** `Coil.imageLoader(context)` builds on demand, so reaching for it under memory pressure
+     * would construct the whole loader graph in response to being told memory is short — in a
+     * process that, by the very fact of having no loader, has never drawn a picture.
+     *
+     * ⚠️ It is a smaller saving than it first appears, and the earlier wording here overstated it:
+     * `ImageLoader.Builder.memoryCache {}` and `diskCache {}` both wrap their lambda in `LazyKt.lazy`
+     * — read out of the shipped coil-base 2.7.0 bytecode — and `SystemCallbacks`' constructor only
+     * takes a `WeakReference`. So building a loader allocates NO cache and registers nothing; what
+     * this avoids is the object graph, not a cache appearing under pressure.
+     */
+    @Volatile
+    private var loader: ImageLoader? = null
+
+    /**
+     * Give the pictures back when the phone needs the room.
+     *
+     * ⚠️ **The whole point of this app is that it runs on a cheap phone, and nothing here released
+     * anything.** `Application` implements `ComponentCallbacks2` already — confirmed against the
+     * platform class rather than recalled — so the callback was arriving and being ignored, and the
+     * thumbnail cache stayed held whatever else the system was trying to do. It is a small cache by
+     * design (six per cent of the heap, ~11 MB on a 4 GB phone), which is the reason to hand it back
+     * rather than a reason not to: a decoded bitmap is the largest single thing this process holds.
+     *
+     * ⚠️ There is deliberately nothing else to drop. The food log keeps at most four months resident
+     * behind its own cap, and the barcode database is read by SQLite through its own page cache,
+     * which Android already trims. Clearing either from here would be re-implementing a bound that
+     * already exists.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        runCatching { loader?.memoryCache?.clear() }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        runCatching { loader?.memoryCache?.clear() }
+    }
+}

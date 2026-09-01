@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
@@ -124,6 +125,19 @@ fun SettingsScreen(
         if (!granted) dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
     }
 
+    // ⚠️ Read into state rather than called at each recomposition: `checkSelfPermission` is a
+    // binder call, and the Security Audit screen froze outright doing exactly that per frame.
+    var smsGranted by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.READ_SMS,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val smsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> smsGranted = granted }
+
     // Lets the Appearance section sound a cue on demand. Gated by the Interface-sounds switch like
     // every other cue, which is what makes it a useful test of the switch.
     val soundTest = rememberLcarsCue()
@@ -209,6 +223,79 @@ fun SettingsScreen(
                 }
             }
 
+            // ----- The companion nutrition app -----
+            if (vis(SettingsCategory.SYSTEM, "nutrition companion app download install food macros")) item {
+                val n by vm.companionState.collectAsStateWithLifecycle()
+                PrefSection("Nutrition app") {
+                    val status = when (val st = n) {
+                        is UpdateUi.Checking -> "Asking GitHub for the newest build…"
+                        is UpdateUi.Available -> "Build #${st.info.versionCode} is ready to download."
+                        is UpdateUi.Downloading -> "Downloading ${st.pct}% — it is a large file."
+                        is UpdateUi.ReadyToInstall -> "Downloaded — tap install."
+                        is UpdateUi.Pending ->
+                            "The newest nutrition build is still going through CI. Nothing to install yet."
+                        is UpdateUi.Error -> st.message
+                        // ⚠️ Says what the thing IS, because nothing else in this app mentions it.
+                        // Somebody reading a settings screen has no way to know a second application
+                        // exists, and "check" with no explanation is a button that means nothing.
+                        else -> "A separate app with just the food and body log — plain, no gate, and " +
+                            "it runs on any phone. Same barcode database. Install it here; after that " +
+                            "it keeps itself current."
+                    }
+                    // ⚠️ **A LABELLED button, not the round icon the rest of this screen uses, and
+                    // that is the whole fix.** `RoundCyberButton` is a 44dp circle holding a 20dp
+                    // icon; its string is a `contentDescription`, so it is read by a screen reader
+                    // and by nobody else. Every other control here is something you already know
+                    // you want — but this one is the *only* route by which the second application
+                    // can get onto the phone at all, and somebody hunting for a download has no
+                    // reason to read a small circular glyph as one. Reported as exactly that: no
+                    // button anywhere.
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        when (val st = n) {
+                            // Installing is the one step Android will not let an ordinary app do
+                            // for you, so it stays a separate, differently-worded action.
+                            is UpdateUi.ReadyToInstall -> LcarsButton(
+                                "INSTALL THE NUTRITION APP",
+                                {
+                                    installApk(
+                                        context,
+                                        st.file,
+                                        dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_PACKAGE,
+                                    )
+                                },
+                                Modifier.fillMaxWidth(),
+                            )
+                            // ⚠️ Disabled rather than hidden while it works. A control that vanishes
+                            // mid-operation leaves the screen looking as though the tap did nothing,
+                            // which is the same class of confusion this section is being fixed for.
+                            is UpdateUi.Checking, is UpdateUi.Downloading -> LcarsButton(
+                                "WORKING…",
+                                {},
+                                Modifier.fillMaxWidth(),
+                                enabled = false,
+                            )
+                            // ⚠️ The size is named because one tap now starts a ~180 MB download
+                            // with no second confirmation — see `getCompanion`. An unnamed number
+                            // that large is a nasty surprise on a metered connection.
+                            else -> LcarsButton(
+                                if (st is UpdateUi.Error) "TRY AGAIN — GET THE NUTRITION APP"
+                                else "GET THE NUTRITION APP  ·  ~180 MB",
+                                { vm.getCompanion() },
+                                Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+
             // ----- Device, OS & special access -----
             if (vis(SettingsCategory.DEVICE, "hardware os graphene attestation sensors")) item {
                 val graphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context) }
@@ -273,6 +360,24 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    // ⚠️ Read through the container, not a fresh reader. The probe keeps a
+                    // high-water mark of the core count because `availableProcessors()` reports only
+                    // cores that are currently online, so a throwaway instance can report an
+                    // eight-core phone as a two-core one.
+                    fun readDeviceClass(): String? = runCatching {
+                        (context.applicationContext as dev.mascwa.pulse.PulseApplication)
+                            .container.deviceProbe.describe()
+                    }.getOrNull()
+                    var deviceClass by remember { mutableStateOf(readDeviceClass()) }
+                    PrefClickable(
+                        "Device class",
+                        value = deviceClass?.substringBefore('\n') ?: "unavailable",
+                        subtitle = deviceClass
+                            ?: "This phone would not say what it is made of.",
+                        // Half of this reading is live — thermal state, heap use, power saver — so
+                        // tapping re-reads it rather than doing nothing.
+                        onClick = { deviceClass = readDeviceClass() },
+                    )
                     var sensors by remember { mutableStateOf<String?>(null) }
                     PrefClickable(
                         "Sensors",
@@ -300,6 +405,12 @@ fun SettingsScreen(
             if (vis(SettingsCategory.DEVICE, "owner usb camera wipe")) item {
                 val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
                 val isOwner = remember { dpc.isDeviceOwner() }
+                // ⚠️ The explanation comes from the controller, not from here. This screen used to
+                // carry its own hand-written version, so the sentence could drift from the check that
+                // produces it — and it did: it pointed at a "Device owner" row above rather than
+                // saying what provisioning actually requires. One definition now, shared with the
+                // first-launch device notice.
+                val ownerReason = remember { dpc.unavailableReason() }
                 val usbSupported = remember { dpc.usbDataControlSupported() }
                 var usbDataOn by remember { mutableStateOf(dpc.isUsbDataEnabled()) }
                 var camDisabled by remember { mutableStateOf(dpc.isCameraDisabled()) }
@@ -307,10 +418,9 @@ fun SettingsScreen(
                 var pendingWipe by remember { mutableStateOf<Int?>(null) }
                 var wipeError by remember { mutableStateOf(false) }
                 PrefSection("Device-owner controls") {
-                    if (!isOwner) {
+                    ownerReason?.let { reason ->
                         Text(
-                            "These hardware-backed protections need LCARS provisioned as Device Owner (see " +
-                                "“Device owner” above). Until then they're inert.",
+                            reason,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -570,6 +680,14 @@ fun SettingsScreen(
                     ) { m -> vm.update { it.copy(refreshIntervalMinutes = m) } }
                     PrefSwitch("Refresh on Wi-Fi only", checked = s.refreshOnlyOnWifi,
                         onChange = { v -> vm.update { it.copy(refreshOnlyOnWifi = v) } })
+                    // ⚠️ Nothing on the phone knows a carrier's billing cycle, so the widget's
+                    // "data used" line is only as right as this. A day the month does not have —
+                    // the 31st in April — resolves to that month's last rather than skipping the
+                    // month; `BillingCycle` decides that once, so this is a plain day number.
+                    SingleChoiceRow(
+                        "Data allowance resets on", s.dataCycleDay,
+                        (1..31).map { d -> d to ordinal(d) },
+                    ) { d -> vm.update { it.copy(dataCycleDay = d) } }
                     SingleChoiceRow(
                         "Articles per category", s.newsItemsPerCategory,
                         listOf(15 to "15", 30 to "30", 50 to "50"),
@@ -580,6 +698,67 @@ fun SettingsScreen(
                         checked = s.showNewsCoverageStrip,
                         onChange = { v -> vm.update { it.copy(showNewsCoverageStrip = v) } },
                     )
+                }
+            }
+
+            // ----- What is waiting for you: unread texts and unread mail -----
+            if (vis(
+                    SettingsCategory.CONTENT,
+                    "unread texts sms email imap mail inbox accounts notification access gmail outlook",
+                )
+            ) item {
+                // ⚠️ No `initiallyExpanded = false`. This was the ONE section of the twenty-two in
+                // this file that rendered collapsed, so the whole of "link your mail" was a bare
+                // header you had to know to tap — and the owner reported not being able to find it.
+                PrefSection("Texts & mail") {
+                    PrefInfo(
+                        "Unread counts",
+                        // ⚠️ `subtitle`, not the positional second parameter — that one is `value`,
+                        // the short right-aligned accent text, capped at two lines. A paragraph
+                        // there is truncated and right-aligned, which is not what it is for.
+                        subtitle = "The widget can show how many texts and emails are waiting. " +
+                            "Nothing is read but the counts — no addresses, no subjects, no message " +
+                            "text — and nothing leaves this phone except the sign-in to your own " +
+                            "mail server.",
+                    )
+                    // ⚠️ Asked here, at the point the feature is switched on, rather than at launch.
+                    // Without it the count is simply absent; it is never shown as a zero, which
+                    // would be a claim about the inbox rather than about the permission.
+                    if (!smsGranted) {
+                        PrefClickable(
+                            "Count unread texts",
+                            subtitle = "Needs permission to read the SMS inbox",
+                            onClick = { smsLauncher.launch(android.Manifest.permission.READ_SMS) },
+                        )
+                    } else {
+                        PrefInfo("Unread texts", "Counting")
+                    }
+                    // Mail with no password at all, from the notification shade. Its own rows,
+                    // above the IMAP mailboxes, because it is the one most people want and the one
+                    // that needs nothing typed in.
+                    MailNotificationRows(
+                        chosen = s.mailApps,
+                        onChosenChange = { picked -> vm.update { st -> st.copy(mailApps = picked) } },
+                    )
+                    s.emailAccounts.forEachIndexed { i, acct ->
+                        PrefClickable(
+                            acct.display,
+                            subtitle = when {
+                                !acct.enabled -> "Switched off — tap to remove"
+                                acct.password.isBlank() ->
+                                    "Needs its password — a backup never carries one. Tap to remove and add it again."
+                                else -> "${acct.host}:${acct.port} — tap to remove"
+                            },
+                            onClick = {
+                                vm.update { st ->
+                                    st.copy(emailAccounts = st.emailAccounts.filterIndexed { j, _ -> j != i })
+                                }
+                            },
+                        )
+                    }
+                    AddMailboxRow { account ->
+                        vm.update { st -> st.copy(emailAccounts = st.emailAccounts + account) }
+                    }
                 }
             }
 
@@ -1135,9 +1314,24 @@ fun SettingsScreen(
                 val pythonTest by vm.pythonTestResult.collectAsStateWithLifecycle()
                 val pythonTestRunning by vm.pythonTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
-                    PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
-                        onClick = { vm.refreshCacheSize() })
-                    PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    // ⚠️ `megabytes`, not `compact` — that produced "8.4M B", which reads as a unit
+                    // nobody uses. Mebibytes, so the figure matches what a file manager says about
+                    // the same app.
+                    val freed by vm.cacheFreed.collectAsStateWithLifecycle()
+                    PrefClickable(
+                        "Cached data",
+                        value = Formatters.megabytes(cacheSize),
+                        subtitle = "Feeds, images, web responses and downloaded installers. All of " +
+                            "it can be fetched again.",
+                        onClick = { vm.refreshCacheSize() },
+                    )
+                    PrefClickable(
+                        "Clear cache",
+                        // Says what it gave back rather than implying the directory is now empty:
+                        // a download in progress and whatever the platform keeps here are left alone.
+                        subtitle = freed?.let { "Freed ${Formatters.megabytes(it)}." },
+                        onClick = { vm.clearCache() },
+                    )
                     PrefSwitch(
                         "Detailed activity log",
                         "Log full content — your messages and the assistant's tool-call inputs — to the " +
@@ -1176,6 +1370,13 @@ fun SettingsScreen(
                             "(Mnemosyne reflection). Uses the cloud brain, throttled; off = raw moments only.",
                         s.jarvis.reflectionEnabled,
                     ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
+                    PrefClickable(
+                        "Clear mail counts",
+                        subtitle = "Forget how much mail is waiting and which of your apps have been " +
+                            "seen to notify. The count comes back on its own; the list of apps is " +
+                            "the part worth forgetting. On-device only.",
+                        onClick = { vm.clearMailNotices() },
+                    )
                     PrefClickable(
                         "Clear what the Oracle learned",
                         subtitle = "Forget which advisories you act on. The Oracle keeps a tally per rule " +
@@ -1378,6 +1579,23 @@ private fun EditableValueRow(title: String, value: String, helpUrl: String? = nu
     }
 }
 
+/**
+ * A day of the month as it is said: 1st, 2nd, 3rd, 21st, but 11th, 12th and 13th.
+ *
+ * ⚠️ The teens are the whole reason this is a function rather than a lookup on the last digit —
+ * eleventh, twelfth and thirteenth break the pattern that 21st, 22nd and 23rd follow. English only,
+ * like the rest of this screen: the app ships `resourceConfigurations += listOf("en")`.
+ */
+private fun ordinal(day: Int): String {
+    val suffix = if (day % 100 in 11..13) "th" else when (day % 10) {
+        1 -> "st"
+        2 -> "nd"
+        3 -> "rd"
+        else -> "th"
+    }
+    return "$day$suffix"
+}
+
 @Composable
 private fun <T> SingleChoiceRow(
     title: String,
@@ -1498,6 +1716,67 @@ private fun androidx.compose.foundation.lazy.LazyListScope.watchlistEditor(
     }
 }
 
+/**
+ * Add a mailbox.
+ *
+ * ⚠️ The password field is a real credential going into `AppSettings`. Three things already know
+ * that and had to before this row existed: the settings blob is encrypted at rest, `allSecretValues`
+ * carries it so a debug report cannot, and `SettingsBackup` blanks it on export and restores the
+ * device's own on import. `CredentialCoverageTest` fails the build if any of that is undone.
+ */
+@Composable
+private fun AddMailboxRow(onAdd: (dev.mascwa.pulse.data.settings.EmailAccount) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    PrefClickable("Add a mailbox", subtitle = "IMAP over TLS, e.g. imap.gmail.com", onClick = { show = true })
+    if (show) {
+        var host by remember { mutableStateOf("") }
+        var user by remember { mutableStateOf("") }
+        var pass by remember { mutableStateOf("") }
+        var label by remember { mutableStateOf("") }
+        LcarsDialog(
+            title = "Add a mailbox",
+            onDismiss = { show = false },
+            content = {
+                Column {
+                    OutlinedTextField(host, { host = it }, label = { Text("IMAP server") }, singleLine = true)
+                    OutlinedTextField(user, { user = it }, label = { Text("Username") }, singleLine = true)
+                    OutlinedTextField(
+                        pass, { pass = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                        ),
+                    )
+                    OutlinedTextField(label, { label = it }, label = { Text("What to call it") }, singleLine = true)
+                    // ⚠️ Said before the attempt, not after it fails. Gmail, Outlook and Yahoo all
+                    // answer "authentication failed" whether the password is wrong or merely the
+                    // wrong KIND, so somebody pasting their website password has no way to tell.
+                    DialogBody(
+                        "Gmail, Outlook and Yahoo need an app-specific password rather than the one " +
+                            "you sign into the website with.",
+                    )
+                }
+            },
+            confirmText = "ADD",
+            confirmEnabled = host.isNotBlank() && user.isNotBlank() && pass.isNotBlank(),
+            onConfirm = {
+                onAdd(
+                    dev.mascwa.pulse.data.settings.EmailAccount(
+                        label = label.trim(),
+                        host = host.trim(),
+                        username = user.trim(),
+                        password = pass,
+                    ),
+                )
+                show = false
+            },
+            dismissText = "CANCEL",
+        )
+    }
+}
+
 @Composable
 private fun AddWatchRow(onAdd: (WatchItem) -> Unit) {
     var show by remember { mutableStateOf(false) }
@@ -1527,18 +1806,6 @@ private fun AddWatchRow(onAdd: (WatchItem) -> Unit) {
             dismissText = "CANCEL",
         )
     }
-}
-
-/** Body copy inside a dialog — the app's own monospace, not Material's body style. */
-@Composable
-private fun DialogBody(text: String) {
-    Text(
-        text,
-        fontFamily = JetBrainsMono,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        color = Pulse.colors.ink2,
-    )
 }
 
 @Composable

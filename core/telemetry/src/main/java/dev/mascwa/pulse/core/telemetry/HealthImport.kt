@@ -243,6 +243,7 @@ object HealthImport {
                 meal = mealOf(h.text(row, "meal")),
                 source = sourceOf(h.text(row, "source")),
                 micros = microsOf(h, row),
+                extras = extrasOf(h, row),
             )
         }
         return Result(entries = out, skippedRows = skipped, reasons = reasons.take(MAX_REASONS))
@@ -417,6 +418,17 @@ object HealthImport {
      * measured; reading it back as 0.0 would turn "unknown" into "none" on the way in, and the day's
      * calcium coverage would then claim a measurement that was never made.
      */
+    private fun extrasOf(h: Columns, row: List<String>): NutrientSet.Amounts {
+        val values = mutableMapOf<NutrientSet.Nutrient, Double>()
+        for (n in NutrientSet.Nutrient.entries) {
+            // ⚠️ A blank cell is an ABSENT nutrient, never a zero — the same rule as the
+            // micronutrients below, and the reason both are maps. A file written before these
+            // columns existed simply has none of them, and every row keeps its macros.
+            h.number(row, HealthExport.extraColumn(n))?.takeIf { it >= 0.0 }?.let { values[n] = it }
+        }
+        return NutrientSet.Amounts(values)
+    }
+
     private fun microsOf(h: Columns, row: List<String>): Micronutrients.Amounts {
         val values = mutableMapOf<Micronutrients.Micro, Double>()
         for (m in Micronutrients.Micro.entries) {

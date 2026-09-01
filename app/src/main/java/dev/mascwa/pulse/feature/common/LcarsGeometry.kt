@@ -7,6 +7,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.State
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -265,25 +267,36 @@ fun LcarsChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     accent: Color = Pulse.colors.accent,
+    /**
+     * ⚠️ **The kit's own idiom, not a new one — [LcarsButton] has taken this since it was written
+     * and the chip was the outlier.** Its shape here is the same: dim to [Pulse.colors.muted] and
+     * decline the press. Added for the star map's FOLLOW control on a handset with no
+     * rotation-vector sensor, where a chip that responds is a chip that lies.
+     */
+    enabled: Boolean = true,
 ) {
     val c = Pulse.colors
     // Wired at the kit rather than at the call site: the app has a full 13-cue haptic vocabulary that
     // reached exactly one screen, and putting the cue here means every chip in every screen gains it
     // without a 109-file sweep.
     val cue = rememberLcarsCue()
+    val tint = if (enabled) accent else c.muted
     val shape = CutCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 0.dp, bottomStart = 10.dp)
     Box(
         modifier
             .clip(shape)
-            .background(if (selected) accent else Color.Transparent)
-            .border(1.dp, if (selected) accent else c.line, shape)
-            .clickable { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
+            .background(if (selected) tint else Color.Transparent)
+            .border(1.dp, if (selected) tint else c.line, shape)
+            // ⚠️ `enabled` on the modifier rather than a branch inside the lambda, so a disabled chip
+            // is not a click target at all — a press that consumes the touch and plays a cue while
+            // doing nothing reads as the control being broken rather than unavailable.
+            .clickable(enabled = enabled) { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
             .padding(horizontal = 15.dp, vertical = 7.dp),
     ) {
         Text(
             text.uppercase(),
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
-            color = if (selected) c.void else c.ink,
+            color = if (selected) c.void else if (enabled) c.ink else c.muted,
         )
     }
 }
@@ -613,17 +626,19 @@ private fun AlertStrip() {
     val tint = if (red) c.accent else c.amber
     // Only red pulses. A yellow alert that throbbed would be a distraction proportional to nothing,
     // and this animates on every screen for as long as the condition lasts.
-    val alpha = if (red) {
-        val t = rememberInfiniteTransition(label = "alert")
-        val a by t.animateFloat(
+    // ⚠️ The animated value is kept as a `State` and read in the DRAW lambda below, never here.
+    // Reading it in composition would invalidate this strip — and the two Texts inside it — on every
+    // frame of the pulse, on whatever screen the reader happens to be on, for as long as the alert
+    // stands. `drawBehind` paints the same rectangle without recomposing anything.
+    val pulse: State<Float>? = if (red) {
+        rememberInfiniteTransition(label = "alert").animateFloat(
             initialValue = 0.42f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(760), RepeatMode.Reverse),
             label = "alertAlpha",
         )
-        a
     } else {
-        1f
+        null
     }
 
     Row(
@@ -631,7 +646,7 @@ private fun AlertStrip() {
             .fillMaxWidth()
             .padding(top = RailGutter)
             .height(20.dp)
-            .background(tint.copy(alpha = alpha))
+            .drawBehind { drawRect(pulse?.let { tint.copy(alpha = it.value) } ?: tint) }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,10 +36,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
+import dev.mascwa.pulse.core.telemetry.LightState
 import dev.mascwa.pulse.core.telemetry.PressureTrend
 import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.sensing.FusionSnapshot
+import dev.mascwa.pulse.data.sensing.SensorsPresent
 import dev.mascwa.pulse.data.sensing.SensoriumStore
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -66,10 +71,15 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val level by vm.level.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val fusion by vm.fusion.collectAsStateWithLifecycle()
+    val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { vm.rearm(ctx) }
+
+    // See refreshModelBytes: the classifiers usually land while this screen is open, so a figure
+    // read once at construction would report zero for the rest of the session.
+    LaunchedEffect(Unit) { vm.refreshModelBytes() }
 
     PulseScaffold(
         title = "Sensorium",
@@ -98,9 +108,10 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                         onLook = { vm.lookNow() },
                     )
                 }
-                item { FacetsCard(reading) }
+                item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
                 item { InstrumentsCard(fusion) }
+                item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
                 item {
                     Text(
                         "SENSED EVENTS · LAST 48H",
@@ -198,7 +209,7 @@ private fun ActionChip(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FacetsCard(reading: EnvReading) {
+private fun FacetsCard(reading: EnvReading, present: SensorsPresent?) {
     val c = Pulse.colors
     Column(
         Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
@@ -207,12 +218,28 @@ private fun FacetsCard(reading: EnvReading) {
         FacetRow("SETTING", reading.setting.name, if (reading.seen) "seen" else "inferred")
         FacetRow("MOTION", reading.motion.name, null)
         FacetRow("SOUNDSCAPE", reading.noise.name, if (reading.heard) reading.soundTags.joinToString(", ") else "mic idle")
-        FacetRow("LIGHT", reading.light.name, null)
+        // ⚠️ Three different silences, and they used to render as one word. An unknown brightness
+        // says which it is: no such sensor on this phone, or a sensor that has not reported yet.
+        if (reading.light == LightState.UNKNOWN) {
+            FacetRow("LIGHT", "—", whySilent(present?.light, "ambient-light sensor"))
+        } else {
+            FacetRow("LIGHT", reading.light.name, null)
+        }
         FacetRow("COMPANY", reading.social.name, null)
-        reading.pressureTrend?.let {
+        // Same rule for the barometer, which plenty of phones also lack. The row used to simply not
+        // exist, so "no barometer" and "the ring has not filled yet" were both a blank space.
+        val trend = reading.pressureTrend
+        if (trend != null) {
             FacetRow(
-                "PRESSURE", it.name,
-                if (it == PressureTrend.PLUNGING || it == PressureTrend.FALLING) "weather may be turning" else null,
+                "PRESSURE", trend.name,
+                if (trend == PressureTrend.PLUNGING || trend == PressureTrend.FALLING) "weather may be turning" else null,
+            )
+        } else {
+            FacetRow(
+                "PRESSURE", "—",
+                // The barometer's own extra case: present and reporting, but the 3 h ring is short.
+                if (present?.pressure == true) "needs about an hour of history"
+                else whySilent(present?.pressure, "barometer"),
             )
         }
         if (reading.sceneTags.isNotEmpty()) {
@@ -223,6 +250,21 @@ private fun FacetsCard(reading: EnvReading) {
             )
         }
     }
+}
+
+/**
+ * Why a sense has nothing to show — **three answers, never one blank**.
+ *
+ * ⚠️ `null` is "nobody has asked the hardware yet" (the sensing service is stood down), `false` is
+ * "this phone does not have it", `true` is "it is there and has not reported". Before this, all
+ * three rendered as a missing row, so a person on a phone with no barometer could not tell that
+ * from a feature that was simply switched off. [what] names the instrument when there is room for
+ * it; the compact instrument strip passes null and lets the row label carry that.
+ */
+private fun whySilent(has: Boolean?, what: String?): String = when (has) {
+    null -> "sensing is not running"
+    true -> "waiting for a reading"
+    false -> if (what != null) "no $what on this phone" else "not on this phone"
 }
 
 @Composable
@@ -240,6 +282,42 @@ private fun FacetRow(label: String, value: String, note: String?) {
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * What the two classifiers are holding on disk, and a way to hand it back.
+ *
+ * ⚠️ **Silent when nothing is held, which is the ordinary state before the watch has ever run.** A
+ * row reading "0 MB" beside a button that would free nothing is worse than no row: it invites the
+ * tap and then appears broken. Once the models are down it says so, because until now they arrived
+ * with nothing asked and nothing said, and 8 MB you cannot account for is more irritating than
+ * 8 MB you can.
+ */
+@Composable
+private fun StorageCard(modelBytes: Long, onDiscard: () -> Unit) {
+    if (modelBytes <= 0L) return
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Text(
+            "ON THIS DEVICE",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.accent,
+        )
+        Text(
+            "Sound and scene classifiers: ${Formatters.megabytes(modelBytes)}. Fetched once, the " +
+                "first time the watch ran, and kept so it works with no network.",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        LcarsButton(
+            text = "STAND DOWN AND FREE ${Formatters.megabytes(modelBytes)}",
+            onClick = onDiscard,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
@@ -290,15 +368,33 @@ private fun InstrumentsCard(f: FusionSnapshot) {
             "INSTRUMENTS", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
             fontWeight = FontWeight.Bold, color = c.accent,
         )
+        // ⚠️ **Every sense gets a row, always.** These used to be dropped when the value was null,
+        // so a phone with no barometer and a phone whose barometer had not reported yet and a phone
+        // where the whole controller was never started all rendered identically: a missing line. A
+        // row that says "no sensor" is a measurement of the hardware; a blank is an absence of one.
+        val p = f.present
+        fun silent(has: Boolean?) = whySilent(has, null)
         val rows = buildList {
-            add("MOTION" to "%.3f".format(f.movement))
-            f.lightLux?.let { add("LIGHT" to "${it.toInt()} lx") }
-            f.pressureHpa?.let {
-                val delta = f.pressureDeltaHpa?.let { d -> " (${if (d >= 0) "+" else ""}%.1f/3h)".format(d) } ?: ""
-                add("PRESSURE" to "%.1f hPa%s".format(it, delta))
-            }
-            f.magneticUt?.let { add("MAG FIELD" to "${it.toInt()} µT") }
-            f.proximityNear?.let { add("PROXIMITY" to if (it) "covered" else "clear") }
+            // ⚠️ MOTION reads the ACCELEROMETER flag rather than the value: `movement` defaults to
+            // 0f, and 0f is also what a phone at rest genuinely measures, so the number alone can
+            // never say whether anything is watching.
+            add("MOTION" to if (p?.accelerometer == true) "%.3f".format(f.movement) else silent(p?.accelerometer))
+            add("LIGHT" to (f.lightLux?.let { "${it.toInt()} lx" } ?: silent(p?.light)))
+            add(
+                "PRESSURE" to (
+                    f.pressureHpa?.let {
+                        val delta = f.pressureDeltaHpa
+                            ?.let { d -> " (${if (d >= 0) "+" else ""}%.1f/3h)".format(d) } ?: ""
+                        "%.1f hPa%s".format(it, delta)
+                    } ?: silent(p?.pressure)
+                    ),
+            )
+            add("MAG FIELD" to (f.magneticUt?.let { "${it.toInt()} µT" } ?: silent(p?.magnetometer)))
+            add(
+                "PROXIMITY" to (
+                    f.proximityNear?.let { if (it) "covered" else "clear" } ?: silent(p?.proximity)
+                    ),
+            )
         }
         rows.forEach { (label, value) ->
             Row(Modifier.padding(top = 4.dp)) {

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,16 +15,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.Comets
+import dev.mascwa.pulse.core.telemetry.Eclipses
+import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
+import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.Occultations
+import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
+import dev.mascwa.pulse.data.orbital.CometRepository
 import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
+import dev.mascwa.pulse.desktop.sky.StarCatalogSource
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.DesktopUnits
 import dev.mascwa.pulse.desktop.settings.LocalUnits
@@ -38,6 +49,9 @@ import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
 import dev.mascwa.pulse.desktop.theme.Pulse
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -46,19 +60,241 @@ class ObservatoryViewModel(
     scope: CoroutineScope,
     orbital: OrbitalRepository,
     launches: LaunchRepository,
+    comets: CometRepository,
+    stars: StarCatalogSource,
     settings: DesktopSettingsStore,
 ) {
     val sky = WorldFeed<OrbitalData>(scope, settings) { lat, lon, force ->
         orbital.fetch(lat, lon, force)
     }
 
+    /** One eclipse and what this place would see of it. */
+    data class EclipseNight(
+        val eclipse: Eclipses.Eclipse,
+        val local: Eclipses.Local,
+        val advice: String,
+    )
+
     /**
-     * ⚠️ Launches ignore the coordinate entirely — a rocket leaves from where it leaves from — but they
-     * still go through [WorldFeed] so the screen has one shape rather than two. The lambda simply does
-     * not use what it is handed, which is honest and costs nothing.
+     * Every eclipse of the next two years, and what this place would see of each.
+     *
+     * ⚠️ **No network at any point.** This is closed-form astronomy over the machine's own clock, so
+     * it is the one thing on this page that works with the cable out. It goes through [WorldFeed]
+     * rather than [OpenFeed] because unlike a comet's position, WHAT YOU SEE of an eclipse is
+     * entirely a fact about where you are standing — a total eclipse and a fifteen-per-cent bite out
+     * of the Sun are the same event, and only the coordinate tells them apart.
+     *
+     * ⚠️ Two years, not three, and that is a measured trade rather than a round number: the phone's
+     * copy of this timed the search at 26/51/74 ms for one, two and three years, returning 4/9/13
+     * eclipses. Two years buys a list worth reading for two thirds of the cost of three.
+     *
+     * ⚠️ [Dispatchers.Default] explicitly, even though the scope this is given already runs there.
+     * A guarantee that depends on a declaration in another file is a guarantee somebody can move
+     * without noticing — and what moves it is a several-hundred-millisecond freeze of the window.
      */
-    val launches = WorldFeed<List<UpcomingLaunch>>(scope, settings) { _, _, force ->
-        launches.upcoming(force)
+    val eclipses = WorldFeed<List<EclipseNight>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            Eclipses.upcoming(now, now + ECLIPSE_HORIZON_MS).map { e ->
+                val local = Eclipses.local(e, lat, lon)
+                EclipseNight(e, local, Eclipses.advice(e, local))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /** One star, already turned into a look angle from here. */
+    data class PlottedStar(
+        val azimuthDeg: Double,
+        val altitudeDeg: Double,
+        val magnitude: Double,
+        /** ARGB from the star's measured B-V, or null where the catalogue has none. */
+        val colourArgb: Int?,
+        /** Only the brightest are named — a chart that labels four hundred stars is unreadable. */
+        val label: String?,
+    )
+
+    /**
+     * The naked-eye sky above this machine, from the bundled catalogue.
+     *
+     * ⚠️ **Magnitude 4.5 is a measured cut, not a round number.** The catalogue holds 8,404 stars;
+     * 904 are brighter than 4.5 and roughly half of those are above the horizon at any moment, which
+     * is about four hundred dots — dense enough to read as the sky and far short of what would turn
+     * a chart into grey mush. Going one magnitude fainter triples it to 2,887.
+     *
+     * ⚠️ **Positions are J2000 and drawn as if of-date, exactly as the phone's chart does.**
+     * Precession moves a star about 50 arcseconds a year, so by 2050 the sky will have drifted a
+     * couple of fifths of a degree — smaller than the dot a star is drawn as. Correcting it would be
+     * arithmetic nobody could see. (The occultation list on the phone DOES precess, because there
+     * the answer turns on arcseconds; that difference is deliberate.)
+     */
+    val chart = WorldFeed<List<PlottedStar>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            stars.brighterThan(CHART_MAGNITUDE_LIMIT).mapNotNull { star ->
+                val h = Ephemeris.toHorizontal(
+                    Ephemeris.Equatorial(star.rightAscensionDeg, star.declinationDeg, 0.0),
+                    lat, lon, now,
+                )
+                // Below the horizon is behind the ground. Dropped here rather than drawn faintly:
+                // this is a "what can I see right now" chart, not an all-sky map.
+                if (h.altitudeDeg <= 0.0) return@mapNotNull null
+                PlottedStar(
+                    azimuthDeg = h.azimuthDeg,
+                    altitudeDeg = h.altitudeDeg,
+                    magnitude = star.magnitude,
+                    colourArgb = StarNames.colourArgb(star.colourIndex),
+                    label = if (star.magnitude <= CHART_LABEL_LIMIT) star.name else null,
+                )
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /** A shower's next maximum, and whether anything can be seen of it from here right now. */
+    data class ShowerNight(
+        val occurrence: MeteorShowers.Occurrence,
+        val viewing: MeteorShowers.Viewing,
+        val advice: String,
+    )
+
+    /**
+     * The meteor showers due, and what the sky here is doing about them.
+     *
+     * ⚠️ **This one goes stale in a way nothing else on the page does, and the screen refreshes it
+     * for that reason.** The peak dates are stable over months; whether the radiant is above the
+     * horizon and whether the sky is dark enough are true only for the minute they were computed.
+     * A console left on this page overnight would otherwise still be reading "too bright, come back
+     * once the Sun is well down" at two in the morning — advice that was correct when the window
+     * opened and is now the exact opposite of the truth.
+     *
+     * Also entirely offline: the shower table is compiled in.
+     */
+    val showers = WorldFeed<List<ShowerNight>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val list = withContext(Dispatchers.Default) {
+            MeteorShowers.upcoming(now).map { occurrence ->
+                val viewing = MeteorShowers.viewing(occurrence.shower, lat, lon, now)
+                ShowerNight(occurrence, viewing, MeteorShowers.advice(occurrence, viewing))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /** One occultation, with what this place gets of it and what to do about it. */
+    data class Hiding(
+        val event: Occultations.Event,
+        val local: Occultations.Local,
+        val advice: String,
+    )
+
+    /**
+     * What the Moon is about to pass in front of, over the next six months.
+     *
+     * ⚠️ **Every constant here comes from [Occultations] rather than being restated.** Both consoles
+     * run this search over the same bundled catalogue, and the two position uncertainties are the
+     * worst pair in the app to let drift — they are what decides whether an occultation is called or
+     * refused near the Moon's edge.
+     *
+     * ⚠️ **The star positions ARE precessed, unlike the sky chart's.** There the drift by 2050 is
+     * smaller than the dot a star is drawn as; here the whole answer turns on arcseconds, because a
+     * graze is decided by how a star sits against a limb half a degree across. That difference is
+     * deliberate and is the reason [Occultations.Target] takes a position FUNCTION rather than a
+     * coordinate.
+     *
+     * ⚠️ A target whose position cannot be had at some instant is skipped rather than guessed at —
+     * which is why the planet lambda returns null instead of a last-known value.
+     */
+    val occultations = WorldFeed<List<Hiding>>(scope, settings) { lat, lon, _ ->
+        val now = System.currentTimeMillis()
+        val catalogue = stars.all()
+        val list = withContext(Dispatchers.Default) {
+            val targets = ArrayList<Occultations.Target>()
+
+            for (name in Occultations.OCCULTABLE_STARS) {
+                val star = catalogue.firstOrNull { it.name == name } ?: continue
+                targets += Occultations.Target(
+                    name = name,
+                    kind = Occultations.Kind.STAR,
+                    magnitude = star.magnitude,
+                    positionUncertaintyDeg = Occultations.STAR_UNCERTAINTY_DEG,
+                ) { ms ->
+                    Ephemeris.precessFromJ2000(star.rightAscensionDeg, star.declinationDeg, ms)
+                }
+            }
+
+            for (name in Occultations.OCCULTABLE_PLANETS) {
+                targets += Occultations.Target(
+                    name = name,
+                    kind = Occultations.Kind.PLANET,
+                    // A planet's brightness changes through the year and the card reads the live
+                    // one; this field only orders the list, so a placeholder is honest here.
+                    magnitude = 0.0,
+                    positionUncertaintyDeg = Occultations.PLANET_UNCERTAINTY_DEG,
+                ) { ms ->
+                    PlanetCalc.planetsNow(lat, lon, ms).firstOrNull { it.name == name }?.let {
+                        Ephemeris.Equatorial(it.rightAscensionDeg, it.declinationDeg, 1.0)
+                    }
+                }
+            }
+
+            Occultations.upcoming(now, now + Occultations.HORIZON_MS, targets).map { e ->
+                val local = Occultations.local(e, lat, lon)
+                Hiding(e, local, Occultations.advice(e, local))
+            }
+        }
+        Fetched(data = list, fromCache = false)
+    }
+
+    /**
+     * ⚠️ **Launches used to go through [WorldFeed] and that was a real defect, not a tidy shortcut.**
+     * The comment here said a rocket leaves from where it leaves from and that the lambda simply
+     * ignores the coordinate it is handed — true of the lambda, and false of the class around it,
+     * which resolves a location first and returns early without one. So on a machine where nobody
+     * had typed a place the launch list never loaded at all, exactly contradicting the sentence
+     * explaining why it was safe. [OpenFeed] is what those two comments always described.
+     */
+    val launches = OpenFeed(scope) { force -> launches.upcoming(force) }
+
+    /**
+     * Comets, for the same reason and with a sharper one behind it.
+     *
+     * Where a comet is depends on the date alone — only whether it clears your horizon needs a site,
+     * and this machine has no horizon it can measure anyway. The phone's tab makes the same choice
+     * deliberately: withholding the whole list over a detail is withholding most of the answer.
+     *
+     * ⚠️ The catalogue is fetched and the orbits are solved in the same step, so the positions are
+     * computed when the page loads rather than when the file was last downloaded — that file lives
+     * for a week, and a week-old comet position would be badly wrong while looking perfectly fine.
+     */
+    val comets = OpenFeed(scope) { force ->
+        val fetched = comets.elements(force)
+        Fetched(
+            data = Comets.visible(fetched.data, System.currentTimeMillis(), limit = COMET_LIMIT),
+            fromCache = fetched.fromCache,
+            timestampEpochMs = fetched.timestampEpochMs,
+        )
+    }
+
+    /**
+     * ⚠️ `internal`, not `private`, and the reason is a rule this project keeps re-learning: the
+     * caption under the chart quotes [CHART_MAGNITUDE_LIMIT], and a screen that cannot see the
+     * constant would have to restate the number — a second copy of a measured value, free to drift
+     * from the one that actually filters the catalogue. The same trap is recorded against
+     * `StarNames.properKeys` and `Stardate.clockOf`.
+     */
+    internal companion object {
+        /** Enough to be worth reading; [Comets.visible] has already dropped what cannot be seen. */
+        const val COMET_LIMIT = 10
+
+        /** See [eclipses] — measured, not rounded. */
+        const val ECLIPSE_HORIZON_MS = 2L * 365L * 86_400_000L
+
+        /** See [chart] — 904 stars in the catalogue, about four hundred of them up. */
+        const val CHART_MAGNITUDE_LIMIT = 4.5
+
+        /** 23 stars in the whole sky, about a dozen up. Any more and the labels overlap. */
+        const val CHART_LABEL_LIMIT = 1.5
     }
 }
 
@@ -71,11 +307,38 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
     val sky: Async<OrbitalData> by vm.sky.state.collectAsState()
     val located by vm.sky.located.collectAsState()
     val launches: Async<List<UpcomingLaunch>> by vm.launches.state.collectAsState()
+    val comets: Async<List<Comets.Sighting>> by vm.comets.state.collectAsState()
+    val eclipses: Async<List<ObservatoryViewModel.EclipseNight>> by vm.eclipses.state.collectAsState()
+    val eclipsesLocated by vm.eclipses.located.collectAsState()
+    val showers: Async<List<ObservatoryViewModel.ShowerNight>> by vm.showers.state.collectAsState()
+    val showersLocated by vm.showers.located.collectAsState()
+    val chart: Async<List<ObservatoryViewModel.PlottedStar>> by vm.chart.state.collectAsState()
+    val hidings: Async<List<ObservatoryViewModel.Hiding>> by vm.occultations.state.collectAsState()
+    val hidingsLocated by vm.occultations.located.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) {
         vm.sky.ensureLoaded()
         vm.launches.ensureLoaded()
+        vm.comets.ensureLoaded()
+        vm.eclipses.ensureLoaded()
+        vm.chart.ensureLoaded()
+        vm.occultations.ensureLoaded()
+    }
+
+    // ⚠️ **The one thing on this page with a timer, and only while the page is open.** Whether a
+    // radiant is above the horizon and whether the sky is dark are true for a moment, not for a
+    // session; everything else here is stable over hours. So this recomputes, and a console sitting
+    // on any other screen runs no timer whatsoever — the same shape the news feed settled on, and
+    // the reason it is a loop here rather than a background job.
+    //
+    // Five minutes moves a radiant about a degree and a quarter, which is far finer than the several
+    // degrees of scatter in where the meteors themselves appear.
+    LaunchedEffect(Unit) {
+        while (true) {
+            vm.showers.refresh()
+            delay(SHOWER_REFRESH_MS)
+        }
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
@@ -140,21 +403,47 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                 // it reports where the station is over the Earth, not where to look for it from here.
                 // Drawing it would mean inventing a sighting, so it stays off until the pass search
                 // the phone runs is ported.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LcarsSkyPlot(
-                        points = visible.map { p ->
-                            SkyPoint(
-                                azimuthDeg = p.azimuthDeg,
-                                altitudeDeg = p.altitudeDeg,
-                                label = p.name.take(3),
-                                // Brighter is bigger, which is what the eye is looking for.
-                                color = c.amber,
-                                radiusDp = if (p.magnitude < 0.0) 4.dp else 3.dp,
-                            )
-                        },
-                        modifier = Modifier.size(SKY_PLOT).padding(top = 3.dp),
-                    )
-                    LcarsFrame(Modifier.weight(1f)) {
+                // ⚠️ **The stars are drawn FIRST, and the order is the whole point.** A planet
+                // plotted behind four hundred stars is a planet nobody can find; the list below
+                // names them, and the chart has to agree with the list at a glance.
+                val stars = chart.data.orEmpty()
+                LcarsSkyPlot(
+                    points = stars.map { star ->
+                        SkyPoint(
+                            azimuthDeg = star.azimuthDeg,
+                            altitudeDeg = star.altitudeDeg,
+                            label = star.label,
+                            // ⚠️ The measured colour where the catalogue has one, and the page's own
+                            // ink where it does not — which is about three per cent of entries. A
+                            // made-up white there would be indistinguishable from a real measurement.
+                            color = star.colourArgb?.let { Color(it) } ?: c.ink,
+                            radiusDp = starRadius(star.magnitude),
+                        )
+                    } + visible.map { p ->
+                        SkyPoint(
+                            azimuthDeg = p.azimuthDeg,
+                            altitudeDeg = p.altitudeDeg,
+                            label = p.name.take(3),
+                            // Amber against the stars' natural colours, because a planet is the
+                            // thing on this chart you are most likely to be looking for.
+                            color = c.amber,
+                            radiusDp = if (p.magnitude < 0.0) 5.dp else 4.dp,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(SKY_CHART_HEIGHT).padding(top = 3.dp),
+                )
+                Text(
+                    if (stars.isEmpty()) {
+                        "Planets only — the star catalogue has not loaded."
+                    } else {
+                        "${stars.size} stars above the horizon, to magnitude " +
+                            "${ObservatoryViewModel.CHART_MAGNITUDE_LIMIT} · " +
+                            "Bright Star Catalogue, bundled and offline"
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                LcarsFrame(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     Column {
                         visible.sortedBy { it.magnitude }.forEach { p ->
                             LcarsDataRow(
@@ -163,7 +452,6 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                                     "mag ${String.format(java.util.Locale.US, "%.1f", p.magnitude)}",
                             )
                         }
-                    }
                     }
                 }
             }
@@ -230,8 +518,79 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // Launches sit outside the coordinate-bound panel above, with their own state, because they are
-        // the one thing on this page that does not depend on where you are.
+        // Eclipses and showers keep their own panels rather than joining the one above: they are
+        // computed here rather than fetched, so their loading and their emptiness are separate facts
+        // from the orbital feed's, and folding them in would make one failure look like three.
+        Column(Modifier.padding(top = 16.dp)) {
+        WorldPanel(
+            title = "Eclipses",
+            feed = vm.eclipses,
+            state = eclipses,
+            located = eclipsesLocated,
+            trailing = "NEXT TWO YEARS",
+            emptyMessage = "No eclipse falls in the next two years, which would be unusual — if this " +
+                "says so, something is wrong rather than quiet.",
+            isEmpty = { it.isEmpty() },
+        ) { list ->
+            list.take(6).forEach { EclipseRow(it) }
+        }
+        }
+
+        Column(Modifier.padding(top = 16.dp)) {
+            WorldPanel(
+                title = "Meteor showers",
+                feed = vm.showers,
+                state = showers,
+                located = showersLocated,
+                emptyMessage = "No shower is due in the next six weeks.",
+                isEmpty = { it.isEmpty() },
+            ) { list ->
+                list.take(4).forEach { ShowerRow(it) }
+            }
+        }
+
+        Column(Modifier.padding(top = 16.dp)) {
+            WorldPanel(
+                title = "The Moon gets in the way",
+                feed = vm.occultations,
+                state = hidings,
+                located = hidingsLocated,
+                trailing = "NEXT SIX MONTHS",
+                emptyMessage = "Nothing bright passes behind the Moon in the next six months — " +
+                    "unusual, since it happens every few weeks, so this is likelier to be a fault " +
+                    "than a quiet sky.",
+                isEmpty = { it.isEmpty() },
+            ) { list ->
+                list.take(6).forEach { HidingRow(it) }
+            }
+        }
+
+        // Comets and launches both sit outside the coordinate-bound panel above, with their own
+        // state, because neither depends on where this machine is.
+        LcarsHeaderBar("Comets worth a look", Modifier.padding(top = 16.dp))
+        val visibleComets = comets.data.orEmpty()
+        if (visibleComets.isEmpty()) {
+            LcarsFrame(Modifier.fillMaxWidth()) {
+                Text(
+                    if (comets.loading) {
+                        "Reading the Minor Planet Center's catalogue…"
+                    } else {
+                        "Nothing bright enough is far enough from the Sun to look at. That is the " +
+                            "ordinary state of affairs rather than a fault."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
+                )
+            }
+        } else {
+            visibleComets.forEach { CometRow(it) }
+            Text(
+                "Magnitudes are predictions from a fitted brightness law, not measurements — a comet " +
+                    "two magnitudes off its own forecast is completely ordinary.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.faint,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+
         LcarsHeaderBar("Next off the pad", Modifier.padding(top = 16.dp))
         val upcoming = launches.data.orEmpty()
         if (upcoming.isEmpty()) {
@@ -249,6 +608,199 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
             modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
         )
+    }
+}
+
+/**
+ * One eclipse, and what this place gets of it.
+ *
+ * ⚠️ The colour says whether it is worth standing outside for, and an eclipse that misses this
+ * place entirely is drawn in the muted tone rather than left off the list. "Nothing happens here"
+ * is the commonest answer by a wide margin, and a page that silently omits those reads as though
+ * eclipses were rare.
+ */
+@Composable
+private fun EclipseRow(night: ObservatoryViewModel.EclipseNight) {
+    val c = Pulse.colors
+    val e = night.eclipse
+    val local = night.local
+    val accent = when {
+        !local.visible -> c.muted
+        local.totalHere || e.kind == Eclipses.Kind.TOTAL_LUNAR -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                Eclipses.describe(e),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                stamp(if (local.visible) local.bestEpochMs else e.greatestEpochMs),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                night.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            if (local.visible) {
+                Text(
+                    listOfNotNull(
+                        // ⚠️ Two different measures, and the labels have to keep them apart. The
+                        // magnitude is the fraction of the DIAMETER covered; the obscuration is the
+                        // fraction of AREA, which is the number people mean by "an 80% eclipse" and
+                        // is always the smaller of the two.
+                        "${(local.magnitude * 100).toInt()}% of its width covered",
+                        if (e.isSolar) "${(local.obscuration * 100).toInt()}% of the Sun's area" else null,
+                        "${local.altitudeDeg.toInt()}° above the horizon",
+                    ).joinToString(" · "),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+        }
+    }
+}
+
+/** One meteor shower: when it peaks, and whether there is any point looking up now. */
+@Composable
+private fun ShowerRow(night: ObservatoryViewModel.ShowerNight) {
+    val c = Pulse.colors
+    val s = night.occurrence.shower
+    val v = night.viewing
+    // ⚠️ Hoisted, because `perHour` is a public property of another module and Kotlin will not
+    // smart-cast one — the trap this project has now hit four times, and the first time a local
+    // build caught it before CI did.
+    val perHour = v.perHour
+    // Amber for something happening tonight that can actually be seen; otherwise the ordinary tone.
+    val accent = if (night.occurrence.active && perHour != null && perHour > 0) c.amber else c.accent
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                s.name,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                "Peaks ${stamp(night.occurrence.peakEpochMs)}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                night.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                listOfNotNull(
+                    // ⚠️ A rate of null and a rate of zero are different answers — the core keeps
+                    // them apart deliberately, and so does this line. "Nothing is falling" and "you
+                    // cannot see it from here at this hour" send a reader to different places.
+                    perHour?.let { "about $it an hour from here" },
+                    "${s.zhr} an hour under a perfect sky",
+                    "${s.pace} meteors, from ${s.parent}",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            if (s.caveat.isNotEmpty()) {
+                Text(
+                    s.caveat,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.amber,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One occultation, and whether it is worth being outside for.
+ *
+ * ⚠️ **A graze is drawn differently from a call, because it is a different kind of answer.** When the
+ * closest approach lands inside the ephemeris's own uncertainty the core refuses to say whether the
+ * disc covers the target, and a card that rendered that identically to a confident yes would send
+ * somebody to the wrong side of a line a few kilometres wide.
+ */
+@Composable
+private fun HidingRow(hiding: ObservatoryViewModel.Hiding) {
+    val c = Pulse.colors
+    val local = hiding.local
+    val accent = when {
+        !local.visible -> c.muted
+        local.grazing -> c.amber
+        local.occulted -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                Occultations.describe(hiding.event),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                stamp(local.bestEpochMs),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                hiding.advice,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                listOfNotNull(
+                    // ⚠️ The disappearance and reappearance are the two moments anybody actually
+                    // needs, and both are nullable for real reasons — a target that never goes
+                    // behind the disc has neither, and one already behind it when the window opens
+                    // has only the second.
+                    local.disappearsEpochMs?.let { "hidden ${stamp(it)}" },
+                    local.reappearsEpochMs?.let { "back ${stamp(it)}" },
+                    "Moon ${local.moonAltitudeDeg.toInt()}° up, " +
+                        "${(hiding.event.moonIlluminatedFraction * 100).toInt()}% lit",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
+    }
+}
+
+/** One comet: what it should look like, and where it is in the solar system. */
+@Composable
+private fun CometRow(sighting: Comets.Sighting) {
+    val c = Pulse.colors
+    val m = sighting.magnitude
+    // Colour says what you would need to see it, which is the question the list answers.
+    val accent = when {
+        m == null -> c.muted
+        m <= 6.0 -> c.violet
+        m <= 10.0 -> c.accent
+        else -> c.muted
+    }
+    LcarsFrame(Modifier.fillMaxWidth().padding(top = 3.dp), accent = accent) {
+        Column {
+            Text(
+                sighting.designation,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                Comets.describe(sighting),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                listOf(
+                    m?.let { "magnitude ${String.format(java.util.Locale.US, "%.1f", it)}" }
+                        ?: "brightness not stated",
+                    "${String.format(java.util.Locale.US, "%.2f", sighting.heliocentricAu)} AU from the Sun",
+                    "${sighting.elongationDeg.toInt()}° from it in the sky",
+                ).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
     }
 }
 
@@ -320,5 +872,34 @@ private fun compass(deg: Double): String {
     return points[(((deg % 360.0) + 360.0) % 360.0 / 45.0).toInt() % 8]
 }
 
-/** Square, because a polar plot that is not square is an ellipse and lies about the sky. */
-private val SKY_PLOT = 168.dp
+/** See the loop in [ObservatoryScreen] — five minutes, for a reason stated there. */
+private const val SHOWER_REFRESH_MS = 5L * 60_000L
+
+/**
+ * How tall the sky chart is drawn.
+ *
+ * ⚠️ A HEIGHT rather than a square size, and the plot is given the full width. [LcarsSkyPlot] draws
+ * its circle off `minDimension`, so a wide box still yields a true circle with margins either side
+ * rather than the ellipse a stretched one would be — while a strict square would be as tall as the
+ * window is wide, which on a torn-off pane is most of the screen.
+ *
+ * 168 dp was the old size, chosen when the plot sat in a row beside a list of five planets. Four
+ * hundred stars need room, and this is a desktop.
+ */
+private val SKY_CHART_HEIGHT = 420.dp
+
+/**
+ * How big a star is drawn, from its magnitude.
+ *
+ * ⚠️ Magnitude is backwards — smaller is brighter — and it is logarithmic, so a linear map either
+ * loses the brightest stars in the crowd or turns the faint ones into blobs. These five bands are
+ * the same shape the phone's chart uses: the two dozen first-magnitude stars are unmistakable, and
+ * the four-hundred-odd at the limit are just visible as texture.
+ */
+private fun starRadius(magnitude: Double): Dp = when {
+    magnitude <= 0.5 -> 3.dp
+    magnitude <= 1.5 -> 2.5.dp
+    magnitude <= 2.5 -> 2.dp
+    magnitude <= 3.5 -> 1.5.dp
+    else -> 1.dp
+}

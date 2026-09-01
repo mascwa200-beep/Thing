@@ -5034,6 +5034,256 @@ review's findings (triage on arrival); the PR #449 batch merge to main once CI i
   half; the tool checks both. Refuted findings recorded in the commit messages.
 - **Tip `7e27436` pushed; PR #449 title/body updated to B1–B13.** Merge to main once CI is green.
 
+### S10 — the standalone star map, finished (this session, PR #464)
+
+S9b merged the proper-motion work; this is S10 from the sky plan, and the first three of its
+slices are pushed and CI-green. **Zero subagent and zero workflow spend**, per the standing credit
+directive, which overrides the ultracode reminder as it has for every arc since.
+
+- **S10a `88922a8`** — the six sky assets move from `app/src/main/assets/sky/` into
+  `core/sky/src/main/assets/sky/`. AGP merges a library's assets into every consuming APK, which is
+  what lets one copy serve both applications; the precedent in this build is `core/health`'s food
+  seed. ⚠️ Every way that merge can break is SILENT (the copy not running, a wrong resource root, a
+  rebuilt catalogue reordering columns), so a CI step derives the expected file list from the
+  library's own asset directory, requires each in the APK, carries a sentinel that must be absent,
+  and asserts `unzip -v` reports `stars.skycat` as **Stored** rather than `Defl:N`. That last check
+  had never existed anywhere despite `SkyCatalogSource`'s KDoc worrying about it at length.
+  ⚠️ `androidResources { noCompress += "skycat" }` **cannot** live in `:core:sky` — packaging
+  belongs to whichever module builds the APK, so every application bundling the catalogue declares
+  it separately.
+- **S10b `834ec07`** — the five catalogue readers follow their assets into `:core:sky`. Package
+  kept, so the diff is five renames and not one call site moved.
+  ⚠️ **The trap: `internal` is scoped to a Gradle MODULE.** `StarCatalog`'s `internal companion
+  object` was legal beside its two readers in `:app` and a visibility error the instant it was not —
+  `EPOCH_YEAR` is read by `SkyMapViewModel` and `OrbitalViewModel`. Same shape that stopped a test
+  seeing `StoredEntry` when the health layer was carved out.
+  ⚠️ **AND THE GATE WRITTEN FOR EXACTLY THIS REPORTED CLEAN AGAINST IT**, two ways, both fixed in
+  the same commit: its module list was hand-maintained and never gained `:core:sky` (so "ok" meant
+  it had not looked — the mirror-map and path-filter shape again; both lists are DERIVED from
+  `settings.gradle.kts` now, 85 members scanned before, 140 after), and an `internal companion
+  object` carries the modifier ONCE on the block while the matcher only looked for it on the member.
+- **S10c `10cdc51`** — `SkyMapViewModel` moves into `:core:sky` behind **`SkyDeps`**, so both
+  applications drive one view model rather than two that can drift. Two questions — where you are,
+  where the phone is aimed — as an interface rather than moving the services in, because
+  `LocationProvider` has twenty consumers and `CompassController` four. `:app` supplies `SkyDevice`.
+  - ⚠️ **A REAL DEFECT FELL OUT OF DESIGNING THE SEAM.** `CompassController` publishes a `StateFlow`
+    seeded with an all-zero reading carrying `hasSensor = true` — meaning "this phone HAS a
+    rotation-vector sensor", true from construction, reading as "level and pointed due north". A
+    StateFlow hands a new collector its current value at once, so the map's "take the FIRST reading
+    whole rather than blending it" branch spent itself on a non-reading and the first real sample
+    arrived at `POINT_SMOOTHING = 0.25`. Sixteen samples at ~20 ms: **about a third of a second of
+    the sky sweeping in from due north on every enable**, which is exactly what that branch exists
+    to prevent. `Reading.hasReading` is now the fact that something was measured (defaulted false,
+    written only from a real event, so the other three consumers are untouched), and `SkyAttitude`
+    is **null until measured**, which makes the seed unrepresentable.
+  - ⚠️ **The move exposed arithmetic in the wrong module.** `PlanetCalc` is Schlyter's method whose
+    only imports are `kotlin.math`, and it sat in `:core:feeds` beside the HTTP client purely
+    because `data/orbital` was carved out of `:app` whole — so the only way for an offline star
+    chart to draw a planet was to depend on OkHttp and twenty-two repositories. It moves to
+    `:core:telemetry` beside `Ephemeris`/`Comets`/`Occultations`, and **`Planet`** — the type it
+    returns, and the only thing that produces one — moves with it. Both keep their package, so none
+    of the seven call sites moved.
+
+**Verification for the three slices, all local and unusually strong because two of the three modules
+genuinely build here:** `:core:telemetry:test` **2,480** green (PlanetCalcTest's 3 among them, in its
+new module) and `:core:feeds:test` **71** green, both really executed; `:desktop:build` green with
+`--rerun-tasks`, which matters because that module names both moved types; and **the whole of
+`:core:sky` — 192 files including the pure core — type-checks clean against the real platform** via
+`tools/android_compile_check.sh` with the compose+lifecycle artifacts on `-l`, that gate
+negative-tested by planting a nonexistent seam method. The widened internal gate was negative-tested
+both ways: it names both crossings with the companion put back to `internal`, and deleting its new
+companion-block branch lets that same defect go unreported again, so the branch is what does the
+work. CI: runs **2123** fully green, **2124** green through "Run unit tests".
+
+⚠️ **THE COMPOUND `git add` TRAP BIT FOR A THIRD TIME AND ALMOST SHIPPED A BROKEN COMMIT.**
+`git add -A <paths>` with a pathspec that no longer exists — the now-empty `app/.../data/sky` —
+**ABORTS the whole add**, so S10b's first commit carried the five renames `git mv` had already
+staged and NONE of the three edits, including the visibility fix that is its whole point. It looked
+complete and would have failed CI. Amended (the commit was local, so no force-push). **Stage paths
+individually and read `git status` afterwards, never the exit message.**
+
+**S10 IS FINISHED — S10d, S10e and S10f closed it, and the star map is its own application.**
+
+- **S10d `4cee00e` — the chart moved into `:core:sky` as `SkyChart`.** ⚠️ **The seam is a colour set
+  and nothing else, and that was MEASURED before it was designed**: the canvas reached into the
+  LCARS palette in exactly twenty-eight places for ten distinct colours and touched nothing else of
+  that application — no typeface, no icon, no string resource, no shape. So `SkyColors` is the whole
+  contract, and every application supplies only its own chrome. ⚠️ **Thirteen roles for ten
+  colours** because five collapse to one ink in LCARS and the standalone map pulls four of them
+  apart; naming the ROLE rather than the hue is what makes that a choice instead of a fork. Weights
+  and alphas do NOT cross — how assertive a line is follows from what it MEANS, which does not
+  change between applications. The file sits in `dev.mascwa.pulse.feature.sky`, so `:app` calls it
+  with no import at all. Two build-file comments were arguments AGAINST the change and had to move
+  with it (the Compose plugin, and `lifecycle-runtime-compose`).
+- **S10e `bdf5942` — `:sky`, and it published on its first run.** Plain Material 3, no device gate,
+  the committed debug key, its own `sky-latest` tag. ⚠️ **What makes it run on any phone is that no
+  architecture is narrowed, not the API floor** — and it is NOT free of native code, which the CI
+  check proves rather than assumes: **Sky Build #1 reported `libandroidx.graphics.path.so` present
+  for all four ABIs**, which is exactly why one universal APK works. **Measured from the shipped
+  artifact: 32,440,206 bytes (31 MB)**, against the plan's "near 160 MB" guess — that estimate
+  assumed the deep tier, which is S11. Star catalogue 23 MB, **Stored** (memory-mappable), all six
+  sky assets merged from `:core:sky`, sentinel correctly absent.
+- ⚠️ **NO INTERNET PERMISSION AT ALL**, the one thing this application can say that neither of the
+  others can — stated by absence, since a permission that is not declared cannot be requested
+  however the code asks. The manifest says outright that the paragraph changes when the updater
+  lands, so the claim cannot quietly go stale. **COARSE location, never FINE**: a kilometre of error
+  moves the sky by under a hundredth of a degree, three orders of magnitude below what the map can
+  use even at the quarter-degree floor.
+- ⚠️ **Its location notice tells two causes apart** — permission never granted, versus granted with
+  no recent fix — which is the shape this repository keeps finding. One message covering both would
+  send somebody to a permission screen where the switch is already on.
+- **S10f `7122901` — the sensor stops when nobody is looking.** With FOLLOW on, the rotation-vector
+  sensor ran at `SENSOR_DELAY_GAME` for the life of the process: `onCleared` stops it, but a
+  backgrounded activity's view model is not cleared. ⚠️ **Both applications had the shape**, so the
+  fix is in the chart they share. Two routes out, answered differently on purpose: ON_STOP remembers
+  the mode and ON_START restores it (the snap on return is correct — `startPointing` takes the first
+  reading WHOLE precisely so a stale aim is never shown), while leaving composition stops the sensor
+  and does NOT remember, since a map that silently resumed aiming would be a control acting without
+  being pressed. `rememberSaveable`, not `remember`, or a rotation would switch FOLLOW off every time.
+
+**Verification for the three slices, all local and free.** The whole of `:sky` + `:core:sky` + the
+pure core — **200 files** — type-checks against the real platform classes AND the real Compose,
+Material 3, activity and lifecycle artifacts, with that gate negative-tested twice (a wrong palette
+member; `text =` for `label =` on an AssistChip), each restore byte-compared. A **typed probe**
+compiled the app's `SkyColors(...)` construction and `SkyChart(...)` call against the real core types
+and was itself negative-tested. `module_dep_check.py` on both modules. All 17 version-catalog
+references in `sky/build.gradle.kts` resolved against the catalogue, the checker negative-tested by a
+planted typo. Every workflow parsed **iterating every job**.
+
+⚠️ **Three verification lessons worth keeping.**
+1. **The resolve gate's `:core:sky` cascade must be proven with an IMPORTED control.** A
+   fully-qualified `dev.mascwa.pulse.sky.StarLayer` is blamed on the *package* segment, whose message
+   already appears at HEAD, so the differencing cancels it and the control silently proves nothing.
+   Import the symbol and it reports identically to the real complaint, which is the proof.
+2. **`androidx.compose.ui:ui` declares `runtime-saveable` in its `releaseApiElements` variant** —
+   checked against the published Gradle module metadata rather than assumed, the way the Guava
+   variant-scoping trap demands. So `rememberSaveable` needs no new declaration; only the local
+   compile gate, which resolves just the artifacts it is named, had to be told.
+3. **`androidx.savedstate:savedstate` has no `-android` variant** while
+   `lifecycle-viewmodel-savedstate` has no `-android` variant either — both are the bare coordinate.
+   Probe with `curl` before concluding an artifact does not exist.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one or opens a sensor.**
+Install **Star Map** from Releases ▸ `sky-latest` (31 MB, alongside LCARS rather than over it) and
+check: the sky fills the screen; granting coarse location produces stars; FOLLOW arrives where the
+phone is aimed rather than swinging in from north; the screen stays awake while following and not
+otherwise; pressing HOME with FOLLOW on and returning re-arms it; and on a phone with no
+rotation-vector sensor the FOLLOW chip is disabled with a sentence rather than silently inert.
+
+**Open: S11** — the Gaia G<14 deep tier (~16.8 M stars, ~135 MB) as an optional LCARS expansion pack
+via the existing `PackRepository`, and bundled outright in `:sky`. (The self-updater that was open
+here landed as S10g, below.)
+
+### S10g — the star map keeps itself current, and three claims are corrected (this session, PR #464)
+
+`:sky` shipped with no way to receive a newer build, and said so in three places. This closes it:
+`:core:update`, INTERNET, ACCESS_NETWORK_STATE, a check on every foreground over Wi-Fi, an install
+on the way out, an ABOUT dialog, and the crash reporter its own `SkyApplication` had promised would
+arrive alongside. Two commits, `5b42088` and `bf42c06`; **Sky #3 fully green in 3m59s and published
+to `sky-latest`; Nutrition #121 fully green and published; LCARS #2128's unit tests green.**
+
+**The extraction is the part worth keeping.** `:sky` is the FOURTH reader of this repository's
+releases, and `NutritionUpdates` was a 239-line state machine that would have become a third copy.
+It moved into `:core:update` as **`SelfUpdate`**, parameterised on the four things that genuinely
+differ — which release ([UpdateRepository]), where the token lives, where the one-at-a-time guard
+lives, and `companionPackage` (null = nothing else installs this app, which is `:sky`'s case).
+`UpdateRepository`'s own KDoc already recorded being parameterised for exactly this. Nutrition's
+`MainActivity` needed **no edit at all** — every method name preserved — and `UpdateCard` was
+thirteen type references.
+
+**⚠️ THREE STALE CLAIMS, and the manifest's was a promise made in writing.** Its paragraph did not
+merely go false: it said the commit adding the self-updater would add the two permissions **and
+rewrite it**, "because leaving that claim standing afterwards would be the overstated comment this
+repository treats as a defect". The same claim lived in `sky/build.gradle.kts` ("genuinely cannot
+reach the network at all") and in the release body ("holds no network permission at all"). All
+three corrected in the one commit, to what is true: **nothing the map DRAWS comes from the
+network** — aeroplane mode leaves it complete — and the network is for fetching a newer build and
+sending on a recorded fault. ⚠️ Two more permissions (REQUEST_INSTALL_PACKAGES,
+UPDATE_PACKAGES_WITHOUT_USER_ACTION) arrive **merged from `:core:update`**; the manifest names them
+without redeclaring them, because a reader comparing that file against the installed app's
+permission list would otherwise find two it does not explain.
+
+**⚠️ THE COST WAS MEASURED AND MY ESTIMATE WAS TEN TIMES TOO HIGH.** The build-file comment first
+quoted jar sizes — okhttp 771 kB, okio 351 kB, serialization 646 kB, plus coil-base and twenty-two
+unused repositories, none shaken with R8 off — and implied several megabytes. The real figure, from
+the two builds' own "Check what actually shipped" lines: **32,440,206 → 33,450,304 bytes, a delta of
+1,010,098.** A jar is not dex, and the APK is deflated afterwards. The comment now carries the
+measured number, because an overstated COST is as much a defect here as an overstated benefit.
+
+**Decisions worth keeping.**
+- `SkySettings` is plain SharedPreferences, not DataStore — three keys, nothing observes them, and
+  DataStore would be three new artifacts on the module built for the cheapest phone that exists.
+  Every read is on `Dispatchers.IO`: the first `getSharedPreferences` parses the file on whatever
+  thread asks, which is the main-thread decode this repository swept twenty-two stores to remove.
+- ⚠️ **`commit()`, not `apply()`.** The pending marker is written immediately before
+  `PackageInstaller.commit()`, which usually tears the process down, and `apply()` only promises the
+  write eventually through a queue this path does not take. A lost marker is the loop it prevents.
+- Every reader passes its OWN fallback. No token and no pending install — but `autoSendReports`
+  falls back to **true**, because turning fault reporting off on the one phone whose preferences will
+  not open is the opposite of what is wanted.
+- ⚠️ **`describe()` takes the state as a PARAMETER** rather than being a `when` written inline. The
+  caller holds it as `by collectAsStateWithLifecycle()`, a delegated property, and a delegated
+  property never smart-casts — the trap this file already records from a coordinate readout.
+- ABOUT is a dialog with a **bounded scrolling `Column`, never a `LazyColumn`**: a lazy list inside
+  a dialog is the `SubcomposeLayout` intrinsic-measurement refusal already recorded here, and an
+  unbounded `AlertDialog` grows until it takes its own buttons off the screen.
+- The token line says **both** halves — read for updates, write for reports. A classic `repo` token
+  carries write by accident; a fine-grained Contents:Read token updates the app and then 403s every
+  report, and that reads as a broken token rather than a missing scope.
+
+**⚠️ A KOTLIN SHADOWING HAZARD, avoided by renaming rather than by reasoning.** `SkyContainer` now
+holds `applicationContext`, and writing that as `private val context: Context = context.applicationContext`
+would leave a **property shadowing the constructor parameter** — which stays in scope through every
+property initializer, so `by lazy { StarCatalog(context) }` could capture the PARAMETER, discarding
+exactly the reference the line exists to discard, and compiling perfectly while doing it. Named
+`appContext`, as the nutrition container does.
+
+**⚠️ THE COMPOUND `git add` TRAP BIT FOR A FOURTH TIME.** `git add <paths>` including the pathspec of
+a file already staged as deleted by `git rm` **aborts the entire add** — nothing was staged and the
+message says only "did not match any files". Stage paths individually and read `git status`.
+
+**A local gate corrected, measured and negative-tested.** `tools/kotlin_import_check.py` excused
+`BuildConfig`/`R` when validating imports and not in the used-but-not-imported check, so a module
+whose `namespace` equals a file's package reported its own generated class as missing. Fixed;
+measured repo-wide over the only two packages that could change — **one report removed, none
+added**. ⚠️ What it gives up: a file using ANOTHER module's `BuildConfig` unimported now goes
+unreported, which is a compile error CI catches in three minutes, against standing noise that makes
+a whole gate get ignored.
+
+**Verification, all local and free.** `tools/check_changed.sh` clean; `tools/module_dep_check.py sky`
+clean; **`tools/android_compile_check.sh` reports the frontend clean over 220 files** — the whole
+`:sky` module, `:core:update`, `:core:sky`, `:core:feeds`' network and util packages and all of
+`:core:telemetry` — against the real platform classes and the real Compose, lifecycle, activity,
+material3 and okhttp jars. Two gate invocations negative-tested (a planted `installNope`, a planted
+`installedVersionTypo`), each restored byte-identical. A typed probe compiled the nutrition
+container's new construction and the cross-module state narrowing, with the store stubbed to the four
+signatures `HealthSettingsStore` actually declares — copied from source, not written from memory.
+
+⚠️ **The recipe additions worth reusing:** `androidx.lifecycle:lifecycle-common` is KMP and
+manifest-only, so the gate needs **`lifecycle-common-jvm`**; and a generated `BuildConfig` can be
+stood in with a five-line stub whose shape is derived from what AGP emits (`const val VERSION_CODE`,
+`const val VERSION_NAME`) rather than guessed.
+
+**⚠️ AND A COST FOUND BY WATCHING THE RUNS: an `:sky`-only commit was rebuilding LCARS.**
+`android-build.yml`'s `paths-ignore` already carried `nutrition/**` with the reasoning spelled out —
+that module cannot affect this build — and `sky/**` was simply missed when it was created. So every
+star-map commit cost a full thirteen-minute build AND republished a 329 MB APK that the in-app
+updater then pulls in full; two of those shipped in the hour before it was noticed, which is the
+second time this repository has learned that lesson. ⚠️ **`sky/**`, NOT `core/sky/**`** — `:app`
+genuinely depends on `:core:sky` (it declares it, draws its console map through `SkyChart`, and this
+workflow asserts the sky assets packaged), while nothing anywhere depends on the `:sky` APPLICATION
+module. Checked with a grep, not assumed, and the filter's behaviour verified across five real
+change shapes, including the two that must still build (`sky/**` alongside `core/update/**`, and
+`core/sky/**` alone).
+
+⚠️ **Owner-verify on the Pixel — CI compiles an updater and never runs one.** Open ABOUT, paste a
+token that can read this repository's contents, and check it reports the build rather than a 404;
+then leave the app closed after a later build publishes and confirm the next open is already the
+newer one. **The first install will show the system confirmation** — this app is not a device owner
+and is not yet its own installer of record, so the honest description is one tap the first time and
+none after. Fault reports need a token that can WRITE contents; with a read-only one the ABOUT card
+says so rather than printing a status code.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
@@ -8687,3 +8937,3613 @@ undone with their reasons**, both recorded above in the PR #459 section: `stepsB
 (it needs Health Connect's step-dedup semantics and a `partial`-reconciliation rule that cannot be
 established without a device, and unlike the write half there is **no false claim on screen**), and
 three unused store APIs (`noteAt`, `seedFood`, `loggedDayCount`) are recorded rather than churned.
+
+### EVERY MACRO THE FOOD CARRIES, AND A STANDALONE APP THAT IS ONLY THIS (this session, PR #464)
+
+Owner: *"make a version of just the health tab into an app that works on every type of phone that
+could exist… without any novelty to it and just the features. Also, ensure that within the intake
+sections, that there are options to add every macro that the food has to offer, that way it isn't
+just calories, fat, protein, carbs and grams."* Alongside it, a **hard budget constraint** that
+overrides plan mode's default to launch Explore/Plan agents and overrides the ultracode reminder:
+until models are free again (**2026-08-26T15:56Z**), **zero subagents and zero workflows**. Four
+binding AskUserQuestion decisions: bundle everything into the standalone APK; keep **every nutrient
+with real coverage**; a **separate copy** of the screens; scope = everything but the AI bits.
+
+**⚠️ `date -u` is the only clock.** A one-shot cron was set for the reset and is session-scoped, so
+it is a convenience and not the meter. Requested sleep duration proves nothing — a lesson this
+project already paid a full misdiagnosis for.
+
+#### The measurements that decided the design
+
+- **Open Food Facts publishes 123 per-100g nutrients** and the app stored sixteen, which really are
+  almost exactly the sixteen best covered. ⚠️ **My first coverage pass counted non-EMPTY cells and
+  was wrong.** Re-measured on **non-zero** values, four candidates collapse — `vitamin-k` 3,081
+  non-empty against **143** non-zero, `caffeine` 68, `choline` 10, `alcohol` 679. The keep list is
+  **29, not the ~40** the plan first said. Counting cells is not counting figures.
+- ⚠️ `salt` and `sodium` have identical non-null counts and, probed value by value, agree on all
+  35,084 products carrying both. One figure in two units; `salt` excluded.
+- ⚠️ `vitamin-k` and `phylloquinone` look like one vitamin in two spellings and are **not**: of the
+  fourteen products carrying both, 36% agree within 1% and their medians differ **thirtyfold**.
+- **The seed's own numbers are far better than the barcodes'.** Over both bundled USDA datasets,
+  non-zero: water 100%, phosphorus/magnesium/zinc/B1/B2/niacin 97%, mono/polyunsaturated 96%,
+  selenium 93%, folate 92%, beta-carotene 82%, K1 79%; the individual sugars 8–13% because only SR
+  Legacy publishes them and FNDDS publishes **none**. 234,349 figures across 13,186 foods — **61% of
+  the cells against roughly 2%** for the same nutrients on a barcode. Generic foods are analysed;
+  packets are typed in.
+- **Cost, measured not estimated:** the seed goes 1,966 kB → 3,061 kB on disk and **500 kB → 887 kB
+  compressed**, which is what the APK actually pays.
+
+#### What shipped
+
+`e17fc5c` the label picker · `94d5aa7` the seed carries 26 more · `c2bfe62` the standalone module
+and its workflow · `a77eff4` the builder's memory and its resource reporting.
+
+- **MORE FROM THE LABEL** under QUICK ADD. ⚠️ **The picker spans two enums deliberately.**
+  `Micronutrients.Micro`'s eight have a published reference intake — that comparison and its two
+  refusals are why that type exists — and `NutrientSet.Nutrient`'s twenty-nine have none. One enum
+  would mean inventing guidelines or discarding real ones. Collapsed by default: thirty-seven number
+  fields would bury the four that matter on the one card that never stops working.
+- ⚠️ **A blank field yields no key** (falls out of `toDoubleOrNull`, not enforced), **a typed 0 is
+  kept** — "0 g trans fat" is printed on labels. Everything typed is what was **eaten**;
+  `per100gMicrosFrom`/`per100gExtrasFrom` convert once in the view model against the same weight.
+  Both return **empty** rather than null without a weight, unlike `per100gFrom`, whose null is the
+  refusal that gates the save.
+- **The seed** gets all 29 columns appended (indices 21…49), **ordered by `NutrientSet.Nutrient.id`
+  rather than declaration order** — the ids were made permanent for exactly this, so alphabetising
+  the enum cannot silently re-map a shipped asset. All 29 rather than the 26 USDA publishes, so
+  "which subset, in what order" is not a second implicit contract; the three empty columns cost
+  ~40 kB. ⚠️ The USDA **number** table is imported from `build_food_db.py` rather than restated —
+  the odd dependency direction buys one definition and its import-time validation.
+- ⚠️ **Two selection conventions in one builder, and it is not an inconsistency:** the macros select
+  by nutrient **id** because `Energy` appears twice under one name; the extras select by **number**
+  because that is what the shared table speaks. Measured first: all **997,140** nutrient entries
+  across both datasets carry a number.
+- ⚠️ **Exactly one unit mismatch of the 26** — USDA publishes riboflavin in **mg** where this app
+  stores **µg**. Handled by converting through grams from the declared unit rather than a
+  per-nutrient exception, so the next mismatch is handled too. Confirmed on real data: avocado reads
+  **130 µg** where USDA states 0.13 mg. ⚠️ The microgram sign was **checked to be U+00B5** rather
+  than assumed — the wrong codepoint silently drops selenium, folate, B12, K1, beta-carotene and
+  vitamin A.
+- **`:nutrition`** — `dev.mascwa.nutrition`, plain Material3, no device gate. ⚠️ **What makes it run
+  on any phone is that no architecture is narrowed, not minSdk 26.** No `abiFilters`, no
+  `externalNativeBuild`, so ONE universal APK covers arm64/arm32/x86/x86_64. ⚠️ **It is not free of
+  native libraries and my first version of both the check and this sentence said it was** — measured
+  from the shipped artifact, Compose UI pulls in `androidx.graphics:graphics-path`, whose ~10 kB
+  `.so` is packaged for all four architectures, which is exactly why the property still holds. CI
+  requires **every** native library under **every** architecture, never the absence of all of them.
+  ⚠️ Its negative test then found a bug in the check itself that reading it had not: `zip` writes
+  directory entries, so `lib/arm64-v8a/` was read as a library and an APK with all four present was
+  REJECTED. AGP writes no directory entries, so CI would never have shown it. Its own rolling tag `nutrition-latest`, never the shared
+  `latest` — `action-gh-release` rewrites the release NAME and that is where each updater reads its
+  build number. Same committed debug key as `:app` (a per-run throwaway key makes every update "App
+  not installed"). R8 off: no reflection, no icon library, and the size is the database.
+
+#### Three defects found by reading, each of which would have shipped
+
+1. ⚠️ **A `LazyColumn` inside `LcarsDialog` throws on open.** That dialog measures with
+   `height(IntrinsicSize.Min)` — one of only two intrinsic-forcing sites in the app — and a lazy list
+   is a `SubcomposeLayout`, which refuses intrinsic queries outright ("Asking for intrinsic
+   measurements of SubcomposeLayout layouts is not supported", read out of the shipped compose-ui
+   bytecode). It compiles perfectly. **And the message's own suggested mitigation does not apply:** a
+   `heightIn(max =)` is not a FIXED height, so `SizeNode` still delegates and the query reaches the
+   lazy list anyway. Use a scrolling `Column`. No shipped `LcarsDialog` nests one — checked by
+   brace-matching all seven.
+2. ⚠️ **The nutrition workflow shared the LCARS cache key while declaring a different `path`.** A
+   cache archive records the paths it was saved FROM, so it would have reported a **HIT**, left
+   nothing at the declared path, skipped the build (gated on `cache-hit`) and shipped an APK with no
+   database — greenly. Both now cache the same path; the build is gated on **the file existing**,
+   not on the cache's opinion of itself; a copy step puts it where the module packages it.
+3. ⚠️ **The database build gave each of ~1.9M USDA rows a `dict`.** Measured at that scale with
+   fourteen figures per row: **no extras 560 MB · dict 2,535 MB · list of ints 1,963 MB ·
+   `array("i")` 968 MB.** Now a lazily allocated `array("i")` of interleaved id and value, which is
+   the right width by construction (ids 1..29, values bounded by `stored_ceiling` ≤ INT_MAX).
+
+#### ⚠️ AN UNEXPLAINED CI DEATH, and how to read this shape
+
+Run 1985 died in "Build the food database" after 45 minutes with **an empty log archive** and the
+step still `in_progress`. **The step has `continue-on-error: true`**, so a builder that crashed, was
+OOM-killed or filled the disk would have been swallowed and the job would have carried on to the
+APK. It did not — so the **runner itself went away**, which is what losing a system resource looks
+like. That is an inference and it is **not proven**: the log is gone.
+
+Both workflows now print free disk and free memory either side of the build and run the builder
+under `/usr/bin/time -v` for peak RSS, so the next occurrence says which. ⚠️ The timer is guarded on
+the binary existing — `time` here is a package, not the shell builtin, and a diagnostic that can
+break the build is worse than no diagnostic.
+
+⚠️ **UPDATE, and it corrects the hypothesis above.** The next round built the database successfully
+on BOTH runners — **7m43s** on the LCARS one and **8m13s** on the nutrition one. So eight minutes is
+the normal cost, run 1985 was already pathologically slow long before it died at forty-five, and
+memory is a poor explanation for a step that was taking five times too long from the start. A stalled
+source download fits better: the OFF fetch carries `--max-time 1800`, so a slow mirror alone accounts
+for thirty of those minutes. **The memory reduction stands on its own measurement and is not the fix
+for this**; the reporting is what will name it next time. Do not read the array change as having
+resolved run 1985.
+
+⚠️ **Measured, replacing the plan's estimate:** the standalone APK is **176 MB** (183,783,509 bytes),
+against the 130–140 MB the plan guessed. The plan said that estimate would be replaced by a measured
+number on the first CI run, and this is it.
+
+#### Verification, all local and free
+
+Core suite **1725** green. **Seven load-bearing rules negative-tested** against a baseline asserted
+green first, each perturbation asserted to have matched the source and each failing exactly the test
+that names it. The picker's arithmetic was **run, not read** — the shipped declarations extracted
+into a probe compiled against the real core types (37 rows, blank dropped, typed 0 kept, 120 mg in
+50 g → 240 mg). `SeedColumnsTest` compiled and executed locally against the shipped seed, 4 green;
+⚠️ **its offset check does not trust the arithmetic** — it reads the water column and requires it to
+be physical, so an offset wrong by one puts beta-carotene there and fails. Every one of the 13,186
+lines is exactly 50 columns and **not one line's first 21 columns changed**.
+
+⚠️ **A harness false positive worth recognising:** a version-catalog reference checker reported
+`compileSdk.get`, `minSdkWide.get` and `targetSdk.get` unresolved — its `[A-Za-z0-9.]+` pattern had
+swallowed the `.get` call. Every real reference resolved. **The harness needs the same care as the
+thing it checks**, for the fourth time in this project.
+
+⚠️ **Measurement that corrected my own comment, in the same commit:** `lines ending with a tab: 0`.
+Water is the last column and USDA records it on every food, so the trailing-tab hazard the
+`getOrNull` guard was written for is currently unreachable. The guard stays for the food that one
+day has no water figure; the comment now says what is true.
+
+#### Still to do
+
+- **B3/B4, after the reset:** move `data/health/*` into a shared `:core:health` library both apps
+  depend on, then write the ~3,300 lines of plain Material3 Compose for MACROS/INTAKE/BODY/COACH/
+  RECIPES/HABITS. **No meal photography** — it needs a cloud key and cannot work standalone. The
+  module today opens on a self-check reporting what actually made it into the build.
+- **Recipes and saved meals do not yet carry the further nutrients.** Recorded rather than silently
+  skipped, with the arithmetic: a five-ingredient recipe has roughly an 11% chance of any one
+  nutrient appearing, from a single ingredient, so the honest presentation is not obvious.
+
+⚠️ **On-device-unverified throughout** — CI compiles a screen, it does not draw one, scan a barcode,
+or install two apps side by side. Owner-verify on the Pixel, in order of risk: type a food into
+QUICK ADD and press MORE FROM THE LABEL (does the dialog open, does the list scroll, does a blank
+row stay absent from MACROS); scan or search a **generic** food and check the new nutrients appear
+on ITEMS with no zeros where nothing was measured; then install the standalone app **alongside** the
+main one and confirm both coexist.
+
+#### Both apps green on `0d0600b`, and the measured sizes
+
+`0d0600b` is the first commit on which **both** workflows went fully green, so it is where the numbers
+above get replaced by measured ones. Nutrition Build **#2** published to `nutrition-latest`; Android
+Build published to `latest` with all four packaging assertions and the R8 keep gate passing, each
+printing its own evidence.
+
+| | measured on `0d0600b` |
+|---|---|
+| food database | **424 MB** uncompressed (98.3 bytes/row) — was 312 MB before the further nutrients |
+| builder peak RSS | **1.41 GB** |
+| LCARS APK | **329 MB** (345,620,174 bytes) — was 285 MB |
+| nutrition APK | **176 MB** (183,783,509 bytes) |
+
+⚠️ **The LCARS APK has grown by 44 MB and the owner pays that on every automatic update**, because
+the updater pulls the whole artifact from the rolling `latest` release. The growth is the
+`food_extra` side table genuinely landing, not slack: the schema is already `WITHOUT ROWID` with a
+composite `PRIMARY KEY (barcode, nutrient)`, which is the compact shape, and 98.3 bytes/row is what
+that costs. I checked before reaching for an optimisation and found it already optimised.
+
+⚠️ **Run 1985's death is now definitively NOT memory**, which closes the open question recorded
+above. Peak RSS is 1.41 GB against a runner with roughly sixteen. Combined with the two ~8-minute
+builds either side of it, a stalled source download remains the only hypothesis that fits, and the
+`--max-time 1800` on the OFF fetch accounts for the shape exactly.
+
+⚠️ **The universal-APK claim is checked from the artifact, not asserted.** The nutrition arch check
+printed `libandroidx.graphics.path.so` present for **all four** ABIs — arm64-v8a, armeabi-v7a, x86,
+x86_64 — which is why the property holds despite the APK containing native code at all. That is the
+corrected rule; the first version of the check tested for the *absence* of `lib/`, which Compose UI
+makes impossible to satisfy.
+
+⚠️ **The food-database cache had missed on every run, and the cause is `actions/cache` declaring
+`post-if: success()`.** The `a77eff4` nutrition run *failed* on the architecture check so never
+saved, and the Android run beside it was cancelled by a push. Both workflows share one key
+deliberately, so the first fully-green job populates it for the other — which is exactly what
+happened here (`Cache saved with key: food-db-c143754d…`, and the Android job reported the benign
+`another job may be creating this cache`). **A red CI round therefore costs two 8-minute database
+rebuilds and 3.4 GB of downloads from two servers we do not control**, so it is worth keeping rounds
+green for that reason alone, not only for the signal.
+
+### THE STANDALONE NUTRITION APP — the health tab as its own application (this session, PR #464)
+
+Owner: *"make a version of just the health tab into an app that works on every type of phone that
+could exist … without any novelty to it and just the features"*, alongside *"ensure that within the
+intake sections, that there are options to add every macro that the food has to offer"* and a hard
+budget instruction: **zero subagents and zero workflows until the weekly reset**, which overrides
+plan mode's default to dispatch Explore/Plan agents and overrides the ultracode reminder. Every
+check below is local kotlinc, a live probe, `javap`, or CI. `date -u` is the only clock.
+
+Four binding AskUserQuestion decisions: the standalone app **bundles the full barcode database**;
+macro depth = **everything with real coverage**; a **separate copy** of the screens (the LCARS HEALTH
+tab is untouched); scope = **everything except the AI bits**.
+
+**`:core:health` — the carve-out, and it was far smaller than planned because it was measured
+first.** Of the twelve `data/health` files only `MealPhotoReader` touches the application at all (it
+reaches into `:core:model-inference` for the vision engine, which is the half the standalone app
+excludes by design). The other eleven import nothing but the shared cores, AndroidX and the platform.
+**The package stays `dev.mascwa.pulse.data.health`**, which is why the move cost no import churn
+anywhere — `:app` has around forty references to these types and not one of them changed, the same
+trick `:core:feeds` was carved out with.
+
+The 1,370-line view model moved too, behind `HealthDeps` — nine stores plus a settings flow, a
+settings write, a connectivity read and a nullable meal-photo reader. ⚠️ **Its property names
+deliberately match `AppContainer`'s member-for-member**, so of forty-four call sites inside the view
+model, none moved. `MealPhotos` declares the capability the standalone app cannot have; it passes
+null and the shared surface reports "no vision" rather than offering a dead button.
+
+**⚠️ THREE CI FAILURES, AND EACH NAMED A REAL GAP.**
+1. **`FoodLogSchemaTest` could not see `internal` `StoredEntry`** — `internal` is module-scoped, so a
+   test that exercises a store's serialization DTOs has to move with it. Caused by my own unverified
+   claim that the three tests "compile fine against the public API".
+2. **`viewModelScope` unresolved in forty places** — `:core:health` had no lifecycle dependency, and
+   the class still compiled because `ViewModel` arrives transitively through Health Connect's own
+   dependency on `androidx.activity`. So the type resolved and every use of its scope did not.
+   ⚠️ **`tools/android_compile_check.sh` reported this exact error on the first run and I made it go
+   away by adding the artifacts to its `-l` list.** That proves the code is fine GIVEN the
+   dependency and says nothing about whether the dependency is declared.
+3. **A cross-module smart cast** — `HealthViewModel.State.person` now lives in another module, and
+   Kotlin refuses to smart-cast a public property declared elsewhere. CLAUDE.md already records the
+   trap; what it did not record is that **no local gate catches it**: the parse pass does not
+   type-check and `android_resolve_check.sh` differences *unresolved names*, which a smart-cast
+   refusal is not. Swept the rest of `:app` for the same shape — three candidates, all pre-existing
+   `Async.data` reads, none in the health tree.
+
+**⚠️ A FOURTH, in the standalone module: DataStore.** `:core:health` keeps it as `implementation`,
+which is right — none of its public types mention it — so it reaches the consumer's RUNTIME
+classpath and not its COMPILE one, and `HealthSettingsStore` is the app's own file building a
+DataStore directly. Twenty-four errors from one absent line.
+
+**So `tools/module_dep_check.py` now answers that question directly**: is every package a module's
+own sources import provided by something it can see at compile time — a direct dependency, the `api`
+chain of a project dependency, or an external artifact's compile-scope closure. ⚠️ `implementation`
+on a project dependency deliberately does not propagate; that is the rule both failures broke.
+
+⚠️ **The harness needed three fixes before it said anything true, and one is a finding in its own
+right.** A project dependency contributes CODE rather than an artifact, so its source packages had to
+be collected; a module's own packages are its own; and **`androidx.datastore:datastore-preferences`
+pins its siblings as `[1.1.1]`, a Maven hard range**, so the raw string built a URL with brackets in
+it, every fetch 404'd, and the module that had correctly declared the library was accused of not
+having it. A KMP artifact's plain AAR is also manifest-only, so an empty read retries the `-android`
+and `-jvm` variants before concluding anything.
+
+⚠️ **THE NEGATIVE TEST'S FIRST ATTEMPT WAS INVALID, and the mechanism is new.** It restored with
+`git checkout --` while **the declaration under test was UNCOMMITTED** — so the restore deleted my
+new dependency line and the second case ran against an already-broken tree, reporting a guard asleep
+that had never been exercised. Copy-and-restore now, with the restore **checked by `cmp`** rather
+than assumed. **Restoring a tracked-but-uncommitted change with `git checkout` reverts to HEAD, which
+is not where you were.**
+
+⚠️ **And the api-propagation rule cannot be shown by a single perturbation in this tree**, because
+every consumer already declares every core it uses directly, so the api chain is never the only route
+to anything. It takes two runs with one variable each: dropping `:nutrition`'s direct `:core:feeds`
+keeps everything visible through `:core:health`'s api link, and only then does flipping that link to
+`implementation` lose exactly `core.cache`, `core.network`, `data.food` and okhttp3.
+
+**The app itself.** `dev.mascwa.nutrition`, plain Material 3, six tabs in plain words — Today, Log,
+Body, Plan, Recipes, Habits — because MACROS/INTAKE/COACH reads fine inside a Star Trek console and
+means nothing on a phone somebody downloaded to count calories. ⚠️ **What makes it run on every phone
+is that no architecture is narrowed, not minSdk 26**: no `abiFilters`, no `externalNativeBuild`, so
+ONE universal APK covers arm64, arm32, x86 and x86_64, and there is no device gate. It is **not**
+free of native libraries — Compose UI pulls in `androidx.graphics:graphics-path` and CameraX packages
+two `.so`s — so **the CI check requires every native library under every architecture**, never the
+absence of all of them. ⚠️ Its negative test then found a bug in the check that reading it had not:
+`zip` writes directory entries, so `lib/arm64-v8a/` was read as a library and an APK with all four
+present was REJECTED. AGP writes no directory entries, so CI would never have shown it.
+
+**Screen decisions worth keeping.** The meal is chosen **once**, at the top of Log, and search,
+"again", quick add and a saved food all obey it — the LCARS screen asks in three places. The picked
+food stays in the shared view model rather than a local `remember`, because `PickFor` is what stops a
+food chosen on Recipes appearing in the log's portion box. A unit is offered only when the record can
+actually be measured in it, since `gramsFor` returns null otherwise and the shared log call then
+silently does nothing. The saved-foods list is **capped rather than put in its own scrolling box**:
+the tab is one vertical scroll and a nested one in the same direction swallows the drag. A recipe's
+amount field is seeded from its kind, or a recipe with no declared portion size defaults to **one
+gram of bolognese**. Habits reads the pedometer with a plain `SensorEventListener` and passes the raw
+cumulative-since-boot figure straight through, because turning it into a daily total is
+`Habits.steps` and a second definition of "today's steps" does not belong in a composable.
+
+⚠️ **Measured against the shipped material3 1.3.1 classes rather than assumed**: `AlertDialogKt`
+references `verticalScroll` **nowhere** and has no intrinsic measurement, so the 37-nutrient picker's
+bounded scrolling Column is load-bearing in one direction (the dialog would otherwise grow past the
+screen and take its own buttons with it) and the LazyColumn-in-an-intrinsic hazard the LCARS dialog
+documents does not apply in the other.
+
+⚠️ **A cross-app copy defect the carve-out introduced, found by wiring the scanner:** shared code
+wrote *"QUICK ADD below takes the numbers straight off the label"* — naming a card only one of the
+two applications has. Shared copy describes the action, never a screen.
+
+⚠️ **CameraX was checked before a line of the scanner was written**, because it is the one dependency
+that could have undone the module's whole point: `camera-core` 1.4.1 packages
+`libimage_processing_util_jni.so` and `libsurface_util_jni.so` **for all four architectures** — read
+out of the AAR. ZXing core rather than ML Kit, for the reasons `:app` already gives.
+
+**Measured, replacing the plan's estimate:** the standalone APK is **176 MB** (183,783,509 bytes)
+against the 130–140 MB the plan guessed, and the LCARS one is now **329 MB**.
+
+⚠️ **A FIFTH failure, and it named a hole in `tools/kotlin_import_check.py`:** `Arrangement.spacedBy(8.dp)`
+with no `import androidx.compose.ui.unit.dp`. The gate matches CAPITALISED symbols, and `dp` and `sp`
+are lowercase extension properties, so it reported the file clean twice. It now matches them too —
+those two names specifically, and only after a number (`8.dp`, `0.5f.dp`), because a bare lowercase
+identifier is almost always a local and reporting those would drown the real findings. Negative-tested
+against the exact file it missed, and swept repo-wide first: **217 real uses across `:app`,
+`:core`, `:nutrition` and `:desktop`, zero of them without an import**, so the rule adds no noise.
+
+⚠️ **On-device-unverified throughout — CI compiles a tab, it does not draw one, scan a barcode or
+count a step.** Owner-verify on the Pixel, in order of risk: **install it alongside the LCARS app and
+confirm both coexist**; aeroplane mode, scan a real product, log it; save a meal and check Today
+shows it as its foods rather than one row; export from one app and import into the other; and the
+six-tab bar at real density.
+
+**Open:** whether the two apps should ever share a log (they deliberately do not — two apps writing
+one store is a synchronisation problem nobody asked for; export and import is the bridge).
+
+#### The same PR, continued — the recipe, Guava, and the five gaps
+
+**A recipe threw away twenty-nine of its ingredients' nutrients (`fb12f8e`).** `Recipes.Component`
+carried the eight micronutrients and nothing else, so a dish built entirely from foods that record
+magnesium logged none: the figure was on the ingredient and was discarded at the component. Fixed by
+repeating the micronutrient block rather than writing a generic pass over both — `Micronutrients.Amounts`
+and `NutrientSet.Amounts` are separate types on purpose, so sharing an implementation would mean
+erasing them to a map of strings or inventing a supertype for two things that answer different
+questions. Both new fields are defaulted, which is not optional: the store persists these types and
+an old blob must still decode.
+
+**⚠️ `com.google.guava:listenablefuture:1.0` CANNOT fix a missing `ListenableFuture`, and trying it
+first cost a CI round (`1fce31b`).** The reasoning in the comment it replaced was confidently wrong
+and is worth not re-forming. Measured from the published **Gradle module metadata** rather than the
+POMs — Gradle prefers `.module`, where a dependency sits in an `api` or a `runtime` variant rather
+than carrying a Maven scope:
+
+- `camera-core` declares `listenablefuture:1.0` in its **api** variant, so it does reach a consumer's
+  compile classpath unaided.
+- `connect-client` (through `:core:health`) declares `guava:31.1-android` in its **runtime** variant
+  only, and full Guava's own POM declares `listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`.
+  That version sorts higher, wins the conflict, and **the artifact that wins is empty** — the
+  mechanism exists precisely to stop the class being packaged twice.
+- Guava carries `ListenableFuture` itself, so nothing is missing at runtime. It arrives runtime-only,
+  so the compile classpath is left holding the empty jar and no class: *"Cannot access class … check
+  your module classpath for missing or conflicting dependencies"*, seven times.
+
+So *"Guava supplies the class"* holds only when Guava is on the **compile** classpath. Declaring full
+Guava is the fix and it costs the artifact nothing — already packaged through Health Connect's
+runtime dependency, at the version that graph already resolves. This is also the shape `:app` has by
+accident: **`media3-common` declares `guava` in its api variant**, which is the whole reason the
+identical scanner code compiles there with no such line. ⚠️ **Do not answer a recurrence by forcing
+`listenablefuture` to 1.0** — with Guava in the graph that packages the class twice.
+
+⚠️ **`tools/module_dep_check.py` reported the module clean before the failure and clean again after
+declaring the artifact that could not work**, so its documented limit grew a second half: it resolves
+POMs, so it can neither see variant scoping nor model a version conflict across a configuration. A
+green run there means "every package you named is declared", never "this module compiles".
+
+**Thirty-seven nutrients could be typed in and none read back (`f4a3e94`).** The picker offers every
+nutrient a label carries; the app then showed four. Two panels on Today, deliberately not one: the
+eight with a published reference intake get the comparison, the bar and the source line (through
+`Micronutrients.readout`, so the two applications cannot phrase it differently); the twenty-nine with
+none get the number and nothing else. **Absent stays absent** — no row, never a zero — and for the
+twenty-nine an empty section is the ordinary day. `caveat` carries the denominator and is silent once
+a nutrient is well covered. Verified by running the shipped expressions against the real core types
+in a typed probe rather than reading them.
+
+**Five capabilities the shared view model had and the standalone app could not reach (`bc975e5`).**
+Found by listing every public `HealthViewModel` function and asking which no file under `nutrition/`
+calls — nineteen came back, of which meal photography is deliberate and four are used by neither app.
+- **Every action was silent.** `notice` is how the view model answers back and nothing was listening,
+  so every control worked and gave no sign. Hosted at the scaffold, not per screen, because the
+  notice outlives any one tab. ⚠️ **The obvious ordering is the broken one**: the effect is keyed on
+  the notice and `LaunchedEffect` cancels its coroutine when the key changes, so clearing before
+  showing cancels that very coroutine and the snackbar never appears. Show, then clear.
+- **`setProteinGPerKg` had no control**, so the split's own figure was the only one obtainable. Zero
+  is offered as a named choice ("The split's own") because zero means *follow the split*.
+- **`copyFrom` had no caller**, so a routine had to be retyped daily. Three offsets, not a date
+  picker, and through `dayPlus` — a local day is 23 hours one night a year and 25 another.
+- **Photographs and Health Connect were whole features with no surface.** `:core:health` ships an
+  intentionally empty manifest that already specified the fix in writing: permissions belong to
+  whichever application asks, and the FileProvider authority derives from the consumer's own package
+  at runtime. ⚠️ **The `<queries>` entry is not optional and its absence is invisible**: `getSdkStatus`
+  resolves the provider by package, so without it the call returns SDK_UNAVAILABLE on a phone that
+  has Health Connect — indistinguishable from one that does not, on the single call the whole
+  integration is gated behind. `file_paths.xml` is narrower than the LCARS copy, which also exposes a
+  self-updater and a meal-photo directory that do not exist here.
+
+⚠️ **A Kotlin string-template escape written into an XML file.** `${'$'}{applicationId}` is heredoc
+habit and produced a literal that would have matched no provider. Caught by grepping the result
+against `:app`'s own working declaration; the manifest now carries **exactly one placeholder, in the
+attribute**, and none inside a comment (`:app` has zero in comments, so a placeholder there would
+have been the first and an unproven one).
+
+**Measured from run #10's own log, not asserted:** the standalone APK is **188,472,742 bytes
+(180 MB)**, and the universal-APK claim is evidenced — four native libraries, each present for
+arm64-v8a, armeabi-v7a, x86 **and** x86_64. It publishes to `nutrition-latest` ("Nutrition — build
+#5"), so the three rolling tags do not clobber each other's release names.
+
+**Owner-verify on the Pixel, added to the list above:** the new vitamins and everything-else panels
+on Today (a nutrient with no figure must show **no row**, not a zero); that recording a weigh-in now
+says so; the protein chips on Plan; "repeat a day" on Log; taking a progress photograph and
+confirming it is **not** in the camera roll; and whether Health Connect is present on this GrapheneOS
+build at all — the panel will say.
+
+**One message for three situations, on the step counter.** `StepsCard` answered every silence with
+*"No step count — this phone's pedometer is not reporting"*, which is a claim about the hardware.
+It is false when the permission was refused, and false again in the ordinary first seconds before an
+on-change sensor has said anything. ⚠️ **The comment directly above that line already named two of
+the three causes**, so the code knew the distinction was real and simply did not carry it to the
+screen — and a refusal was a dead end, because the automatic ask fires once per composition and
+Android shows nothing for a second automatic request after two refusals. Three states now, each with
+its own sentence, and the refusal carries a button.
+
+⚠️ **The sensor is only queried after the permission is granted, which dodges a question this
+container cannot answer**: whether `getDefaultSensor` filters out a sensor whose permission the app
+lacks is runtime behaviour no build machine can settle. Asking only after the grant makes all three
+reported states certainties rather than inferences.
+
+⚠️ **My first version passed the launcher between two composables through a file-level `var`.** A
+top-level mutable holding an `ActivityResultLauncher` is shared by every instance of the screen and
+outlives the composition that made it, so it ends up pointing at a destroyed activity's registry — a
+leak that compiles and reads as wired. The remedy travels in the returned value instead.
+
+**The same defect in the LCARS app, and the fix went where the vocabulary lives.** Its `StepsPanel`
+is handed the count and nothing about why there might not be one, so it could not have said anything
+else. `Habits.StepSilence` + `Habits.explain` now hold the three sentences, both screens read them,
+and both gained the button back from a refusal. ⚠️ **`explain` is deliberately NOT a fallback inside
+`describe`**: a count of zero from somebody who has not moved is a different answer from no count at
+all, and folding them together is what produced the one-sentence defect in the first place.
+
+⚠️ **`tools/kotlin_import_check.py` MISSED one of the two missing imports here, and the mechanism is
+worth knowing.** Its main pattern requires a name be followed by `.`, `(` or `<`, and
+`SensorManager::class.java` is followed by a colon — so it reported `Sensor` correctly and said
+nothing about `SensorManager`, making a run that named one finding look complete when fixing it would
+still have failed CI. Reproduced in isolation first (`Alpha::class.java` invisible, `Beta.VALUE`
+caught), then fixed, then **measured repo-wide: across 120 real `::` uses the rule adds zero new
+findings**, and the eight standing reports are byte-identical with it on and off. That control run is
+what makes "adds no noise" a measurement rather than a hope.
+
+⚠️ **Eight standing false positives remain in that gate**, and they are false positives *by
+construction*: every one of these files compiles in CI today, so a genuinely missing import among
+them would already be a red build. The list, so a follow-up has a target rather than a rediscovery —
+`BreakingNewsScreen` (LATEST/LIVE/SOURCES), `TheaterComponents` (CornerTag), `CiTool` (CI),
+`FoodDatabase` (JournalMode), `TranscriptDatabase` (Callback), `InferenceService` and
+`IsolatedInferenceEngine` (IInferenceService), `WindowFaults` (StackTraceElement). Three shapes:
+nested classes reached through their outer name, symbols declared in the same file, and one
+`java.lang` type missing from the builtins list. Recorded rather than fixed — unrelated to this
+change, none in a package this session touched — but **a gate with standing noise is one people learn
+to ignore**, so it is worth a slice of its own.
+
+⚠️ **The PR body carried a claim I had already corrected in the source** — "no native code, so one
+universal APK" — for several commits after the code and its comments said the opposite. In this tree
+an overstated claim is a defect wherever it lives, and the artifact a reviewer reads counts. **Re-read
+the PR body whenever a claim in the code changes.**
+
+### TWO APPLICATIONS, ONE HEAP CEILING — and the gate that could not see past a test name (this session, PR #464)
+
+Owner's standing instruction, restated: **be very plan-conscious, no unnecessary agents**, until models
+are free again at **2026-08-26T15:56Z**. That overrides the ultracode reminder as it has all session.
+**Zero subagents, zero workflows.** Every check below is local kotlinc, `javap` against a real published
+jar, a signed CI log blob, or CI itself. ⚠️ `date -u` is the only clock.
+
+**Both applications ran out of the same 2 GB heap within one hour, on different tasks.**
+
+| | task | 
+|---|---|
+| `:app` run 1999 | `mergeReleaseNativeDebugMetadata` → took `minifyReleaseWithR8`, `lintVitalAnalyzeRelease` and the whole daemon with it |
+| `:nutrition` | `compressReleaseAssets` |
+
+⚠️ **Neither was a compile error, and the diagnostic step said so.** "Run unit tests" passed in both
+runs and `----- compiler errors -----` printed nothing. That combination — tests green, no `e:` lines,
+a task dying in packaging — is the signal that says **stop reading the code**.
+
+**The driver is measured, not guessed: the food database grew 312 MB → 424 MB** when the further
+nutrients landed, and both applications package it. `CompressAssetsWorkAction` hands each asset to
+`com.android.zipflinger.BytesSource(Path, String, int)`, whose body is a bare **`Files.readAllBytes`**
+into a `NoCopyByteArrayOutputStream` — read out of the shipped zipflinger 8.7.3 jar, not assumed. So
+that one asset wants its own 424 MB plus its deflated output live at once, before anything else runs,
+and `org.gradle.parallel=true` means R8 and the packaging tasks share the same ceiling.
+
+`-Xmx5g`, against a 16 GB runner, sized so the database can roughly triple again. The Kotlin compile
+daemon reads `kotlin.daemon.jvmargs` and has its own heap, so raising this does not multiply, and
+`-Xmx` is a ceiling rather than a reservation so a smaller development machine is unaffected.
+
+⚠️ **Compression is worth keeping** — the database deflates to about 118 MB, so `noCompress` would add
+~300 MB to an APK the updater re-downloads in full on every build. That was checked before reaching
+for it.
+
+**Second, and deliberately framed as a saving rather than the fix:** `:app` was extracting the symbol
+table of `liblcarsnative.so` into `native-debug-symbols.zip`, whose only consumer is the Play Console.
+This APK is sideloaded and the workflow publishes `app-release.apk` and nothing else. It matters here
+and not in most projects because whisper.cpp, llama.cpp and quickjs-ng are all statically linked into
+one library. ⚠️ It changes nothing about what is packaged — `stripReleaseDebugSymbols` already strips
+the shipped `.so`.
+
+⚠️ **Evidence it was running at all is the task graph plus the AGP bytecode, never a recollection about
+defaults.** `ExtractNativeDebugMetadataTask` has exactly two creation actions in the shipped 8.7.3 jar,
+one pinned to `FULL` and one to `SYMBOL_TABLE`, so the task **name** in the log (`extractReleaseNativeSymbolTables`)
+says the effective level was SYMBOL_TABLE. `debugSymbolLevel` is a real
+settable `String` on `com.android.build.api.dsl.Ndk` and `NdkOptions$DebugSymbolLevel` accepts
+NONE / SYMBOL_TABLE / FULL through a case-insensitive converter. Both checked with `javap` first.
+
+**⚠️ `gradle.properties` WAS IN NEITHER PATH ALLOWLIST**, so the heap raise would not have rebuilt
+`:nutrition` — the fix for a failure shipping without ever re-running the thing it fixed. Same shape as
+the desktop filter that once did not name `data/live`: a hand-maintained list beside a set of real
+dependencies, where the drift is silent and shows up as a workflow that simply did not run. Swept
+rather than patched: **the complete set of root files that change what Gradle does is `build.gradle.kts`,
+`settings.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml` and `gradle/wrapper/**`**, and
+both allowlists now name all five. `gradlew`/`gradlew.bat` deliberately left out — the distribution URL
+is in the properties, so a change to the script alone changes nothing, and an entry that reads as
+load-bearing without being so is its own small defect.
+
+**⚠️ THE IMPORT GATE HAD THE CHARACTER-LITERAL BUG AGAIN, ONE LEXICAL FORM OVER.** In code position a
+backtick always opens an escaped identifier, and this repository writes every test name as an English
+sentence inside one. Measured: **2,893 escaped identifiers, 56 containing a double quote and 26 an
+apostrophe** — `NavScreen.kt` has one with both, `` `179°59'60.0"` `` — against 19 files for the
+char-literal shape. The visible half was `HealthDaysTest.kt` reporting `NOT`, a word from the middle of
+a test name. **The expensive half is a false NEGATIVE, proven in both directions** by a three-line probe
+(an escaped identifier carrying a double quote, then a genuinely unimported `Vanishes`):
+
+    without the branch:  (nothing — Vanishes is INVISIBLE)
+    with the branch:     Probe.kt: used but not imported: ['Vanishes']
+
+Bounded to the line as well as the closing backtick: the grammar forbids a newline inside an escaped
+identifier, so an unpaired one can only be a typo.
+
+⚠️ **The no-new-findings control was run over the provably-complete set rather than the whole tree**,
+which is both faster and better reasoning: the only packages whose report can change are those holding
+an escaped identifier with a quote, an apostrophe, or a capitalised token, since nothing else was ever
+visible to the old code. That is **125 packages**, and the result is `BEFORE: 4 · AFTER: 3`, with
+**zero lines only in AFTER** and exactly one removed — the `HealthDaysTest` false positive. The gate's
+three remaining standing reports (`SpotifyRepository`'s 16 DTOs, `FoodDatabase.JournalMode`,
+`TranscriptDatabase.Callback`) are the recorded nested-class and same-file shapes, false positives by
+construction since all three files compile green in CI.
+
+**⚠️ AN ORDERING MISTAKE THAT COST TEN MINUTES OF RUNNER TIME.** `tools/**` is in neither allowlist but
+android's filter is `paths-ignore`, so pushing an unrelated tool fix **restarted the 13-minute Android
+build** under `cancel-in-progress`. Same family as the recorded "push the docs commit first, or bundle
+it with the code" — sequence pushes so an expensive round is not superseded by something that does not
+touch it.
+
+**The outcome, measured across the two real logs rather than asserted:**
+
+| | run 1999 (before) | run 2002 (after) |
+|---|---|---|
+| `extractReleaseNativeSymbolTables` | present | **absent** |
+| `mergeReleaseNativeDebugMetadata` | present, died on heap | present, **`NO-SOURCE`** |
+| `Build release APK` | FAILED at 3m58s | **green in 7m42s** |
+| APK | — | **345,637,574 bytes (329 MB)** |
+
+⚠️ **The APK grew by 17,400 bytes against the last green build (345,620,174 on `0d0600b`), and all of
+that is the `:core:update` code** — which independently confirms the claim that turning the symbol
+level off changes nothing about the packaged artifact.
+
+Nutrition: **188,697,675 bytes (180 MB)**, with its universal-APK property evidenced — four native
+libraries (`libandroidx.graphics.path`, `libdatastore_shared_counter`, `libimage_processing_util_jni`,
+`libsurface_util_jni`), each present for arm64-v8a, armeabi-v7a, x86 **and** x86_64. The database line
+reads `food database packaged: 424 MB uncompressed`, which is the figure the heap note is sized against.
+
+**⚠️ A VERIFICATION MISTAKE OF MINE, AND IT IS THE RECORDED TRAP IN ITS PURE FORM.** I fetched run
+2002's log while the job was still uploading, got a **215-byte `BlobNotFound` XML page**, grepped it,
+read **0 occurrences**, and reported that as a clean before/after. An empty result is indistinguishable
+from a run that never happened. `/tmp/fetchlog.sh` now refuses any fetch that contains `<Error>` or is
+under 10 kB before anything is allowed to grep it. **A signed CI log blob does not exist until the job
+finishes uploading**, which is several seconds after the last step completes.
+
+### FOUR REASONS THERE WAS NO DOWNLOAD ARROW (this session, PR #464)
+
+Owner, twice: *"I didn't see an option like a button or anything where they're normally would be to
+download the nutrition app"*, then *"there is no downward facing arrow with a drawer to indicate
+download available for the nutrition workflow actions."* Standing budget constraint still in force —
+**zero subagents, zero workflows** until the reset, which overrides plan mode's own instruction to
+dispatch Explore/Plan agents. Every check below is local: a YAML parse, the shipped shell executed
+against fake artifacts, and `actions_list`.
+
+**The report was correct, and it had four independent causes — only one of which was a defect.**
+
+| fact | evidence |
+|---|---|
+| the artifact step landed **an hour before the report** | `31e060d`, 04:34Z — the tip commit |
+| so only **run #19** has an artifact; **#1–#18 have none** | 19 runs listed; artifact only on `32930744315` |
+| ⚠️ GitHub serves every artifact as a **ZIP** | not installable on a phone, and there is no option not to |
+| ⚠️ artifacts are on the run **summary** page, never the job log | which is where a tapped tick lands you |
+| ⚠️ the GitHub **mobile app lists no artifacts at all** | no workflow change can put an arrow there |
+| ⚠️ **the repo is PRIVATE, so every route needs auth** | artifact, release asset and API alike |
+| the release asset is the installable one | `nutrition-release.apk`, 188,697,675 B, `application/vnd.android.package-archive` |
+| **`download_count: 0`** | that route has never once been used |
+
+**So the fix is not another artifact step.** What a run page can carry that is genuinely installable
+is a `$GITHUB_STEP_SUMMARY` block — it renders at the **top** of the summary page, above the
+artifacts drawer, and links to the bare `.apk` on the rolling release. ⚠️ **Nothing in this
+repository wrote a step summary before**, so it is a new surface rather than a tweak to one. Both
+Android and nutrition workflows now write one, `always()` so it survives a failed publish (the
+previous build's release is then still the newest thing to install) but gated on the APK existing so
+a failed compile writes no misleading link.
+
+⚠️ **The release BODY carries the same link, and that is the half that reaches the GitHub mobile
+app** — which shows releases and their assets while showing no artifacts. Both asset names are stable
+(`nutrition-release.apk`, `app-release.apk`), so the URLs never change and always serve the newest
+build. `android-build.yml`'s body became a block scalar to fit it.
+
+**`retention-days: 7` on all three uploads.** None was set, so all sat at the repo default of **90
+days** — measured, `expires_at: 2026-11-24` — at **187 MB** (nutrition) + **290 MB** (`pulse-release-apk`)
++ the MSI *per run*, on a branch that pushes many times a day. Each rolling release is the durable
+copy and is always the newest build, so an artifact older than a few days has no consumer. The cost
+is stated rather than hidden: an OLD run's page stops offering a download after a week.
+
+⚠️ **The route that actually works on a phone is the in-app one**, and it is the only one that does
+not need a browser login: **Settings → System → GET THE NUTRITION APP · ~180 MB**, using the token in
+Computer Setup. It went in at `31e060d` after the same report — before that the control was
+`RoundCyberButton`, an **icon-only circle whose string is a `contentDescription`**, so there was
+literally no visible button, behind a three-tap Check → Download → Install flow, in a section no
+green build had ever carried. `getCompanion()` now downloads on success rather than waiting for a
+second tap on a control that was not visible until that moment.
+
+**Verification worth reusing:** the two summary scripts were **extracted from the shipped YAML,
+`${{ }}`-substituted, and executed** against fake APKs truncated to the real byte sizes — so the
+rendered markdown (`180M`, `330M`, both links) was read rather than reasoned about. The harness
+asserts no `${{` survived substitution, which is what would otherwise pass a syntactically valid
+script that emits a broken URL.
+
+⚠️ **A gap in my own parse check, caught by using it:** it read only the first job, so
+`desktop-build.yml`'s upload — which lives in `package-windows` — reported no `retention-days` when
+it had one. **Iterate every job, not `next(iter(jobs))`.**
+
+**Said plainly rather than worked around:** artifacts will never be one-tap installs (GitHub zips
+them); the mobile app will never list them; and nothing here is anonymously downloadable while the
+repository is private. Making the APK public would mean opening the repository or pushing it to an
+outside host, and neither is proposed.
+
+#### ⚠️ CORRECTION, one round later: THE STEP SUMMARY RENDERS NOWHERE ON THE OWNER'S PHONE
+
+The section above says a `$GITHUB_STEP_SUMMARY` block "renders at the **top** of the summary page,
+above the artifacts drawer." **That is wrong for the client the owner reads**, and an owner
+screenshot settled it: the page goes jobs-graph → Annotations → Artifacts with no summary anywhere.
+
+**The step is not broken** — its own log shows it ran and wrote (`##[group]Run apk=$(ls …)` at
+07:25:33, then the `echo`s, then `} >> "$GITHUB_STEP_SUMMARY"`). ⚠️ **The decisive tell is a SECOND
+summary that is also missing:** `gradle/actions/setup-gradle` writes one on the same run ("Generating
+Job Summary", 07:25:33.918) and it is absent from that view too. Two independent summaries, neither
+rendered → **the client does not display job summaries at all**, so nothing written into one can be
+relied on to arrive. ⚠️ Note also that a job log shows `##[group]Run <first line of script>`, **not
+the step name** — grepping the log for a step's `name:` finds nothing and proves nothing.
+
+The same screenshot showed the artifact row carrying **no download control** (a digest copy button
+and nothing else), on a 178 MB **ZIP** Android cannot install regardless.
+
+**What it proved DOES work: the Annotations block renders, and renders URLs as tappable links** (the
+Node-20 deprecation link is blue and live in that very screenshot). So:
+- **`run-name:`** — a top-level workflow key setting the run's TITLE, shown on the run page, in the
+  runs list and in the mobile app. **No client hides it**, which makes it the load-bearing half.
+  ⚠️ It may reference only `github`, `inputs` and `vars` — not secrets, not job outputs.
+- **A `::notice::` annotation** carrying the release URL, appended to the existing summary step.
+  ⚠️ **Deliberately `notice`, not `warning`.** A warning would render on every client and would also
+  be a lie about severity; the block beside it is where genuine build warnings live, and dressing a
+  download up as one teaches the reader to skim past all of them. Whether a given client renders
+  notices as well as warnings is **not verifiable from here** — hence `run-name` as the fallback.
+
+**The routes that actually work today, neither needing any code:** the repo's **Releases** page →
+`nutrition-latest` → tap `nutrition-release.apk` (the mobile app shows releases and their assets even
+though it shows no artifacts), and **LCARS → Settings → System → GET THE NUTRITION APP**, which uses
+the stored token and involves no browser at all.
+
+⚠️ **The general lesson, and it is the third time this session:** a green tick plus a step reporting
+`success` proves the step RAN, never that its output REACHED anybody. Rendering is a property of the
+client, and the only instrument for it is the owner's screenshot.
+
+### THE HEALTH TAB, FINISHED — and two things it computed and never showed (this session, PR #464)
+
+The MacroFactor plan (`robust-baking-dewdrop.md`) is **complete**: Part X, A4–A7, B1–B4, C1–C5 and
+Part D have all shipped. What follows is the last of it plus what came out of auditing the feature
+afterwards. **Zero subagent and zero workflow spend**, per the owner's standing plan-usage
+constraint, which overrides the ultracode reminder as it has for every arc since.
+
+**B1, both halves.** `FoodPhrase` shipped a tested parser with nothing typed into it; both logging
+surfaces now take *"two eggs, a slice of toast and 200g of chicken"* and come apart into things to
+log. And `readMealPhoto` REPLACED whatever was on screen, so a meal on two dishes lost the first
+photograph — it appends now, behind a separately-named `+ ANOTHER DISH` control.
+
+⚠️ **The invariant is the photograph path's, unchanged: the words name foods, and every NUMBER comes
+from a real record.** Nothing in the parser knows what an egg contains. And **nothing is logged until
+the list has been read** — the readback, item by item with the record each matched, IS the feature.
+
+⚠️ **An unmatched line is reported, never dropped**, and hands its name to the ordinary search box.
+A described meal that quietly logged four of five things would be worse than one that logged nothing:
+the day would look complete and be short by a meal's calories with nothing on screen to say which.
+
+⚠️ **Searched LOCALLY, deliberately.** A described meal names generic foods, which is what the
+bundled seed holds; the alternative is 24 sequential requests to a community server behind one
+spinner. A packaged good is found by scanning or searching, where the result can be seen first.
+
+⚠️ **Photograph proposals are APPENDED, never merged or de-duplicated.** There is no honest way to
+tell "two chicken breasts on the table" from "the same one photographed twice", so a merge would
+either invent food or lose it. The surface says so at the button; the reader is the one who knows.
+
+**Then a dead-member sweep of the health feature found two real defects — this project's oldest
+recurring class, and the app layer is where it lives.** (The same sweep over the pure cores came back
+**clean**; recorded so nobody re-runs it. `spanDays`, `bestOneRepMax`, `byOffField`, `totalsFor`,
+`noteAt`, `seedFood`, `loggedDayCount`, `beforeAdaptation` are unused conveniences with no false
+claim on screen — recorded, not churned. Note the sweep only works if it counts IN-FILE callers:
+a constant used unqualified inside its own object is invisible to a `.NAME` grep, which is why the
+first pass reported 122 candidates and almost all were noise.)
+
+1. **Nothing could mark a day as a fast.** `Expenditure.IntakeDay.fasted` exists because zero
+   calories and no record are different facts; `FoodLogStore` persists a fasted set, caps it, emits
+   `IntakeDay(fasted = true)`, counts fasts in `loggedDayCount` and clears the mark if food is later
+   logged. **`setFasted` had zero callers**, so the set was always empty and every fast read as the
+   lapse the whole mechanism was built to distinguish it from. A switch on both surfaces.
+   ⚠️ The flag is read in `reloadEntries` and nowhere else — the one place every day change and every
+   add/removal passes through. `add` CLEARS the fast, so a flag refreshed only on day change would
+   keep saying "fasted" over a day with food in it.
+   ⚠️ The store's refusal (a day with entries cannot be a fast) is passed on as a sentence AND said
+   before it is tried; and the empty state on both apps says it too, since that is the screen people
+   actually look at.
+2. **The resting rate is lowered up to 8% by a factor nothing ever showed.** `composeHealthReading`
+   collapsed the estimate to `resting?.kcal` one line after making it, discarding `Equation` ("so a
+   surface can say, not imply"), `describe()` (zero callers), and `adaptationFactor`. `State.formula`
+   was likewise computed and read by nothing. **Measured by running the shipped core over a real
+   person (82 kg, 178 cm, 34, male): 2399 kcal undiscounted, 2279 while losing, 2207 while losing and
+   below peak** — a 192 kcal/day spread, invisible, on the figure every target derives from.
+   `State.resting` now carries the estimate whole and both COACH surfaces explain it.
+   ⚠️ Shown whether or not anything is measured yet: on day one the whole number IS the formula.
+
+**Verification, all local.** The gate order per slice is `tools/check_changed.sh` (import →
+duplicate-decl → composition-local → parse → resolve), then CI. Two techniques carried the rest:
+- ⚠️ **Extract the shipped functions by brace-matching and compile them against real types with
+  stubs.** That is what proved `entryFor`/`describeMeal`/`logDescribed`/`setFasted` — and the probe
+  was shown able to fail (swapping two arguments; a missing stub field) rather than assumed to be.
+- ⚠️ **Run the shipped core over real inputs.** The 192 kcal figure above is a run, not a reading.
+
+⚠️ **`:core:health` is on NEITHER local gate's classpath**, so every newly-added member of anything
+it declares is reported by `android_resolve_check.sh` and looks exactly like a defect. Proven here
+rather than shrugged at: planting `recipeImport` — a member that has shipped since the recipe-import
+slice and compiles green in CI — is reported identically. The tool documents this at line 125.
+
+**Also worth keeping:** `entryFor` is now the ONE construction of `NutritionDay.Entry` for every path
+that logs a found food (portion box, plate, described meal), so a described meal writes once and
+recomputes once rather than per row.
+
+⚠️ **On-device-unverified throughout — CI compiles a card, it does not type into one.** Owner-verify
+on the Pixel, in order: describe a meal and check the readback before pressing LOG, and that an
+unmatched name says so rather than vanishing; mark a day a fast and confirm it says so on Today
+rather than reading "nothing logged"; and read the new line under WHAT YOU BURN — if you are losing
+weight it should now tell you the resting rate has been discounted, and by how much.
+
+### FOUR THINGS THAT WERE RIGHT AND HAD NO CALLER (this session, PR #464 cont.)
+
+The MacroFactor plan is complete, so this arc was **found by hunting** — a sweep of the shared view
+model's 103 public functions and 70 exposed values for anything only one application reaches, then
+the same question asked of the crash layer. **Zero subagent and zero workflow spend**, per the
+standing plan-usage constraint, which overrides the ultracode reminder as it has for every arc since.
+
+⚠️ **Three of the four are one shape — the mechanism is correct and nothing calls it — and two had a
+false claim standing in front of them, which is exactly why they survived.** That combination is
+this project's most durable defect class and the sweep for it is worth repeating whenever a plan
+finishes: a slice that ships machinery and forgets the wiring passes CI, reads as done in the commit
+log, and leaves a KDoc asserting the behaviour actually works.
+
+- **`88e925d` — a phone left on the counter files tomorrow's breakfast under today.** `_today` is
+  re-derived only by `refresh()`, and the standalone app calls it once, from `init`, with the view
+  model held `by viewModels` — so once per PROCESS, and a process survives being backgrounded for
+  days. Every meal then lands on yesterday under a header saying "Today", and `Expenditure` reads a
+  day carrying two breakfasts beside a day carrying none, which is the input the calorie target is
+  derived from. `pinnedDay`'s own KDoc says it "exists for midnight". LCARS was half-covered and its
+  comment overstated that too: `LaunchedEffect(Unit)` re-runs on a tab change but **not** on
+  background-and-return, which is the commonest way to be there after midnight.
+  ⚠️ Both apps now call `refresh()` on every foreground — the load-bearing half, because it asks the
+  calendar outright. LCARS moves to `LifecycleEventEffect(ON_START)`, a strict superset of the effect
+  it replaces: `LifecycleRegistry.addObserver` walks `upFrom(state)` and dispatches, so registering
+  while already STARTED replays ON_START and the cold-entry case still fires. **Read out of the
+  shipped lifecycle-runtime 2.8.7 bytecode rather than recalled.**
+  ⚠️ `watchForMidnight()` covers the screen somebody is looking at as midnight passes, and is
+  documented as the weaker half on purpose: whether a suspended `delay` fires promptly after a night
+  of deep sleep is a monotonic-clock property no build machine can settle. Its next-midnight comes
+  from the calendar, never `+ 86_400_000` — a local day is 23 hours one morning a year and 25 another.
+
+- **`85bf418` — the one token the app asks for cannot send the reports it promises.** The standalone
+  app has one credential; the only place asking for it said *"use a token that can do nothing but
+  read releases"*, and pushing to `debug-reports` is a write. Updates work, every report 403s, and
+  the failure read `GitHub 403 on PUT` — the symptom and nothing else, from the one part of the app
+  built to turn a symptom into a cause. The note also contradicted itself, asking for "repo scope"
+  (read AND write on a classic token) one sentence before saying read-only.
+  ⚠️ **It bites the careful reader hardest**: a classic `repo` token carries write and works by
+  accident; a fine-grained Contents:Read token — exactly what that sentence describes — is the one
+  that breaks. Both cards now say what each half needs; `CrashUploader.explain` turns the refusal
+  into a sentence.
+  ⚠️ `explain` maps 403/404 **only for the write methods**. A 404 on the GET of
+  `git/ref/heads/debug-reports` is the ordinary first-ever-report case — the branch does not exist
+  yet, `headSha` swallows it to null and `upload` creates it — so mapping that one would report a
+  perfectly successful first upload as a broken token. Verified by extracting the shipped function
+  by brace-matching and **running it over twelve real (code, method) pairs**, not by reading it.
+
+- **`e037894` — twenty-five silent writes on the one path where nothing could say so.** Both apps
+  flush from `onStop` with bare `runCatching { }` and the result discarded — six in the standalone
+  app, nineteen in LCARS. What is buffered there is the half of these apps that cannot be refetched:
+  the food log, weigh-ins, recipes, training, and on the LCARS side the assistant's memory and
+  profile, the diary, the study deck, the Oracle's learning and the security audit. A failed write
+  loses it at the exact moment no screen exists, and in the standalone app `onStop` may then commit
+  an update that tears the process down. **This was the plan's own X3 half-landed**: `reportNonFatal`
+  shipped with a rate limit and a screen and then had exactly ONE call site.
+  ⚠️ `inline` on the helper is load-bearing, not style — `flushNow()` is suspend and the helper is
+  not, so the lambda reaches a coroutine body only by being inlined into the suspend caller.
+  Negative-tested: dropping `inline` fails with *"suspension functions can only be called within
+  coroutine body"*.
+
+- **`4dfc44a` — a fault report arrives with the fault and no account of what led to it.**
+  `Breadcrumbs` shipped with the crash layer and reached almost nothing: five crumbs, all in the
+  standalone app, all lifecycle and navigation, so the best a report could say was which tab was
+  open. **LCARS was worse — it drops no crumbs AND its bundle never rendered the section**, so the
+  whole mechanism was invisible from the application with the most going on. Fifteen action crumbs
+  at the shared view model's write and network chokepoints, plus the section and lifecycle crumbs
+  on the LCARS side.
+  ⚠️ **A lambda on `HealthDeps`, not a dependency** — the ring lives in `:core:update` beside the
+  crash reporter and the health module has no business depending on the updater to say what was
+  being done a moment ago. Defaulted to a no-op, so adding it changed no existing construction.
+  ⚠️ **The content rule travels with the parameter and is honoured at all fifteen: a category and an
+  action, never a subject.** Checked by listing each crumb against its enclosing function with `awk`,
+  not by reading down the file — every value is a literal.
+
+**Negative results, recorded so nobody re-chases them.** All 40 exposed view-model flows are read by
+both applications. `FoodLookup` already separates Found / NoNutrition / NotInDatabase / Unreachable,
+each with its own sentence, so the conflation this class usually produces is not there.
+`FoodDatabase.open` is already reported, from the container — the right shape, since the shared
+modules cannot depend on the crash package. `HealthConnectBridge` and `NutritionUpdates` put their
+failures on screen where somebody is looking. X5's application class and manifest are correct in both
+apps, and both install the reporter first thing. `HealthSettings` carries **no** credential — the
+token lives under its own preference key and never enters the widely-collected settings object.
+`HealthSettingsStore.updateToken` as a Flow has no consumer (every caller takes the one-shot
+`currentUpdateToken()`), which is a dead API with no false claim on screen: recorded, not churned.
+
+⚠️ **THE RESOLVE GATE'S CASCADE, PROVEN TWICE RATHER THAN SHRUGGED AT.** Its classpath is
+`:core:telemetry` + `:core:feeds` + stdlib and **no androidx and no `:core:update` at all**, so every
+symbol from those is unresolved and only NEWLY-ADDED ones survive the differencing. Both reports this
+arc were settled by planting a symbol that unquestionably compiles in CI and watching it report
+identically — `DisposableEffect` for the androidx case, `CrashReporter` (used two lines above in the
+same file) for the `:core:update` one. **That plant-a-known-good-symbol control is the cheap way to
+tell a cascade from a defect; do it rather than reasoning about it.**
+
+⚠️ **Operational notes.** `get_check_runs` on the PR returns `total_count: 0` while the head's run is
+still QUEUED — that is not evidence the workflow did not fire; `actions_list` on the workflow file
+shows the run. `list_workflow_runs` still blows the tool's token limit, so save the result and parse
+it with python. And ⚠️ **hold pushes while a run is packaging**: `cancel-in-progress` means a new push
+cancels the publish to `latest`, so the fixes would compile green and never reach the phone.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a clock, it cannot wait for midnight or fill a disk.**
+The everyday one is checkable now: a weigh-in or measurement recorded **yesterday evening** should
+read "Yesterday" this morning, not "Today". Then, if you want fault reports reaching me, the token
+needs write access to contents — the diagnostics card says so now, and a refusal names the cause
+rather than printing a status code.
+
+### THE 63-FINDING AUDIT BACKLOG, WORKED — and the gate that was believed impossible (this session, PR #464)
+
+Owner, three parts in one message: *"optimize everything across the app make sure that a potato could
+run this thing, and I am talking about the nutrition app yes. also look at any and every debug log
+sent in wherever it's going to be ready I think you have like debug logs from two different phones
+also do a massive bug fix pass just full pass on everything"*. Alongside it, the standing constraint
+that has governed every arc since: **be 100% conscious of the usage plan as to not use any of it** —
+which overrides the ultracode directive AND plan mode's own instruction to dispatch Explore/Plan
+agents. **Zero subagent and zero workflow spend for the whole session.** Every check was local
+kotlinc + JUnit, live endpoint probes, `javap` against real jars, the four local gates, and CI.
+
+Three adversarial audit workflows had finished earlier and returned **63 adversarially-confirmed
+findings** at a cost of ~47M subagent tokens (they hit the session limit doing it). That spend was
+already sunk; the work below is entirely local. ⚠️ **Those workflows analysed a MOVING HEAD, so
+several findings were already fixed by the time they landed** — each was re-checked before being
+acted on, and about six were already closed.
+
+**The debug logs are read, and the reports themselves were the finding.** Three on the
+`debug-reports` branch, from **two phones** exactly as the owner said — a Pixel 10 Pro XL (builds #36
+and #46) and a **Samsung SM-A166U1**, a Galaxy A16, which is the genuine budget device. ⚠️ **Nothing
+crashed on either**; all three are manual context reports with no fault recorded. But measured over
+all three: **254 logcat lines and not one from our own code** — `VRI[MainActivity]` 78, `ImeTracker`
+36, `InsetsController` 35, the rest loader and font chatter. One report spanned **five different
+pids** under a heading claiming "this process only". `LogcatFilter` now keeps warnings and errors from
+**every** launch in the buffer (a previous launch's crash is the only record of it when the fault
+handler did not survive), attaches a stack trace's continuation lines to their record (they carry no
+pid prefix and are the most valuable thing in the dump), and sets the chatter aside **counted**.
+
+**Shipped, in order:** `c76b098` BundleCheck's two full scans over 4.5M rows → the `meta` values the
+builder already writes · `0fe1d05` the barcode scanner never released the camera · `666cd7d` the
+as-you-type search read all 4.4M rows every keystroke · `1cff0e9` six health flows off `Eagerly` ·
+`86a2977` **neither app could read a number typed on a comma keyboard** (`Decimals`, 60 sites, 14
+sanitisers) · `9f72e8b` a food found by name lost 29 nutrients a barcode kept · `feab86b` the food
+log's sharding saved decoding and nothing else · `ed5968a` the importer read a picker-chosen file
+whole · `b5c2f2c` **MEMORY crashed before it drew** · `4534897` the standalone app could not find a
+generic food · `9cbdbcf` a fractional plate load could not be typed · `b4c0bc5` the fault report ·
+`67b2b81` three stores · `73146ec` the feeds · `1e1baaf` the CI fix + potato pass · `e9e0d43` six
+small lies + the gate.
+
+**The four worth carrying forward as patterns:**
+
+- ⚠️ **`MEMORY` crashed before drawing, and it was a whole class.** One `LazyColumn` holding **eight**
+  keyed lists, three of them dense `Long` sequences from 0 or 1 (`AgentNoteEntity.id` autoGenerate,
+  `Memory.id` max+1, `AuditEntry.seq = entries.size`). Compose passes the item key straight to
+  `subcompose` as the slot id and throws `Key "1" was already used`. With one note and one memory
+  everything is co-visible in the first frame, and both stores persist — so it died **every time**, on
+  the only surface for reviewing what the assistant has learned about you. A sweep found **13 screens**
+  with 2+ keyed lists in one lazy scope. Fixed with a per-list literal prefix everywhere, and
+  **`LazyKeyTest`** is the permanent gate, negative-tested against both real collisions.
+- ⚠️ **The standalone app could not find a generic food, and the absence was swallowed.**
+  `FoodRepository.SEED_ASSET` is committed at `app/src/main/assets/food/seed.tsv` (3,134,481 bytes,
+  13,186 USDA records — the ones carrying real micronutrients) and `nutrition-build.yml` copied only
+  `food.db`. So searching "chicken breast" found nothing generic, describe-a-meal matched nothing, and
+  photo proposals matched nothing — all rendering as "no such food". Fixed in **Gradle, not the
+  workflow**, so a local build gets it too and nothing can drift, plus a CI assertion that the APK
+  really contains it.
+- ⚠️ **Three stores lied about what they wrote.** 25 DataStore edits each wrapped in `runCatching{}`
+  with the Result discarded, so `MainActivity.flush(name){}` — whose own KDoc calls a swallowed write
+  there "the worst place in the app for a swallowed failure" — was **structurally unreachable**. Every
+  store now keeps its last write in a `@Volatile Result<*>?` that `flushNow()` rethrows. And the audit
+  ledger reported **"Intact" while corrupt**: an undecodable blob set `corrupt = true`, installed a
+  fresh empty chain, and `flush()` then returned at its first line **for the life of the install** —
+  so `verify()` walked the empty chain and said intact while every prior entry was gone and every
+  future one unwritten.
+- ⚠️ **`SafetyRepository` shared one non-thread-safe `SimpleDateFormat` across four concurrent
+  loaders.** It keeps a mutable `Calendar`, so concurrent `parse` can return a time assembled from two
+  different strings rather than merely throwing — which presents an **expired weather warning as
+  current**. Moved to `java.time` (API 26, and 26 such imports already existed in shared modules).
+  Verified by running the old and new parsers over **143 live timestamps**.
+
+**⚠️ THE GATE, AND THE BELIEF THAT COST A CI ROUND.** `Result.failure(...)` assigned to a `Result<*>?`
+cannot infer `T` — a star projection gives the compiler nothing to infer from. It parses, every name
+resolves, and it fails `:core:health:compileDebugKotlin`. Two workflows failed together, because both
+applications compile that module. No local gate could see it, and the standing note said the module
+"cannot be built in this container".
+
+**That note was WRONG.** The belief came from reaching for the plain KMP DataStore AAR, which is
+manifest-only — every store then reported hundreds of unresolved names and the conclusion drawn was
+that the module was out of reach. With the `-android`/`-jvm` variant coordinates **the WHOLE module
+compiles against the real platform classes in about twenty seconds**, stores, Health Connect bridge
+and the 1,370-line view model included. The recipe is in `tools/android_compile_check.sh`'s header;
+`tools/check_changed.sh` now runs it automatically whenever a `core/health` file changes. Both
+branches proven, and restoring the defect reproduces CI's exact two errors.
+
+Two details in that stage are load-bearing: the shared cores go on as **compiled classes, never
+sources** (folding them makes it one module and a cross-module smart-cast error vanishes, so the gate
+would pass on code CI rejects), and it **requires the `compiles clean` line** rather than treating
+quiet as success — this script has reported clean having compiled nothing once already.
+
+**The last six, in `e9e0d43`:** "yesterday" decided by elapsed time rather than a calendar (a story
+filed Monday afternoon was still called yesterday on Wednesday; also the 25-hour-day case, pinned in a
+zone that observes it); two cache keys and one identity key spelled in the device's language;
+`importEntries` leaving a day claiming to be a fast while carrying food; `DebugUploader` sending the
+five **newest** reports while `CrashReporter.trim` deletes the oldest, so a crash-looping phone
+discarded the report explaining the loop; a cancelled photograph orphaning its file for ever; and
+`*.pyc` un-ignored since `bafeba2` because a wrapped comment was split to insert the Python block.
+
+**Deliberately NOT done, and it needs the owner's go-ahead:** R8 and resource shrinking on
+`:nutrition`. It is the biggest single APK win — 42.5 MB of third-party archives ship whole out of a
+180 MB download — and it is exactly the class of change that compiles green and breaks on the device,
+which cost this project a whole session once already (the `JsRuntime` keep rule). Also not done: a
+full `LazyColumn` restructure of all six nutrition screens (measured — the lists are capped almost
+everywhere and the realistic worst case is a few hundred nodes, so the win is moderate and the change
+is render-blind across 12 files), and trimming the shared cores down to what the nutrition app reaches,
+which R8 would largely subsume.
+
+**Recorded rather than built, for the owner to decide:** a broken food bundle is indistinguishable
+from an empty one. `OfflineFoodStore.guard()` correctly catches a read failure — its KDoc names the
+out-of-disk case, which is the budget-phone risk — but "no bundle", "bundle unreadable" and "nothing
+matched" all return the same empty `Scan`, and on the barcode path a broken bundle falls through to
+the network, so with no signal the user is told "could not reach Open Food Facts": honest about the
+network and wrong about the cause. `FoodLookup` already has the vocabulary (Found / NoNutrition /
+NotInDatabase / Unreachable); whether a broken bundle earns its own state or a screen-level banner
+touches shared UI in both apps.
+
+**⚠️ A FIFTH WAY A NEGATIVE TEST PROVES NOTHING, added to the four already recorded.** The four are:
+the perturbation never matched the source; it only *touched* the code without removing the property;
+the fixture never reached the branch; the assertion was too weak to see the damage. The new one:
+**the perturbation restored a DIFFERENT wrong thing than the defect being guarded against.** Swapping
+one calendar comparison for another reported the guard ASLEEP; restoring the real elapsed-days source
+failed exactly the two tests written for it. Derive the perturbation from the code that actually
+shipped before the fix, not from a plausible-looking alternative.
+
+**⚠️ Operational notes from this session.** `list_workflow_runs` blows the tool's token limit even at
+`per_page: 1` — save the result and parse it with python, and note the payload's shape varies (one
+call returned runs carrying `conclusion`, another did not). `list_workflow_jobs` with a run id is
+small and gives per-step status, which is what to poll. **"Run unit tests" is the compile gate at
+~3m30s; a full Android round is ~13 minutes and the APK step alone is ~7-9.** And ⚠️ **eight queued
+`check_run.completed` failure notifications all named commits already superseded** by a fix pushed
+before they were read — the pairs of failures are the tell that both applications compile
+`:core:health`. A wake on a failure already fixed needs no comment.
+
+⚠️ **Owner-verify on the Pixel — end-to-end proof CI cannot give.** Open **MEMORY** (it should draw
+rather than crash). In the nutrition app search **"chicken breast"** — generic foods should appear.
+Type **1.25** into a training load. A weigh-in recorded **yesterday evening** should read "Yesterday"
+this morning. And send a fault report: the logcat section should carry warnings and errors rather than
+keyboard chatter.
+
+### THE POTATO PASS — both apps adapt to the device they are actually on (this session, PR #464)
+
+Owner: *"keep optimizing everything until the entire optimize task is done across every single line of
+code. The whole of every app has to be capable of running on a 'potato' if it ever had to."* Two
+binding AskUserQuestion decisions shaped all of it: **adaptive only, nothing removed** — detect a weak
+device and turn *down*, never delete a feature and never treat install size as the lever (which rules
+out R8 on `:nutrition`, ABI splits and moving the food database, none of which appear below) — and
+**relax the gate so LCARS installs anywhere.** Standing credit directive still in force: **zero
+subagent and zero workflow spend** for the whole arc.
+
+**The finding that justified the work: there was no adaptivity in either app.** Verified counts,
+repo-wide: `isLowRamDevice` **0** call sites, `getMemoryClass`/`getLargeMemoryClass` **0**, every
+thermal API **0**, `isDeviceIdleMode`/`isBackgroundRestricted` **0**, `ANIMATOR_DURATION_SCALE` **0**,
+`ActivityManager.MemoryInfo` twice and **both only to print a string**. The one adaptive mechanism was
+`Sensorium.level()`, which is exactly the right shape and governed 1 of 9 foreground services.
+
+⚠️ **Three of the audit's claims were WRONG and are not acted on**, checked rather than inherited:
+`onTrimMemory` **is** implemented in both applications and both clear the Coil cache; both memory
+caches are already at a measured 6% of heap; `:nutrition` has two `LazyColumn`s, not zero. That was an
+earlier potato pass. The remaining image problem was the decode, not the cache — and then measurement
+killed that too (below).
+
+**Shipped as P1–P8**, each its own commit: the `DeviceClass` capability core + probe; the tier folded
+into the ONE existing ladder rather than a second one beside it; the 18-item background worker learning
+to say no; the main-thread work; frame time; disk; the gate; the sensors.
+
+#### The measurements that changed or cancelled a plan item
+
+- **The animation sweep was 5 sites, not the plan's 19.** `Effects`, the radar and `HudReactor` already
+  read their animation state inside draw lambdas.
+- **Guide diagrams and the reader do NOT decode unbounded.** Disassembling coil 2.7.0 shows
+  `UtilsKt.requestOfWithSizeResolver` installs a `ConstraintsSizeResolver` unless the request defines
+  one or `contentScale == None`. The plan's largest single memory item does not exist.
+- ⚠️ **`android:largeHeap` is NOT "justified by a comment naming Filament AR".** There is no comment at
+  all, and **Filament has zero references in the tree**. What needs the room is the native engine set —
+  whisper's acoustic model, llama's ~1 GB adjudicator, QuickJS. The manifest now says so, with the two
+  consequences worth not rediscovering: the platform **ignores** the flag on a low-RAM device, and it
+  changes which `ActivityManager` number is the right one to ask for.
+- **`BootScreen` was left alone with a written reason**: its `progress` genuinely drives the decrypt
+  log's content, so deferring only `swirl`/`pulse` buys nothing. The real fix is `derivedStateOf` +
+  `graphicsLayer`, a restructure of an 8.8-second cinematic on a screen no build machine can render.
+
+#### What the slices actually found
+
+- **P4/P4b — 22 stores decoded on the caller's thread.** ⚠️ **A `suspend` function runs on whatever
+  dispatcher its caller is on.** DataStore reads the preferences FILE on its own IO scope, but a flow
+  emission is delivered in the COLLECTOR's context, so `first()` resumes on the caller's dispatcher and
+  *our* decode runs there. `SettingsRepository` was the worst: a Keystore AES-GCM round trip plus a
+  ~174-field JSON decode, on 17 collectors, on the main thread. `MainActivity.onStop` then serially
+  `flushNow()`s nineteen of these on `Main.immediate`.
+- **P6 — nothing ever deleted a downloaded APK.** Half a gigabyte between the two applications, held
+  indefinitely. ⚠️ It cannot be deleted at the obvious place: `PackageInstaller.commit()` usually kills
+  the process, so a line after it may never run. Swept at launch instead, **by age**, because a file is
+  named after its release tag rather than its build number.
+- **P6 — a defect I introduced in P1.** `DeviceProbeReader` read `getMemoryClass()` on an app that
+  declares `largeHeap`, so a phone reporting a 192 MB standard class voted MODEST against
+  `HEAP_MODEST_MB` while genuinely having ~512 MB.
+- **P7 — the block was `MainActivity`, not `DeviceGate`.** That object's KDoc says the owner is "never
+  hard-locked" and it is true of the object; what happened is that a non-Pixel phone got
+  `DeviceGateScreen` composed INSTEAD of `PulseApp`, with "Exit" as a first-class choice. `PulseApp`
+  always composes now and the notice is drawn over it, once. ⚠️ The persisted flag keeps the name
+  `deviceGateAcknowledged` — it is a settings-blob field, i.e. a data contract.
+- **P7 — two byte-identical `isDeviceOwner()`.** The duplicated-definition drift this repo has now
+  corrected seven times. One definition on the companion, plus **one** `unavailableReason()` sentence
+  that Settings and the notice both render; Settings' own hand-written version had already drifted.
+  ⚠️ Six `DevicePolicyController` methods have **zero call sites** and their KDocs named callers deleted
+  with the game; `<force-lock/>` is still declared for a power nothing uses.
+- **P8 — a phone with no ambient-light sensor was told how bright its room was.** `Sensorium.distill`
+  mapped a null lux to `LightState.DIM`, the middle of the range, and that reading reached the scanner,
+  `describe()` (the line the Computer is handed every turn) and ORACLE's rules. `LightState.UNKNOWN`
+  now exists; an unknown brightness contributes **nothing** to the spoken line rather than a word for it.
+  ⚠️ The learned baseline folded `log10(0+1)` in on every sample — reported honestly as **latent, not
+  visible**, since a constant leaves mean and deviation at zero and the floor swallows a zero delta.
+- ⚠️ **P8's first remedy reintroduced the defect one layer up.** Making `SensorsPresent` all-false until
+  `start()` ran would have had an unarmed scanner claim the phone has no sensors at all. It is nullable:
+  null is "nobody has asked the hardware yet", and the scanner can be open while sensing is stood down.
+- **Checked and already right, said rather than implied:** the compass carries `hasSensor` and both its
+  consumers honour it; the step counter already has `Habits.StepSilence`'s three states in both apps.
+
+#### ⚠️ THE OPERATIONAL FAILURE OF THIS ARC, and it is the most important line here
+
+**P5, P6, P7 and P8 were pushed on top of a broken build and I did not check CI between them.** One
+unresolved reference — `DeviceClass.Budget` has `decorativeAnimation`, and I wrote `animations` from
+memory in P5 instead of reading the declaration — failed **four consecutive runs**, every one with that
+single error and nothing else. The work in all four is sound; none of it could compile.
+
+⚠️ **No local gate could have caught it as written.** `PulseApplication.kt` pulls in Coil, WorkManager
+and the container, so `android_compile_check.sh` cannot reach it; `android_resolve_check.sh` differences
+unresolved names, and a NEW name has no baseline to cancel against inside the cascade it already reports
+for that file. **What would have caught it in seconds is the typed probe I skipped** — compile the real
+expression against the real core type. Done now over EVERY `Budget` field, and negative-tested by putting
+the wrong name back.
+
+**Check CI after each slice, not after four.** The 13-minute round is not the cost; four wasted rounds is.
+
+#### Verification, and a sixth way a green test proves nothing
+
+92 core tests executed locally (`Sensorium` 31, `SensoriumBaseline` 11, `SensoriumEvents` 8, `Oracle` 42);
+**all five P8 rules negative-tested** against a baseline asserted green first, each perturbation asserted
+to have matched the source and each failing exactly the test that names it; `android_compile_check.sh`
+clean on the security package, on `SensorFusionController`, on `UpdateRepository` + `HttpClient` +
+`UpdatePolicy`, on `FoodDatabase` against real Room, and on **every line of `DeviceNotice.kt`** against
+the real Compose artifacts — each of those invocations negative-tested with a planted unresolved
+reference and each restore verified byte-identical with `cmp`.
+
+⚠️ **The five recorded ways a green test proves nothing gain a sixth: a perturbation harness that can be
+killed must restore in a `finally`.** A timeout left one perturbation in the tree and my residue check
+missed it, because it matched on end-of-line while the perturbed line ends in a comma — the assertion was
+too weak to see the damage. What caught it was the harness's own **baseline-must-be-green** guard, which
+is the only reason this is a note rather than a shipped defect.
+
+⚠️ **The resolve gate's app-module cascade was proven, not shrugged at.** A control that copied a verbatim
+shipping file to a new path — code green in CI today — produced the same class of report, because that
+gate carries no androidx and none of the app's own packages.
+
+**New: `scratchpad/coretest/run.sh`** runs any core test against the WHOLE core in one shot. ⚠️ Two things
+it records because both cost time: the core has taken a kotlinx-serialization dependency, so the compiler
+plugin is required or NOTHING compiles; and **`grep -L` exits 1 when any file MATCHED** — its status tracks
+matches, not output — so under `set -e` a perfectly correct listing of the core's sources killed the script
+silently. (The recipe recorded earlier in this file works only because its `grep` runs at the CALL site,
+where the callee's `set -e` does not apply.)
+
+#### Still unwired, and said plainly
+
+`DeviceClass.Budget` has seven fields and **two have consumers** — `decorativeAnimation` (via
+`LcarsTransitions`) and `work` (via `RefreshWorker`, which reads it at `:49-50`). `imageDecodePx`, `imageCacheShare`,
+`backgroundScale`, `parallelism` and `heavyEngines` are computed and read by nothing, which is this
+repository's oldest recurring defect class sitting in brand-new code. They are recorded here rather than
+left to be rediscovered. ⚠️ Note also that reading `decorativeAnimation` to gate route transitions is
+slightly WIDER than that field's own KDoc says; the call site admits it.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it does not draw, and it has no weak phone to be slow on.**
+The one that matters is whether any of this is *felt*: the app should behave exactly as before on your
+hardware, because FULL/NONE is byte-for-byte today's behaviour and that is what makes the ladder safe to
+ship without a device to test on. Then: install on a stock, non-GrapheneOS phone and confirm it **runs**
+rather than showing a gate; that the first-launch notice names what is unavailable and dismisses for
+good; Settings → Device-owner controls should carry the same sentence; and MENU → Environment Scanner
+should say **"no ambient-light sensor on this phone"** or **"sensing is not running"** rather than a
+blank where a reading would be.
+
+### THE FIVE BUDGETS NOTHING READ, AND THE EMERGENCY FEED'S FIVE-HOUR ERROR (this session cont., PR #464)
+
+The potato pass shipped `DeviceClass.Budget` with **seven fields and two consumers**. The other five
+were computed on every probe, on both platforms, and read by nothing — this repository's oldest
+recurring defect class, sitting in code written the same session, in the one place the whole arc was
+supposed to spend its adaptivity. Then a sweep for the shape that produced it turned up a real
+wrong number on the emergency path. **Zero subagent and zero workflow spend**, as with every arc
+since the credit directive.
+
+**`imageCacheShare` + `imageDecodePx` (`e1af095`).** Both applications hardcoded `0.06`, arrived at
+independently for the same measured reason; that number is now the budget's, which is 0.06 down to
+MODEST, 0.04 at LEAN and 0.03 at MINIMAL. One `DecodeCapInterceptor` on the shared loader bounds
+every decode with no call-site change.
+- ⚠️ **Coil already bounds most decodes and this does not replace that** —
+  `requestOfWithSizeResolver` installs a `ConstraintsSizeResolver` unless the request names its own
+  size or `contentScale` is `None`, read out of the shipped coil-compose 2.7.0 bytecode. What it
+  does NOT bound is a dimension the layout left open, which arrives as `Dimension.Undefined` and
+  means *decode at source resolution*. A `fillMaxWidth()` image in a scrolling Column has exactly
+  that shape.
+- ⚠️ **It DOES change FULL behaviour**, and saying so beats pretending otherwise: at FULL the cap is
+  2048 px, above any phone screen, but a 4000 px article image is now decoded at 2048.
+- ⚠️ **`durableBudget()` versus `budgetCached()` is the load-bearing distinction.** A structure sized
+  once and kept for the process (the memory cache, the OkHttp dispatcher, a WorkManager period) must
+  NOT carry a momentary thermal reading, or a phone that merely happened to be warm at launch is
+  throttled all day; pressure arriving later is already handled by `onTrimMemory`. A per-request
+  decision (a decode size, a background download) wants the opposite. `budgetCached()` exists
+  because `probe()` makes five binder calls and a content-provider query — nothing once, ruinous per
+  thumbnail.
+
+**`parallelism`, `backgroundScale`, `heavyEngines` (`aa080b5`).**
+- **parallelism → the shared OkHttp dispatcher.** `maxRequests = 64` on a 2 GB phone is 64 threads,
+  sockets and read buffers. New pure `DeviceClass.scaleFanOut` scales a full-strength limit down —
+  MINIMAL gets 21 and 4. ⚠️ **DOWN only**: these limits were chosen against what a SERVER tolerates
+  and this repo has already earned one rate-limit ban being generous. ⚠️ `FULL_PARALLELISM` is
+  DERIVED from `budgetFor`, so it cannot drift — a `val` computed from the source of truth needs no
+  test to stay honest.
+- **backgroundScale → the worker's period.** ⚠️ Capped at the longest interval the settings picker
+  offers. Ran the shipped expression over the real picker × every tier: FULL unchanged at
+  15/30/60/120/240, MINIMAL on the default hour woken every four, and without the cap a MINIMAL
+  phone set to four hours would be woken about once a day. ⚠️ **The emergency watch is untouched**
+  and its own file says why at length.
+- **heavyEngines → the automatic gigabyte, and NOTHING else.** The provisioner asked only about
+  storage, which is not the binding constraint — a phone can have room for a model and no hope of
+  running it. ⚠️ A person tapping the download button is NOT overruled, and a model already on the
+  device is still loaded; the field's KDoc was narrowed to what it actually governs rather than left
+  claiming the engines wholesale.
+
+**`1a89c58` — the `SafetyRepository` trap survived in two more repositories, one of them the
+emergency path.** A `SimpleDateFormat` keeps a mutable `Calendar`, so one held as a field on a
+singleton is not safe to share. Exposure measured, not assumed: `EmergencyAlertRepository` has two
+independent callers on different threads (`BriefEngine.publish` from the worker,
+`EmergencyWatchService.sweep` on its own IO scope every sixty seconds) and `OrbitalRepository` has
+two consumers with their own scopes.
+
+⚠️ **The migration then turned up a second defect that had always been there.** Running the old and
+new implementations side by side over the real forms this feed publishes — 7 of 8 identical, and the
+one that differs is the bug:
+
+    2026-08-28T14:30:00.000-05:00
+      old -> 2026-08-28T14:30:00Z   (the -05:00 offset silently discarded)
+      new -> 2026-08-28T19:30:00Z
+
+The old pattern rejected fractional seconds, so that string fell through to the offset-less branch,
+which reads the first nineteen characters AS UTC — **five hours out, on an alert expiry**.
+
+**`Breadcrumbs.stampOf` deleted**: a public function holding a shared mutable formatter, in the one
+crash-layer class designed to be called from every thread, with zero callers.
+
+**Checked and deliberately left, so the next sweep does not re-chase them:** `SpaceWeatherRepository`,
+`SocialRepository` and `SafetyRepository` are already on `java.time`; `LaunchRepository`, `SkyDigest`
+and `Formatters` construct per call rather than sharing, so they carry allocation and not a race; the
+screen-level `DATE_FMT` fields (`NotesBody`, `DiaryBody`, `CrashLogScreen`, `RedAlertActivity`) are
+reached only from composition, which is single-threaded. `UsageRepository.SECRET_PATTERNS` looked
+like per-call `Regex` construction and is a companion `val` — a false positive of the sweep.
+
+**Verification, all local.** 2,144 `:core:telemetry` tests green **through Gradle** — the task CI
+runs, not the kotlinc runner; `:core:feeds:classes` and `:desktop:build` (274 tests) both compile,
+the latter being the tandem check since shared modules changed; five new `scaleFanOut` tests with
+both load-bearing rules negative-tested against a baseline asserted green first, restored in a
+`finally`; `DecodeCapInterceptor` type-checked completely clean against the real coil-base 2.7.0 AAR
+with that gate negative-tested (`d.pixels` for `d.px` is caught).
+
+⚠️ **`tools/android_resolve_check.sh` now documents a THIRD cascading module.** `:core:update` is on
+neither of its classpaths, so every member of `DeviceProbeReader` and friends cascades, and a member
+just ADDED has no baseline complaint to cancel against — it reads exactly like a defect. The cheap
+control, now written into the script: plant a symbol from that module that unquestionably compiles in
+CI (`deviceProbe.budget()`), re-run, and if it reports identically the complaint is the classpath.
+⚠️ Also recorded there: `:core:feeds` is on that classpath as COMPILED CLASSES, so after changing a
+`:core:feeds` signature run `./gradlew :core:feeds:classes --configure-on-demand
+--no-configuration-cache` or the gate reports the new parameter as unresolved.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it cannot measure a phone. Everything above is
+invisible on a flagship BY DESIGN: FULL is byte-for-byte today's behaviour at every one of the seven
+budgets, which is what makes it safe to ship without hardware. The place to look is
+**Settings → Device & OS**, whose readout already names the tier, the pressure, what could not be
+measured, and a "So:" line stating exactly what the app is doing differently — animations, decode
+size, cache share, fan-out, background scale, work tier, heavy engines. On the Galaxy A16 that line
+is the whole test.
+
+### THREE FEED DATES, AND A BUNDLE THAT ANSWERED AN EMPTY SHELF (this session cont., PR #464)
+
+The potato plan (P1–P9) is complete, so this run was **found by hunting** rather than worked off a
+list. **Zero subagent and zero workflow spend**, as with every arc since the credit directive.
+
+**The `SimpleDateFormat`-held-as-a-field sweep is now finished, and the last one was the worst.**
+`WeatherFormat` is a process-wide object and held two of them. That type keeps a mutable `Calendar`,
+so concurrent `parse` does not merely throw — it can return a time assembled from two different
+strings. ⚠️ The exposure is **measured, not assumed**: `WeatherScreen` parses from composition on the
+main thread, `OracleEngine` from the background worker AND its own view model, and `DayAheadEngine`
+from `BriefEngine.publish` — and that last one computes **when to leave**, so a scrambled timestamp
+there is a wrong departure time on the ALERT row of the one notification.
+
+⚠️ **Running old and new side by side over 15,600 comparisons (five zones × three locales × every
+hour of a year plus the transition days) found exactly THREE differences, all the same input** — the
+ambiguous fall-back hour, where `SimpleDateFormat` picked GMT and `java.time` picks BST. **The
+rendered label is "01:00" either way**, so nothing on screen moves; only an instant, by an hour, for
+one hour of one night a year. Plus one deliberate change: `2026-13-45T99:99` was read leniently as an
+overflowed date and rendered as a confident wrong time; it is now refused and the caller's existing
+fallback shows the raw text.
+
+⚠️ **The display formatters are cached per (pattern, locale) rather than held as constants, and that
+is correctness rather than tidiness.** `DateTimeFormatter.ofPattern(p)` resolves the locale at
+CONSTRUCTION, so a top-level `val` keeps printing day names in whatever language the process started
+in — and this object outlives the Activity Android recreates on a locale change. The old code dodged
+that by building a `SimpleDateFormat` per call, which was correct and wasteful.
+
+**Then `FeedDate` — one definition where there were three, and three separate wrongs.** The Android
+RSS parser and the desktop one held byte-identical eight-pattern loops and `NewsRepository` a
+narrower two-pattern one. Running the shipped code over real feed strings:
+
+| defect | what it did |
+|---|---|
+| fractional seconds > 3 digits | `SSS` parses greedily, so `14:30:00.123456Z` became **14:32:03.456Z** — two minutes into the story's own future — and nine digits landed **two days** away |
+| a bare local time | matched no offset pattern, fell to the date-only one, became **midnight** — 14½ hours out, on the number articles are sorted by |
+| cost | 200 items cost 8.4 ms for an ISO stamp and 10 ms for an unparseable one, most of it building formatters and filling in stack traces for a `ParseException` used as loop control |
+
+Reachable because a custom feed is any URL the user pastes and the parser advertises itself as
+RSS 2.0 + Atom. ⚠️ This is the **third** place in this repository with the fractional-second defect;
+`SocialRepository` already carries a note about it. After: 1.9× / 2.0× / 2.1× / 23.7× faster on the
+four shapes, one substring allocated where there were eight formatters, and the family is decided on
+the one character that separates them rather than by throwing three exceptions to find out.
+
+⚠️ **Two decisions there look wrong until you measure them.** `RFC_1123_DATE_TIME` is NOT used: it
+refuses `UTC`, `EST` and `PDT` — names RFC 822 defines and real feeds still emit — and it cross-checks
+the weekday against the date, so a feed naming the wrong day is refused where `SimpleDateFormat`
+shrugged. The weekday carries no information the date does not, so it is dropped rather than
+validated. And the obsolete zone names are a **table**, not a library lookup: `SimpleDateFormat` reads
+`EST` as a fixed −05:00 while `java.time` resolves it to America/New_York, which in August is −04:00.
+An hour apart, on a string whose meaning RFC 822 fixes.
+
+`FeedDate` lives in `:core:feeds` under `dev.mascwa.pulse.core.network` — **the same package the app's
+`RssParser` already declares, so that file needed no import at all.** The XML pulling genuinely
+differs by platform (`android.util.Xml` vs `XMLStreamReader`) and that is the honest reason those two
+parsers stay separate; reading a date out of a string is not platform work.
+
+**⚠️ A MEASUREMENT THAT INVERTED MY HYPOTHESIS, recorded so nobody repeats it.**
+`FoodSearch.couldMatch` does `line.lowercase()` per line — 13,186 allocations per query — and the
+obvious fix is `contains(ignoreCase = true)`, which allocates nothing. It is **3× SLOWER** on a real
+query ("chicken": 6.3 ms → 18.7 ms), because case-insensitive `regionMatches` folds case at every
+position while `lowercase()` allocates once and then `contains` uses the vectorised `indexOf`
+intrinsic. **The current code is right.** Do not "optimise" it.
+
+**And the seed-search path was measured and left alone**, which is the other half of an honest pass.
+A single-letter query costs 42 ms and splits 12,448 lines into 50 columns each — but `MIN_QUERY = 2`
+excludes it, the 280 ms debounce cancels the previous search, and the work is on `Dispatchers.IO`.
+The realistic worst case is a 2-character query at 15–25 ms on this machine. Extracting only the
+three fields the scorer reads instead of splitting all fifty was built and measured at **1.0×–1.6×**,
+which is not worth the risk on code carrying that much correctness reasoning. Not shipped.
+
+**The bundled food database stopped reporting an empty shelf (task #330, closed).** Its guard reports
+to the crash console — the right place for a stack trace, the wrong one for somebody in a
+supermarket. Every path still answered `null`, and `null` is also what the bundle says when it does
+not hold that product, so *"Barcode X is not in the packaged-food database"* and *"No bundled product
+has all of those words"* were claims about 4.4 million rows the app never opened. ⚠️ And the failure
+is permanent and silent: Room unpacks 424 MB on the first query, the ordinary way that fails is a
+phone with no room left, and the app then falls back to the network — so **with a connection it
+half-works and the offline half is dead forever**. That is exactly the cheap phone this whole pass is
+about. The store now keeps the FIRST reason (after the first failure every later query fails for its
+own downstream reason) and the repository reads it **after** the queries, because the bundle unpacks
+lazily and asking beforehand always says "fine" on the very run where it is about to fail.
+
+**Two local gates were fixed, both negative-tested.** `tools/android_resolve_check.sh`'s
+broken-extractor guard asserts that a baseline with no Android SDK must produce unresolved
+references — true of a file importing `android.*`, false of one that does not, so **the strongest
+result the gate can produce was reported as a failure**. And JUnit joined its target classpath: it is
+routinely handed `src/test` files, and without it every one reports `unresolved reference 'junit'`
+plus a line per assertion plus a cascade, since a lambda whose body has an error type cannot have its
+parameter inferred. It cannot hide a real defect — Kotlin still requires the import, which is what the
+negative test shows.
+
+⚠️ **The recurring habit cost time again and is now on its eighteenth appearance**: two assertions in
+`WeatherFormatTest` were inventions of mine that looked plausible (an epoch literal five days wrong,
+and `"2"` where the shipped fallback is `takeLast(2)` = `"e2"`). **Compute the expected value from the
+shipped function before writing the assertion.**
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot wait for a clock change or fill a disk.** A
+custom Atom feed's stories should sort by their real times rather than piling at the bottom; the
+weather hours should read the same as before; and if the food bundle ever fails to unpack, the search
+and the scanner should now say so rather than reporting the product unknown.
+
+### THE DISK VEIN, CLOSED — and four models where the notes said two (this session, PR #464)
+
+Owner's standing directive is unchanged: **every app has to run on a potato**, adaptive only, nothing
+removed, install size is not the lever. The plan (`robust-baking-dewdrop.md`, P1–P9) is **complete**,
+so everything here was found by hunting. **Zero subagent and zero workflow spend**, as with every arc
+since the credit directive — local kotlinc, the four gates, `javap`, and CI.
+
+**The vein worked was disk, and it is now genuinely closed for `:app`.** Feed cache bounded; camera
+captures swept; APKs pruned; interrogator models discardable; **Sensorium models discardable (new)**;
+harvested media deletable; progress photos store-managed; packs self-clearing staging; Coil and OkHttp
+self-bounded; transcript database capped with a purge. Settings reports and clears the rebuildable set.
+
+**The find: `ModelFile` described two models and there were four.** The Sensorium fetches YAMNet
+(~4 MB, sound labels) and EfficientNet (~4 MB, scene labels) into `filesDir` by the **identical**
+`<name>` + `<name>.part` contract that file was written for, and nothing reported or freed either —
+`bytesOnDisk`/`discardModel` existed only on the two interrogator engines.
+
+⚠️ **Only one of the four was ever asked for.** The adjudicator follows a tap; whisper, YAMNet and
+EfficientNet all arrive on first use, and **`SensingSettings.enabled` defaults on** — so the two
+classifiers land on an ordinary install whose owner never opened the scanner. That makes reporting
+them the *more* important half: storage taken by something you chose is at least explicable.
+
+⚠️ **An interrupted fetch holds far more than the finished 8 MB**, because each download is capped at
+**24 MB** and the `.part` it leaves is invisible to any `exists()` check. `ModelFile.bytes` counts
+both halves, which is exactly why the pairing lives in one definition.
+
+`ModelFile` moved out of `data/interrogator` into `data/model`: with four models across two unrelated
+subsystems, leaving it filed under one of its callers meant a sensing sampler importing from
+`data.interrogator`, a dependency it does not have and should not appear to. Both samplers already had
+a `close()`, so the release-before-delete discipline came free.
+
+⚠️ **`discardModels` stands ambient sensing down first, and that is not politeness.** A sampler still
+armed re-downloads on its very next sip, so discarding underneath a running service spends the user's
+data and leaves the disk where it started — a control that appears to work and does nothing. It uses
+`sensing.enabled`, the same lever the notification's Stop action uses, so `RefreshWorker` cannot
+restart the service behind it.
+
+**A defect of my own, found by re-reading the path rather than by a gate.** `modelBytes` was read once
+in the view model's `init` — but the models are fetched on the samplers' first sip, which routinely
+happens *while the scanner is open*, so the figure would read zero, the card would stay hidden, and
+8 MB would arrive with nothing said for the rest of the session. **That is the exact defect the card
+exists to fix, one layer up.** Driven from `LaunchedEffect(Unit)` in the screen now, which re-runs on
+every return — the shape the MENU recents strip needed for the same reason.
+
+**Two smaller corrections, bundled deliberately** so they did not cost their own 329 MB republish:
+`DeviceContextProvider.gb()` formatted with the default locale ("5,7 GB" across most of Europe) on a
+figure every consumer reads as *data* — the `device` tool hands it to the model, the dossier draws it,
+the persona carries it. And `AppCaches`'s KDoc gave only the benefit of rooting the feed store at
+`filesDir`; ⚠️ **the cost is that Android's own Settings ▸ Apps ▸ Storage ▸ Clear cache empties
+`cacheDir` and cannot reach `filesDir`** — which is precisely why that class had to be written.
+
+⚠️ **So the nutrition app's opposite choice is RIGHT, not an oversight to converge.** It roots the same
+`DiskCache` at `cacheDir` because it caches product lookups on top of a 4.4-million-row bundled
+database, ships no cache screen, and thereby keeps the platform's own button working. The note now
+says so, so nobody "fixes" one app to match the other and takes that button away for nothing.
+
+**⚠️ AN ALARM OF MINE THAT WAS WRONG, AND CHECKING IS THE ONLY REASON I KNOW.** Seeing `:app` root
+`DiskCache` at `filesDir` and the desktop at `dataDir`, I concluded my new 8 MB prune — which deletes
+oldest-first with no filter — would eat the downloaded models, the settings, the ledger and the study
+deck. It cannot: `DiskCache` owns a **`pulse_cache` subdirectory** inside the root it is given
+(`private val dir = File(root, "pulse_cache")`), so the prune, `clear()` and `sizeBytes()` all stay
+inside it and everything else is a sibling. I had misremembered `dir` as `root`. **Read the field
+before acting on the alarm.**
+
+**Negative results, recorded so nobody re-chases them.** The nutrition app has no `onTrimMemory`
+defect (its loader is `.diskCache(null)` and its trim clears only memory); `pruneCache` is wired in
+both applications; `FoodDatabase` already guards the 424 MB unpack with a `usableSpace` check; the
+standalone `onStart` is clean; and a repo-wide sweep for default-locale numeric formatting across
+`:nutrition`, `:core:health`, `:core:update` and `:app` found **exactly one** hit, the `gb()` above.
+
+⚠️ **Two things left alone on purpose, with the reasoning, because they look like the same class and
+are not.** The Sensorium's `"%.1f hPa"` and movement readouts are default-locale *deliberately* — a
+human eyeballing an instrument wants their own separator, which is what locale formatting is for; the
+project's Locale.US rule is for numbers that are **data** (SOS coordinates, cache keys, CSV fields),
+and `gb()` qualifies because a parser reads it. And the interrogator's per-call `SimpleDateFormat` is
+the known allocation-not-a-race shape this file already records for `LaunchRepository` and `SkyDigest`.
+
+**⚠️ THE RESOLVE GATE'S CASCADE, PROVEN FOUR TIMES RATHER THAN SHRUGGED AT.** Every complaint this arc
+was settled by planting a symbol that unquestionably compiles in CI today and confirming it reports
+identically: `usageRepository` (the `AppContainer` chain), `LcarsFrame` (the app's own Compose kit),
+and `remember` (androidx.compose.runtime, used in several hundred files). ⚠️ Also worth knowing: the
+tool is **count-sensitive**, so a name already present at HEAD is reported when a new usage is added —
+`collectAsStateWithLifecycle` appeared despite being imported and used eight times already.
+
+**Verification:** the four-gate chain per slice; `ModelFile` compiles clean against the real platform
+classes via `android_compile_check.sh`, **with that gate negative-tested** (a planted `filesDirTypo` is
+caught); every perturbation restored and confirmed byte-identical with `cmp`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a card, it never draws one or downloads a model.** Open
+MENU ▸ Environment Scanner: once the watch has run, an **ON THIS DEVICE** card should say how much the
+two classifiers hold and offer to free it; pressing it should stand sensing down and make the card
+vanish, with ARM bringing everything back. Before the watch has ever run there should be **no card at
+all** — a row reading 0 MB beside a button that frees nothing invites the tap and then looks broken.
+
+**Open / steerable:** nothing outstanding on the potato plan. `DeviceClass.Budget` was re-swept and all
+seven fields have consumers, so P9's wiring holds. The remaining owner-verify items from the arc are
+unchanged: whether the tiering *feels* right on the Galaxy A16, thermal behaviour under load, and the
+first-run unpack on slow flash — all device-only, and the owner's hardware is the only instrument.
+
+### THE SKY ARC — comets, and the companion catches up (this session, PR #464)
+
+Owner's directive: *"Make maps and sky showcase more features and stuff about space and our astral
+bodies near and far, like eclipses and anything, even astrology. Make the sky chart not so small and
+capable of acting as a real map. Do not stop optimizing everything from all workflows, desktop,
+mobile and nutrition… do not use any of the plan usage data."*
+
+⚠️ **That last clause is the credit directive and it OVERRIDES the standing ultracode reminder.**
+**Zero subagents and zero workflows this entire session.** Every check was local kotlinc + JUnit,
+`./gradlew :desktop:build`, a live measurement, or CI.
+
+**MAPS & SKY is complete on the phone** (#346): eclipses, occultations, meteor showers and now
+comets, plus the zodiac surface and the full-screen chart. The rest of the arc was the **companion**
+catching up, which the tandem rule puts squarely in scope.
+
+- **Comets** — `Comets.kt` (three orbit branches: elliptic Kepler, Barker's parabolic, hyperbolic
+  `M = e sinh F − F`), `CometRepository` over the MPC's own `CometEls.txt`, and the COMETS tab.
+- **`OpenFeed`, and a real defect it exposed.** `WorldFeed` resolves a coordinate before it fetches
+  and **returns early when there is none** — correct for every feed it was written for. Launches were
+  nonetheless routed through it, with a comment at the call site AND one on the field both explaining
+  that a rocket leaves from where it leaves from regardless of the observer. True of the lambda,
+  false of the class around it. So on a machine where nobody had typed a place, the desktop's launch
+  list **never loaded at all** — silently, in exact contradiction of the sentence written to justify
+  the arrangement. `OpenFeed` is what those two comments always described; `WorldFeed`'s KDoc now
+  points at it so the next coordinate-free feed cannot inherit the fault.
+- **Eclipses + meteor showers** on the desktop, both pure astronomy over the machine's own clock, so
+  they are the only things on that page that work with the cable out.
+  ⚠️ **The shower reading goes stale in a way nothing else there does**, so the screen refreshes it
+  on a five-minute loop **inside the composition** — a console left on the observatory overnight
+  would otherwise still read *"too bright, come back once the Sun is well down"* at two in the
+  morning. A machine sitting on any other screen runs no timer at all; the same shape the news feed
+  settled on.
+- **A real star chart.** The companion's sky plot was 168 dp square and drew five planets. The
+  Bright Star Catalogue is now **borrowed into the desktop jar** by `processResources`, exactly as
+  the Knowledge Base and the typefaces are — one copy in the repository, so the two consoles cannot
+  disagree about where a star is. 420 dp across the full width, magnitude 4.5, planets in amber on top.
+- **Occultations**, the last tab the companion lacked. Its blocker *was* the star catalogue.
+
+**Measured rather than chosen, every time:**
+
+| | measurement |
+|---|---|
+| star chart cut | 904 of 8,404 brighter than mag 4.5, ~half up → ~400 dots; one magnitude fainter triples it to 2,887 |
+| chart labels | mag ≤ 1.5 is 23 stars in the whole sky, ~a dozen up; more and they overlap |
+| occultation window | 9/28/57/118 ms of scan over ten targets for 1/3/6/12 months, returning 5/11/23/38 candidates |
+| of which visible | **3 of 23** were actually occulted from London — what a parallax four times the Moon's own diameter does |
+
+⚠️ **That last measurement CORRECTED a KDoc I had written an hour earlier.** It claimed cost was what
+capped the occultation search at six months. Two years is a few hundred milliseconds — affordable.
+The binding reason is the **length of the list**, and the comment now says so. In this tree an
+overstated comment is a defect.
+
+**Two definitions stopped being stated twice, both by this project's own precedent
+(`Oracle.urgencyArgb`):**
+- **The B-V star-colour table** → `StarNames.colourArgb`, returning an **Int** because
+  `:core:telemetry` carries no UI dependency. ⚠️ **Null in, null out is the contract**: about three
+  per cent of the catalogue has no measured colour, and the honest answer is the drawing surface's
+  own ink — a palette fact, which belongs to the platform. A made-up white would put a claim about a
+  measurement into a value nothing could tell from a real one.
+- **The occultation constants** (five star names, two uncertainties, the window) → `Occultations`.
+  The uncertainty pair is the worst in the app to let drift: it is what decides whether an
+  occultation is **called or refused** near the Moon's edge, and the two differ ninety-fold.
+
+⚠️ **Deliberate asymmetry worth not "fixing": the chart does NOT precess star positions and the
+occultation search DOES.** On a chart the drift by 2050 is smaller than the dot a star is drawn as;
+in an occultation the whole answer turns on arcseconds against a limb half a degree across. That is
+exactly why `Occultations.Target` takes a position FUNCTION rather than a coordinate.
+
+**New gate: `StarCatalogBundleTest`** (6 tests). ⚠️ Every way the borrowed catalogue can break is
+silent — the copy not running, the wrong prefix, a resource path read relative to a package rather
+than the jar root, a rebuilt catalogue reordering its columns. None is a compile error, none throws
+(the loader answers an empty list by design), and all look identical from here. It asserts the count,
+that RA/Dec are angles, that Sirius is the first row **at Sirius's coordinates**, that the file is
+still sorted brightest first (what makes `brighterThan` a prefix rather than a walk of eight
+thousand), that the five occultable stars still resolve, and that **the CDS attribution shipped** —
+a licence condition, and the same copy that would leave the notice behind is the one that puts the
+stars there.
+
+**Verification:** 2,248 core tests and 280 desktop tests, both executed locally; **twelve
+load-bearing rules negative-tested** against a baseline asserted green first, each perturbation
+asserted to have matched the source and each restore byte-compared.
+
+⚠️ **The cross-module smart cast bit for the FOURTH time** — `v.perHour != null && v.perHour > 0`,
+where `perHour` is a public property of another module. Three of the previous four were CI failures;
+**this is the first one a local build caught**, which is the argument for the desktop module carrying
+real features.
+
+⚠️ **And the recorded kotlinc trap bit again, in a throwaway benchmark: without kotlinx-coroutines on
+the COMPILER's own `-cp` it dies in `CoreApplicationEnvironment` before reading a line — and my grep
+printed "compiled" for a run that produced no class files at all.** Assert the output exists.
+
+⚠️ **Owner-verify on Windows — this container has no GL context, so none of the desktop render is
+provable here.** The observatory should now carry: a large star chart with the planets in amber over
+it and a line saying how many stars are up; ECLIPSES with two years of them, an eclipse that misses
+you drawn muted rather than omitted; METEOR SHOWERS whose advice changes on its own as the evening
+goes on; the Moon's occultations with a graze called out as a refusal rather than a yes; and comets
+brightest first. On the Pixel nothing should have changed at all except that the star colours now
+come from the shared table.
+
+**Open / steerable:** the desktop still has no ZODIAC surface — `Astrology` is in the core and
+`PlanetCalc` is available, so it is the same small shape as the eclipse slice whenever the owner
+wants it.
+
+### THE PLANETARIUM — the sky map becomes Stellarium (this session, PR #464, S1–S7)
+
+Owner: the sky map is *"a little too sparse… somehow just a circle when in reality it shouldn't be a
+circle… I don't want it to just show stars and astral bodies that are near… constellations… galaxies…
+the Milky Way… as if I'm actually able to see it,"* and it must *"effectively leave nothing out."*
+Then, separately: make it **its own standalone mobile app**, *"100% offline and purely math based."*
+Four binding AskUserQuestion answers: imagery **purely procedural**; catalogue **deeper than
+Tycho-2** (Gaia); **give LCARS the new engine too**; renderer **Compose Canvas, batched**.
+
+⚠️ **The owner's headline complaint was literally true and I had said otherwise.**
+`SkyProjection.Screen.inField` is `radius <= 1.0` and the screen multiplied it by
+`size.minDimension / 2f` — so the drawn sky was a **disc inscribed in the narrow dimension**, in a
+black rectangle, with dead bands above and below on a portrait phone. Not a metaphor; a circle.
+
+⚠️ **Two things stated before anything was designed, and both are still true.** "Accurate in a
+million years" is not achievable by anyone — Barnard's Star crosses 10.3″/yr, so the constellations
+dissolve in ~100,000 years and stellar velocities are not linear over that span anyway. What is
+delivered instead is sub-arcsecond over centuries, degrading gracefully over millennia, with the app
+saying what it assumes. And the catalogue conflict is arithmetic: **G < 12 is 3,087,821 stars at
+~25 MB** (bundled in both apps, 367× the old 8,404) while **G < 14 is 16,844,156 at ~135 MB**
+(the `:sky` deep tier). LCARS is already 329 MB and its updater re-downloads the whole APK. ⚠️ That
+329 MB was true when this was written and is now **371,423,433 bytes** — the argument holds a fortiori,
+and the S11 section at the end of this file carries the measured figure.
+
+**The one idea everything rests on:** `SkyProjection.magnitudeLimit(fovDeg, deepest)` deepens the cut
+as the field narrows, so the DRAWN count is a few thousand at any zoom whatever is on disk. That is
+what makes a 16.8-million-star catalogue and a Compose Canvas compatible rather than needing OpenGL.
+
+**Shipped, each its own CI-green commit:** S1 the projection fills the rectangle · S2 `SkyGrid` +
+`SkyCatalogFormat` + the Gaia builder · S3 `:core:sky` (reader, index, batched canvas) · S4
+constellations (`0d61b1c`/`b6b6760`/`4a23b86`) · S5 deep sky (`7447798`/`3902103`/`b3796d9`) · S6 the
+Milky Way (`0c52e40`/`dcba62e`) · S7 the solar system (`8d13b5f`/`c88c680`/this commit).
+
+#### The measurements that overruled the plan
+
+- **S5: the packed binary was cancelled.** OpenNGC's 12,039 drawable objects fit a lean TSV at
+  **236 kB deflated** — cheaper than the estimate — so no record layout, no `noCompress`, no mmap and
+  no spatial index. Twelve thousand objects is a linear scan, the shape `ConstellationSource` already
+  uses. ⚠️ And the **median object is 1.20′ across**, so most of that catalogue can only ever be a
+  marker; shapes are for the few hundred that are genuinely large.
+- ⚠️ **S5: cutting on surface brightness would have shipped a deep-sky layer with no Andromeda in
+  it.** The top 200 by magnitude and the top 200 by surface brightness **overlap by 8**. Surface
+  brightness decides HOW an object is drawn, never WHETHER. Pinned by a test.
+- ⚠️ **S5: `magnitudeLimit` must NOT be reused from the stars.** Star counts rise 2.8-fold per
+  magnitude; deep-sky counts rise about 1.7 (measured 1.58/1.78/1.70 across the ladder). `DeepSky`
+  carries its own constants.
+- ⚠️ **S6: density, not flux — the plan's stated method was the weaker one.** Measured over the real
+  3,087,821-star catalogue: density gives a plane-to-pole contrast of **7.93×**, integrated flux only
+  **4.52×**, because flux is dominated by nearby bright stars and those are nearly isotropic.
+- ⚠️ **S6: and dust rifts are the MOST visible structure, not the least.** I expected a
+  magnitude-limited catalogue to lose them. Extinction pushes stars below the cut, removing them from
+  the count outright — so l = 20–50° reads 82 /deg² against ~210 either side, which is the Great Rift.
+- ⚠️ **S6: `SkyGrid` cannot carry it, and the plan's HEALPix figures do not apply** (S2 shipped
+  `SkyGrid`). Its polar bands are **51.4° wide**; a 51° × 2.8° sliver cannot hold a brightness. Its
+  own KDoc justifies its design by saying nothing computes a density — which is exactly what S6 does.
+  A 1° galactic raster at **63 kB** instead, a sixth of the plan's budget.
+
+#### The defects, all found by running shipped code rather than reading it
+
+- **S6b, the poles were a speckled ring.** Found by running the shipped reader over the real bundled
+  asset — every fixture in the test was one that file built itself. A 1° cell at |b| = 89.5 covers
+  0.0087 deg² and holds 0.16 stars, so 303 of that row's 360 cells were EMPTY and the rest read ~115
+  against a truth of ~23. The plan's "7.9% Poisson noise" was measured near the plane; at the poles it
+  is about 230%. Smoothed over 1/cos(b) columns, which covers a constant degree of arc and preserves
+  each row's total.
+- **S7a, four defects in the Galilean moons**, none visible by reading, all found against JPL DE421
+  and Horizons: an 1899-epoch phase set under J2000-era rates (Callisto out by 1.19 Jovian radii);
+  `− J` where Meeus specifies `− B` (J carries 0.9025179 °/day, drifting Io a whole orbit in seven
+  months); offsets labelled celestial when they are **Jupiter's own equatorial frame** (the line of
+  moons tilts 8–18° over 2026 alone); and `behind` **inverted** — `u` is measured from inferior
+  conjunction, so the hidden half is `cos(u) < 0`, confirmed 5/5 against Horizons ranges.
+- ⚠️ **That fourth one was found by a negative test coming back ASLEEP** — the guard asserted `behind`
+  was true for about half the orbit, which a flipped comparison satisfies perfectly. Mechanism #4 of
+  the recorded five. Chasing it meant fetching real ground truth, and the ground truth said the code
+  was wrong.
+- ⚠️ **The Laplace resonance is NOT a valid check on Meeus's method**, and the probe says so:
+  `λ₁ − 3λ₂ + 2λ₃` cancels the frame term entirely (1−3+2 = 0), so it could never have caught the
+  second defect, and the three periodic terms run at unrelated rates giving a **4.04° envelope**
+  against a real libration of 0.07°. What IS worth testing is that the method's own **constants**
+  satisfy it — phases to 180.0001, rates to −0.0000001 °/day — which needs no ephemeris and catches a
+  single mistyped digit in any of six numbers.
+
+#### Design decisions worth keeping
+
+- ⚠️ **Nothing in the renderer assumes which way round the projection puts the sky.** Every
+  orientation is naturally a position angle east of celestial north, and turning one into a screen
+  rotation needs two things a pure core has no business knowing. So `PlanetDisc.Appearance` carries
+  each direction as **a second point on the sky**; the renderer projects it with the same projection
+  and takes the screen difference. No parallactic angle to get backwards.
+- ⚠️ **Both the equator AND the pole are carried, and neither implies the other.** The equator fixes
+  which way the rings and the line of moons run; only the pole says which HALF of a ring passes behind
+  the globe and which side of the line a moon at +y belongs on.
+- ⚠️ **A crescent is a half-circle joined to a half-ELLIPSE, never two overlapping circles.** The
+  terminator's semi-minor axis is `r·cos(i)`, and the SIGN is what makes a gibbous disc bulge away
+  from the lit limb rather than toward it.
+- ⚠️ **A marker is still right most of the time.** At a 60° field on 1080 px there are 18 px to the
+  degree, so Jupiter — the largest planetary disc there is, ~50″ — is a QUARTER OF A PIXEL. The real
+  disc takes over only once it exceeds the marker it replaces.
+- **S6b's arithmetic runs BACKWARDS**, unlike every other pass: a screen pixel becomes a direction,
+  then galactic coordinates, then a raster index. Forward projection fails three ways — the cell count
+  is worst exactly where the picture matters least, quads give a mosaic, and an equirectangular grid
+  degenerates at the poles.
+
+#### S7c — the ecliptic and the celestial equator (this commit)
+
+`ReferenceCircles` (pure, 12 tests) + `ReferenceLines` (the filler) + two `SkyLines` on the view model
++ two draw calls. The ecliptic is the one that earns its place: every planet and the Moon are within a
+few degrees of it, so once it is drawn half the sky is ruled out at a glance.
+
+- ⚠️ **Both circles are cut into 12 runs and that is not cosmetic.** A great circle passes through
+  every part of the sky, so the smallest cap containing it is the whole sphere and `SkyLines`'s
+  per-run cap test could never reject it. **Measured** with the shipped fill and the shipped cap test,
+  pointed at the line from each of 360 directions: at 150° nine of twelve runs survive (144 of 192
+  vertices projected); at a quarter-degree field **exactly one run survives, so 16 vertices are
+  projected instead of 192** — and at every field at least one segment still reaches the screen, which
+  is the property that matters, because the failure mode is the ecliptic silently vanishing on zoom.
+- ⚠️ **A chord is not angularly wrong at all, and my first KDoc said it was.** Every point of a chord
+  lies in the plane of its own great circle, which passes through the observer, so from the centre of
+  the sphere a chord and its arc are the same set of directions. The error is a **projection**
+  artefact — this projection is stereographic, under which a great circle becomes a circle. Measured
+  through the shipped projection: **0.35 px on a 1080-wide portrait at the widest field**, falling
+  monotonically to 0.08 px at 5°. The old note's formula described a linear sagitta and its number
+  (0.017°) was wrong as well.
+- ⚠️ **The traversal moved into `ReferenceCircles.longitudeOf` because `:core:sky` HAS NO TEST SOURCE
+  SET and CI's test line does not name it.** A rule left in the filler would have had no gate at all.
+  The first filler also ran `while (step * STEP_DEG <= ARC_SPAN_DEG)` — a floating-point comparison
+  deciding how many slots of a **preallocated** buffer get used; two integer loops cannot drift.
+- The obliquity is a **parameter, not a constant**: it falls ~0.013°/century, invisible now and a
+  quarter of a degree by the year 4000, which is inside what a chart with a time control can be asked.
+- Both circles ride the existing **NO LINES / FIGURES / + BORDERS** control. A mode labelled "NO
+  LINES" that left two lines across the sky would be lying about itself.
+- ⚠️ They are drawn **outside** the `shapes != null` guard: they depend on no asset, so a failed
+  constellation file must not silently take the ecliptic with it.
+
+**Verification (S7c):** 12 tests locally green; **all seven load-bearing rules negative-tested**
+against a baseline asserted green first, each perturbation asserted to have matched the source and the
+file restored in a `finally` and byte-compared. `:core:sky` type-checks clean against the real
+platform plus the real Compose artifacts, gate negative-tested with a planted typo; a **typed probe**
+compiled and RAN every new view-model expression against the real types (192 vertices, 12 runs), and
+was itself negative-tested. The resolve gate's one complaint is its documented `:core:sky` cascade.
+
+⚠️ **Two of my own expectations were wrong again this slice, roughly the nineteenth in this
+arc-series.** A perturbation expectation listed a test that the perturbation is a literal **no-op**
+for (`sin(e)` in place of `sin(l)·sin(e)` is still 0 at zero obliquity) — the recorded "fixture never
+reached the branch", applied to the perturbation rather than the test. And the perturbation harness
+**reported "exited with code 0" for a run that raised an AssertionError** and never reached its own
+verdict line: do not read an exit code alone.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one.** In order: that the map
+**fills the screen** rather than being a disc in a black rectangle; that zooming to the floor shows
+the Sun as a disc with a limb rather than a dot; Saturn's rings and the four Galilean moons; that the
+Milky Way reads as the Milky Way and not a smudge; and the two reference lines — thin enough not to
+compete with what they cross, and the amber ecliptic passing through every planet on screen.
+
+**Open, in the plan (`robust-baking-dewdrop.md`):** **S8** pointing mode (`CompassController` already
+has rotation-vector, remap and true north; it needs roll and a stiffer filter, plus nudge-to-align
+because a phone magnetometer is good to a few degrees at best) · **S9** IAU precession–nutation,
+aberration, refraction, parallax, proper motion · **S10** the `:sky` standalone app, modelled on
+`:nutrition` · **S11** the deep tier as an LCARS expansion pack via the existing `PackRepository`
+— ⚠️ **and that last mechanism is measurably the wrong one; see the S11 section at the end of this
+file.**
+
+~~⚠️ **Recorded rather than acted on: `:core:sky` has no test source set at all** … Adding
+`:core:sky:testDebugUnitTest` to `android-build.yml`'s test line is its own small slice.~~
+**DONE — that slice is the second half of the S11 section at the end of this file**, and it found a
+real trap in `StarLayer` on the way in.
+
+### S11 — THE DEEP TIER: what it costs, what it buys, and why it is NOT built (this session, PR #464)
+
+The last item in the sky plan, and the one where measuring first changed the answer. **Zero subagent
+and zero workflow spend**, per the standing credit directive, which overrides the ultracode reminder
+as it has for every arc since. Everything below is a live measurement, a `grep`, or a local run.
+
+**⚠️ THE PLAN'S STATED MECHANISM CANNOT CARRY IT, and that is a fact about the code rather than a
+judgement.** `PackArchive` takes **only `*.json`** (`PackArchive.kt:39`), caps an entry at **32 MB**
+and a pack at 256 MB, and the merge happens at `SurvivalContentRepository.index()` — it is the
+library-guide mechanism, and the deep tier is a 135 MB binary that must be **memory-mapped**.
+Routing one through the other means lifting the JSON filter, raising the entry cap fourfold, and
+pointing a guide merger at a star catalogue. The plan's sentence "via the existing `PackRepository`"
+reads as reuse and is a rewrite of the safety-shaped part of that class.
+
+**⚠️ AND THE TIER HAS NO NATURAL STOPPING POINT, which the plan's own reasoning assumed it did.**
+Star counts read live from the Gaia DR3 archive this session; file sizes at
+`StarCatalogFormat.RECORD_BYTES` = 8 a star; saturation fields computed from the shipped
+`magnitudeLimit`:
+
+| catalogue | stars | file | saturates at | dead zoom | marginal |
+|---|---|---|---|---|---|
+| **G < 12 (shipped)** | 3,087,821 | 24.7 MB | 5.59° | **48.6%** | — |
+| G < 13 | 7,369,627 | 59.0 MB | 3.23° | 40.0% | +34 MB for +8.6 points |
+| G < 14 | 16,844,156 | 134.8 MB | 1.87° | 31.4% | +76 MB for +8.6 points |
+
+"Dead zoom" is the share of the range, **in decades of field**, over which the map already draws
+everything it holds. Every extra magnitude buys **exactly** 0.238 decades — always, because
+`magnitudeLimit` is linear in log-field, so one magnitude is 1/`MAGNITUDES_PER_DECADE` — and costs
+about **2.2× the last**. The plan justified stopping at G < 14 on drawn density (408 /deg²), but the
+adaptive cut bounds the drawn count identically at every tier, so that argument does not distinguish
+13 from 14. **It is a budget choice with no cliff in it.** Nothing closes the gap either: saturating
+at `MIN_FOV_DEG` needs magnitude **17.7**, on the order of a billion stars.
+
+**⚠️ Three more measurements that bear on the decision, so nobody re-derives them.**
+- `stars.skycat` is **committed to git** and `.git` is already **427 MB**. A 135 MB blob makes it
+  ~562 MB permanently, on every clone in every run of four workflows. The repo's own pattern for a
+  large generated binary is **build in CI behind a cache** (the 424 MB food database), never commit.
+- ⚠️ **LCARS is 371,423,433 bytes and `:sky` is 33 MB**, and its updater downloads the whole APK on
+  every build. So the same 135 MB is a very different proposition on each, and on LCARS it is a
+  recurring cost on the owner's phone rather than a one-off.
+  ⚠️ **The 329 MB this section was written against is stale by 26 MB.** Measured from LCARS #2137's
+  own "Check what actually shipped" line, alongside `star catalogue: 23 MB, Stored
+  (memory-mappable)` — `:core:sky` merges its assets into every consuming APK, so the LCARS build
+  carries the catalogue too. ⚠️ **What the delta is made of is NOT measured and is not claimed
+  here**: dozens of commits landed between the two builds and nothing attributes the bytes among
+  them. I said flatly that the growth "is the star catalogue" earlier in this session, which was an
+  inference dressed as a measurement. Every other 329 MB figure in this file is a dated record of
+  what a particular commit measured and is correct as written; these two are corrected because they
+  are inputs to a decision that has not been made yet.
+- The Gaia TAP is reachable from this container (a `COUNT(*)` at G < 14 answers in 4.4 s), so
+  building it is possible — the obstacle is delivery, not data.
+
+**So S11 is left unbuilt and reported, deliberately.** Every remaining decision in it is a
+size-versus-depth trade with no engineering answer, on artefacts the owner downloads to their own
+phone. What shipped instead is the half that has an answer.
+
+⚠️ **SUPERSEDED — the owner made that decision, twice, and S11 IS BUILT.** Everything above is a
+dated record of the measurement that put the choice to them and is correct as of when it was
+written; the heading is not, and a future session grepping for S11 lands here first. **The built
+state is the "S11 — THE DEEP TIER: G<15, 36.9 million stars, built in CI" section further down.**
+Left standing rather than rewritten for the reason the log is always left standing — but flagged,
+because unlike an ordinary stale record this one names a conclusion the owner has since overruled.
+
+### What DID ship: the map stops lying about its own ceiling (`b2ff8cb`)
+
+Over **48.6% of the zoom range** the shipped catalogue draws everything it has, and both readouts
+said nothing — so the only available reading was that the sky is empty there. It is not; the file is.
+⚠️ **And the field readout was worse than silent: both apps printed `fovDeg.roundToInt()`, so
+anything under half a degree read "0° across"** — the deepest three quarters of a decade, exactly the
+range the deep catalogue exists to reach, and everything from 0.5° to 1.5° read "1°".
+
+`SkyProjection` gained `saturationFovDeg`, `isSaturated`, `formatFieldWidth` and `depthNote`, beside
+the law they are properties of; both readouts use them.
+- ⚠️ **Null is the ordinary answer for the note.** A line on every frame is read once and never again.
+- ⚠️ **It does not replace the catalogue's own note** — "the file would not open" and "you have zoomed
+  past what is in it" are different facts. Which turned up a second gap of the same class: **the
+  LCARS screen never rendered that one at all**, though the standalone app has since it was written,
+  so the LCARS map could silently fall back to the 8,404-star bright list with nothing on screen.
+- ⚠️ Arcminutes below a degree — the Moon is 31′, so "30′ across" is a picture — built from integers
+  rather than `String.format` so it carries **no locale**: a comma decimal would make the test pass or
+  fail by the machine it runs on, the rest of the readout is already locale-free, and both apps ship
+  `resourceConfigurations += listOf("en")`.
+
+⚠️ **A claim in the first draft was wrong and is corrected in the source rather than dropped:
+`roundToInt` is NOT `Math.rint`.** Measured against the JDK — `roundToInt` is `Math.round`
+(0.5 → 1, 2.5 → 3, 14.5 → 15) and `kotlin.math.round` is `Math.rint`, banker's (0.5 → 0, 2.5 → 2,
+14.5 → 14). Every value here is positive, where half-up and half-away-from-zero agree.
+
+### `:core:sky` gets its first test source set, and it found a trap (`this commit`)
+
+The recorded gap, closed: the module shipped **26 files and no `src/test` at all**, nine of them pure
+Kotlin — about **1,300 lines** of layer, field and batching arithmetic with no gate of any kind.
+`core/sky/src/test` now exists, `libs.junit` is declared, and **`android-build.yml`'s test line gains
+`:core:sky:testDebugUnitTest`** in the same commit, because a test source set CI does not run is
+worth exactly nothing.
+
+**⚠️ The trap it was written against, found by reading `StarLayer` for it.** `ensure()` **replaced**
+its arrays rather than copying, on the stated grounds that "every caller fills from scratch after
+clearing" — and `add()` is a caller that does not. `add` calls `ensure(count + 1)` and keeps the
+count, so the moment it crossed the capacity every star already written became a **zero vector at
+magnitude zero**: the whole bright set collapsed to one point on the celestial sphere, drawn, with
+nothing thrown and nothing logged.
+
+⚠️ **Not reachable today, and only by three hundred rows.** The one `add` caller
+(`SkyMapViewModel:312`) pre-sizes with `ensure(rows.size)` first, so the growth never fires — but
+`BRIGHT_CAPACITY` is **8,704** against a bright catalogue of **8,404**, and nothing in the build
+would notice the day that asset gains three hundred stars. `ensure` copies now, which makes `add`'s
+own contract true instead of leaving it right by the grace of a caller that need not have been
+written that way, and costs nothing measurable: both real call sites reach it with `count` at zero.
+A second guard closes a hang — `var size = maxOf(vx.size, 1)`, because a layer built with no capacity
+would otherwise spin for ever in the doubling loop (zero times two is zero).
+
+⚠️ **`:core:sky:testDebugUnitTest` cannot be run in this container** — it is an Android library and
+there is no SDK. Its PURE files can be, and `/tmp/skytest.sh` in the session scratchpad is how:
+compile the whole telemetry core (every file that does not import `android.*`) plus the named sky
+files plus the test, then `JUnitCore` on `dev.mascwa.pulse.sky.<Class>`. Same jar discipline as
+`scratchpad/coretest/run.sh`, including the serialization compiler plugin without which nothing
+compiles at all.
+
+**Verification across both slices, all local and free:** 35 `SkyProjectionTest` cases (up from 28)
+and 4 `StarLayerTest` cases run locally, every expected value computed from the shipped formulas
+before the assertion was written; **all seven load-bearing rules negative-tested** against a baseline
+asserted green first, each perturbation asserted to have matched the source, each file restored in a
+`finally` and confirmed byte-identical; `:desktop:build` green at 280 tests, since a shared core
+changed. ⚠️ The resolve gate's complaints were its documented `:core:sky` cascade, **proved rather
+than assumed** by planting `vm.revision` — a member that unquestionably compiles in CI — and watching
+it report identically.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a readout, it does not draw one.** Zoom the star map
+right in: the field should read in arcminutes (`15′`) rather than `0°`, and once past about 5.6°
+across a line should say the catalogue is exhausted and where that happened. On the LCARS map only,
+a second line now appears if the packed catalogue fails to open — it never used to.
+
+**Open:** S11 itself, above — a size decision, not an engineering one. If the deep tier is wanted,
+the shape that fits what was measured is **G < 13 or G < 14 built in CI behind a cache and bundled in
+`:sky` alone** (which keeps the owner's "100% offline, no download ever" for that app and costs the
+git history nothing), with **LCARS left on the core tier** — its pack mechanism cannot carry a
+memory-mapped binary, and 329 → 464 MB re-downloaded on every build is not a trade worth making for
+the last third of a zoom range.
+
+### THE STAR MAP STANDS ON ITS OWN — horizon-locked, tiered, and down to API 23 (this session, PR #464)
+
+Owner: *"make the sky map stay stationary and you have to move your phone to see the stuff around
+the earth. it has to be horizon locked. Ensure that the sky map is made into its own separate app
+and that it is optimized for any phone, shitty or G.O.A.T.E.D. find the lowest common denominator
+for phones that runs still and then the highest and plan for each and every single one."* Three
+binding AskUserQuestion answers governed it: pointing **default-on with drag still there**; the
+`:sky` **APK** unattached to LCARS while every feature built for it also lands in LCARS; and reach
+**every Android version still officially supported, nothing already abandoned**.
+
+⚠️ **The owner's "do not use plan usage" is a hard constraint and it overrides BOTH plan mode's own
+instruction to dispatch Explore/Plan agents AND the ultracode directive.** Zero subagents and zero
+workflows for the whole arc. Every check below is local kotlinc + JUnit, a `javap`, a published
+artifact fetched from Maven, or CI.
+
+**Four parts, four commits:** `6ffa33a` horizon-locked by default · `1db8862` SkyBudget device
+tiering · `cd6ed6a` the independence gate · `ea467e7` the API floor.
+
+#### Part A — the map opens following the phone
+
+`SkyPreferences` (read+write as ONE interface, so the pair cannot be split), a `skyFollowByDefault`
+key in each application's own store, and `hasAttitudeSensor` plumbed through `SkyDeps`.
+
+⚠️ **Three defects found by reading the call sites before shipping, none by a gate.**
+`ReleaseTheSensorWhenNobodyIsLooking` calls `setPointing(false)` on ON_STOP and on dispose — with
+persistence that writes "not following" on every background, silently retiring the default the
+commit exists to add. Split into `applyPointing` (non-recording, returns whether anything changed)
+and `setPointing` (records), with the observer on the former; my own KDoc claiming "teardown does
+not come through here" was false and is corrected. Second: `init` racing `load()` left `_site` null
+when `startPointing` reads it for declination, so the compass reported MAGNETIC north — up to ~20°
+out — for the whole screen; `load()` now sets declination as soon as it has a fix. Third: `init`
+calling `setPointing` would do a full settings read-modify-write on every screen open.
+
+#### Part C — SkyBudget, and the trap the whole file is shaped around
+
+`core:telemetry/SkyBudget.kt` maps `DeviceClass.Tier` to sensor period, smoothing, Milky Way samples
+and the deep-sky shape threshold. **FULL is byte-for-byte today's behaviour**, which is what makes a
+ladder nobody here can measure on hardware safe to ship — the worst case is a weak phone getting a
+different experience, never a good one.
+
+⚠️ **`pointSmoothing` is a weight applied PER SAMPLE**, so carrying 0.25 to a device sampling a
+quarter as often gives four times the lag — the map would visibly trail the hand on exactly the
+phones this exists to help, reading as a broken sensor rather than a setting. An exponential blend
+of weight `w` every `Δt` leaves `(1-w)^(t/Δt)` = `exp(-t/τ)` for `τ = -Δt/ln(1-w)`; inverting gives
+`w = 1 - exp(-Δt/τ)`, holding the lag in real TIME at every rate. Reference τ = 69.5 ms.
+
+⚠️ **20,000 µs is `SENSOR_DELAY_GAME`, read from the platform rather than recalled.** Disassembling
+`SensorManager.getDelay` gives the whole table — 0→0, 1(GAME)→20,000, 2(UI)→66,667, 3(NORMAL)→200,000
+— and a `default:` that returns the argument unchanged. So `registerListener` genuinely takes a raw
+microsecond period and only 0..3 are special-cased, which is what lets MODEST sit at 33,333 (the
+named ladder jumps straight from 20 ms to 67).
+
+⚠️ **I had the deep-sky threshold INVERTED.** `DeepSky.SHAPE_MIN_PX` is a FLOOR on apparent size, so
+a smaller value draws MORE shapes; my first LEAN/MINIMAL values were below the shipped 7.0 and would
+have loaded the weakest phones with the most work. Corrected to 11.0/16.0, field renamed
+`deepSkyShapePx` so its direction is legible at the call site, and a test ("the ladder only ever
+asks for less") makes it a build failure.
+
+**Two plan items dropped after reading the code:** star labels are already bounded to ~17 on screen
+by `StarGlyph.LABEL_HEADROOM`; and capping catalogue depth would bite only in the deep half of the
+zoom range AND make the depth readout claim "everything down to magnitude 10.5" about a catalogue
+holding 12 — the app more confident than its data.
+
+#### Part B — independence proved, not asserted
+
+`tools/check_sky_standalone.py`: the project-dependency graph never reaches `:app` (walked
+TRANSITIVELY, since a shared module growing that dependency is the realistic regression), the
+manifest names no LCARS package, and the dex carries no class from an `:app`-only package.
+
+⚠️ **The marker set is DERIVED from the source trees, never hand-listed** — carve a package out of
+`:app` and it leaves the set on its own. And the obvious derivation is wrong TWICE, both found by
+running the gate rather than reading it. **Seven packages are declared in BOTH `:app` and a shared
+module** (`core.network`, `core.util`, `data.health`, `data.settings`, `data.weather`,
+`feature.health`, `feature.sky` — the last is `:core:sky`'s own), so package names are not a
+partition and a check reading `dev.mascwa.pulse` as "LCARS code" fails on the star chart itself.
+Worse: the first version matched each marker as a PREFIX, and **`dev.mascwa.pulse` is itself an
+`:app`-only package** (MainActivity, PulseApplication), so its descriptor matched every shared class
+and the gate rejected a synthetic APK carrying nothing but sky classes. A dex descriptor is
+`Lpath/to/Name;`, so a class declared DIRECTLY in a package has no further slash.
+
+⚠️ **The positive control is load-bearing.** Every check is an ABSENCE, and an absence proves nothing
+until the search is known to find something — an obfuscated or wrongly-extracted dex would report
+every marker "absent" and pass. R8 is off for `:sky` today, but the gate does not depend on that
+staying true. ⚠️ And an EMPTY argument is a failure rather than a mode: CI resolves the path with
+`$(ls .../*.apk)`, which yields "" when the build produced nothing.
+
+⚠️ **`app/**` is deliberately NOT in the workflow's path filter.** The marker set derives from
+`:app`'s packages, but only safely: adding an LCARS-only package makes the set stricter over an APK
+that did not change, and moving a package OUT necessarily edits a `core/**` file, which is listed.
+Listing `app/**` would republish 33 MB on every news-screen commit for a verdict that cannot flip.
+
+**Deliberately NOT added: a "get the star map" link in LCARS.** Nutrition has one; this app was
+asked to be unattached, and a link is exactly the attachment.
+
+#### Part D — minSdk 26 → 23, and three things that had to be true first
+
+⚠️ **23 is where THIS CODE naturally sits, which is a far better reason than my reading of Google's
+support window.** Every borderline platform member the three modules touch lands at exactly 23 and
+none lower: `Context.getSystemService(Class)`, `ConnectivityManager.activeNetwork` and
+`PowerManager.isDeviceIdleMode`. Going to 21 would mean guarding three things that work today. The
+support window is the part I could NOT verify (cutoff May 2026, and it moves), so `minSdkSky` is its
+own catalogue entry with the evidence beside it and changing it changes nothing else.
+
+- **Core library desugaring**, landing BEFORE the floor drops. Enabled even though nothing in `:sky`'s
+  own source uses `java.time` — the reach is `:core:feeds` transitively, and a future core could add
+  one without this module noticing. ⚠️ desugar_jdk_libs **2.1.5 is safe for AGP 8.7.3 by
+  MEASUREMENT**: the `desugar_jdk_libs_configuration` jars for 2.0.4/2.1.4/2.1.5 all declare
+  `configuration_format_version: 200` and `required_compilation_api_level: 30`. It is a JAR, so no
+  `aar-metadata.properties` and no `checkDebugAarMetadata` trap.
+- ⚠️ **A pre-26 launcher icon, which the plan did not know about and which would have failed the
+  build.** `:sky` shipped ONLY `mipmap-anydpi-v26/ic_launcher.xml`; below 26, `@mipmap/ic_launcher` —
+  which the manifest names — has no resource at all. `tools/sky/build_legacy_icon.py` renders it from
+  the same mark and **crops to the adaptive SAFE ZONE** (the central 72 of 108 units), because drawn
+  full-viewport into an unmasked legacy icon the asterism fills 44% of the frame instead of 66%.
+- ⚠️ **`Math.floorDiv` is API 24, used eight times in `:core:telemetry` and `:core:feeds` — plain-JVM
+  modules whose classes land in the dex as a jar dependency, which lint does NOT analyse for NewApi.**
+  Green build, clean lint, `NoSuchMethodError` on the device. Asked R8 directly rather than recalling:
+  `com.android.tools.r8.BackportedMethodList --min-api 23` lists `Math#floorDiv(JJ)J` and `floorMod`
+  among its backports. **The r8 jar is not in the Gradle cache here — AGP fetches it only when it
+  runs — so pull it from Google's maven for this class of question.**
+
+⚠️ **Declaring the lower floor on `:core:sky` and `:core:update` is not a formality**: a library
+declaring a higher minimum than its consumer fails the manifest merge, AND it puts those modules'
+sources under lint at 23, which is what turns an unguarded newer API into a build failure. `:app`
+and `:nutrition` are unaffected — lint analyses each module at its own minimum.
+
+**DELIBERATELY NOT DONE: the plan's `:core:net` extraction.** Its stated purpose was removing
+`java.time` from the sky graph — and **`:core:feeds` is ALREADY a plain Kotlin/JVM module, not an
+Android library**, so it declares no minSdk and gates nothing; desugaring covers it completely. What
+the extraction still buys is ~1 MB of repositories and coil that this app never calls and R8 is not
+on to shake. Worth doing, not part of the floor, and `sky/build.gradle.kts` already records it as
+non-urgent. Bundling a module carve-out into a floor change lands two independent risks together.
+
+#### Method notes worth reusing
+
+- **A published artifact answers a toolchain question for free.** `desugar_jdk_libs_configuration`'s
+  format version, R8's backport list, and every AndroidX AAR's declared `minSdkVersion` were all read
+  from Maven rather than recalled. The AAR-manifest trick also confirmed the dependency set's own
+  technical floor is 21.
+- ⚠️ **`tools/android_compile_check.sh` reported "0 errors" for a run that compiled NOTHING** — it
+  aborts on an unresolvable artifact (`lifecycle-viewmodel-savedstate-android` has no `-android`
+  variant), exits 1 correctly, and a caller piping it into `grep 'error:'` sees silence. Hardened to
+  say `COMPILE CHECK ABORTED … this is NOT a pass`. Same family as its coroutines check; a silent
+  false pass is worse than no check.
+- ⚠️ The resolve gate's complaints were settled by the documented control — planting
+  `calendarRepository` and `pointForward`, both unquestionably valid, and watching it report them
+  identically. `:core:sky`, `:core:update` and `:core:health` all cascade there.
+
+**⚠️ NOT DOING: iOS.** The owner said "Android or iOS" and there is no iOS app. `:core:sky` is an
+Android library built on `Context`, `AssetManager`, `SensorManager` and the Compose **Android**
+artifacts, the catalogue reader memory-maps an Android asset, and `:sky` is an AGP application
+module. A port is real but it is its own arc — KMP with `expect`/`actual` for assets and sensors,
+Compose Multiplatform's iOS target, an Xcode project, and a distribution route for a sideloaded app
+on a platform that has none.
+
+⚠️ **Owner-verify on the Pixel, and one item is unverifiable anywhere here.** The map should open
+already following the phone and remember that across launches; a phone with no rotation-vector sensor
+should stay in drag with the chip disabled and a sentence saying why; and the tiering is **invisible
+on a flagship BY DESIGN** — the line under the star map's controls is where it surfaces, and on a
+Pixel it should say nothing at all. The Galaxy A16 is where the ladder is actually tested. ⚠️ **There
+is no API 23 device here and CI compiles rather than installs**: what CI proves is that nothing
+unguarded slipped past lint; what only a phone proves is that it runs.
+
+⚠️ **THAT SENTENCE WAS FALSE WHEN IT WAS WRITTEN, and it took a `lint { fatal += "NewApi" }` block
+in all three modules to make it true.** `assembleRelease` genuinely runs `lintVitalRelease` — the log
+names it for `:sky`, `:core:sky` and `:core:update` — so it looked settled. But `lintVital` passes
+`--fatalOnly`, and measuring what that means rather than recalling it:
+
+  * `ApiDetector.UNSUPPORTED.defaultSeverity` is **error**, not fatal. Instantiated from the real
+    lint-checks 31.7.3 and printed, because the constant is passed as a local in a static
+    initializer and cannot be read off the bytecode.
+  * `FlagConfiguration.getDefinedSeverity` under `fatalOnly` returns **IGNORE** for any issue whose
+    default severity is not FATAL, unless something explicitly configures it FATAL. Read from the
+    bytecode: `getDefaultSeverity() == FATAL ? … : IGNORE`.
+  * Nothing configured it — there was no `lint {}` block anywhere in the repository and no workflow
+    ran a full `lint` task.
+
+So `NewApi` was ignored on every release build, and the whole safety argument for the floor change
+rested on my having read each `android.*` import by hand. Promoting the one issue costs no new task
+and no extra CI time, because the analysis that was ignoring it is already running. ⚠️ **The general
+lesson is bigger than this module: a lint task appearing in a build log says nothing about which
+checks it is running.** `lintVital` ≠ lint.
+
+⚠️ The DSL was confirmed by a typed probe, not recalled: `javap` reports `getFatal()` as
+`java.util.Set<String>`, which is what BOTH `Set` and `MutableSet` erase to, and `+=` compiles only
+on the mutable one. A two-line Kotlin file compiled against the real `gradle-api-8.7.3.jar`, with a
+negative control on a genuinely immutable `Set` that failed with `unresolved reference 'plusAssign'`
+— the exact error the real code would have produced.
+
+⚠️ **AND THE GATE WAS NEGATIVE-TESTED IN CI, because two links of the chain were verified and one was
+not.** The DSL compiles and lint honours an explicit FATAL override — both read from real artifacts —
+but that AGP carries a module's own `lint {}` block into the analysis had never been observed, and
+"standard and documented" is exactly what I believed about `NewApi` being caught in the first place.
+So one unguarded `Context.getDataDir()` (API 24) was pushed into `:sky` on purpose. It failed with:
+
+    Execution failed for task ':sky:lintVitalRelease'.
+    > Lint found fatal errors while assembling a release target.
+      Lint found 1 errors, 0 warnings. First failure:
+      NewApiGateProbe.kt:22: Error: Call requires API level 24 (current min is 23):
+        android.content.Context#getDataDir [NewApi]
+
+which confirms all four things at once: the task is the one that already runs, the promotion made it
+**fatal**, the issue is `[NewApi]`, and lint is analysing at **min 23**. Reverted immediately after.
+
+⚠️ The test was safe to run on the dev branch for a checked reason rather than a hoped one: `sky/**`
+is in `android-build.yml`'s `paths-ignore` and matches no other workflow's allowlist, so only the
+five-minute sky build ran, and a FAILING sky build never reaches its publish step — `sky-latest` kept
+the last good APK throughout.
+
+### THE SKY MAP SPUN WHEN YOU POINTED IT UP — one sign, negated twice (this session, PR #464)
+
+Owner, reported against **both** applications: *"whenever I look directly up or directly down the
+orientation of the skymap seems to go all wonky … it only shifts for a slightly and that slight shift
+causes such a massive rotation … it should stay completely orientate locked, horizon lock and
+whatever locked no matter what way you Orient your phone sideways cattywampus."* Two binding
+AskUserQuestion answers governed the design: roll = **stay fixed to the world** (the picture
+counter-rotates so a constellation keeps its real tilt — true horizon-lock), overhead = **extra
+damping near the pole**.
+
+⚠️ **"you cannot use the plan usage" is a HARD constraint and it overrode BOTH the ultracode
+directive AND plan mode's own instruction to dispatch Explore/Plan agents.** Zero subagents, zero
+workflows for the whole arc. Every check below is local kotlinc + JUnit, a probe against the real
+`SensorManager` maths, `tools/android_compile_check.sh`, or CI.
+
+**The cause was one character.** `SkyPointing.fromDeviceOrientation` negated the reported roll and
+`equivalentView` negates it again — the same sign applied twice. `SkyPointingTest` line 104 stated
+the correct design *in words* ("`equivalentView` carries that negation") while the code did it in two
+places.
+
+⚠️ **The tests could not have caught it, and the reason is this repo's recorded shape.** `the vector
+path draws exactly what the angle path draws` compares the two paths **against each other**, both
+built from the same wrong `Attitude` — they agree perfectly and prove nothing about the sensor. The
+other test asserted the negated value as an expectation. Two independent statements of one fact, both
+wrong the same way.
+
+**Measured end to end** (`scratchpad/sky/PoleProbe.kt`: synthetic attitude matrix → real
+`remapCoordinateSystem` → real `getOrientation` → the shipped composition), because a derivation is
+not evidence:
+
+| | worst picture error |
+|---|---|
+| shipped | **180°** |
+| corrected | **7.0e-06°** |
+
+A 0.25° nudge of the aim, at 10 / 1 / 0.5 / 0.25° from vertical, turned the picture by
+**2.8 / 29.0 / 60.0 / 175.0°** under the shipped sign and **0.000°** under the corrected one. The
+degeneracy is real and is why it presents at both poles: at the zenith the well-conditioned
+combination is `A − ρ` (the bearing of the nearly-horizontal screen-up); the shipped code formed
+`A + ρ`, which amplifies hand noise without bound.
+
+**Three more defects fell out of the same read.**
+- ⚠️ **`SkyPointing.smooth` was a total no-op at its only call site.** `smooth(f, u, next, α, f, u)`
+  aliases `prev` and `out`, and it wrote the fresh reading into `out` before the blend read `prev` —
+  so the blend was `new·(1−w) + new·w = new`. **The whole of `SkyBudget` is shaped around that
+  weight and none of it could have any effect.** No test caught it: every existing `smooth` test
+  passes distinct arrays. Fixed in the function (the aliased call is the natural way to use it and
+  the signature invites it), not at the call site.
+- **The horizon, the compass letters, the planets and every tap read the clamped angle view** while
+  the stars came from the vectors. See the next section.
+- Three comments overstating their own justification, corrected.
+
+**Slice 4 — the pole damping, and the arithmetic that makes it safe to ship blind.**
+`SkyPointing.upAlpha(alpha, altitudeDeg)` stretches the screen-up's time constant near the pole:
+`w' = 1 − (1−w)^(1/k)`, which is exact rather than a fudge — an exponential filter retains `(1−w)`
+per sample, so running it `k` times longer is that identity. ⚠️ It operates on the **already
+rate-corrected** weight `SkyBudget.smoothingFor` produces, so it stays correct at every sensor rate,
+which is the trap that whole file exists for; and **`k = 1` returns the argument unchanged**, so away
+from the pole this is provably today's behaviour. Only the screen-up is damped, never the look
+direction — damping the aim would make a deliberate sweep across the zenith lag, and `smooth`
+re-orthogonalises `up` against `forward` so the two may carry different weights safely. `k` ramps by
+smoothstep (a step would snap the picture at the crossing); `POLE_RAMP_DEG`/`POLE_MAX_STRETCH` are
+named constants because they are a guess at *feel*.
+
+⚠️ **Blast radius checked rather than assumed:** `Reading.roll` and `Reading.pitch` have exactly one
+consumer each (`SkyDevice.kt:75,77`), only in `cameraUpright` mode, which only the star map uses. The
+compass rose, the HUD and the nav map pass `cameraUpright = false`, where neither is ever written.
+
+### The horizon, the planets and every tap join the stars' frame (same PR)
+
+Everything the map holds in **horizon** coordinates went through `basisOf(equivalentView(a, fov))`
+while the stars came from `SkyFrame.ofPointing` — two frames for one picture. Now one
+`SkyMapViewModel.pointedHorizonBasis(fov)`, null when not aiming, used by `drawHorizon` (which takes
+a `Basis` instead of a `View`), by the four compass letters, by the eight solar-system bodies and by
+`identify`.
+
+⚠️ **THE FIRST VERSION OF THAT KDOC OVERSTATED IT AND THE MEASUREMENT CORRECTED ME.** I wrote that
+the view "clamps the altitude AND carries a roll sign the vector pair does not need", implying both
+contributed. Measured over a spread of attitudes (`scratchpad/sky/FrameGapProbe.kt`), the two roll
+conventions agree to **0.000000000 screen units** — `equivalentView` negating the roll is exactly
+what makes the angle path match the vector path, which `SkyPointingTest` has always asserted. **The
+altitude clamp is the whole difference**, and it is a fixed *angular* error that a narrow field
+magnifies without bound:
+
+```
+aimed 89.9° up, where does a tap in the middle of the screen resolve to?
+  field 120°  0.400°   under 1% of the screen        field   5°  0.400°    8%
+  field  20°  0.400°   2%                            field   1°  0.400°   40%
+                                                     field 0.25° 0.400°  160%
+```
+
+So it is invisible at a wide field and total at the narrowest — the shape of a defect nobody notices
+until they zoom in on something overhead. **The planets are the sharpest of the four**: they are what
+somebody aiming the handset straight up is most likely to be pointing at.
+
+⚠️ **A probe that reports 0.0000 has not necessarily measured anything.** My first field sweep swept
+*horizon directions* and reported a flat zero at 5° and below — because at that field none of them is
+on screen, so nothing was compared. That reads as "no error" and is really the recorded *fixture
+never reached the branch*. Rewritten to ask where the **middle of the screen** resolves to, which is
+what a tap actually asks and is defined at every field.
+
+**Also worth keeping:** `drawHorizon`'s `centreAzimuthDeg` only sets where the 360° sweep starts —
+verified numerically over seven centre values that the loop runs exactly 181 samples spanning exactly
+360°, so the polyline closes on itself and the parameter cannot leave a gap. And `unitVector` +
+`projectUnit` is **strictly cheaper** than the `project` it replaces, which rebuilt the whole basis
+(four trigonometric calls and a second allocation) for every one of the 181 samples.
+
+**Verification, all local and free.** `SkyPointingTest` 27 green (was 23); **nine load-bearing rules
+negative-tested** against a baseline asserted green first, each perturbation asserted to have matched
+the source, all restored byte-identical, all nine awake. `tools/check_changed.sh` clean per slice; the
+whole of `:core:sky` plus the pure core — 196 files — type-checks clean against the real platform and
+the real Compose artifacts, that gate negative-tested with a planted typo. CI green on the first four
+slices (all five check runs, including the Windows MSI).
+
+⚠️ **`scratchpad/negtest_pole.py` gained a per-case target file**, because three of the slice-5 rules
+live in `SkyProjection.kt` and a harness that could only reach `SkyPointing.kt` would have reported
+them "awake" without touching the rule at all. It now backs up **every** file any case touches before
+the first perturbation — not the one being perturbed when its turn comes round.
+
+⚠️ **`scratchpad/` is NOT gitignored**, and 64 files there are already tracked — so the probes are
+committed (the source KDocs cite them). Re-confirmed the `git add -A` trap the hard way.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one, and this container has no
+phone to wave about.** In order: point it straight up and move your wrist a little (the sky should
+barely move, where it used to spin); roll the handset (the constellations should keep their tilt
+against the horizon rather than turning with the glass); check the horizon line and the N/E/S/W
+letters still sit where they should when aimed high; tap a star near the zenith at a narrow field and
+confirm the identify card names what your finger was on. The pole damping's *feel* — steady versus
+sluggish — is the one thing only a hand can judge; both constants are named and easy to tune.
+
+### S11 — THE DEEP TIER: G<15, 36.9 million stars, built in CI (this session, PR #464)
+
+Owner decided, via AskUserQuestion and twice over after the costs were measured and reported back:
+**G<15**, and **in LCARS as well as the standalone map** — the option I had explicitly advised
+against, because LCARS is 371 MB today and its auto-updater pulls the whole APK on every build. Their
+call; this builds it properly. **Zero subagent and zero workflow spend**, per the standing credit
+directive, which overrides the ultracode reminder as it has for every arc since.
+
+⚠️ **Everything numeric below was measured, not recalled.** Three live `COUNT(*)` queries against the
+ESA archive, a full local build at the shipped magnitude, and the shipped `saturationFovDeg` run over
+the shipped constants:
+
+    G<12 (was)   3,087,821 stars    24.7 MB   saturates 5.59°   48.6% dead zoom
+    G<15 (now)  36,909,335 stars   295.3 MB   saturates 1.08°   22.9% dead zoom
+
+Each magnitude buys exactly 0.238 decades (the limit is linear in log-field) and costs about 2.2× the
+last, so there is no natural stopping point — it is a budget choice, and the owner made it.
+
+#### The builder had to stop holding the sky in memory
+
+`main()` accumulated every row into one list and `pack()` re-bucketed them into a dict of lists, so
+both lived at once. A six-float Python tuple is ~250 bytes; 36.9M of them is roughly 9 GB on a runner
+already hosting Gradle. ⚠️ **The fix is cheaper than typed arrays because of a property that was
+CHECKED rather than assumed: a tile never straddles a declination band.** `SkyGrid` cuts bands first
+and divides each into whole RA columns, so every band is an independent packing problem — fetch it,
+bucket by tile as chunks arrive, write a part file, return only per-tile counts.
+
+⚠️ **Fetching and packing are ONE pool task on purpose.** A `Future` holds its result until the future
+itself is collected, so a worker that returned rows would keep every completed band alive for the
+whole run — exactly the memory this exists to avoid. And `fetch_chunk` now hands each leaf chunk to a
+sink and returns a count, rather than concatenating its children's lists, so a band never exists
+twice at the moment its last child returns.
+
+⚠️ `BandPacker.add` re-derives each row's tile with the shipped `Grid.tile_of` and refuses anything
+outside that band's range. That turns "the fetch bands and the grid bands line up" from prose into
+something the build fails on.
+
+**Measured at the shipped magnitude rather than on a toy: G<12, 3,087,821 stars, peak 191 MB.** The
+densest band at G<15 holds 1,159,100 rows against 97,000, so the deep tier lands near 2.2 GB.
+**Byte-identical to the builder it replaces** over the same cached chunks at G<6, G<9 and G<12; the
+write-flush branch was exercised separately by lowering the threshold to 64 bytes and comparing again.
+
+#### ⚠️ THE FINDING WORTH KEEPING: the archive does not answer twice the same way
+
+Rebuilding G<12 matched the committed catalogue in size, star count and tile index, and **differed in
+190 of 5,370 tiles — every one holding precisely the same records in a different order.** The cause
+is upstream and was settled by one repeated request rather than by reasoning: the query carries **no
+`ORDER BY`**, so a parallel execution plan may return the same rows differently, and asking the same
+small question twice returned an identical multiset that **differed at row 0**. `list.sort` is
+stable, so that order leaked straight into the file.
+
+Sorting server-side would mean an `ORDER BY` over a 36.9M-row scan, which is a far worse thing to ask
+of a research archive. Sorting on `(magnitude, ra, dec)` costs a few megabytes at the very largest
+tile, because `sort` builds its keys **per tile**, not per band. Four different upstream orders now
+produce one identical digest; without the tiebreak they produce four. Peak went 188 → 191 MB.
+
+#### What is now where, and why
+
+- **`.github/actions/star-catalogue`** is the ONE definition of the depth and the cache key. Three
+  workflows want this asset and a key drifting by one character would not fail — each would simply
+  never find the other's entry and rebuild for the best part of an hour, for ever.
+  ⚠️ Its build guard **reads the header** rather than asking whether a file exists: a checkout can
+  hand it a catalogue from another tier, and caching that under the right key would be permanent and
+  silent. Extracted from the YAML and run against real right-depth, wrong-depth and absent files.
+  ⚠️ Gated on the file, never on `steps.cache.outputs.cache-hit` — the recorded nutrition trap.
+- **`tools/sky/check_packaged.py`** answers present / STORED-not-deflated / right-DEPTH for a file on
+  disk or inside an APK. Ten cases negative-tested, including the count-floor branch, which the first
+  nine never reached. ⚠️ It says honestly what it **cannot** catch: a single lost chunk is 0.14% of
+  the catalogue, inside any floor a gate can carry. Completeness is the builder's own job.
+- **`.github/workflows/sky-catalogue.yml`** is a warmer, never a dependency — both builds still build
+  on a miss. It exists because a cold run is 1,100–1,900 requests to a research archive, and doing
+  that twice at once in two workflows is not polite.
+  ⚠️ **`workflow_dispatch` does not work from a feature branch.** GitHub registers dispatchable
+  workflows from the DEFAULT branch only: dispatching answered 404, and the API lists four workflows
+  here whose URLs all point at `blob/main`. So it also triggers on a push touching that file alone.
+  Once the cache is warm such a run finishes in about a minute, because the guard reads the header.
+  ⚠️ Its two `if:` guards are **truthiness, not `== ''`** — on a push event there is no `inputs`
+  context at all.
+
+#### Two defects found on the way, neither of them the thing being built
+
+- **The desktop jar has carried the packed catalogue since `:core:sky` was created.** Its build file
+  copies the whole asset directory while its comment claims "a quarter of a megabyte", and the
+  desktop `StarCatalogSource` opens exactly one resource, `/sky/stars.tsv` — there is no desktop
+  deep-tier reader at all. At G<15 that oversight would have put 295 MB into every MSI, silently.
+- **`build_milkyway.py`'s defaults still pointed at `app/src/main/assets/sky`**, gone since those
+  assets moved into the library that reads them. A run without `--catalogue` could only have failed.
+
+#### The test's split, and why it stops pinning numbers
+
+`SkyCatalogBundleTest` **maps** the file rather than reading it whole — 295 MB as a byte array, nine
+times over on the default test heap, is the difference between running and failing, and mapping is
+what the app itself does. It **no longer pins the star count or the depth**: those belong to whichever
+depth the build asked for, the Python gate checks them twice, and a stale copy in Kotlin would fail a
+perfectly good build. What the test owns is COHERENCE — the half a packaging gate cannot see.
+
+⚠️ Its tile-balance bounds are ratios now. Measured at G<12: thinnest 135, thickest 3,638, mean 575.
+The absolute ceiling of 20,000 was right for the shallow tier and would have failed the deep one while
+proving nothing extra. Colour completeness was measured too, before trusting the existing 90%
+assertion: **99.619% at G<15**.
+
+⚠️ **CORRECTION: the G<15 figure first recorded here — "tile 372 holds 54,097 against a mean of
+6,873", i.e. 7.9x — was WRONG, and it is the recurring mistake in its usual shape.** Tile 372 is the
+busiest at G<12 and I assumed it stayed busiest; it does not. The real busiest at G<15 is **tile 1416,
+toward the galactic CENTRE, holding 129,280 — 18.81x the mean**, measured from the first green build's
+own verifier line and confirmed against the archive. The ceiling of `mean * 12` that the wrong figure
+justified would have failed a perfectly good LCARS build. It is `mean * 30` now.
+
+⚠️ **And the two bounds move with depth in OPPOSITE directions**, which is what makes a fixed multiple
+a coarse instrument: a deeper cut gains disproportionately toward the galactic centre and
+disproportionately little at the poles, so the thickest pulls away from the mean while the thinnest
+sinks toward it. Measured — thinnest 0.235x at G<12 against **0.155x** at G<15 (floor is 0.0625x, so
+2.5x of headroom); thickest 6.33x against **18.81x**. A new depth means re-measuring both.
+
+#### ⚠️ Not committed, and untracking saves nothing retroactively
+
+`.gitignore` already states the rule in this repository's own words about the food database: GitHub
+hard-rejects files over 100 MB and there is no LFS. The old 24.7 MB blob **stays in history for
+ever** — untracking avoids future growth and shrinks nothing. The BRIGHT catalogue beside it stays
+committed and must: Gaia saturates above about G = 3 and holds none of the fifteen brightest stars in
+the sky, so the two files are the faint and bright halves of one picture.
+
+#### The updater says when a build will not fit
+
+A build this size wants roughly two and a half times its own size transiently. ⚠️ Guessing at that
+multiplier and refusing on it would block installs that would have worked, so **the only bar is that
+a download needs somewhere to land**, checked again against the file's real size before the install.
+Both sentences carry the two numbers rather than saying "not enough space". The next APK's size is
+estimated from the RUNNING package (`applicationInfo.sourceDir`), because the release asset's size is
+not something `UpdateInfo` carries and adding it would be a second thing to keep in step.
+
+#### ⚠️ Owner-verify on the Pixel — and the cost you accepted
+
+The whole point is visible only past 5.6° of field: zoom well in and stars should keep appearing
+where the map used to go empty, with the depth line falling silent until much further in. **And the
+one to watch is that a 612 MB update installs at all** on the budget phone rather than failing for
+space — that is what the new updater sentences are for, and only a device can settle it.
+
+⚠️ The recurring auto-update cost does not go away and cannot be mitigated within this design: every
+LCARS build republishes 612 MB and the phone pulls it in full. If it becomes tiresome, the shape
+that fixes it is the deep tier as a **downloaded pack** rather than a bundled asset — but
+`PackArchive` takes only `*.json`, caps entries at 32 MB and merges through the guide index, so that
+is a rewrite of the pack format rather than a switch to flip.
+
+⚠️ **ITEM G IS ANSWERED — see "THE RIFT QUESTION, MEASURED" at the end of this file.** The framing
+below is what was true before it was asked properly: the question does NOT need the catalogue on
+disk, because a density map can be got from the archive with a `GROUP BY`. Left standing as the
+record of the open item; the answer supersedes it.
+
+**Open, deliberately:** the Milky Way raster is still derived from the G<12 catalogue and is
+unchanged and correct as it stands. Whether rebuilding it from G<15 **strengthens or weakens** the
+Great Rift is a real question — the rift exists *because* extinction pushes stars below the cut — and
+it cannot be answered until the deep catalogue exists. Measure both and keep the one with more
+structure; do not guess, which is the trap this file records eighteen times.
+
+### S11 continued — the first cold build, and the verifier that rejected a correct catalogue
+
+The deep tier's first real crawl ran, and everything about it is now measured rather than estimated.
+**Zero subagent and zero workflow spend**, as with every arc since the credit directive.
+
+**The crawl works and the memory rewrite was the right size.** All 64 bands fetched and packed,
+**36,909,335 stars in 6,021 s (100 minutes)**, peak RSS **1.29 GB** against the 2.2 GB the local
+G<12 measurement extrapolated to — comfortably inside a 16 GB runner. The count matches the archive's
+own `COUNT(*)` exactly.
+
+⚠️ **AND THEN IT FAILED ON ITS OWN SPOT-CHECK, after a hundred minutes, on a catalogue that was
+entirely correct:** `AssertionError: record 14007680 decoded outside tile 1416`.
+
+`verify()` asserted `grid.tile_of(ra, dec) == busiest` with **no tolerance**. A position is stored as
+a fraction of its own tile, so a star hard against the top quantises to 65535 and decodes to EXACTLY
+the upper bound — and tile bounds are half-open, so `tile_of` correctly answers the tile above.
+Nothing was mis-filed. Measured over the shipped G<12 catalogue rather than reasoned about:
+
+    records at a quantisation maximum:                    51
+      of those, tile_of answers a different tile:         50
+      largest quantum involved:                     0.1545 arcsec
+      how many landed in the BUSIEST tile:                 0     <- the only tile verify() inspects
+
+⚠️ **It passed at G<12 by luck.** None of the fifty happened to fall in the one tile the loop checks.
+At G<15 there are ~12× as many such records and the busiest tile holds ~15× as many stars.
+
+⚠️ **`SkyCatalogBundleTest` has documented and tolerated this exact case since it was written** — "a
+handful of stars decode into the NEXT tile along, and that is the format working rather than failing…
+measured: 3 stars in 281,625". Two independent statements of one fact, disagreeing, in the shape
+where the disagreement only surfaces after an hour of work. The fix states the format's own
+condition rather than a threshold: an out-of-tile record is permitted **only** when its raw
+coordinate is at the quantisation maximum, because a decode is always inside the closed bounds
+(`lo + f*(hi-lo)`, f in [0,1]) and the half-open tie-break is the only thing that can disagree.
+Negative-tested three ways against the real file — baseline green first, tile forced to one that
+holds a boundary record (passes, reports it), then the exception removed (fails with the original
+message) — source restored byte-identical.
+
+**What the failure cost, and the two mitigations that were considered and REJECTED.** `actions/cache`
+is `post-if: success()`, so nothing saved: `Restore the star catalogue … outcome=skipped`. The
+hundred minutes are gone.
+- ⚠️ **Persisting the chunk cache would not work**: 36.9M rows of CSV at ~90 bytes is about **3 GB**,
+  which would swamp the 10 GB repository cache and evict the food database.
+- ⚠️ **Saving the catalogue on failure is worse than the disease**: it would cache an unverified
+  295 MB file under the right key, permanently, with every later build drawing a sky built from it —
+  precisely the trap `action.yml`'s own comment warns about for the wrong-depth case.
+
+**Measurements worth not re-deriving.**
+- ⚠️ **A cold crawl is `2L − 1` requests, not `L`.** Every interior node of the binary split fetches
+  a full 50,000-row page and then **throws it away** (`os.remove(path)` on a truncated chunk). The
+  action's "1,100–1,900 requests" counted leaves only and undercounts by roughly half; the real range
+  is **~2,200–3,000**, which is what 100 minutes at 4 concurrent × ~9.25 s actually reflects. **The
+  lever, if cold builds ever need to be cheaper: an interior node only needs to know WHETHER it
+  exceeds the cap, so a `SELECT COUNT(*)` there would replace a discarded 50k-row fetch.**
+- ⚠️ **The reading path has a hard ceiling, measured: `FileChannel.map` throws
+  `IllegalArgumentException: Size exceeds Integer.MAX_VALUE` at exactly 2,147,483,648.** With
+  `HEADER_BYTES = 32`, `RECORD_BYTES = 8` and 5,370 tiles that caps a catalogue at **268,432,766
+  stars (2.00 GiB)**. G<12 uses 1.15% of it, G<14 6.27%, **G<15 13.75%**. Nothing stated this
+  anywhere before.
+- ⚠️ **The cache key hashes `StarCatalogFormat.kt` and `SkyGrid.kt` by CONTENT**, so editing either —
+  *even a comment* — forces a fresh ~100-minute crawl. That is exactly where a note about the format
+  wants to go, so such notes belong in `action.yml`, which is not in the hash.
+- The eager assertion messages in `SkyCatalogBundleTest`'s two hot tests cost **2.8 s** at G<15
+  scale, measured with a real JVM program. Not worth changing; my instinct said "tens of seconds".
+- Verified safe at the deeper tier, each by running code rather than reading it: `Sink` grows rather
+  than truncating; the `MappedByteBuffer` survives closing both the channel and the
+  `RandomAccessFile`; and `StarCatalogReader` has no `.array()`/`hasArray`/`arrayOffset`, so handing
+  it a direct mapped buffer instead of a heap one cannot throw.
+
+⚠️ **Operational: `get_job_logs` returns 404 for an IN-PROGRESS job.** A running job's progress cannot
+be watched through the MCP tools at all — the log archive does not exist until the job finishes
+uploading. The only instrument is the step status, and a frozen `in_progress` is normal rather than
+evidence of a stall. (Same family as the recorded `BlobNotFound` trap on a job that has only just
+finished.)
+
+⚠️ **A push touching `tools/sky/**` starts TWO cold crawlers** — that path is in `sky-build.yml`'s
+allowlist and is not in `android-build.yml`'s ignore list. One of them must be cancelled by hand, or
+two 100-minute crawls hit a research archive at once, which is the exact discourtesy the warmer
+exists to prevent.
+
+**THE DEEP CATALOGUE NOW EXISTS AND IS CACHED. Sky #18 (`33310557054`) went fully green**, and
+every number below is from its own log rather than an estimate:
+
+    fetching Gaia DR3 down to G < 15
+    fetched and packed 36909335 stars in 6077s          (101 min, sole crawler)
+    verified: busiest tile 1416 holds 129280 stars, in order, 2 on the tile's upper edge
+    36909335 stars, 5370 tiles, 295.3 MB (8.00 bytes a star)
+    APK: size: 304486113 bytes (291M)
+    every native library is present for all four architectures
+    sky assets packaged: NOTICE.txt constellations.json deepsky.tsv milkyway.bin stars.skycat stars.tsv
+    == the star map stands alone ==
+    Cache saved with key: star-catalogue-g15-e597a88d…-dr3-v1     (267,320,289 bytes compressed)
+
+⚠️ **`busiest tile 1416 … 2 on the tile's upper edge` is the fix vindicated on the same tile that
+killed the previous run** — `record 14007680 decoded outside tile 1416`. Two boundary records; the
+old assertion rejected the first, the new one reports both and passes.
+
+**The Star Map APK is 304,486,113 bytes (291 MB)**, up from 33 MB, and one universal APK still covers
+all four architectures.
+
+**LCARS #2143 (`33315488303`) then went fully green against that warm cache, and S11 is finished.**
+Every figure here is from its own log:
+
+    Cache hit for: star-catalogue-g15-e597a88d…-dr3-v1
+    Received 267320289 of 267320289 (100.0%), 260.1 MBs/sec      <- restore, 1762 ms
+    core/sky/src/main/assets/sky/stars.skycat: v1, 5,370 tiles, 36,909,335 stars, built for G < 15.0
+    assets/sky/stars.skycat: v1, 5,370 tiles, 36,909,335 stars, built for G < 15.0   <- read from the APK
+    APK: 612 MB (641994673 bytes)
+      444657664  assets/food/food.db
+      295296196  assets/sky/stars.skycat
+      940108809  1214 files          <- uncompressed total
+
+⚠️ **The two-second catalogue step is explained rather than assumed: 260.1 MB/s.** 267 MB compressed
+lands in 1,762 ms, the build step then skips in 56 ms and the header check takes 52 ms. A cold crawl
+is a hundred minutes, so that timing was the one thing worth confirming before believing the round.
+
+⚠️ **The gate reads the header OUT OF THE APK, not off the file that was written.** Both lines above
+are real: one is `check_packaged.py` against the working copy, the other against the packaged asset.
+A build that restored the right catalogue and then packaged something else would pass the first and
+fail the second, which is the whole reason the second exists.
+
+**The measured LCARS APK is 641,994,673 bytes — 612 MiB, and 642 MB decimal**, so the estimate this
+section was written against was right to within rounding. ⚠️ It is stated as **612 MB** everywhere
+now because that is the number the build itself prints and the number a phone's storage screen shows;
+the two food and sky assets are 740 MB of the 940 MB uncompressed total, and `stars.skycat` is
+packaged at its exact on-disk size, which is `noCompress` working.
+
+**Item G (the Milky Way) is now baselined rather than blocked.** `build_milkyway.py`'s corrected
+default paths had never been run; they work, take 6.6 s over 3.09M stars, and produce a raster
+**byte-identical** to the committed `milkyway.bin`. New `scratchpad/sky/measure_milkyway.py` measures
+density, flux and the plane profile under one band definition:
+
+    DENSITY  plane 183.80  poles 22.86    -> 8.04x   (docstring says 7.93x)
+    FLUX     plane 0.01645 poles 0.003694 -> 4.45x   (docstring says 4.52x)
+    l  20- 49   137.2, 105.9, 143.0   <- a trough 2.01x below both its flanks
+
+⚠️ **My first flux figure was 5.42× and it was wrong**: I decoded magnitude as
+`MAG_OFFSET + raw/255*MAG_SCALE` when the shipped `decodeMagnitude` is `raw/MAG_SCALE + MAG_OFFSET` —
+MAG_SCALE is *steps per magnitude*, not a span, which is why a full byte reaches 16.21 and not 12.
+That made every faint star three magnitudes too bright and was one commit from being written up as
+"the docstring has gone stale". With the shipped decode all three figures reproduce to within a few
+per cent, so **the docstring is NOT stale and there is nothing to correct.** The figure to carry into
+a deep-tier comparison is the **local trough depth (2.01×)**, not the global 5.00× ratio, whose
+minimum is the anticentre — thin because the line of sight leaves the galaxy, not because of dust.
+
+### THE RIFT QUESTION, MEASURED — item G answered, and the rebuild it argues for (this session)
+
+The last open item of the sky plan. It had been recorded twice as blocked on "needs the 295 MB
+G<15 catalogue locally", and **that framing was the thing standing in the way, not the data.** The
+Milky Way raster is a DENSITY map, `gaiadr3.gaia_source` carries galactic `l`/`b` as columns, and a
+`GROUP BY` therefore answers it directly — **four requests instead of the ~2,200 a crawl costs**,
+which also keeps faith with the politeness reasoning `sky-catalogue.yml` is built on. Tool:
+`scratchpad/sky/measure_rift_depth.py`. **Zero subagent and zero workflow spend.**
+
+⚠️ **VALIDATED BY A COMPLETELY DIFFERENT ROUTE BEFORE ANY OF IT WAS BELIEVED.**
+`measure_milkyway.py` runs the shipped raster over the packed catalogue and banked a G<12 rift
+depth of **2.01x** and a plane-to-pole contrast of **7.93x**. This reads raw Gaia through the
+archive and gets **2.01x and 7.93x**. Two independent paths, same numbers — which is the only
+reason the deeper comparison is worth anything.
+
+| | G<12 | G<15 |
+|---|---|---|
+| plane-to-pole contrast | 7.93x | **17.38x** |
+| rift, min-based (the banked method) | 2.01x | 2.05x |
+| rift, mean of the three trough bins | 1.65x | 1.56x |
+| rift, min-based, centre bin excluded | 1.96x | 1.63x |
+
+⚠️ **THE THREE RIFT MEASURES DISAGREE AND THE CAUSE IS IDENTIFIABLE RATHER THAN NOISE: `l = 0-9`
+IS THE GALACTIC CENTRE, NOT A FLANK.** It grows **30.3x** between the two cuts against the plane's
+overall 15.5x — the centre emerging from its own extinction, which is the same phenomenon the rift
+is made of, happening somewhere else and dragging the flank average up with it. That is what props
+the min-based ratio flat. Exclude it and the min-based measure agrees with the mean-based one.
+
+**So: the band gets much stronger, and the rift fills in somewhat.** A likely mechanism, offered as
+reasoning and NOT as something measured here: extinction is a fixed magnitude penalty, so a dust
+lane admits stars to `L-A` where clear sky admits them to `L`, and `N(L-A)/N(L)` tends toward 1 as
+`L` moves into the range where disc counts flatten. In a Euclidean universe that ratio would not
+move with depth at all; the galaxy is not Euclidean, and it runs out.
+
+⚠️ **THE TRAP I WALKED INTO, and it is the recurring one wearing a new coat.** I chose a
+mean-of-three-bins aggregation, got 1.65x -> 1.56x, and was one sentence from reporting "the rift
+weakens" — when the **like-for-like** comparison against the banked method says 2.01x -> 2.05x,
+essentially flat. Neither number is wrong; they are different questions. **Match the banked
+method before comparing to a banked number**, then report the others beside it. Nineteenth or so
+appearance of this habit in the arc-series.
+
+**The verdict this argues for: REBUILD the raster from G<15.** The band more than doubles in
+contrast and the rift survives as a visible trough at 1.6-2x by every measure, so the structure is
+not lost and the picture gains a great deal. ⚠️ **NOT DONE HERE, deliberately**: `build_milkyway.py`
+reads the packed catalogue, which this container does not have and should not crawl for; and it
+regenerates a shipped visual asset that nothing here can look at. It wants the catalogue in hand —
+a CI step beside the builder is the obvious shape — and `measure_milkyway.py` re-run against the
+old raster before it ships, because the raster adds its own binning and smoothing on top of what
+was measured here.
+
+⚠️ **SUPERSEDED — THE REBUILD IS DONE. The paragraph immediately above is a dated record of why it
+had not been done YET, and it is correct as of when it was written; it is NOT a description of the
+current state, and a future session acting on it would redo finished work.** The shape it predicted
+is the shape that shipped: a CI step beside the builder. See **"THE MILKY WAY IS REBUILT FROM G<15"**
+at the end of this file. Left standing rather than rewritten for the reason the log is always left
+standing — but flagged, because unlike an ordinary stale record this one names an open task that is
+closed.
+
+⚠️ **Two ADQL notes, both of which cost a round.** The parser rejects an EXPRESSION in `GROUP BY`
+outright — `GROUP BY FLOOR(l/10)` answers 400 with *"Was expecting ... &lt;REGULAR_IDENTIFIER&gt; ...
+&lt;UNSIGNED_INTEGER&gt;"* — so the alias or the column position is the only form it takes. And a 400
+from this endpoint carries the real complaint in the body, which `urllib` puts on the exception
+rather than raising with it: `except HTTPError as e: e.read()`. Guessing at the cause instead
+would have taken several attempts.
+
+### THE MILKY WAY IS REBUILT FROM G<15 (this session, `706cb7c` + `550d76e`, PR #464)
+
+The item above argued for it; this did it. The catalogue went to 36,909,335 stars at G<15 last arc
+while `milkyway.bin` was still derived from the old G<12 one, so the app shipped a catalogue and a
+galaxy that disagreed about how deep the sky goes. **Zero subagent and zero workflow spend**, as with
+every arc since the credit directive — local kotlinc + JUnit, live measurement, and CI.
+
+Owner's two binding decisions: the raster **stays committed and CI verifies it** (the picture stays
+reviewable in the repo, and drift from the catalogue becomes a build failure); and the thresholds are
+**rescaled with the builder asserting them**, so the pair can never move apart again.
+
+#### ⚠️ THE RESCALE WAS THE POINT, NOT THE ASSET — and one measurement is the whole argument
+
+`MilkyWay.opacity` maps a density in **stars per square degree** through two ABSOLUTE constants, and
+they were tuned for G<12. Measured over the shipped raster, cell by cell:
+
+| | sky drawn at all | at full opacity |
+|---|---|---|
+| G<12 raster, the old 40 / 400 | 43.6% | 0.11% |
+| **G<15 raster, 280 / 10,000** | **50.3%** | **0.10%** |
+| G<15 raster, the old 40 / 400 | **100%** | **37.5%** |
+
+**The third row is what swapping the asset alone would have shipped**: every direction glowing and
+more than a third of the sky pinned flat at the cap — a uniform wash with a slab through it, not a
+galaxy. **Every automated gate would have passed**; the builder's own contrast check reads 17x on
+that raster and is delighted. Only a person looking at a phone would have seen it. That is the
+recurring class — *an asset regenerated at a new scale while its consumer's absolute thresholds stay
+put* — and it is why the two must move in one commit.
+
+So `FAINTEST_DENSITY` 40 → **280** (the raster's own median cell is 276.2, which is what keeps
+roughly half the sky black) and `BRIGHTEST_DENSITY` 400 → **10,000** (its 99.9th percentile is
+9991.4). `AssetProbe` through the shipped reader over the real asset confirms the design intent
+landed: **50.3% drawn, 0.10% capped, both poles at zero opacity**, Sgr A* at l=359.944 b=-0.046.
+
+#### ⚠️ THE LIKE-FOR-LIKE TRAP, AND IT NEARLY SHIPPED A FALSE CLAIM
+
+My first replacement fixtures were measured by a **different method** from the ones they replaced,
+and implied the Great Rift had deepened **2.6x → 6.2x**. Reading the *previous* raster with the
+method the *old fixtures actually used* — mean density over |b| <= 5 per whole degree of longitude,
+trough as the minimum over l = 20..50, flanks as the mean of the best 20° either side — returns
+**83.0 and 214.1, exactly what stood in the test**. The same method on the new raster gives 1656.5
+and 4241.1. So the honest answer is **2.58x → 2.56x: unchanged**, which agrees with
+`measure_rift_depth.py`'s independent archive measurement (2.01 → 2.05) and disagrees with the number
+I was one sentence from writing.
+
+**Match the banked method before comparing to a banked number.** Twentieth appearance of this habit.
+The test's companion object now states the method as well as the numbers, and says outright that a
+different-but-reasonable method (single cells rather than a band mean) gives 487 and 3046 for the
+same sky.
+
+What *did* change, measured the one way: plane-to-pole **8.03x → 17.46x**, along-the-plane variation
+**5.03x → 9.63x**, and the maximum moved from Carina–Crux to **Sagittarius at l = 1** — the bulge
+emerging from its own extinction, the one place a deeper cut un-hides something rather than scaling
+everything up.
+
+#### The gate, and why each piece is load-bearing
+
+`.github/actions/star-catalogue/action.yml` rebuilds the raster and **hard `cmp`s** it against the
+committed bytes. It lives in the composite action for the reason that file's header already gives
+about the cache key: three workflows want it, and a definition drifting between two of them would not
+fail loudly.
+
+- **The builder RAISES rather than warns.** `report_thresholds` exits non-zero if the poles reach the
+  floor, or if either constant is more than **±30%** from the raster's own statistic. That tolerance
+  is measured, not chosen: the shipped pair sits +1.4% / +0.1% off this raster and the G<12 pair sat
+  +12% / −0.8% off its own, where a change of depth moves them 8–30x.
+- ⚠️ **`if: always()` on the artifact upload, and there are TWO failure modes.** A `cmp` mismatch
+  prints the bytes as base64 into the log as well — but the builder *raising* fails before the base64
+  is ever reached, and `build()` writes the raster **before** either gate runs, so in that case the
+  artifact is the only copy of the bytes that exists.
+- The comparison is sound because the rebuild is deterministic in the strong sense: it depends only
+  on the **multiset** of star positions, so a catalogue refetched cold in a different row order
+  yields identical bytes.
+
+#### Verification worth copying
+
+- **The new assert negative-tested with REAL DATA rather than a perturbation.** The G<12 catalogue is
+  still on disk; running the builder against it exits 1 naming `FAINTEST_DENSITY` and the 35.7 that
+  raster implies. Its `worst byte error 3.6% (55.2% had it been linear)` reproduces the KDoc exactly,
+  which independently confirms the new linear-cost reporting is right before it was ever pointed at
+  G<15.
+- **The gate's shipped shell lifted out of the YAML and executed** against real files in all three
+  states — identical → 0; different → 1 with both markers and base64 decoding byte-identical to the
+  rebuilt file; builder fails → 1 without claiming identical. (Assert no `${{` survived substitution.)
+- CI proved it end to end on a warm cache: **Sky #20** printed `both constants agree with this
+  raster` and `identical — the committed raster is what this catalogue implies`, with matching
+  digests. Then **Sky #21 and LCARS #2146** green on the follow-up commit.
+- ⚠️ **And re-verifying these very figures produced a false alarm, which is the harness lesson again
+  in its smallest form.** A throwaway script written to re-check the plane/pole contrast divided by
+  **11** rows where `|b| <= 5` actually holds **10**, so it reported 7.30x / 15.88x against the
+  recorded 8.03x / 17.46x — a 9% discrepancy that reads exactly like a wrong number in the record.
+  The record was right (CI's own line says `contrast 17.46x`); the checker was wrong. **A
+  verification script that miscounts its own denominator accuses the thing it is checking.** The
+  earlier measurement had it right by construction, using `len(vals)` rather than a hand-written
+  count — which is the general fix.
+
+#### ⚠️ A SIXTH WAY A GREEN TEST PROVES NOTHING
+
+The five recorded are: the perturbation never matched the source; it only *touched* the code without
+removing the property; the fixture never reached the branch; the assertion was too weak to see the
+damage; and the baseline was already failing. New:
+
+**A perturbation harness whose total runtime can exceed the tool's 2-minute timeout is SIGTERMed, and
+`finally` does not run.** It left a perturbation in the tree — caught immediately, but only because
+the next command checked the file rather than the exit message. **The restore belongs in the shell,
+after the python exits**, via a `trap … EXIT`, and run one case per invocation. All three test guards
+were then confirmed awake, including the decisive one: putting the G<12 floor of 40 back under the
+G<15 raster fails exactly the two pole tests.
+
+#### Two figures the first green run corrected (`550d76e`)
+
+- ⚠️ **I had quoted half a comparison.** `encodeDensity`'s KDoc gave `55.2% linear vs 3.6% sqrt` for
+  G<12 and only the `5.4%` sqrt figure for G<15, leaving a reader to pair a new number with an old
+  one — the "two different sums" mistake the same file warns about. CI prints the missing half:
+  **33.3%**. So the ratio moved **15.3x → 6.2x**; still decisive, less so than it was, because a
+  deeper catalogue fills in the faint end that linear scaling handles worst. Both halves are now
+  quoted at both depths.
+- The action's cost comment stated 56.1 s as *the* measured figure; this round measured **72.6 s**.
+  Now given as the range across two real runners (305 MB peak), with the reason — variance plus the
+  linear-cost computation the second one also does.
+
+#### Also corrected in `MilkyWay.kt`
+
+Every G<12 figure restated or labelled. ⚠️ **The density-vs-flux table is deliberately LEFT at its
+depth**: it argues which of two instruments to use, not what this raster looks like, and re-measuring
+flux needs the packed catalogue in hand — quoting a fresh density beside a stale flux would compare
+two different sums. The counting noise is **re-measured rather than derived**: 2,130 stars a cell
+near the plane, so **2.2%**, against the encoding's 5.4% — the byte is now the coarser of the two and
+says so. `STEP_DEG`'s step-size table keeps its G<12 rows for the same reason (the comparison
+*between* step sizes is what it is for) with the G<15 figure added beside it.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one.** The question no gate
+here can answer is whether the galaxy looks **better**: more structure in the band, the Great Rift
+still a visible dark lane through it, and the high-latitude sky still genuinely black rather than
+washed. That is the reason the raster stays committed and reviewable.
+
+**Open, unchanged by this arc:** nothing on the Milky Way. The sky plan's remaining item is still the
+owner-facing one — a screenshot would settle both the aesthetic and whether `MAX_OPACITY` wants
+tuning, and it is one constant.
+
+### THE NUTRITION APP — scanner, database and layout (this session, PR #464)
+
+Owner: the barcode scanner *"doesn't actually work… it can't even figure out what the barcode is…
+it doesn't even quickly search through the barcodes"*, the data behind it *"doesn't give the correct
+amount of information"*, and *"a lot of the stuff looks wonky on the phone… not formatted
+correctly"*. It should work like MacroFactor's, hold effectively every food barcode, be continuously
+topped up, and *"not be so slow or so shit as it is right now"*.
+
+⚠️ **The target is the STANDALONE `:nutrition` app, not the HEALTH tab in LCARS** — the owner said
+so explicitly after I planned against the wrong one. ⚠️ **And this container's checkout was 866
+commits behind**, so `nutrition/`, `:core:health`, `:core:update` and three workflows did not exist
+locally; three Explore agents had already been dispatched against the stale tree and their findings
+were discarded. **`git log --oneline -1` against the remote before planning.**
+
+Owner's three binding decisions: **ML Kit *and* fix ZXing**; **a downloadable data pack**, not APK
+payload; **both** scheduled rebuilds and on-demand lookup.
+
+#### The scanner (`2f47cac`) — the defect was one omission, proven not guessed
+
+An `ImageProxy` arrives in the **sensor's** orientation and reports how far that is from upright in
+`imageInfo.rotationDegrees`. Neither scanner read it. ZXing's one-dimensional readers scan **rows**,
+so a barcode lined up horizontally on screen lies **vertically** in the buffer — perpendicular to
+every line the decoder looks along. It cannot decode. It succeeds only when the phone or the packet
+happens to be turned, which is exactly the intermittency reported.
+
+⚠️ **And the retry that looks like it covers this is dead code.** `OneDReader.decode` tries a rotated
+copy only `if (tryHarder && image.isRotateSupported())`, and `PlanarYUVLuminanceSource` never
+overrides `isRotateSupported`, so it inherits `false` from `LuminanceSource`. Read out of the shipped
+3.5.3 classes. `TRY_HARDER` was buying nothing on this path, which is why the code read as though the
+case were handled.
+
+⚠️ **A second, silent defect: a UPC-E decode yields a key the database can never match.** UPC-E is a
+twelve-digit UPC-A with a run of zeros squeezed out and the decoder returns the **compressed eight**
+(`convertUPCEtoUPCA` is called only inside `checkChecksum` — confirmed by disassembling
+`UPCEReader`). Read as a number that is 1,234,565 where the product is 12,345,000,065, so the app
+reports an unknown product for a barcode it read perfectly. UPC-E is what small packets carry.
+
+- **New `:core:scan`**, because the two applications had a near-verbatim copy of the camera and
+  decode layer each, both with a header saying in writing they must be changed together, and both
+  carrying this bug. Not depended on by `:core:health`.
+- **Bundled ML Kit leads, rotation-corrected ZXing behind it.** ⚠️ Both build scripts said the
+  bundled variant "adds two or three megabytes" — wrong by an order of magnitude. Measured from the
+  published artifact: **9.9 MB AAR, 20.2 MB of native across four ABIs**, and the shipped APK went
+  189,972,281 → 211,834,953 bytes, +20.8 MB, exactly as predicted. It needs no Play Services; that
+  is strong evidence rather than proof from a build machine, which is why the ZXing fallback is live.
+- **`BarcodeScan.expandUpcE` + `canonical`** in the shared pure core so the two apps cannot drift.
+  ⚠️ Checked **exhaustively against ZXing's own `convertUPCEtoUPCA` over all 2,000,000
+  number-system-0-and-1 codes: zero disagreements.**
+- **`LumaRotate`**, pure and JVM-testable, checked against an independent reference over 1,600 random
+  shapes. ⚠️ **My first draft was wrong twice at once** — 90° and 270° swapped, and both multiplying
+  by a dimension that goes negative whenever a frame is wider than it is tall, i.e. always.
+- 1280×960 analysis instead of the default VGA (an EAN-13 module is about three pixels at VGA and
+  arm's length), a torch, tap-to-focus, a centre-band retry, and six honest states where a camera
+  that never opened and a room too dark to read both said *"Line the barcode up in the frame."*
+- **ITF dropped**: variable-length, no enforced check digit, and with TRY_HARDER it reads a run of
+  bars off a folded label and hands back fourteen plausible digits that confirm and find nothing.
+
+#### The database leaves the APK (`841029a`)
+
+Measured: the APK was 189,972,281 bytes of which the overwhelming majority was ONE 425 MB asset
+holding 4,524,449 products — and the in-app updater downloads the **entire APK on every published
+build**, so adding barcodes meant re-downloading the whole corpus every time a line of UI changed.
+
+- `FoodPack` (pure, 18 tests) decides: never downgrade (a rolled-back release leaves a phone
+  **ahead**, not stale); never offer a pack whose schema this build cannot read, and say which
+  direction the mismatch runs; prefer a delta chain only when the saving is real.
+- `FoodPackRepository` carries it out — verify the checksum **before** unpacking, work in temporaries
+  beside the destination, replace by rename **last**, so an interruption leaves the existing database
+  exactly as it was.
+- ⚠️ **Deltas are NOT implemented and the code says so** rather than quietly doing a full download.
+- ⚠️ **`FoodDatabase.open` gained a REFUSAL that is the most dangerous branch in the file.** With no
+  database and no asset, `databaseBuilder` would happily create an **empty** one — schema emitted, no
+  error anywhere, every barcode from then on answering "no such product" from a genuinely empty
+  table, permanently.
+- ⚠️ **And a second:** `fallbackToDestructiveMigration` is what makes an *asset's* version bump work,
+  and on a file the app **downloaded** it means Room silently deletes several hundred megabytes
+  somebody waited for. A version check ahead of Room deletes a stale or truncated file and names it.
+- ⚠️ **`FoodRepository` takes a SUPPLIER of the store, not a value.** Held as a value, whatever it
+  resolved to at construction — null, on the run where somebody first downloads it — is the answer
+  for the rest of the process, and the person finishes a ten-minute download the app then insists did
+  not happen. Same reason the container's memo is not `by lazy`.
+- ⚠️ **The LCARS app is deliberately untouched and still bundles the asset.** `open` handles both.
+- ⚠️ Honest cost: the first run needs a network, and a private repo needs the updater's token.
+
+#### CI: the corpus can finally grow (`2b43c5d`)
+
+⚠️ **The cache key hashed only the BUILDER, so once a database was cached it was restored for ever
+and the corpus was frozen at whatever day it was first built.** "Keep adding barcodes" was
+structurally impossible. The key now carries a **monthly window** and a `schedule:` fires on the 4th,
+so it does not depend on somebody happening to push. Monthly rather than weekly only until deltas
+exist: each content change means a fresh ~160 MB download offered to the phone.
+
+The publish step is **content-gated** (the release name carries the database's SHA-256 prefix), so a
+run whose corpus has not moved uploads nothing. ⚠️ **Both workflows' keys had to move together** —
+they deliberately share one cached database — which costs one full rebuild.
+
+#### Layout: `Row` does not wrap, and 19 of 23 held controls that cannot shrink
+
+⚠️ **A `Row` neither wraps nor shrinks its children: whatever does not fit is simply not drawn.** No
+scrollbar, no fade, nothing to suggest there is more. Classified every fixed-arrangement row in the
+app by whether its children can shrink — **19 hold buttons or chips, which cannot.** `RepeatADay`'s
+three ("Yesterday", "Two days back", "A week back") need more width than a card has on any phone, so
+the third option did not exist as far as anyone could tell. New shared `WrapRow`; 18 converted.
+
+⚠️ Its content takes a **`RowScope`, not a `FlowRowScope`** — the latter extends the former, so
+callers keep `weight()` (two converted rows rely on it) without `@ExperimentalLayoutApi` leaking into
+a signature every screen would have to opt in to.
+
+Also: `StatRow` bounded both sides (a long label pushed the **value** off the edge, the half being
+read, because it is laid out second); the weekday strip's seven equal weights left **18.7 dp for a
+three-letter label** (379 dp card ÷ 7 minus a chip's own 32 dp padding), so it wraps at content size
+now; `SetRow`'s 268 dp of hard-coded width in a ~296 dp card became weights; **20 of 24 text fields
+declared no keyboard type**, and every numeric one (marked by `Decimals.keep`) now asks for the
+number keyboard; the GitHub token field gets `KeyboardType.Password` — the masking beside it is a
+different thing, and without this a soft keyboard is free to "correct" a pasted token invisibly; and
+the **viewfinder became a full-screen window** instead of a 4:3 box a third of the way down a
+scrolling page.
+
+#### ⚠️ New gate: `tools/kotlin_missing_return.py`
+
+A CI failure, and no local gate could have caught it: a `by lazy` became a block-bodied function, and
+a lazy initializer's last expression IS its value where a block body's is discarded. The parse pass
+does not type-check, `android_resolve_check.sh` differences unresolved NAMES, and that file pulls in
+half the application so `android_compile_check.sh` cannot reach it.
+
+⚠️ **Its first version reported a confident zero across the whole repository and did NOT catch the
+defect it was written for** — it looked for the substring `return` in the body, and the body contains
+the word *"returning"* in a **comment**. Comments and string literals are stripped before anything is
+searched and `return` is matched as a whole word. Negative-tested against the real defect first.
+
+#### Verification, and two more of the recurring habit
+
+Zero subagents. Local kotlinc + JUnit, exhaustive cross-checks against reference implementations,
+`javap` against real published jars, the gate chain, and CI. **12 rules negative-tested** across the
+arc against baselines asserted green first.
+
+⚠️ **Two predictions of mine were wrong where the code was right**, and one produced a finding worth
+keeping: the four-quarter-turn round trip **cannot detect a turn going the wrong way** (four
+anti-clockwise turns also return to the start), so direction is held only by the fixed examples —
+that is documented on the test now. The other was a fixture list that claimed to cover all four
+branches of the UPC-E rule while covering three; deleting the missing branch failed nothing.
+
+⚠️ **A verification technique that paid twice: extract a workflow step and RUN it.** The pack-publish
+step was pulled out of the YAML and run against a throwaway database, which found a real defect —
+`sqlite3` is not installed everywhere and the `|| echo 0` beside it swallowed that, producing a
+manifest saying "0 products" for a corpus of four and a half million, which is the sentence asking
+somebody to allow a 160 MB download. It counts with python3 now and refuses to publish rather than
+claiming none. All three of that step's guards were then confirmed to fire.
+
+⚠️ **And a near-miss of the class this file keeps recording**: I read "0 ExperimentalLayoutApi" off a
+`javap` that had **failed to find the class at all** — `FlowRow` lives in `foundation-layout`, not
+`foundation`. An empty grep over a failed command is indistinguishable from a clean answer.
+
+#### Open
+
+- **Deltas.** The format, `FoodPack.plan` and the install branch are in place; the builder does not
+  emit them. Until it does, every content change is a full ~160 MB fetch, which is why the schedule
+  is monthly rather than weekly.
+- **⚠️ The recorded reason for rejecting an FTS index is now OBSOLETE and worth re-deciding.**
+  `FoodDao.searchByNamePrefix` documents an FTS5 index at ~107 MB, rejected because that was "on an
+  APK the in-app updater re-downloads in full on every build". The database is no longer in the APK,
+  so the cost is a one-time download rather than a per-build one — and name search is still a full
+  scan of 4.5 million rows. Doing it means bumping `FoodPack.SCHEMA`, and **now is the cheapest
+  possible moment**, because no phone has downloaded a pack yet.
+- **Remembering a network-found product.** `FoodRepository.byBarcode` already falls back to Open Food
+  Facts and already distinguishes `NoNutrition` from `NotInDatabase` — but nothing writes the result
+  into the local database, so the same product is fetched again tomorrow.
+- Whether the LCARS app should also stop bundling the corpus (its APK is 285 MB and its updater
+  re-downloads all of it on every build). Deliberately not done: a behaviour change on a daily driver.
+
+⚠️ **Everything here is owner-verify on the Pixel.** CI compiles a scanner; it cannot point one at a
+packet. In order: **scan a curved can, a crinkly bag and a small cosmetic barcode in PORTRAIT**,
+which is the case that could not work at all before; then the first-run database download (Log tab,
+or Plan ▸ Food database); then whether the app still looks cramped anywhere.
+
+### THE NUTRITION APP, CONTINUED — the pack that deleted itself, and the search that never was (this session, PR #464)
+
+The section above left three items open; this closes two of them (the FTS index, which its own Open
+list called *"worth re-deciding"*, and search speed), and along the way found a defect that would
+have made the whole pack mechanism useless on a real phone. **Zero subagent and zero workflow spend**,
+per the standing plan-usage constraint, which overrides the ultracode reminder as it has for every
+arc since. Every check below is local kotlinc + JUnit, a live measurement, a read of Android's own
+source, or CI.
+
+**⚠️ THE DEFECT THAT MATTERED MOST: NOTHING EVER SET `user_version`, SO A DOWNLOADED PACK DELETED
+ITSELF ON FIRST OPEN.** `FoodDatabase.usable` deletes any file whose version is not the schema — the
+guard written a few commits earlier precisely so Room could not destructively migrate several hundred
+megabytes somebody had waited for. The builder never stamped one, so every pack was version 0,
+and the guard fired on it: 170 MB and several minutes of somebody's time, deleted, permanently,
+with *"this is for an older version of this app; download it again"*.
+
+⚠️ **The bundled asset survived only by taking a completely different route, which is why nothing
+caught it.** A version-0 file makes Android's `SQLiteOpenHelper` call `onCreate`; Room's
+`createAllTables` is `IF NOT EXISTS`, so the populated tables are left alone and Room stamps the
+version itself — and `usable` never sees that file until after Room has already fixed it. Both paths
+validate (verified by `javap` on room-runtime 2.6.1: version-0 → `onCreate` → `createAllTables` →
+`onValidateSchema` → `updateIdentity`; matching version → `onOpen` → `checkIdentity` → no master
+table → `onValidateSchema`). **Nothing in CI could see it**: the file builds, packages, publishes and
+verifies, and the deletion happens on the phone. The builder now stamps it, **reading the number out
+of `FoodDatabase.kt` rather than restating it**, and `verify` asserts it.
+
+**⚠️ FTS5 WAS NOT THE MORE EXPENSIVE OPTION, IT WAS AN IMPOSSIBLE ONE — and the note rejecting it had
+that wrong.** Android builds its own SQLite with `SQLITE_ENABLE_FTS3`, `FTS3_BACKWARDS` and `FTS4`
+and **no FTS5** — read out of `platform/external/sqlite`'s `dist/Android.bp`, not recalled. SQLite
+parses the WHOLE schema when it prepares its first statement, so a database carrying an `fts5` table
+would have failed **every query on every device**, not merely queries against it. The other half of
+that note is gone too: it weighed the cost against *"an APK the updater re-downloads on every
+build"*, and the database had already left the APK.
+
+So: **contentless FTS4**, `content=''`, `matchinfo=fts3`. Measured on 70,415 real Open Food Facts
+names over ten realistic queries — **18.9 ms scanning against 0.7 ms through MATCH**. The scan is
+linear in the table, so at four and a half million rows it is past a second on a warm desktop SSD and
+worse on a phone reading a 489 MB file cold from flash.
+
+⚠️ **The small-sample size estimate was PESSIMISTIC and the real build settled it.** Sized on 70,415
+names it came to 28.8 bytes a row and was *falling* with scale (33.3 at ten thousand, 30.4 at fifty,
+28.8 at seventy) as the term dictionary amortises, so it was recorded as a ceiling. At full scale it
+is **24.1 bytes a row — 58 MB over 2,541,457 products** against the 74 MB the extrapolation implied.
+The trend held further than the sample could show. Build time is **five to seven seconds**, and the
+two runners disagree by that much on identical input, which is why it is quoted as a range rather
+than as whichever figure happened to be read.
+
+⚠️ **Every term carries a trailing `*`, and dropping it would silently break the scorer.**
+`FoodSearch.wordMatch` accepts a corpus word up to three characters longer than the query token —
+cook/cooked, roast/roasted — while a bare `MATCH 'roast'` is exact-token only, so it would lose every
+inflection that function exists to allow. A prefix query over-admits and `score` refuses the excess,
+which is the split the rest of that file already uses. What a prefix query cannot reach is a match in
+the MIDDLE of a word, and nothing is lost there: `wordMatch` scores those zero, so they were being
+read and thrown away.
+
+⚠️ **Detected, not assumed** — the database is downloaded independently of the app now, so a phone can
+hold a corpus built last month and an app built today, and a hard dependency would turn that into a
+search that throws. The detector is the builder's own recorded row count, which is also the **only**
+way to count a contentless FTS4 table: `SELECT COUNT(*)` on one is a *"SQL logic error"*, which is
+how the check that tried it found out.
+
+#### ⚠️ AN EMPTY EXPRESSION IN A COMMENT, AND THE TWO RUNS IT COST
+
+**A `#` line inside a `run:` block is a comment to the SHELL and not to GitHub.** Expressions are
+substituted before the script exists, so a comment written to explain that a newline must not appear
+inside `${{ … }}` contained a literal empty one — and an empty expression is a syntax error in the
+workflow itself. Both workflows carried it.
+
+⚠️ **The failure gives you nothing at all to read.** An invalid workflow never reaches the point of
+creating a job, so the run completes in **under a second with ZERO jobs**: no log, no failing step,
+no annotation, just "failure". The only way to tell it from a runner that vanished is that
+`created_at`, `run_started_at` and `updated_at` are the same second and `list_workflow_jobs` returns
+an empty array.
+
+⚠️ **`yaml.safe_load` passes the broken file, which is why loading it is not a gate** — expressions
+are opaque strings to YAML and a separate language to GitHub. I loaded both files, they parsed, and I
+reported that as verification; it proved the indentation and nothing else.
+
+`tools/workflow_expr_check.py` checks the four delimiter mistakes that produce a run with nothing in
+it to diagnose — an empty expression, an unclosed `${{`, a stray `}}`, and an expression spanning
+lines inside a literal block (where the substitution puts a real newline into whatever the script was
+building, which is how a value written to the line-oriented `$GITHUB_OUTPUT` arrives truncated). All
+four negative-tested, the first against the exact text that broke the build. It deliberately does NOT
+validate the expression *language* — an unknown function still only fails on GitHub.
+
+⚠️ **And wiring it in found a hole in `tools/check_changed.sh` immediately: it exited early when no
+KOTLIN file changed.** So a commit touching only a workflow ran no gates at all — which is exactly
+the commit that broke the build. The early exit now requires *nothing* to have changed, the
+Kotlin-only gates skip explicitly rather than being handed an empty file list (kotlinc and the
+duplicate-declaration checker each print their own usage text when given no arguments, which reads as
+a finding), and the whole-tree file list is computed above the exit rather than inside the gate that
+used it.
+
+#### ⚠️ `actions/cache` DECLARES `post-if: success()` — a failed job never banks its work
+
+Run 134 downloaded 1.7 GB from two servers, built the database in eight minutes, published a pack
+from it, and then threw the file away because a one-line Kotlin error failed the APK four minutes
+later. That is the documented behaviour of the combined action, read out of its own `action.yml`
+rather than recalled: the save runs in a post step gated on the job succeeding.
+
+⚠️ **And a claim I nearly recorded here was WRONG — checking it is the only reason I know.** I wrote
+that the next run therefore rebuilt from scratch. It did not: run 135's `Build the food database` is
+`skipped`, because the sibling LCARS workflow shares that cache entry on purpose and had banked it.
+So the loss was real and was **covered by the shared cache rather than paid for**, which is the
+sharing working rather than a mitigation of the bug. The bug is still worth fixing — the two
+workflows can and do fail together, which is precisely when nothing would be banked. Both now use
+`actions/cache/restore@v4` plus an explicit `actions/cache/save@v4` step guarded on
+`always() && the file exists && it was not a cache hit`. Confirmed firing: LCARS #2153's
+`Bank the food database`, two seconds, and the next run restored from it.
+
+⚠️ **The whole key is emitted once from the stamp step and read by both**, because `hashFiles` plus a
+salt written out twice is a key that will one day differ by a character — at which point each half
+silently rebuilds for ever and neither ever finds the other's entry.
+
+#### ⚠️ `tools/nutrition_compile_check.sh` — the gate the CI failure named
+
+The failure was `Unresolved reference 'SpaceBetween'`: I wrote `Arrangement.SpaceBetween` from memory
+in a shared UI helper. **No existing gate could reach it** — the parse pass does not type-check,
+`android_resolve_check.sh` differences unresolved *names* against a baseline and a brand-new one has
+nothing to cancel against, and `android_compile_check.sh` stops where a file pulls in the app's own
+kit. The new gate compiles **all 57 module files** plus `:core:scan`, `:core:update` and
+`:core:health` sources against the real platform classes and the real AARs in about thirty seconds,
+and is negative-tested against the exact failure.
+
+⚠️ **`:core:telemetry` and `:core:feeds` go on as COMPILED CLASSES, never as sources.** Passing them
+as sources folds them into one compilation unit, which makes them one module, which makes a
+cross-module smart-cast error vanish — so the gate would pass on code CI rejects. That trap has cost
+this project four CI rounds already.
+
+⚠️ **Its success check first accepted only the string `compiles clean`** — but a clean Compose run
+reports `frontend clean` (a `@Composable` cannot be *lowered* without the Compose plugin, so reaching
+IR lowering is what a passing Compose file looks like), so it would have called a passing tree a
+failure. Accepts both now.
+
+#### ⚠️ A `Row` NEITHER WRAPS NOR SHRINKS: whatever does not fit is simply not drawn
+
+No clipping, no scrollbar, nothing to suggest a control was ever there. Two rows in the training card
+put an unweighted `Text` beside an unweighted `TextButton` under `SpaceBetween`, so each was measured
+at its full intrinsic width and the button lost. The content is user-supplied with no length limit,
+and even the bundled catalogue reaches it: *"Bulgarian split squat · Squat"* is thirty-one characters,
+about 240 of the 296 dp a card has on a 360 dp phone, which leaves less than a "Forget". Fixed with
+`weight(1f, fill = false)` — hugs its text when short, ellipsises when long — leaving the unweighted
+button measured first and always given its width.
+
+⚠️ **Found by re-running the audit with the RIGHT rule, after the first one missed one of the two.**
+The rule I started with was *"a Row holding two or more controls"*; the actual defect is *"unweighted
+flexible content beside any fixed control"*, and the second row has only one button. Worth recording
+because **the wrong rule looked like it was working** — it found the first row and reported the file
+clean of anything else.
+
+⚠️ **Deliberately NOT turned into a gate.** The corrected sweep returns seven rows of that shape and
+only two are defects; the other five hold fixed strings (a date, "Send reports automatically",
+"Earlier"/"Later") whose widths are bounded and measured to fit. At five false positives in seven it
+is a report people would learn to skim, which this project has repeatedly found worse than no gate.
+
+Also checked and sound while sweeping: no `LazyColumn` nested inside the outer vertical scroll (both
+mentions are comments explaining why not), every scrolling child is bounded by a `heightIn`, and every
+text field without a declared keyboard is a name, note or search box where the default is right — so
+the numeric sweep is genuinely complete rather than merely finished.
+
+#### Measured, from the two green runs
+
+| | measured |
+|---|---|
+| products indexed | **2,541,457** of 2,541,457 searchable, in 5–7 s |
+| search index | **58 MB (24.1 bytes/row)** |
+| database | **489 MB (113.3 bytes/row)**, packaged 488 MB uncompressed |
+| pack | **213 MB compressed, 489 MB unpacked** |
+| nutrition APK | **35,247,288 bytes (34 MB)** — *"no bundled food database, as intended"* |
+| LCARS APK | **693,876,801 bytes (661 MB)** |
+
+⚠️ **The LCARS APK figure is the current one and the delta is NOT attributed.** Many commits landed
+between it and the 612 MB recorded earlier in this file; that earlier figure is a dated record of
+what a particular build measured and stays as written. What is certain is that this application still
+bundles the corpus while its updater pulls the whole APK on every build, so it pays the index in
+full. The real answer is to move it onto the pack as well — a change to a daily driver nobody asked
+for, and still the largest open item here.
+
+⚠️ **Nutrition #139 SKIPPED both the database build and the pack publish**, which is the content
+gating working rather than a failure: the corpus had not changed, so the cache restored and the
+release step found the same SHA already published.
+
+#### ⚠️ A cost to be deliberate about before touching the builder
+
+`hashFiles('tools/food/build_food_db.py', …)` is part of the food-database cache key, so **editing
+that file — even a comment — forces a full rebuild**: **8m36s on one runner and 9m23s on the other**,
+plus ~1.7 GB fetched from Open Food Facts and USDA, on each. The same shape as the star catalogue's key, where the
+recorded remedy is to put such notes somewhere outside the hash. Here the note belongs with the code
+that produces the number, so the rebuild was accepted knowingly.
+
+⚠️ **I predicted that rebuild would publish a fresh ~213 MB pack, and it did NOT — the measurement
+refuted me and established something better.** The reasoning was that the OFF export is rebuilt
+daily, so a rebuild fetches a newer dump; what it misses is that the previous build was *the same
+day*, so the dump had not rolled over. Nutrition #140 printed:
+
+    database content: 3589a76e7649d636
+    published:        Food database — pack #138 · 4523700 products · content 3589a76e7649d636
+    the published pack already holds this database — nothing to publish
+
+⚠️ **So the builder is DETERMINISTIC over identical sources — byte-identical output from two
+different runners forty minutes apart — which is the property that makes content gating mean
+anything and which I had not established.** Corroborated from an entirely independent direction:
+the LCARS APK went **693,876,425 → 693,876,801 bytes across #2153 and #2154, a delta of 376 bytes**,
+which is the version code and nothing else. The 488 MB of database inside it did not move a byte. The honest statement of the cost is therefore: a rebuild
+on the SAME day is pure waste (CI time and 1.7 GB from two third-party servers, for a file already
+held); a rebuild on a LATER day fetches a newer dump and does offer the phone a fresh download. Both
+are reasons to keep such edits off that file's content when they are only comments.
+
+⚠️ **And the cost is DOUBLE, not single, because the two workflows race rather than share.** The
+cache entry is shared on purpose so that whichever builds it first saves it for the other — but a
+change to a file both build fires both at once, and here LCARS reached `Restore the food database`
+at 09:25:18 while nutrition was still building until 09:29:12. Both missed, both rebuilt, and both
+banked the identical result. **The sharing only pays when the runs are staggered; on the push that
+invalidates the key it never can be.** So the real price of touching that file is ~3.4 GB from Open
+Food Facts and USDA and about eighteen runner-minutes, which is worth knowing before spending it on
+a comment.
+
+#### Open
+
+- **Deltas** — the format, `FoodPack.plan` and the install branch exist; the builder does not emit
+  them. Until it does, every content change is a full ~213 MB fetch, which is why the schedule is
+  monthly rather than weekly.
+- **Remembering a network-found product** — `FoodRepository.byBarcode` falls back to Open Food Facts
+  and distinguishes `NoNutrition` from `NotInDatabase`, but nothing writes the result into the local
+  database, so the same product is fetched again tomorrow.
+- **Whether LCARS should stop bundling the corpus too** (see the APK figure above).
+- ⚠️ **The as-you-type path still ranks by name length rather than by `FoodSearch.score`**, and
+  deliberately, for the reason its own KDoc gives: the last word of a half-typed query is a fragment,
+  and scoring "cho" against "chocolate" returns zero. Every *other* limitation that KDoc describes —
+  a whole-name anchor that could not find "Coca-Cola Zero Sugar" from "coke zero", a 400-row cap, and
+  that cap's country-prefix bias from reading in rowid order — was a consequence of having no index
+  and is gone. What changed is which candidates get ranked.
+
+⚠️ **Owner-verify on the Pixel, unchanged and unavoidable — CI compiles a scanner and cannot point one
+at a packet.** In order: **scan a curved can, a crinkly bag and a small cosmetic barcode in
+PORTRAIT**, which is the case that could not work at all before; then the first-run pack download and
+**that it survives a restart** (that is the `user_version` defect not happening); then type a few
+letters into food search and check it answers immediately rather than after a pause.
+
+### THE WIDGET BECOMES THE MOCKUP — six slices (this session, PR on `claude/loving-edison-bd65oa`)
+
+Owner sent a screenshot of the current widget and a dense concept mockup: *"nice and a good start,
+but it's still very sparse … Whatever it takes to make it, it is ok, as long as you don't use all
+our plan usage in the process."* Then, interrupting, a binding correction: **the mockup is
+illustrative and every value in it is filler** — they live in **Holland, Michigan**, not Trenton NJ,
+and *"it shouldn't be dependent on a specific location it should be dependent on the current
+location."* Three AskUserQuestion decisions: COMMS = **READ_SMS plus multi-account email**; build
+**all four** missing blocks (water, petrol, data used, free storage); keep the panel **transparent**.
+
+**Zero subagent and zero workflow spend for the whole arc**, per the standing plan-usage constraint,
+which overrides the ultracode reminder as it has for every arc since. Every check was local kotlinc
++ JUnit, a live endpoint probe, `javap` against the real platform jar, or CI.
+
+**⚠️ THE SPARSENESS HAD A MEASURABLE CAUSE, and finding it is what made the plan small.**
+`lock_widget_info.xml` allows `maxResizeHeight="640dp"` and the tallest `SizeF` breakpoint was
+**300×385dp** — so above 385 the host had nothing richer to pick and stretched the same twenty rows.
+That gap *was* the complaint. Two new breakpoints and a board vocabulary, not a rewrite.
+
+Six slices, each its own CI-green commit: S1 block vocabulary + `widget_board.xml` · S2 sparklines +
+meter · S3 data already fetched and unsurfaced · S4 water · S5 petrol + data used · S6 texts + mail.
+
+#### Platform facts, read out of `android-all` rather than recalled
+
+| fact | value | consequence |
+|---|---|---|
+| `MAX_NESTED_VIEWS` / `MAX_INIT_VIEW_COUNT` | 10 / 16 | used only in `initializeFrom` — caps nested **RemoteViews objects**, NOT XML depth. A deep static layout is fine. |
+| `MAX_SINGLE_PARCEL_SIZE` | 800000 | the budget bitmaps eat into |
+| size variants share one `BitmapCache` | de-duped on **identity** | one Bitmap instance costs ONE copy however many variants draw it — so the provider builds each chart once and passes it around |
+| `@RemoteView` whitelist | includes GridLayout, **ProgressBar**, TextClock; **bare `View` is absent** | a real breadth bar with no bitmap; hairlines must be ImageView |
+
+Charts render at a **fixed pixel size independent of density** (~132×44 px, ~23 KB each). A
+sparkline is low-frequency so upscaling is invisible, and 3× density would have made seven charts
+~706 KB against the 800 KB ceiling.
+
+#### The water block, and why probing first changed the design
+
+⚠️ **There are ZERO tide-prediction stations in Michigan** — the Great Lakes are not tidal, so the
+nearest to the owner is **879 km** away in Washington DC. A tides block would have sat permanently
+empty where they live. NOAA publishes water **levels** for the lakes and there is a gauge **8.6 km**
+from them. So `core:telemetry/WaterStations.kt` carries which product each station supports and the
+reading follows the coast or the lake.
+
+⚠️ **The two reaches differ and that is the rule the whole design turns on.** High water travels
+along a coast, so a distant tide gauge is right about the height and wrong about the hour — the half
+anybody acts on. A lake's level is basin-wide. `TIDE_REACH_KM = 90`, `LEVEL_REACH_KM = 220`, tested
+against each candidate's OWN kind: one shared limit would either discard the good lake gauge or
+admit the bad tide one.
+
+⚠️ **Twelve water-level stations are deliberately NOT bundled**, and the measurement is what decided
+it. The app asks for **IGLD**, correct for the Great Lakes–St. Lawrence system and meaningless
+elsewhere; NOAA also publishes levels for Mississippi river stages, the Texas Laguna Madre and six
+in Puerto Rico. **Every one of the twelve has a tide station within 37 km, and four of the six PR
+ones are the SAME station publishing both products, at 0.0 km.** An asset test holds the rule.
+
+⚠️ Worth recording because it is the OPPOSITE of what this app usually finds: asking a Great Lakes
+station for predictions answers **HTTP 400** with its own explanation, not a 200 carrying an error
+object. So the client throws and nothing has to sniff a body for the word "error".
+
+`tools/water/build_stations.py` reproduces the bundled list from the two endpoints, and `--check`
+found the committed asset had **154 names truncated mid-word** by the ad-hoc script that first made
+it ("Gardiners B", "Little ", "Ne"). The builder's output replaced it and now matches byte for byte.
+
+#### Petrol, data used, and a cycle day that is not a day every month has
+
+**The pump price was already being fetched and drawn nowhere.** `FuelRepository.fetchEiaUsRetail`
+has returned `usRetail` whenever an EIA key is set, and the widget showed only the crude benchmark
+beside it — the computed-and-never-used class, in a feed the widget already paid for. One fetch now
+returns both lines. US-only and key-gated, because the World Bank retired both pump-price indicators
+and there is no free worldwide equivalent.
+
+`core:telemetry/BillingCycle.kt` is pure and clock-free like every other date core in that module.
+⚠️ **A cycle starting on the 31st has to start somewhere in April**, and the 30th is the only
+defensible answer — the alternative is a month with no cycle, or one that rolls into May and reports
+six weeks as a month's usage. Comparing the date against the RAW setting gets that wrong in a way
+that hides: on 30 April it says the cycle is still March's, and on 1 May it says so again, so April
+never rolls over at all. ⚠️ **Nor is a cycle as long as its month**: 31 March → 30 April is thirty
+days, 28 February → 31 March is thirty-one, and **31 May → 30 June is thirty** — my own expectation
+there said 31 and the code was right.
+
+**Cross-checked against `datetime` over 56,606 cases across five years — every date, every cycle
+day — with zero disagreements.**
+
+⚠️ Wi-Fi is deliberately not counted: a cap applies to the radio. `MobileData.Reading` is sealed
+because there are four answers and one is a number — used, no Usage Access, no radio, or the query
+threw. Zero for the last three is the recurring defect: zero on a tablet with no SIM looks frugal,
+and on a refused permission looks broken. Usage Access is asked once up front the way `place` is,
+because a source returning null from inside `widgetSource` is recorded as **Empty** — "asked,
+nothing to report" — which is the wrong thing to say about a permission nobody granted.
+
+#### Texts and mail, and the credential gate that did not exist
+
+Three IMAP commands over TLS; the parsing is `core:telemetry/ImapProtocol.kt` and the socket around
+it is a dozen lines. ⚠️ **`quote` escapes backslashes BEFORE quotes** or the escape added in front
+of a quote is itself doubled and the quote goes out bare, ending the argument early and leaving the
+rest of the password read as further IMAP arguments. A value carrying CR or LF is refused outright.
+
+⚠️ **HOSTNAME VERIFICATION IS NOT AUTOMATIC ON A RAW `SSLSocket` AND ITS ABSENCE IS SILENT.** Without
+`endpointIdentificationAlgorithm = "HTTPS"` the certificate CHAIN is validated and the NAME is not,
+so anybody holding a valid certificate for any domain could answer for this one — no error, no
+warning, a password handed over. `HttpsURLConnection` sets it for you; a socket does not. ("HTTPS"
+names the RFC 2818 verification rules, not the protocol; there is no "IMAPS" algorithm.)
+
+⚠️ **THE THREE CREDENTIAL INVARIANTS AND WHY THEY LAND IN ONE COMMIT.** At rest is free — the whole
+settings blob goes through `SecretCrypto`. `allSecretValues()` must name the password, because a
+password has no shape a pattern scrubber could find and the exact-match pass is the only thing that
+can keep it out of a debug report. And `redactSecrets` must blank it while **`merge` puts the
+device's own back** — the export half ALONE is a data-loss bug, not an incomplete feature: restoring
+a backup would write blanks over working credentials and sign you out of everything.
+
+**Nothing guarded any of that, so `CredentialCoverageTest` now does** — textual, like
+`WidgetLinkageTest`, so it cannot fail for an environmental reason. It reads the whole `data/settings`
+**package** (not one file: `EmailAccount` moved to its own file mid-slice, and a single-path gate
+would have stopped seeing its password and gone on passing) and carries a self-check, because with
+its regex broken every "nothing is missing" assertion passes trivially.
+
+⚠️ **TWO DEFECTS IN THAT GATE, BOTH FOUND ONLY BY RUNNING IT, and the second is a new lesson.** Its
+brace matcher took each function's own PARAMETER list as the body — `()` for `allSecretValues` — and
+reported every credential in the app as uncovered, a harness declaring the thing it checks broken.
+Then a negative test showed **the gate could be satisfied by a COMMENT**: deleting the real
+registration left the paragraph explaining it behind, and the substring match found the word there.
+**Comments are stripped before matching now — the comment documenting a rule must not stand in for
+the rule.**
+
+⚠️ **READ_SMS bars an app from Google Play** outside a few declared categories, none of which this
+is. Sideloaded and private, so it costs nothing — but it is a decision, named in the manifest.
+
+#### Two silent-truncation defects I introduced, and the fix
+
+The board draws a fixed number of readout slots and `getOrNull` past the last is **silent** — so the
+water line vanished whenever the weather detail, the air quality and space weather were all present.
+`pairs` had the same shape and two slots while S6 wanted three. Same trap CLAUDE.md already records
+for the one notification's five row slots. The layout grew by a readout and a region,
+`MAX_READOUTS`/`MAX_PAIRS` are constants the caller `take()`s **knowingly**, and the full breakpoint
+moved 540 → 610dp — a breakpoint below its content clips, which is the rule governing that whole list.
+
+#### Method notes worth reusing
+
+- ⚠️ **`tools/android_compile_check.sh`'s `-m` classes go stale the moment a core file is added.**
+  Three times this arc a "defect" was a `:core:telemetry` class written after the last
+  `compileKotlin`. Rebuild first; the script documents this for `:core:feeds` and it applies equally.
+- ⚠️ **A file that cannot be type-checked locally is one only CI can gate**, and that is worth
+  designing for: `CommsRepository` took the whole `AppSettings` for one field, which dragged in two
+  unbuildable modules; narrowing it to `List<EmailAccount>` (and moving that type to its own file)
+  made the entire comms layer locally verifiable.
+- **The resolve gate's cascade was proven, never shrugged at** — by planting `safetyRadiusKm` and
+  `period`, both in shipping CI-green code, and watching them report identically; and by typed
+  probes of the exact expressions.
+- ⚠️ **Check every Compose call site against the REAL declaration.** `PrefInfo`'s second positional
+  parameter is `value` — short, right-aligned, two lines — not `subtitle`; a paragraph there would
+  have been truncated and right-aligned.
+- ⚠️ **A python edit script writes at the END**, so an assertion failing on the third replacement
+  means NONE were written. That fired once here and the file was correctly untouched.
+
+**Verified across the arc:** 21 + 14 + 15 core tests, 9 asset tests, 9 IMAP client tests (end to end
+against a fake in-process server, since port 993 is blocked here and there is no account), 4
+credential-gate tests and 7 linkage tests, all run locally. **35 load-bearing rules negative-tested**
+against baselines asserted green first, each perturbation asserted to have matched the source and
+each restore byte-compared. Both NOAA products and both EIA/NOAA error shapes probed live.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a widget and never draws one.** In order: **resize the
+widget to full height** and check it shows genuinely more rather than the same rows stretched; the
+water line should read **lake level for Holland**, not tides; Settings → Data & refresh → "Data
+allowance resets on" and then whether the DATA line matches your carrier's own figure; Settings →
+Texts & mail → grant the texts permission and add a mailbox (**Gmail needs an app password** — the
+dialog says so before you try). Sparklines should be crisp rather than blurry, and the clock should
+tick without the widget refreshing.
+
+**Open / steerable:** whether the board is now too dense at full height (every region is a
+`Column` the provider fills, so trimming is a call-site change); the EIA key is the owner's to add,
+without which the pump line is absent by design; and `safetyRadiusKm` was found to have **no Settings
+control at all** — a pre-existing dead setting read by `RefreshWorker`, recorded rather than fixed
+here.
+
+#### The station list is now proven to reach the phone (`ceb0aac4`, run 2161 green)
+
+⚠️ **The water block is DESIGNED to go quiet, which is what made this worth a gate.** No gauge
+within reach draws nothing at all — honest for somebody far from one, and byte-for-byte the same
+answer as an asset that never shipped. `WaterStationsAssetTest` reads the file on DISK and proves it
+correct; nothing proved the file the phone opens is that file. A new `Verify the water stations
+packaged` step closes it, mirroring the sky-asset check beside it.
+
+⚠️ **The size floor is load-bearing, and a control proved it rather than reasoning about it.** An
+empty or truncated list parses to zero stations, `nearest` returns null, and the block goes quiet in
+exactly the same way — so presence alone would pass on a file carrying nothing. Removing the floor
+makes a 400-byte asset pass.
+
+Negative-tested by extracting the shipped shell out of the YAML and running it against five states:
+real asset (0), absent (1), truncated (1), an APK carrying the sentinel (1, so the check *can*
+fail), and the floor removed (0). ⚠️ Case 1 also proves an `assets/water/` **directory entry** does
+not satisfy the filename grep — `zip` writes those where AGP does not, which is the trap the
+nutrition arch-check hit once.
+
+**Measured, from the two runs' own logs rather than asserted:** run 2160 (S6) published at
+**694,050,252 bytes (661 MB)**; run 2161 (the gate, a workflow-only change) at **694,049,880** — a
+delta of **−372 bytes**, the version code and nothing else, which independently confirms the step
+added no payload. The step's own line reads `stations.tsv: 189028 bytes`, matching the file on disk
+exactly. ⚠️ Note this APK figure supersedes the 693,876,801 recorded earlier in this file, and the
+delta between them is **not attributed** — many commits landed in between.
+
+⚠️ **A gap this did NOT close, recorded rather than left to be rediscovered:** the equivalent
+question is unanswered for every other asset the app opens by name. The sky and food checks exist
+because those paths are fragile; this one exists because its consumer is silent. Nothing
+systematically asks "does every `assets.open(...)` reach the APK", and deriving that list from the
+source is the obvious shape if it is ever worth doing.
+
+### THE WIDGET REACHES THE MOCKUP, AND EMAIL LINKS WITH NO PASSWORD (this session, PR #464)
+
+Owner: *"ensure that you … manage to get the full scope of the actual widget that was in that one
+reference image, with every feature hopefully, and also I was hoping that it would be like easier to
+just link the email without having to do like some key or this or that or the other thing. also you
+can use ultra code, you just can't burn through the usage like it doesn't matter."* Two binding
+AskUserQuestion answers: email = **read the phone's mail notifications** (chosen over "notifications
+*and* IMAP", so IMAP is to be retired), and the mid-height widget is **left as it is**.
+
+⚠️ **"You can't burn through the usage" is the constraint that governed the whole arc, and it
+overrides the ultracode directive.** Zero subagents and zero workflows. Every check below is local
+kotlinc + JUnit, a compile against the real `android.jar`, a typed probe, or CI.
+
+**Seven CI-green commits: W1 clock · W2 per-outlet news · W3 calendar column · W4 the widget stops
+hiding its failures · M1 the mail core · M2 the store and read path · M3 the listener, the grant and
+the picker.**
+
+#### The widget half — and the two defects were worth more than the features
+
+- ⚠️ **The board could not report a dead feed AT ALL.** `degradedLine` was folded only into the ROW
+  list and the board received `foot = sysLine` instead — so on BOTH tall breakpoints, the surface
+  this whole arc exists to fill, a source that threw was indistinguishable from a quiet day. It has
+  its own view now, deliberately **not** gated on `full`: a failure notice that appears at one
+  height and not the other is half a diagnostic. That one line is the stated exception to "leave
+  mid-size as is" — it draws nothing unless something has actually failed.
+- ⚠️ **And on the row form it was truncated, with the notice first to go.** Twenty-one `rows +=`
+  sites against twenty slots, plus the notice appended at the end, and a bare `rows.take(limit)`.
+  The comment above it said it went last *"so it never pushes real content off a small widget"* —
+  but going last is precisely what made it the first row dropped. `WidgetDiagnostics.fit` places it
+  **above** the cut and sheds a real row from the tail, where the caller appends in descending
+  consequence. Restoring the shipped `(rows + notice).take(cap)` fails exactly the two tests that
+  name it, returning "row 20" where the notice should be — the plan demanded a test that fails
+  against today's code, and that is it.
+- ⚠️ **`rule_6` was in the wrong place.** Declared between pair_0 and pair_1 while `render` has
+  always drawn it as the separator before the footer, so the hairline appeared in the MIDDLE of the
+  two-column block and the footer had none above it. Not a compile error and not a crash: a line in
+  the wrong place is only ever visible on a phone.
+- **`AppSettings.use24HourClock` was a DEAD SETTING** — declared, given a `PrefSwitch` the owner can
+  flip, and read by nobody. The board's `TextClock` is its first and only reader. ⚠️ Honouring an
+  app preference means setting **both** `format12Hour` and `format24Hour` to the same pattern, since
+  a TextClock picks the 24-hour one only when the DEVICE is in 24-hour mode. And `setCharSequence`
+  reaches a view method only if it is `@RemotableViewMethod` — a miss throws `ActionException` **on
+  the device** while compiling perfectly, so the three remotable TextClock methods were read out of
+  the platform bytecode rather than recalled.
+- **Per-outlet news costs zero new I/O** — the provider already fetched the TOP list and threw away
+  everything but `.firstOrNull()`. New `BreakingNews.perOutlet`; ⚠️ the tempting shortcut (passing
+  `source` as `select`'s existing `key`) is subtly wrong, because that dedupe is first-occurrence
+  over input order, so each outlet would be represented by an arbitrary article rather than its
+  newest. The battery moved into THIS PHONE where the mockup puts it and the footer kept the
+  connection, because both regions draw only at full height and leaving the combined line in the
+  footer would print the same percentage a few centimetres below itself.
+
+⚠️ **A CORRECTION TO MY OWN PLAN, recorded rather than acted on.** It listed "the Kp number is not
+printed" and that is **wrong**: `SpaceWeatherExplainers.kp` returns `"Kp ${trimNum(k)} — ${band}"`,
+so the widget has always rendered `SPC  Kp 3.4 — Unsettled`. I read the call site and inferred the
+headline was the band alone instead of reading the function. No change was needed and none was made.
+
+#### The mail half — what the number means is the whole design
+
+`core:telemetry/MailGlance.kt` (15 tests) + `data/comms/{MailNotices, MailNoticeStore,
+NotificationAccess, MailNotificationListener}` + `feature/settings/MailAppPicker.kt`.
+
+- ⚠️ **It says "N new", never "N unread", and `Glance.line` is the only phrasing in the app.** They
+  are different quantities — a mail read on a laptop is unread nowhere and its notification may
+  still be sitting there; a notification swiped away is gone while the mail is not. **And no total
+  is ever computed across this and SMS**: texts are counted exactly from the content provider, and a
+  combined figure would be wrong in a way neither half is.
+- ⚠️ **Counts only. `Notice` has nowhere to put a sender or a subject**, and the reason is concrete:
+  `DebugUploader` uploads logcat, the breadcrumb ring and the recent activity log, and `SecretScrub`
+  structurally cannot protect a person's name — its strong pass matches exact values out of the
+  settings blob, and a name is not in it; its pattern pass looks for credential *shapes*, and
+  "Re: your test results" has none. Refusing to hold it is the only real protection.
+- **The four ways the count comes out wrong on a real phone**, each a rule and each negative-tested:
+  a permanent foreground notification is not waiting mail (K-9 and FairEmail would give a stuck
+  "1 new" for ever); a badge on every child is not multiplied by its children (three children
+  carrying 57 would read 171); a summary stating zero is worth **one**, not none; and a replayed
+  notification is not new mail (dedupe by the platform's own key, because a rebind hands back what
+  is already on the shade). Groups bucket on `groupKey`, not the package — an app running two
+  accounts would otherwise lose one.
+- **Three double-count vectors against SMS, all barred**: `CATEGORY_MESSAGE` never counts; the
+  default SMS package is barred **before** the ticked set is consulted, because RCS through Google
+  Messages can post with no category at all; and the picker starts empty and never seeds a messaging
+  package.
+- ⚠️ **NEITHER platform signal gates anything — the user picks.** `CATEGORY_EMAIL` is optional
+  metadata plenty of mail apps never set, and a hardcoded allowlist goes stale *invisibly*.
+  `MailGlance.LIKELY_MAIL` decides the picker's ORDER and never its membership, and **only apps that
+  have actually notified are offered** — ticking one that never notifies is a control that cannot
+  work. The listener records the whole shade on connect so the list is populated immediately.
+- ⚠️ **THE MANIFEST LINE THAT FAILS SILENTLY.** Every other service here is `exported="false"`, and
+  copying that means the system binder can never reach the component: no error, no log, no crash —
+  a feature that never counts anything, which reads as a bug in the counting. It must be
+  `exported="true"` **with** `android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"`,
+  which is what protects it, since only the system holds that permission.
+- **A snapshot, never an accumulator.** Every trigger recomputes from `getActiveNotifications()`;
+  posts and removals are *triggers*, not data. A snapshot cannot drift, so removals missed while the
+  process was dead and posts replayed across a rebind all self-correct. This runs for every
+  notification on the phone, so the callbacks do a package check against a `@Volatile` field — the
+  alternative being a Keystore-decrypted settings read per notification — then a debounced hand-off.
+- ⚠️ **A DataStore of its own, not `DiskCache`**: that cache LRU-prunes at 8 MB and its own KDoc says
+  nothing in it is a system of record, but this snapshot has **no upstream to refetch from**.
+  `read()` answers **null the moment the grant is gone**, and is deliberately *not* aged out — a
+  count with no new mail since Tuesday is days old and still exactly right.
+- ⚠️ **Three states on the Settings row, not two**, and whether it is running is inferred from
+  EVIDENCE (has it ever read the shade?) rather than a `@Volatile` flag, which would be false on
+  every freshly-started process — exactly when somebody is reading that screen. The row re-reads on
+  `ON_START`, because access is granted in a SYSTEM page and the moment that matters is the return.
+- ⚠️ Store reads are gated on the grant, and not merely to save work: the first read **creates** the
+  DataStore file, and `AppContainer` says in writing that a phone which never grants access never
+  has it on disk.
+
+#### Verification techniques worth reusing
+
+- ⚠️ **Split the platform-facing half into its own file so it CAN be gated locally.** The listener
+  and the picker reach the app container, so neither compiles standalone — but `MailNotices` does,
+  and it is exactly where getting a platform API wrong is plausible and invisible. Every signature
+  (`sbn.key`, `groupKey`, `isOngoing`, `FLAG_GROUP_SUMMARY`, `Notification.number`,
+  `Telephony.Sms.getDefaultSmsPackage`) is confirmed against the real `android.jar` in a minute.
+  Same split, same stated reason, as `TranscriptSeal`.
+- ⚠️ **For what cannot be split: compile against stubs COPIED VERBATIM from the real declarations.**
+  `PulseApplication`, `AppContainer`, `SettingsRepository`, `AppSettings`, `PrefSwitch`, `PrefInfo`,
+  `PrefClickable`, `LcarsDialog` — ten files then report **frontend clean** against the real
+  platform, real Compose, real DataStore and real lifecycle artifacts. Negative-tested by renaming
+  `PrefSwitch`'s `onChange` to `onCheckedChange`, which it caught by name. A stub written from
+  memory asserts that the wrong thing is fine, and that has cost this repo a CI round before.
+- A **typed probe** compiled AND RAN the widget's exact `buildList` expression against the real core:
+  3 → `MAIL  3 new`, 0 → nothing, null → nothing.
+
+#### ⚠️ TWO NEW FALSE-POSITIVE SHAPES FOR `tools/android_resolve_check.sh`, both now in its own header
+
+1. **Its caveat block claimed the "argument type mismatch: actual type is X, but X was expected"
+   false positive "never" happens for `core/telemetry`. That is false and was measured to be
+   false.** A `?.let { add(...) }` inside a `buildList` reports
+   `Function1<String, Boolean>` vs `Function1<T, R>` — and the control that settles it is
+   `TaskBoard.focus`, a core function the same file already imports and that ships green in CI,
+   reproducing it identically.
+2. **The complaint set is NOT monotone, so a "NEW" line can name code you did not touch and that is
+   not even in the target set.** The core is compiled every run, and a compilation carrying more
+   error-typed symbols gives up earlier and therefore reports LESS — so adding a file lets the
+   compiler get further and surfaces complaints that were always latent. Measured: a `MatchGroup`
+   mismatch that is `supergroups[category]` in `Curriculum.kt`. **Grep for a complaint's construct
+   in your own diff before chasing it.** A NEW file bites hardest, having no baseline at all.
+
+#### ⚠️ M4 — RETIRING IMAP — IS DELIBERATELY NOT DONE
+
+The owner's choice settles the END STATE, and the plan sequences this last and marks it vetoable for
+a reason that still holds: **M1–M3 are entirely on-device-unverified.** Removing the working IMAP
+path before the replacement is proven would leave the owner with no mail count at all if notification
+listeners misbehave on GrapheneOS, or if their mail app does not notify. It is one commit whenever
+they confirm — and the honest loss to state when it happens is that an account with no app on the
+phone (a work IMAP box read only on a desktop) becomes invisible.
+
+#### ⚠️ Owner-verify on the Pixel — CI compiles a widget, it never draws one or reads a notification
+
+1. **The header should show a ticking clock** that updates without the widget refreshing, and it
+   should follow Settings' own 24-hour switch rather than the device's.
+2. **Three different outlets** on the news lines, not one headline; and a **calendar column** with
+   real events (refused `READ_CALENDAR` should say so rather than showing a blank).
+3. **Resize the widget to full height**: THIS PHONE should carry power, data and storage; SYS should
+   be at the bottom; and the hairline should sit above SYS rather than in the middle of the columns.
+4. **Settings → Texts & mail → "Switch on notification access"**, then come back — the row should
+   change on its own. Tick your mail app and check the count against the app itself. The picker
+   should show what each ticked app is contributing, which is where a wrong tick shows up.
+5. **If a feed fails, the tall widget should now say so.** Nothing else in this arc surfaces that.
+
+### "I CAN'T FIND IT" — the mail setting was findable four ways and none of them worked (this session, `b1c0d032`)
+
+Owner's reply to the arc above, in full: **"I can't find it"**, and via AskUserQuestion they named
+the thing — **the mail setting**. **Zero subagent and zero workflow spend**, per the standing
+plan-usage constraint, which overrides plan mode's own instruction to dispatch Explore/Plan agents
+as it has for every arc since.
+
+⚠️ **The report was literally true, and I measured it rather than taking my own word for it: typing
+"email" into the app's own search returned NOTHING.** The setting was reachable the whole time. Three
+of the four ways a person looks for something failed, each for a different reason:
+
+| how you look | before |
+|---|---|
+| scan the ten Settings rows | the section lives under CONTENT, whose row read *"Content & feeds — Refresh · watchlist · feeds · mutes"* |
+| land on that page | it was the **only one of 22 `PrefSection` call sites** passing `initiallyExpanded = false` — a bare header you had to know to tap |
+| device search | `DeviceSearchIndex` indexes `"${cat.blurb} ${cat.keywords}"`; neither held a mail word |
+| MENU search | the Settings entry's terms were `preferences options config toggles setup` |
+| the Settings search box | ✅ **worked** — the surface this change must not break |
+
+#### ⚠️ WHICH FIELD TAKES THE WORDS IS THE WHOLE DESIGN
+
+`vis()` (`SettingsScreen.kt:168`) matches a plain **substring** over
+`"title + keywords + the section's own keywords"`, and **five** sections live under CONTENT (Data &
+refresh, Texts & mail, Markets watchlist, Custom RSS feeds, Muted keywords). So a mail word in
+`keywords` or `title` makes searching "mail" *inside* Settings return **all five** — breaking the one
+surface that already worked in order to fix the two that did not.
+
+**`blurb` is the only field that reaches both the master row and device search while `vis` never
+reads it.** Measured against the three readers:
+
+| field | master row | device search | `vis` |
+|---|---|---|---|
+| `blurb` | ✅ | ✅ | — |
+| `keywords` | — | ✅ | ✅ |
+| `title` | ✅ | ✅ (result title) | ✅ |
+
+⚠️ **Both "mail" and "email" must be spelled out.** Device search ranks through `GuideSearch`, whose
+`wordMatch` scores 2 for an exact word and 1 only when one word is a **prefix** of the other at ≥4
+characters — neither is a prefix of the other, so one word does not find the other.
+
+⚠️ **Width measured, not guessed.** The blurb is JetBrainsMono 10sp (0.6 em ⇒ 6dp/char) in a
+`weight(1f)` column after 32dp of row padding, a 22dp icon, a 14dp gutter and the "›" — about 280dp
+on a 360dp phone ⇒ **~46 characters** before it wraps. The new string is **38**, now the longest of
+the ten and still inside the budget. "watchlist" and "mutes" left the blurb for the keywords, where
+search still finds them.
+
+#### The verification, and it is the reusable part
+
+**`scratchpad/mailfind/run.sh`** extracts the literals out of `SettingsCategory.kt`,
+`SettingsScreen.kt` and `Directory.kt` and runs the **shipped** `GuideSearch` + `DeviceSearch` over
+them — stronger than a unit test, because it checks what is in the tree rather than a paraphrase.
+`--control` restores the pre-fix strings, and the two runs together are the evidence:
+
+    query          before                          after
+    email          NOTHING                         Settings, Settings · Content & feeds
+    mail           NOTHING                         Settings, Settings · Content & feeds
+    texts          NOTHING                         Settings, Settings · Content & feeds
+    inbox          NOTHING                         Settings
+    unread mail    NOTHING                         Settings, Settings · Content & feeds
+    mail settings  Settings, · System, · Interface  Settings, Settings · Content & feeds
+
+And the surface that worked is unchanged: "mail", "email", "texts", "sms" and "inbox" each still
+return **exactly 1 of the 5** CONTENT sections. ⚠️ For contrast **"watchlist" and "rss" return 5 of
+5** — pre-existing, because those words sit in `cat.keywords`, and precisely what mail words there
+would have done. That contrast is what turns the design argument above into a measurement.
+
+⚠️ Two results worth expecting rather than chasing: **"sms" also returns Safety (SOS)**, correctly —
+that feature really does send SMS; and **device search for "email" returns two rows** (Settings, and
+Settings · Content & feeds). Both are right; the second is the precise one.
+
+#### Considered and rejected, each on evidence
+
+⚠️ **A MENU entry pointing at `settings?cat=content`** — one tap, its own name, and three silent
+defects: `MainActivity.kt:285` records usage as `route.substringBefore('?')`, so an argumented route
+can **never** be marked visited and `UsageInsights.recommend()` would offer it as untried for ever;
+`SiblingRail.kt:53,72` compares `entry.route == here` where `here` is argument-stripped, so it would
+**never highlight** and would stay clickable while you are on it, pushing a second Settings copy onto
+the back stack — the "back button is broken" shape that file's own comment warns about; and it would
+add a literal to `SHORTCUT_ROUTES`, which is only ever consulted after `substringBefore('?')`.
+
+⚠️ **A second MENU entry on the plain route** — `ENTRY_OF` is `associateBy { it.route }`, so the
+later entry wins and `menuLabel(Routes.SETTINGS)` would return "Texts & mail" for the whole Settings
+screen, everywhere the app names that feature.
+
+⚠️ **Mail words on `SECURITY.keywords`** — a plausible place to hunt, since this grants a permission.
+A category's keywords make the **category** match, and opening `settings?cat=security` shows only
+SECURITY sections — landing the searcher on a page that does not contain the thing. Worse than no
+match at all.
+
+#### Also corrected
+
+**`PrefSection`'s comment claimed "All sections start COLLAPSED by default"**, which the default
+argument one line below (`initiallyExpanded: Boolean = true`) flatly contradicts. Not harmless: it
+let a collapsed section read as the house style, and the one section that had been given `false` —
+by `6cc6be5f`, the earlier comms arc, not by M3 — was the whole of "link your mail". **No caller
+passes `false` today.**
+
+#### ⚠️ The systemic gap — recorded, deliberately not fixed
+
+**Every section's `vis()` keywords are visible ONLY to the Settings search box.** Device search sees
+`cat.blurb + cat.keywords` and nothing else, so any section naming something its category does not is
+findable inside Settings and **invisible from the app's main search**. There are **30** `vis()` call
+sites. Neither structural fix belongs in a "make the mail setting findable" change: folding section
+keywords into `cat.keywords` pollutes exactly as measured above, and lifting the 30 literals out of
+the composable into data so `DeviceSearchIndex` can read them is its own refactor.
+
+#### Shipped
+
+**LCARS #2167 (run 33461537412) fully green on `b1c0d032`** — every step, published to `latest`.
+Unit tests 3m38s, release APK 9m35s, whole run 16m35s. Each gate printed its own evidence:
+`kept: dev.mascwa.pulse.BuildConfig`, `kept: dev.mascwa.pulse.data.media.JsRuntime`, sentinel
+correctly absent; `stations.tsv: 189028 bytes`; food database 488 MB; all six sky assets present.
+**APK 661 MB (694,099,348 bytes)** — 596 bytes above the previous build, which is what a change made
+entirely of strings and comments plus a new version code looks like. The handoff commit that follows
+is docs-only and, per `paths-ignore`, triggered no run — verified in practice as well as on paper,
+since the build already in flight was not superseded under `cancel-in-progress`.
+
+#### ⚠️ Owner-verify on the Pixel
+
+0. **Settings → System — is the installed build 2167 or higher?** Build #2166 published at 00:40 UTC
+   and auto-update installs "the next time you leave the app"; on anything older the mail row does
+   not exist in the installed app at all, and that is the whole answer.
+1. Open **Settings**: the fifth row should read *"Content & feeds — Refresh · feeds · texts · mail ·
+   email"*. Tap it; **"Texts & mail" should already be open**.
+2. **MENU** search "email", and the **SEARCH** screen for "email" — both should reach Settings.
+3. Ask the Computer to "open my mail settings".

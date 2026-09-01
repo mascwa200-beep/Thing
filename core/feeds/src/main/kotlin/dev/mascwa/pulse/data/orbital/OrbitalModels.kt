@@ -63,15 +63,10 @@ data class NeoObject(
     val closeApproachEpochMs: Long? = null,
 )
 
-@Serializable
-data class Planet(
-    val name: String,
-    val altitudeDeg: Double,   // above horizon if > 0
-    val azimuthDeg: Double,    // from true north, clockwise
-    val magnitude: Double,     // lower = brighter
-    val aboveHorizon: Boolean,
-)
-
+// ⚠️ `Planet` used to be declared here and now lives in `:core:telemetry`, beside `PlanetCalc`,
+// which is the only thing that produces one. It is the OUTPUT of a pure calculation, so it belongs
+// with the calculation; keeping it here forced the star map's module to depend on the whole HTTP
+// layer for a type made of eight numbers. Same package, so nothing that names it moved.
 @Serializable
 data class OrbitalData(
     val iss: IssPosition? = null,

@@ -54,7 +54,41 @@ android {
         // libraries (Vosk / JNA / MediaPipe / MapLibre / ExoPlayer) for arm64-v8a. Dropping the unused
         // armeabi-v7a / x86 / x86_64 variants removes the bulk of the APK's native footprint with zero
         // behaviour change on the target device.
-        ndk { abiFilters += "arm64-v8a" }
+        ndk {
+            abiFilters += "arm64-v8a"
+
+            // ⚠️ **Nothing in this project has ever read the symbol table this was producing.** AGP
+            // was extracting it from `liblcarsnative.so` and zipping it into `native-debug-symbols.zip`
+            // — an artifact whose only consumer is the Play Console's crash symbolication. This APK is
+            // sideloaded from a GitHub release and has never been near Play; the workflow publishes
+            // `app-release.apk` and nothing else.
+            //
+            // The evidence it was running at all is the task graph and the AGP bytecode rather than a
+            // recollection about defaults. In run 1999 `extractReleaseNativeSymbolTables` ran for nine
+            // seconds and `mergeReleaseNativeDebugMetadata` then died with `Java heap space`. And
+            // `ExtractNativeDebugMetadataTask` has exactly two creation actions in the shipped 8.7.3
+            // jar — one pinned to `FULL` and one to `SYMBOL_TABLE` — so the task *name* in that log
+            // says the effective level was SYMBOL_TABLE.
+            //
+            // ⚠️ **The two tasks do NOT disappear together, and the first version of this comment said
+            // they did.** Measured across the two real logs: `extractReleaseNativeSymbolTables` goes
+            // from present to entirely absent, because it is the conditionally-registered one — but
+            // `mergeReleaseNativeDebugMetadata` is registered unconditionally and simply reports
+            // `NO-SOURCE`, having nothing to merge. The expensive half is gone; the cheap half is a
+            // no-op that still appears in the graph. Do not read its name in a log as this line having
+            // failed to take effect.
+            //
+            // ⚠️ **This is NOT the fix for that failure and should not be read as one.** The ceiling
+            // was the 2 GB heap in `gradle.properties`, which `:nutrition` hit in the same hour on a
+            // completely different task; the note there has the measurement. What this removes is work
+            // nothing collects, which happens to be a large share of the pressure here because
+            // whisper.cpp, llama.cpp and quickjs-ng are all statically linked into one library, so that
+            // one symbol table is enormous.
+            //
+            // ⚠️ It does not change what is packaged either. `stripReleaseDebugSymbols` already strips
+            // the shipped `.so`, so the APK is byte-identical with or without this line.
+            debugSymbolLevel = "none"
+        }
 
         // ⚠️ **NAME THE ONE TARGET, because the AGP default is "build every executable and shared
         // library the CMake project defines" — and `EXCLUDE_FROM_ALL` on `add_subdirectory` does not
@@ -168,6 +202,19 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // ⚠️ The star catalogue must be stored UNCOMPRESSED or it cannot be memory-mapped, and the
+    // whole point of its tile index is that a view reads a few kilobytes rather than all
+    // hundreds of megabytes. Deflating it would force the entire file onto the heap.
+    //
+    // Nearly free: measured, the packed binary deflates to 93.7% of its size, so this costs about
+    // 1.5 MB of APK and buys zero-copy random access. SkyCatalogSource detects the mistake and says
+    // so rather than silently working slowly — see its KDoc, which also records why this line
+    // cannot live in :core:sky (packaging belongs to whichever module builds the APK, so every
+    // application bundling the asset has to declare it separately).
+    androidResources {
+        noCompress += "skycat"
     }
 
     packaging {
@@ -305,6 +352,12 @@ dependencies {
     // desktop companion. Moved out of this module in the same pass that made `:core:telemetry`
     // a plain JVM module: not one of those files imported `android.*`.
     implementation(project(":core:feeds"))
+    implementation(project(":core:health"))
+    implementation(project(":core:update"))
+    // The star renderer. ⚠️ Until this line existed, `:core:sky` was declared in settings.gradle.kts
+    // and depended on by nothing, so no task in any build ever compiled it — a module Gradle knows
+    // about but never builds fails nowhere, which is the same shape as a gate that cannot fire.
+    implementation(project(":core:sky"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.
@@ -319,14 +372,22 @@ dependencies {
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
-    // The viewfinder for the barcode scanner. A scanner that cannot show what it is aimed at
-    // is not usable, and PreviewView owns the surface lifecycle and transform that doing this
-    // by hand over a raw SurfaceView gets wrong. 111 kB.
-    implementation(libs.androidx.camera.view)
-    // ⚠️ ZXing core, NOT ML Kit. The unbundled ML Kit variant needs Play Services, which is the
-    // wrong bet on GrapheneOS, and the bundled one adds 2-3 MB to an APK the auto-updater
-    // re-downloads in full on every build. This is pure JVM and 608 kB.
-    implementation(libs.zxing.core)
+
+    // The barcode scanner: the camera, both decoders, the rotation and the viewfinder, all in
+    // `:core:scan` and shared with the standalone nutrition application.
+    //
+    // ⚠️ **The note that used to be here rejected ML Kit "because the bundled one adds 2-3 MB". That
+    // figure was wrong by an order of magnitude** — measured from the published artifact, the AAR is
+    // 9.9 MB and its native decoder is 20.2 MB across four architectures. The rest of the reasoning
+    // was sound and is why ZXing is still in the graph behind it: the bundled model working without
+    // Play Services is strong evidence rather than proof, and cannot be established from a build
+    // machine. What it buys is a trained detector that reads curved, crinkled, angled and dim
+    // barcodes a scanline reader cannot. ⚠️ This APK is arm64-only, so it carries 4.9 MB of that
+    // 20.2, not all of it.
+    //
+    // ⚠️ It brings `androidx.appcompat` transitively, through `com.google.mlkit:common`. Unwanted and
+    // unavoidable; recorded so a future dependency audit does not go hunting for who asked for it.
+    implementation(project(":core:scan"))
 
     // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
     implementation(libs.maplibre.android)

@@ -2,21 +2,24 @@ package dev.mascwa.pulse.data.diagnostics
 
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.core.device.DeviceGate
 import dev.mascwa.pulse.core.device.GrapheneOs
 import dev.mascwa.pulse.core.util.SecretScrub
+import dev.mascwa.pulse.crash.Breadcrumbs
 import dev.mascwa.pulse.crash.CrashReporter
+import dev.mascwa.pulse.crash.LogcatFilter
 import dev.mascwa.pulse.data.selfcode.GitHubRepo
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.settings.allSecretValues
 import dev.mascwa.pulse.data.usage.UsageRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Pushes scrubbed debug/diagnostic reports to a dedicated `debug-reports` branch in the repo so they can
@@ -56,7 +59,19 @@ class DebugUploader(
         val pending = crashReporter.entries().filter { it.timeMs.toString() !in sent }
         if (pending.isEmpty()) return@withContext Result.Skipped("nothing new")
         var last: Result = Result.Skipped("nothing new")
-        for (e in pending.take(5)) {
+        // ⚠️ **Oldest first, and that is the whole point of the sort.** `entries()` hands these back
+        // newest-first, so `take(5)` was sending the five most recent — while `CrashReporter.trim`
+        // deletes the OLDEST beyond twenty. On a phone crashing at every launch those two rules pull
+        // against each other: each launch writes a new report, the uploader sends the newest five,
+        // and the report from the FIRST crash — the one that explains the loop, where every later
+        // one is a consequence — is deleted having never been sent. Prioritising what is about to
+        // be discarded is the only ordering that gets it off the device.
+        //
+        // ⚠️ A failure deliberately does NOT stop the loop. It is tempting on a phone with no
+        // network, where all five will fail alike, but a single report that fails permanently — too
+        // large, or badly encoded — would then be first in the queue for ever and block every newer
+        // one behind it. Five attempts on a bad launch is the cheaper mistake.
+        for (e in pending.sortedBy { it.timeMs }.take(5)) {
             val bundle = buildBundle("crash", crashReporter.read(e))
             last = upload("crash", bundle)
             if (last is Result.Ok) markSent(e.timeMs.toString())
@@ -103,23 +118,49 @@ class DebugUploader(
             if (crashText != null) {
                 append("## Latest fault\n\n```\n").append(crashText.take(20_000)).append("\n```\n\n")
             }
+            // ⚠️ **This section did not exist, and the trail it renders was reaching nobody.**
+            // `Breadcrumbs` is shared with the standalone application and this bundle never read it,
+            // so a LCARS report arrived with the fault and no account of what led to it. The two
+            // sections below are not the same thing: the activity log is durable, aggregated and
+            // written to disk on its own schedule; this is the last couple of hundred moments held
+            // in memory, which is the resolution that matters for the seconds before a crash — and
+            // the only one that survives to be copied into the report as the process dies.
+            append("## What was happening just now\n\n```\n")
+                .append(Breadcrumbs.render(now)).append("```\n\n")
             append("## Recent activity (last ").append(activity.size).append(")\n\n```\n")
             activity.forEach {
                 append(TS.format(Date(it.epochMs))).append("  ").append(it.category).append("  ").append(it.label).append('\n')
             }
             append("```\n\n")
-            append("## Logcat — this process, last lines\n\n```\n").append(readOwnLogcat()).append("\n```\n")
+            // ⚠️ **Filtered rather than tailed, and the heading no longer claims something untrue.**
+            // Counted over the three reports actually sent from two phones, the raw tail was 254
+            // lines of which 149 were keyboard-and-window chatter and NOT ONE came from this
+            // application's own code; and "this process" was false, because logcat's ring buffer
+            // outlives a process and one report carried five different pids. See `LogcatFilter`.
+            append("## Logcat\n\n")
+            val log = readOwnLogcat()
+            append(
+                if (log == null) "_The log buffer could not be read on this device._\n"
+                else LogcatFilter.report(log, Process.myPid()),
+            )
         }
         return SecretScrub.scrub(raw, liveSecrets())
     }
 
-    /** Reads THIS app's own recent logcat (non-privileged apps are restricted to their own process). */
-    private fun readOwnLogcat(): String = runCatching {
+    /**
+     * Reads THIS app's own recent logcat (non-privileged apps are restricted to their own UID).
+     *
+     * ⚠️ Returned WHOLE, and null only when it genuinely could not be read. The budget and the
+     * choosing belong to [LogcatFilter]; tailing here first would throw away the warnings and errors
+     * from an earlier launch, which is the one thing in the dump that can explain a crash the fault
+     * handler did not survive to record.
+     */
+    private fun readOwnLogcat(): String? = runCatching {
         val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "threadtime", "-t", "500"))
         val out = proc.inputStream.bufferedReader().use { it.readText() }
         runCatching { proc.destroy() }
-        if (out.length > 40_000) out.takeLast(40_000) else out.ifBlank { "(no logcat captured)" }
-    }.getOrDefault("(logcat unavailable on this device)")
+        out
+    }.getOrNull()
 
     private suspend fun upload(kind: String, bundle: String): Result = runCatching {
         // Ensure the debug-reports branch exists (create from main on first use).

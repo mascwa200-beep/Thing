@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the FileProvider is allowed to hand out, and it is one directory.
+
+  ⚠️ **`files-path`, not `cache-path`, and that is the whole point of the feature.** Android reclaims
+  the cache without asking and without telling anyone, so a twelve-week comparison would lose its
+  "before" at some arbitrary point with no error and no gap in the list. Progress photographs live in
+  filesDir/progress/ so they survive until they are deleted on purpose.
+
+  ⚠️ The path must match `ProgressPhotoStore.DIR`. They are two statements of one fact, and a mismatch
+  is invisible at build time: the camera is simply handed a Uri the provider refuses.
+
+  ⚠️ Deliberately narrower than the LCARS application's copy, which also exposes cacheDir/apk (its
+  self-updater) and cacheDir/camera (photographing a meal). Neither exists here — this app does not
+  update itself and has no meal photography — and a provider path with nothing behind it is reach
+  granted for nothing.
+-->
+<paths>
+    <files-path name="progress" path="progress/" />
+</paths>

@@ -108,6 +108,111 @@ if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head
 # That reports `unresolved reference 'BuildConfig'` on its own import line, which is proof the
 # mechanism is generic rather than anything about your edit. Do check the member exists —
 # VERSION_CODE, VERSION_NAME and the flavour fields are the only ones this build generates.
+#
+# ⚠️ **CHOOSING THE CONTROL IS THE PART THAT GOES WRONG, and it goes wrong SILENTLY IN THE
+# REASSURING DIRECTION.** The technique is to plant a reference to something real and long-standing
+# beside the suspect one and see whether it is reported too. But this script DIFFERENCES against
+# HEAD, so a control the target file ALREADY references at HEAD has its message in the baseline
+# already and can never come back as new — planting it looks like the gate resolving it correctly,
+# which reads as "then my five complaints are real defects" and sends you chasing phantoms.
+#
+# A valid control is real, long-standing, AND absent from the target file at HEAD. Find one:
+#
+#     git show HEAD:<target.kt> > /tmp/head.kt
+#     git show HEAD:<the-declaring-file.kt> | grep -oE '^    (val|fun) [A-Za-z0-9_]+' | awk '{print $2}' \
+#       | sort -u | while read -r m; do grep -q "vm\.$m\b" /tmp/head.kt || echo "$m"; done
+#
+# ⚠️ **AND THE CONTROL HAS TO GO AT THE CALL SITE THAT IS COMPLAINING, not merely in the same file.**
+# A local helper whose INFERRED return type mentions an unresolvable type has an error type itself,
+# and then every member call on its result is reported — while the identical call on a cleanly typed
+# receiver a hundred lines away resolves perfectly. So one file can hold a poisoned site and a clean
+# one, and a control planted in the clean one comes back quiet and tells you nothing:
+#
+#     fun place(az: Double, alt: Double) = SkyProjection.project(az, alt, view).let {
+#         it to Offset(...)          // androidx: unresolved here, so `place` returns an error type
+#     }
+#     val (p, at) = place(...)
+#     p.onScreen(viewport)           // reported — and so is p.radius, which has shipped for months
+#
+# Planting `p.radius` AT THAT LINE is what settles it: `radius` unquestionably compiles in CI, so a
+# report for it is proof the receiver is poisoned. Planted anywhere else in the file it resolves.
+#
+# ⚠️ And note `:core:health` is on NEITHER path here — not as sources, not as classes — so every
+# member of anything it declares cascades. That is a whole module's worth of false positives, and it
+# is the commonest one this repo hits. It does NOT follow that the module is beyond checking: the
+# whole of it compiles against the real platform classes in about twenty seconds, and
+# `tools/check_changed.sh` now runs that automatically whenever a `core/health` file changes. When
+# this gate blames a health symbol, that compile is the instrument to reach for — not a shrug.
+#
+# ⚠️ `:core:update` is on neither path either, and it now carries `DeviceProbeReader` and
+# `DecodeCapInterceptor` as well as the updater and the crash reporter — so every member of those
+# cascades exactly the same way, and a member ADDED to one of them has no baseline complaint to
+# cancel against and reads as a brand-new defect. The cheap control is to plant a symbol from that
+# same module that unquestionably compiles in CI (`deviceProbe.budget()` has shipped since the
+# device probe landed) and re-run: if it reports identically, the complaint is this classpath and
+# not your change. That control is one command and it beats reasoning about it.
+#
+# ⚠️ `:core:sky` is the third such module, and the one this gate blames most loudly, because the
+# sky map's whole renderer lives there: `StarBatches`, `SkyFrame`, `DeepSkyLayer`, `MilkyWayGlow`,
+# every `DrawScope.draw*` pass. A screen that starts using a NEW one of them gets it reported as an
+# unresolved name with nothing at HEAD to cancel it. ⚠️ **Do not reach for the plant-a-known-symbol
+# control here** — a fully-qualified `dev.mascwa.pulse.sky.X` reports as `unresolved reference
+# 'sky'`, which the app's own `dev.mascwa.pulse.data.sky` package already produces at HEAD, so the
+# differencing cancels it and the control comes back inconclusive. The instrument that works is
+# POSITIVE: `:core:sky` compiles completely clean against the real platform plus the real Compose
+# artifacts, which is stronger than a control because it type-checks the code rather than merely
+# reproducing the complaint. The invocation is
+#
+#   tools/android_compile_check.sh \
+#     -l androidx.compose.ui:ui-android:1.7.6 -l androidx.compose.ui:ui-graphics-android:1.7.6 \
+#     -l androidx.compose.ui:ui-unit-android:1.7.6 -l androidx.compose.ui:ui-geometry-android:1.7.6 \
+#     -l androidx.compose.runtime:runtime-android:1.7.6 -l androidx.annotation:annotation-jvm:1.9.1 \
+#     <the core/sky files> <the core/telemetry files they use>
+#
+# ⚠️ **A NEW EXPRESSION OVER AN UNRESOLVABLE APP TYPE REPORTS A TYPE-INFERENCE FAILURE OR A
+# RECEIVER MISMATCH, NOT AN UNRESOLVED NAME — so the differencing does not cancel it.** Adding a
+# `Pair<String, AppSettings>` field to `SettingsRepository`, plus `raw to it` and `x?.also { }` over
+# an `AppSettings?`, produced two brand-new complaints ("not enough information to infer type
+# argument for 'B'" and "receiver type mismatch") in a file whose every other mention of
+# `AppSettings` was already at HEAD and therefore already cancelling. `AppSettings` is an app class,
+# so it has an error type here; a NEW generic instantiation or a NEW call on an error-typed receiver
+# is a message KIND that did not exist at HEAD. Nothing is wrong with the code.
+#
+# Two ways to settle it, cheapest first:
+#   - retype the same expression over a resolvable type (`Pair<String, String>`) and re-run; the
+#     inference complaint disappears while any unrelated one stays — that is the tell.
+#   - better, because it is positive rather than negative: compile the file properly with
+#     `tools/android_compile_check.sh -s <target.kt> <the-file-declaring-the-type> ...`. Here that
+#     reported ZERO errors attributed to the target and left only the declaring file's own missing
+#     transitive deps, which is proof the target is fine rather than an argument that it might be.
+#
+# ⚠️ **A NEW OR RENAMED FUNCTION IN A FILE THAT ALREADY CASCADES REPORTS AS UNRESOLVED, AND THAT
+# SAYS NOTHING ABOUT IT.** In a Compose screen every `LazyListScope` extension and every call to one
+# is unresolved here, because androidx is on neither path — so all of them are in the HEAD baseline
+# and cancel. Add one and its name is new, so it survives the differencing and reads as the one real
+# defect on the page. `it` comes along with it whenever the new function has a lambda.
+#
+# The control that settles it in one command, and it is a positive rather than an argument: RENAME
+# an existing function in the same file — one that unquestionably compiles in CI today — and re-run.
+# Measured on `OrbitalScreen.kt`: renaming `chartTab` to `chartTabZZ` produced
+# `unresolved reference 'chartTabZZ'` beside the new function's own, from code that has shipped for
+# months. Restore the rename afterwards and verify with `cmp`.
+#
+# ⚠️ Note the WRONG control for this one: adding a brand-new function alongside and checking whether
+# IT reports. It may not, because the cascade depends on where the call sits — a call from a plain
+# top-level function resolved cleanly while the identical call from inside the `@Composable` body did
+# not. Rename something real instead.
+#
+# ⚠️ **DO NOT PASS A TEST FILE. This is for main sources, and a test file poisons the whole run.**
+# JUnit is not on the classpath, so `Test`, `assertEquals` and `assertTrue` come back unresolved —
+# which is obvious enough — but the damage does not stop there. Adding a file full of unresolved
+# names to the same compilation changes how far the frontend gets before it gives up, and it then
+# reports names in the OTHER files that resolve perfectly well without it. Measured: passing one new
+# test file alongside four main files produced five complaints, one of them `theme`, in a file that
+# had not changed; dropping the test file from the same run reported "no new complaints since HEAD".
+# The tell is a reported name that has nothing to do with what you edited. `tools/check_changed.sh`
+# derives its file list from `git diff`, so a new test WILL be swept in — run the main files alone
+# as a control before believing anything it says.
 
 FEEDS=core/feeds/build/classes/kotlin/main
 OKHTTP=$(find "$GC/com.squareup.okhttp3" -name 'okhttp-*.jar' 2>/dev/null | head -1)
@@ -120,9 +225,49 @@ fi
 # have just ADDED to `core/feeds` source is absent from them and every call to it is reported as a
 # real unresolved reference. It reads exactly like a defect and is not one. Rebuild first:
 #   ./gradlew :core:feeds:classes --configure-on-demand --no-configuration-cache
-# (`:core:telemetry` is passed as SOURCES, so it never has this problem — only feeds does.)
+#
+# ⚠️ **AND A FALSE POSITIVE THAT LOOKS LIKE NOTHING ELSE: "argument type mismatch: actual type is
+# X, but X was expected."** `core/telemetry` is compiled here FROM SOURCE alongside the target
+# files, while `core/feeds` is on the classpath as CLASSES — and those classes were compiled
+# against their own copy of `core/telemetry`. So a `:core:telemetry` type passed through a
+# `:core:feeds` signature has two definitions in one compilation, and the compiler says so in the
+# most confusing way available. `method 'iterator()' is ambiguous` on a perfectly ordinary `for`
+# loop is the same thing wearing a different hat.
+#
+# Settle it the documented way rather than shrugging: a typed probe compiled against the COMPILED
+# classes of both modules, which has only one definition of each. If the probe compiles and runs,
+# the complaint was this.
+#
+# ⚠️ This paragraph used to end "(`:core:telemetry` is passed as SOURCES, so it never has this
+# problem — only feeds does.)" **That is false and was measured to be false.** The mismatch can name
+# a STDLIB type rather than a module one, and it fires on a `:core:telemetry` value too: a
+# `?.let { add(...) }` inside a `buildList`, whose receiver is a core call, reports
+#   argument type mismatch: actual type is 'kotlin.Function1<kotlin.String, kotlin.Boolean>',
+#   but 'kotlin.Function1<T, R>' was expected.
+# Reproduced with `TaskBoard.focus(...)`, a core function already imported by the target file and
+# shipping green in CI, so it is the gate and not the code. `let`'s `T` simply cannot be pinned in a
+# compilation holding two definitions of something in its chain. Same remedy: a typed probe.
+#
+# ⚠️ **AND THE COMPLAINT SET IS NOT MONOTONE, so a "NEW" line can name code you did not touch and
+# that is not even in the target set.** The core is compiled every run, and a compilation carrying
+# more error-typed symbols gives up earlier and therefore reports LESS. Add a file and the compiler
+# gets further, and complaints that were always latent in `core/telemetry` appear for the first
+# time. Measured: adding a new app file surfaced
+#   argument type mismatch: actual type is 'kotlin.text.MatchGroup', but 'kotlin.String' was expected.
+# which is `supergroups[category]` in `Curriculum.kt` — a map lookup the compiler re-resolves onto
+# `MatchGroupCollection.get` once the map's own type has gone bad. Before chasing a complaint, grep
+# for its construct in your diff; if it is not there, it is not yours.
+#
+# ⚠️ A NEW FILE has no baseline at all, so this bites hardest there: HEAD cannot be checked out for
+# a file that does not exist in it, and the two compilations therefore hold different file sets.
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar"
+# ⚠️ JUnit is here because this gate is routinely handed `src/test` files alongside the source they
+# cover, and without it EVERY test file reports `unresolved reference 'junit'` plus one line per
+# assertion — and then a cascade, because a lambda whose body has an error type cannot have its
+# parameter inferred either. Six lines of pure noise on a file that compiles perfectly in CI.
+# It cannot hide a real defect: Kotlin still requires the import, so an unimported `assertEquals`
+# is unresolved whether or not the jar is on the classpath.
+TARGET_CP="$COR:$SER:$SERJ:$JSOUP:$FEEDS:$OKHTTP:$OKIO:$G/kotlin-stdlib-2.0.21.jar:$G/junit-4.13.2.jar:$G/hamcrest-core-1.3.jar"
 
 # The whole pure core, so its types DO resolve — exactly one file in it imports android.*.
 mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')
@@ -175,6 +320,14 @@ complaints() {
   # zero lines here, and reported "no new complaints" for every possible edit. A check that cannot
   # fail is worse than no check, and it passed its own smoke test by looking clean. Both forms are
   # handled; the count assertion below is what would catch a third.
+  # ⚠️ Distinguish "the compiler found nothing wrong" from "my pattern found nothing". Only the
+  # SECOND is a broken check, and the guard below could not tell them apart until a file with no
+  # `android.*` import at all was passed to it, at which point a genuinely clean compile — the
+  # strongest result this script can produce — was reported as a failure.
+  if ! grep -qE '(^|[[:space:]])error:|^e: ' <<<"$out"; then
+    echo "!!NO-ERRORS-AT-ALL"
+    return
+  fi
   grep -E '^([^ ]+\.kt:[0-9]+:[0-9]+: error: |e: )' <<<"$out" \
     | sed -E 's|^[^ ]+\.kt:[0-9]+:[0-9]+: error: ||; s|^e: file://[^ ]*:[0-9]+:[0-9]+ ||; s|^e: ||' \
     | sed -E 's/[[:space:]]+$//' \
@@ -204,12 +357,28 @@ fi
 
 then_=$(complaints "${baseline[@]}")
 
-# ⚠️ **THE EXTRACTOR MUST HAVE FOUND SOMETHING.** These are Android files compiled with no Android
-# SDK on the classpath, so the baseline ALWAYS produces unresolved-reference errors — every
-# `android.*` and `androidx.*` import is missing. Zero means the message pattern above stopped
-# matching, not that the code is clean, and the difference would then be empty for any edit whatsoever.
-# That exact failure shipped in a first cut of this widening, so it is asserted rather than trusted.
-if [ -z "$then_" ]; then
+# The whole set compiles with nothing but the shared cores — no Android SDK needed. That is not a
+# gap in this gate, it is the best answer it has: there is nothing left for the SDK to resolve.
+baseline_clean=0
+grep -q '!!NO-ERRORS-AT-ALL' <<<"$then_" && baseline_clean=1
+if [ "$baseline_clean" = 1 ] && grep -q '!!NO-ERRORS-AT-ALL' <<<"$now"; then
+  echo "these files need nothing from the Android SDK — they compile clean against the shared cores"
+  exit 0
+fi
+then_=$(grep -v '!!NO-ERRORS-AT-ALL' <<<"$then_")
+now=$(grep -v '!!NO-ERRORS-AT-ALL' <<<"$now")
+
+# ⚠️ **THE EXTRACTOR MUST HAVE FOUND SOMETHING — unless the compiler genuinely found nothing.**
+# These are usually Android files compiled with no Android SDK on the classpath, so the baseline
+# normally produces unresolved-reference errors for every `android.*` and `androidx.*` import. Zero
+# extracted lines would then mean the message pattern above stopped matching, not that the code is
+# clean, and the difference would be empty for any edit whatsoever. That exact failure shipped in a
+# first cut of this widening, so it is asserted rather than trusted.
+# ⚠️ `baseline_clean` is what keeps the assertion honest: a file with no Android imports at all
+# compiles clean here, so its empty extraction is a FACT rather than a broken pattern. Without that
+# distinction this guard fired on the strongest result the script can produce — which is how it
+# reported a failure for a file that had just been migrated off `SimpleDateFormat` onto `java.time`.
+if [ -z "$then_" ] && [ "$baseline_clean" = 0 ]; then
   echo "EXTRACTOR MATCHED NOTHING — the compiler's message format changed. This is NOT a pass."
   echo "  An Android file with no SDK must produce unresolved-reference errors; zero means the"
   echo "  grep/sed in complaints() no longer matches. Print the raw output and fix the pattern."

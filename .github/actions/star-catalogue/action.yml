@@ -1,0 +1,249 @@
+name: Star catalogue
+description: >-
+  Restore the packed Gaia catalogue from cache, or build it, prove it is the right one, and prove the
+  Milky Way raster committed beside it is still what that catalogue implies.
+
+# ⚠️ **THIS FILE IS THE ONE DEFINITION OF THE CATALOGUE'S DEPTH AND ITS CACHE KEY, and it is a
+# composite action rather than three copies of the same block for exactly that reason.** Three
+# workflows want this asset — the LCARS build, the standalone star map's build, and the manual
+# warmer beside them — and a cache key that drifted by one character between two of them would not
+# fail: each would simply never find the other's entry and rebuild for the best part of an hour,
+# for ever, with nothing on screen to say why. That is the duplicated-definition drift this
+# repository has corrected seven times, in the shape where it is hardest to notice.
+#
+# ## Why it is built here and not committed
+#
+# At G<15 the catalogue is about 295 MB. `.gitignore` already states the rule in this repository's
+# own words about the food database: GitHub hard-rejects files over 100 MB and there is no LFS. So
+# it is built in CI behind a cache, which is the pattern the food database already proves.
+#
+# ## ⚠️ It is a HARD gate, unlike the food database
+#
+# The food database is one optional feature and its step is `continue-on-error` on purpose: the app
+# falls back to the network and says so. This is not that. The star map IS the standalone
+# application and a major part of LCARS, and an APK that shipped without the catalogue would install
+# perfectly and show an empty sky. There is no honest degraded state, so a failure here fails the
+# build.
+#
+# ## ⚠️ What a cold run costs, measured rather than guessed
+#
+# The archive caps a sync query at 50,000 rows, so 36.9 million stars is at least 738 leaf requests
+# and realistically 1,100–1,900 after adaptive splitting. Measured locally at G<12 (3.09M stars):
+# about five minutes and roughly 150 requests, four at a time. Scaling that gives roughly 45–60
+# minutes and about 3.5 GB fetched for a cold G<15 build, plus a few minutes of packing.
+#
+# That is why `sky-catalogue.yml` exists: run it once by hand after changing the depth or the
+# builder and both build workflows find the entry already warm. It is a warmer, never a
+# replacement — the build step below still runs on a miss, so nothing depends on anyone having
+# remembered.
+#
+# ⚠️ **The faster shape, priced and NOT taken.** Gaia also offers an ASYNC TAP endpoint whose row
+# limit is in the millions, which would turn ~1,900 requests into ~64 and the step into perhaps
+# fifteen minutes. It is a genuinely better fetch and it is also a new subsystem — submit, poll,
+# collect — with its own failure modes, validatable only against a live service. The sync path is
+# proven and its output is byte-identical to the builder that came before it. If cold builds become
+# painful, that is the next lever, and this paragraph is the measurement to act on.
+
+inputs:
+  magnitude:
+    description: >-
+      Faintest Gaia G magnitude to include. ⚠️ THE DEFAULT HERE IS THE PROJECT'S SETTING — every
+      caller leaves it alone, and changing it changes the cache key, so a new depth rebuilds rather
+      than silently restoring the old file. Each magnitude buys exactly 0.238 decades of usable
+      zoom (`SkyProjection.magnitudeLimit` is linear in log-field) and costs about 2.2x the last.
+    required: false
+    default: "15"
+
+outputs:
+  stars:
+    description: How many stars the catalogue on disk actually holds.
+    value: ${{ steps.check.outputs.stars }}
+  magnitude:
+    description: >-
+      The depth this build used. ⚠️ Exists so the APK gate downstream can check the PACKAGED file
+      against the same number without restating it — a literal `--magnitude 15` in each workflow
+      would be a third and fourth copy of the one thing this action exists to own, and the drift
+      would be silent: the gate would happily pass a catalogue built to a depth nobody asked for.
+    value: ${{ inputs.magnitude }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the star catalogue
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: core/sky/src/main/assets/sky/stars.skycat
+        # ⚠️ The magnitude is IN THE KEY. The food database's own comment records what happens
+        # without that: a change to *what* is fetched that does not move the builder's hash restores
+        # the stale artefact and the change does nothing at all, silently. Here the stale artefact
+        # would be a shallower sky that looks entirely correct.
+        #
+        # ⚠️ The two Kotlin files are in the hash because the builder READS them — the record
+        # layout out of `StarCatalogFormat.kt` and the tiling out of `SkyGrid.kt`. That is what
+        # stops the builder and the reader drifting; with only the builder hashed, a change to the
+        # magnitude scale or the number of bands would restore a catalogue laid out to the old rules
+        # and every star would decode into slightly the wrong place.
+        #
+        # The trailing salt is a manual rebuild switch, exactly as the food database's is. Gaia DR3
+        # is a frozen release so its contents cannot move underneath us; bump the salt only to force
+        # a rebuild for some other reason.
+        key: >-
+          star-catalogue-g${{ inputs.magnitude }}-${{ hashFiles('tools/sky/build_catalogue.py',
+          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/StarCatalogFormat.kt',
+          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyGrid.kt')
+          }}-dr3-v1
+
+    - name: Build the star catalogue
+      shell: bash
+      # ⚠️ Gated on THE FILE ON DISK BEING THE RIGHT ONE, not on `steps.cache.outputs.cache-hit`.
+      # Two separate traps, and the first has bitten this repository already:
+      #
+      #   * a cache archive records the paths it was saved from, so an entry saved from a different
+      #     path reports a HIT and leaves nothing behind — which is exactly how the nutrition
+      #     workflow once skipped its build and shipped an APK with no database, greenly;
+      #   * and a file being PRESENT is not it being the right DEPTH. A checkout can hand this step
+      #     a catalogue from some other tier — that is precisely what happens the first time the
+      #     warmer runs against a tree where the shallow one is still committed — and a guard that
+      #     only asked "does it exist" would cache the wrong file under the right key, permanently,
+      #     with every build after it drawing a sky that simply stops early.
+      #
+      # So the header is read, and anything that is not what was asked for is deleted and rebuilt.
+      run: |
+        set -euo pipefail
+        out=core/sky/src/main/assets/sky/stars.skycat
+        if [ -s "$out" ] && python3 tools/sky/check_packaged.py \
+              --catalogue "$out" --magnitude ${{ inputs.magnitude }} >/dev/null 2>&1; then
+          echo "restored from cache: $(du -h "$out" | cut -f1)"
+          exit 0
+        fi
+        if [ -e "$out" ]; then
+          echo "a catalogue is present but is not the one this build asked for:"
+          python3 tools/sky/check_packaged.py --catalogue "$out" \
+            --magnitude ${{ inputs.magnitude }} 2>&1 | sed 's/^/    /' || true
+          rm -f "$out"
+        fi
+        echo "fetching Gaia DR3 down to G < ${{ inputs.magnitude }}"
+        echo "--- before ---"; df -h / | tail -1; free -m | sed 's/^/    /'
+        # ⚠️ Guarded, because a diagnostic that can break the build is worse than none: /usr/bin/time
+        # is a package rather than the shell builtin and a future runner image could drop it. The
+        # same guard is on the food database's build for the same reason.
+        TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+        $TIMER python3 tools/sky/build_catalogue.py \
+          --magnitude ${{ inputs.magnitude }} \
+          --out "$out" 2> >(tee /tmp/skycat-time.log >&2)
+        echo "--- after ---"; df -h / | tail -1; free -m | sed 's/^/    /'
+        grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/skycat-time.log | sed 's/^/    /' || true
+
+    - name: Check the catalogue on disk is the one that was asked for
+      id: check
+      shell: bash
+      # ⚠️ Belt and braces over the cache key. The key already carries the magnitude, so a stale
+      # catalogue at the wrong depth should be impossible — but "should be impossible" is how the
+      # food database shipped 48.8% coverage while reporting PASSED, and reading eight bytes of a
+      # header costs nothing. This checks the file we are about to compile against; the APK gates in
+      # the two build workflows separately check the file that actually got packaged.
+      run: |
+        set -euo pipefail
+        python3 tools/sky/check_packaged.py \
+          --catalogue core/sky/src/main/assets/sky/stars.skycat \
+          --magnitude ${{ inputs.magnitude }} \
+          --github-output "$GITHUB_OUTPUT"
+
+    # ⚠️ **The raster lives here rather than in each build workflow for the reason this file's
+    # header gives about the cache key: the two build workflows and the warmer all want it, and a
+    # definition that drifted between two of them would not fail — it would quietly check something
+    # different in each.** The raster's only input is the catalogue the steps above just produced,
+    # so "the sky's derived data is right" is one gate with one definition.
+    #
+    # ⚠️ Unlike the catalogue this asset IS committed. It is 64,816 bytes rather than 295 MB, and it
+    # is the only SHIPPED PICTURE in the sky feature — nothing in CI can draw it, so keeping it in
+    # the repository is what allows anyone to look at it before it goes out. What CI can do is prove
+    # it still matches the catalogue, which is exactly what a rebuild-and-compare is.
+    #
+    # ⚠️ The comparison is sound because the build is deterministic in the strong sense: the raster
+    # depends only on the MULTISET of star positions — `counts[cell] += 1` is order-independent — so
+    # even a catalogue refetched cold in a different row order yields identical bytes. A G<12
+    # reproduction has already been confirmed byte-identical, twice.
+    #
+    # ⚠️ **It costs about a minute of every round in three workflows, and that is measured on real
+    # runners rather than assumed: 56.1 s and 72.6 s wall over two rounds, 305 MB peak, over 36.9
+    # million stars.** Quoted as the range it is: the two rounds differ by 30% for runner variance
+    # and for the linear-cost comparison the second one also computes, and a single figure here
+    # would read as more precise than the thing being measured. If it ever hurts, the
+    # lever is a cache keyed on exactly (this catalogue's key, `build_milkyway.py`, `MilkyWay.kt`)
+    # holding a stamp, so the rebuild is skipped when none of its inputs moved. Named, not built —
+    # caching a gate is how gates go stale, and it should only be done against a measured need.
+    #
+    # ⚠️ **A HARD GATE. A raster that disagrees with the catalogue beside it fails the build.**
+    # There is no honest degraded state: the two would ship together describing different skies, and
+    # nothing downstream could tell — the app would draw a perfectly plausible galaxy scaled for a
+    # catalogue it is not reading. The builder's own thresholds check (see `report_thresholds`) is
+    # part of the same gate, so `MilkyWay.kt`'s two absolute densities are held here too.
+    - name: Rebuild the Milky Way raster and check it matches the committed one
+      shell: bash
+      run: |
+        set -euo pipefail
+        committed=core/sky/src/main/assets/sky/milkyway.bin
+        out="${RUNNER_TEMP:-/tmp}/milkyway.rebuilt.bin"
+
+        # The timer is guarded and uses `-v` rather than a format string, matching the catalogue
+        # step above: /usr/bin/time is a package rather than the shell builtin, and a diagnostic
+        # that can break the build is worse than no diagnostic.
+        #
+        # ⚠️ No `|| true` here, unlike the round that bootstrapped this. The builder raising is
+        # itself a finding — it means the raster it just wrote disagrees with `MilkyWay.kt`, which
+        # is precisely what this gate exists to catch — so it must fail rather than be reported.
+        TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+        $TIMER python3 tools/sky/build_milkyway.py \
+          --catalogue core/sky/src/main/assets/sky/stars.skycat \
+          --out "$out" 2> >(tee /tmp/milkyway-time.log >&2)
+        grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/milkyway-time.log \
+          | sed 's/^/    /' || true
+
+        echo "--- committed vs rebuilt ---"
+        echo "  committed $(sha256sum "$committed" | cut -c1-16)…  $(stat -c%s "$committed") bytes"
+        echo "  rebuilt   $(sha256sum "$out"       | cut -c1-16)…  $(stat -c%s "$out") bytes"
+        if cmp -s "$out" "$committed"; then
+          echo "  identical — the committed raster is what this catalogue implies"
+          exit 0
+        fi
+
+        # ⚠️ The recovery path is the SAME MECHANISM that bootstrapped the deep raster in the first
+        # place, which is why it is here rather than left to be reinvented under time pressure:
+        # decode this block into `core/sky/src/main/assets/sky/milkyway.bin` and commit it, having
+        # first read the statistics the builder printed above and moved `MilkyWay.FAINTEST_DENSITY`
+        # and `BRIGHTEST_DENSITY` with it. The artifact below is the tidier route; base64 in the log
+        # is the one that cannot fail, since a job log is always readable.
+        #
+        # ⚠️ Deliberately wrapped at the default 76 columns rather than `-w0`: one 86,000-character
+        # line is at the mercy of whatever truncates long log lines, and nothing is gained by it.
+        #
+        # ⚠️ **A mismatch is not automatically the raster's fault.** The rebuild is deterministic in
+        # the strong sense — it depends only on the multiset of star positions — so if the catalogue
+        # has not changed depth, a difference means something upstream of both moved: the grid, the
+        # record layout, the smoothing. Read the builder's numbers before adopting these bytes.
+        echo "  DIFFERENT — this catalogue does not imply the committed raster."
+        echo "--- rebuilt raster, base64 (between the markers) ---"
+        echo "BEGIN_MILKYWAY_BASE64"
+        base64 "$out"
+        echo "END_MILKYWAY_BASE64"
+        exit 1
+
+    - name: Keep the rebuilt raster
+      # ⚠️ `always()` so a FAILED step still uploads, and there are TWO ways it fails. A cmp
+      # mismatch prints the bytes into the log as well, so either route works — but the builder
+      # RAISING (its own thresholds check) fails before the base64 is ever reached, and `build()`
+      # writes the raster before either gate runs, so in that case this artifact is the only copy
+      # of the bytes there is. Without `always()` the upload happens exactly when nobody needs it.
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: milkyway-rebuilt-${{ github.run_id }}-${{ github.job }}
+        path: ${{ runner.temp }}/milkyway.rebuilt.bin
+        # 64 KB, and its only purpose is to be collected in a round that has to adopt it.
+        retention-days: 7
+        # ⚠️ `warn`, not `error`: the builder can fail before writing anything (a missing catalogue,
+        # a Kotlin constant it cannot read), and in that case the step above has already failed with
+        # the real reason. A second failure here would bury it.
+        if-no-files-found: warn

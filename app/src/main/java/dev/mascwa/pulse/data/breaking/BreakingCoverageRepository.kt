@@ -56,14 +56,27 @@ class BreakingCoverageRepository(
         return result
     }
 
-    /** True when an outlet name is one of the widely-trusted, free-to-read organisations. */
-    fun isTrusted(source: String): Boolean {
-        val s = source.lowercase()
-        return TRUSTED.any { s.contains(it) }
-    }
-
     companion object {
         private const val TTL_MS = 90_000L // coverage is time-sensitive; a short cache only
+
+        /**
+         * True when an outlet name is one of the widely-trusted, free-to-read organisations.
+         *
+         * ⚠️ On the companion rather than the instance because callers that want the JUDGEMENT
+         * should not have to construct a repository — which drags in the news repository and a
+         * disk cache — to ask it. The home-screen widget needs exactly this and nothing else.
+         *
+         * It moved here because the rule had already been written twice: this one, and a private
+         * copy in `BreakingNewsScreen` restating `TRUSTED.any { ... }` by hand. Two statements of
+         * one rule is how they drift, and a third was about to be added.
+         *
+         * (Unqualified calls from this class's own instance methods still resolve here, so the
+         * ordering at [coverage] is unchanged.)
+         */
+        fun isTrusted(source: String): Boolean {
+            val s = source.lowercase()
+            return TRUSTED.any { s.contains(it) }
+        }
 
         /** Widely-trusted, free-to-read news organisations — floated to the top of the coverage. */
         val TRUSTED = listOf(

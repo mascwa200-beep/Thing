@@ -197,4 +197,108 @@ class NutrientGuidesTest {
         assertEquals("18 of 28 g", NutrientGuides.fibre(2000)!!.readout(18.0))
         assertEquals("1400 of 2000 mg", NutrientGuides.sodium(1990, THIS_YEAR)!!.readout(1400.0))
     }
+
+    /**
+     * ⚠️ **The point of [NutrientGuides.Nutrient] is that a caller can tell which of its own rows a
+     * guide belongs to WITHOUT matching on display prose.** That only holds while every member is
+     * actually produced and no two producers claim the same one — so both halves are pinned here.
+     * A fourth member added without a producer, or a copy-paste that stamps saturated fat as fibre,
+     * fails this rather than silently rendering one nutrient twice and another not at all.
+     */
+    @Test
+    fun everyNutrientIsProducedExactlyOnceWhenEveryFactIsKnown() {
+        val stamped = NutrientGuides.forDay(
+            eaten = NutritionDay.Nutrients(),
+            targetKcal = 2000,
+            birthYear = 1990,
+            thisYear = THIS_YEAR,
+        ).map { it.guide.nutrient }
+        assertEquals(NutrientGuides.Nutrient.entries.toSet(), stamped.toSet())
+        assertEquals(NutrientGuides.Nutrient.entries.size, stamped.size)
+    }
+
+    /**
+     * ⚠️ The property that makes [NutrientGuides.whyAbsent] trustworthy: a reason appears exactly
+     * when the guide does not. If the two could disagree, a screen would show a comparison AND a
+     * sentence saying no comparison could be made, or worse, neither.
+     */
+    @Test
+    fun aReasonIsGivenExactlyWhenTheGuideIsMissing() {
+        for (n in NutrientGuides.Nutrient.entries) {
+            for (target in listOf(null, 0, 2000)) {
+                for (birthYear in listOf(0, THIS_YEAR - 10, 1990)) {
+                    val stated = NutrientGuides.forDay(
+                        eaten = NutritionDay.Nutrients(),
+                        targetKcal = target,
+                        birthYear = birthYear,
+                        thisYear = THIS_YEAR,
+                    ).any { it.guide.nutrient == n }
+                    val why = NutrientGuides.whyAbsent(n, target, birthYear, THIS_YEAR)
+                    assertEquals(
+                        "$n at target=$target birthYear=$birthYear: stated=$stated, why=$why",
+                        stated,
+                        why == null,
+                    )
+                }
+            }
+        }
+    }
+
+    /** And the reason names the fact that is actually missing, not a generic one. */
+    @Test
+    fun theReasonNamesTheMissingFact() {
+        // No target: fibre and saturated fat are shares of energy; sodium is not, so with an adult
+        // birth year it is stated and has no reason at all.
+        assertEquals(
+            NutrientGuides.NO_TARGET,
+            NutrientGuides.whyAbsent(NutrientGuides.Nutrient.FIBRE, null, 1990, THIS_YEAR),
+        )
+        assertEquals(
+            NutrientGuides.NO_TARGET,
+            NutrientGuides.whyAbsent(NutrientGuides.Nutrient.SATURATED_FAT, null, 1990, THIS_YEAR),
+        )
+        assertNull(NutrientGuides.whyAbsent(NutrientGuides.Nutrient.SODIUM, null, 1990, THIS_YEAR))
+
+        // No birth year: the reverse. Sodium alone is withheld.
+        assertNull(NutrientGuides.whyAbsent(NutrientGuides.Nutrient.FIBRE, 2000, 0, THIS_YEAR))
+        assertEquals(
+            NutrientGuides.NO_ADULT_AGE,
+            NutrientGuides.whyAbsent(NutrientGuides.Nutrient.SODIUM, 2000, 0, THIS_YEAR),
+        )
+    }
+
+    /**
+     * ⚠️ [NutrientGuides.Nutrient.eatenIn] and [NutrientGuides.forDay] must read the same field, or
+     * a screen showing a total beside a comparison would show two different numbers for one
+     * nutrient. Distinct values on every field, so a copy-paste that reads fibre for saturated fat
+     * fails rather than passing on a fixture where they happen to match.
+     */
+    @Test
+    fun theEnumReadsTheSameFieldTheServingDoes() {
+        val day = NutritionDay.Nutrients(fibreG = 11.0, satFatG = 22.0, sodiumMg = 3300.0)
+        assertEquals(11.0, NutrientGuides.Nutrient.FIBRE.eatenIn(day), 1e-9)
+        assertEquals(22.0, NutrientGuides.Nutrient.SATURATED_FAT.eatenIn(day), 1e-9)
+        assertEquals(3300.0, NutrientGuides.Nutrient.SODIUM.eatenIn(day), 1e-9)
+
+        for (s in NutrientGuides.forDay(day, targetKcal = 2000, birthYear = 1990, thisYear = THIS_YEAR)) {
+            assertEquals(s.guide.label, s.guide.nutrient!!.eatenIn(day), s.eaten, 1e-9)
+            // And the guide's display strings come from the enum rather than a second copy.
+            assertEquals(s.guide.nutrient!!.label, s.guide.label)
+            assertEquals(s.guide.nutrient!!.unit, s.guide.unit)
+        }
+    }
+
+    /** And each producer stamps its own, which is what makes the lookup mean anything. */
+    @Test
+    fun eachProducerStampsItsOwnNutrient() {
+        assertEquals(NutrientGuides.Nutrient.FIBRE, NutrientGuides.fibre(2000)!!.nutrient)
+        assertEquals(
+            NutrientGuides.Nutrient.SATURATED_FAT,
+            NutrientGuides.saturatedFat(2000)!!.nutrient,
+        )
+        assertEquals(
+            NutrientGuides.Nutrient.SODIUM,
+            NutrientGuides.sodium(1990, THIS_YEAR)!!.nutrient,
+        )
+    }
 }

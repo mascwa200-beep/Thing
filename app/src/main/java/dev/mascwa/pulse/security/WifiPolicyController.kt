@@ -1,6 +1,5 @@
 package dev.mascwa.pulse.security
 
-import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.net.wifi.WifiManager
 
@@ -17,11 +16,16 @@ class WifiPolicyController(context: Context) {
 
     private val appContext = context.applicationContext
     private val wifi = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-    private val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
 
-    /** True once Pulse has been provisioned as Device Owner → radio toggling will actually take effect. */
-    fun isDeviceOwner(): Boolean =
-        runCatching { dpm?.isDeviceOwnerApp(appContext.packageName) == true }.getOrDefault(false)
+    /**
+     * True once Pulse has been provisioned as Device Owner → radio toggling will actually take effect.
+     *
+     * ⚠️ Delegates rather than asking again. This file kept a byte-for-byte identical copy of the
+     * check, which is two statements of one fact — the drift this repository has corrected seven
+     * times. [DevicePolicyController.unavailableReason] is the matching sentence for a surface that
+     * has to explain the answer.
+     */
+    fun isDeviceOwner(): Boolean = DevicePolicyController.isDeviceOwner(appContext)
 
     /** Whether the Wi-Fi radio is currently enabled (independent of whether it's associated). */
     fun isWifiEnabled(): Boolean =

@@ -23,6 +23,7 @@ import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.device.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.core.telemetry.VoiceMachine
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.console
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.interrogator
@@ -185,25 +186,41 @@ class ActiveMatrixService : Service() {
         runCatching { c.textToSpeech.speak(line) }
     }
 
-    /** Self-preservation: at critical battery, conserve (pause heavy polling) and warn once — spoken if
-     *  voice is available — then stand down quietly. Resets when charging or the level recovers. */
+    /**
+     * Self-preservation: at critical battery, conserve (pause heavy polling) and warn once — spoken
+     * if voice is available — then stand down quietly. Resets when charging or the level recovers.
+     *
+     * ⚠️ **The hysteresis is [Sensorium.conserveBattery]'s, and this file no longer has its own.**
+     * It used to keep a private `BATTERY_RECOVER_PCT = 25` while `Sensorium`'s was 30 and claimed in
+     * its own KDoc to "mirror ActiveMatrix". Neither mirrored the other — live duplicated-definition
+     * drift, and the class of defect this repository has corrected repeatedly. Unifying moves
+     * recovery here from 25% to 30%, so it stays conserving slightly longer; the cost of recovering
+     * late is a few minutes of reduced polling, and the cost of recovering early on a phone hovering
+     * at the boundary is flapping between the two states.
+     *
+     * ⚠️ It also inherits the unknown-battery guard: `ctx.batteryPct` is -1 when the gauge cannot be
+     * read, and an unreadable battery is not a flat one.
+     */
     private fun handleBattery(ctx: DeviceContext) {
-        if (ctx.isCriticalBattery) {
-            lowPowerConserve = true
-            if (!batteryWarned) {
-                batteryWarned = true
-                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power."
-                update("⚠ $msg")
-                // Never mid-exchange: a TTS speak() here QUEUE_FLUSHes an in-flight spoken reply and
-                // takes its done-callback with it, so the wake mic never re-arms. The guard covers the
-                // reply as well as the capture — the reply is the longer window and was the exposed one.
-                // The notification shows regardless.
-                if (!voiceBusy) runCatching { container?.textToSpeech?.speak(msg) }
-            }
-        } else if (ctx.isCharging || ctx.batteryPct >= BATTERY_RECOVER_PCT) {
-            lowPowerConserve = false
+        val conserve = Sensorium.conserveBattery(
+            batteryPct = ctx.batteryPct,
+            charging = ctx.isCharging,
+            previouslyConserving = lowPowerConserve,
+        )
+        lowPowerConserve = conserve
+        if (!conserve) {
             batteryWarned = false
+            return
         }
+        if (batteryWarned) return
+        batteryWarned = true
+        val msg = "Battery critical at ${ctx.batteryPct}% — conserving power."
+        update("⚠ $msg")
+        // Never mid-exchange: a TTS speak() here QUEUE_FLUSHes an in-flight spoken reply and
+        // takes its done-callback with it, so the wake mic never re-arms. The guard covers the
+        // reply as well as the capture — the reply is the longer window and was the exposed one.
+        // The notification shows regardless.
+        if (!voiceBusy) runCatching { container?.textToSpeech?.speak(msg) }
     }
 
     /** Poll the news feeds on a short interval and keep the one LCARS board (and the breaking-news
@@ -735,7 +752,6 @@ class ActiveMatrixService : Service() {
         // Live breaking-news poll cadence — as fresh as Android allows without a push server.
         private const val LIVE_NEWS_INTERVAL_MS = 90_000L
         // Battery % at which we leave conserve mode (when not charging).
-        private const val BATTERY_RECOVER_PCT = 25
 
 
         // --- Follow-up / conversation mode ---

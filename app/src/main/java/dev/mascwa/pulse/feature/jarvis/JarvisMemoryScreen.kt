@@ -62,6 +62,14 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
         title = "MEMORY",
         onBack = onBack,
     ) { innerPadding ->
+        // ⚠️ **Every key below carries a per-list literal prefix, and this screen is why.** Compose
+        // passes a lazy item's key straight to `subcompose` as the slot id and throws
+        // `Key "1" was already used` when one id is subcomposed twice in a measure pass. Eight keyed
+        // lists live in this one scope and three of them were dense sequences: `AgentNoteEntity.id`
+        // (autoGenerate → 1, 2, 3…), `Memory.id` (max+1 → 1, 2, 3…) and `AuditEntry.seq`
+        // (`entries.size` → 0, 1, 2…). One remembered note plus one episodic memory was enough, both
+        // stores persist, so MEMORY died before drawing — every time — and it is the only place to
+        // review or delete what the computer has learned about you. `LazyKeyTest` holds the rule now.
         LazyColumn(
             Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -76,7 +84,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(notes, key = { it.id }) { note ->
+            items(notes, key = { "note:${it.id}" }) { note ->
                 MemoryCard(note, c, onSave = { vm.edit(note.id, it) }, onDelete = { vm.delete(note.id) })
             }
             if (notes.isNotEmpty()) {
@@ -95,7 +103,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(profile, key = { it.category.name + "·" + it.text }) { entry ->
+            items(profile, key = { "profile:${it.category.name}·${it.text}" }) { entry ->
                 ProfileCard(entry, c, onForget = { vm.forgetProfile(entry.text) })
             }
             if (profile.isNotEmpty()) {
@@ -114,7 +122,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(tasks, key = { it.title }) { task ->
+            items(tasks, key = { "task:${it.title}" }) { task ->
                 TaskCard(task, c, onForget = { vm.forgetTask(task.title) })
             }
             if (tasks.isNotEmpty()) {
@@ -134,7 +142,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(episodic, key = { it.id }) { mem ->
+            items(episodic, key = { "episodic:${it.id}" }) { mem ->
                 EpisodicCard(mem, c, onForget = { vm.forgetMemory(mem.id) })
             }
             if (episodic.isNotEmpty()) {
@@ -154,7 +162,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(interests, key = { it.id }) { interest ->
+            items(interests, key = { "interest:${it.id}" }) { interest ->
                 InterestCard(interest, c, onForget = { vm.forgetInterest(interest.topic) })
             }
             if (interests.isNotEmpty()) {
@@ -174,7 +182,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(findings, key = { it.id }) { finding ->
+            items(findings, key = { "finding:${it.id}" }) { finding ->
                 FindingCard(
                     finding, c,
                     onSeen = { vm.markFindingSeen(finding.id) },
@@ -198,7 +206,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(procedures, key = { it.name }) { proc ->
+            items(procedures, key = { "procedure:${it.name}" }) { proc ->
                 ProcedureCard(proc, c, onForget = { vm.forgetProcedure(proc.name) })
             }
             if (procedures.isNotEmpty()) {
@@ -220,7 +228,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 )
             }
-            items(audit, key = { it.seq }) { entry ->
+            items(audit, key = { "audit:${it.seq}" }) { entry ->
                 AuditCard(entry, c)
             }
             item {

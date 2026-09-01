@@ -47,6 +47,19 @@ class SpaceWeatherRepository(
      * `force = true` purely to read `kp`, and those five products are ~546 KB of the ~596 KB
      * payload — roughly 57 MB a day to obtain one number. A light fetch skips them and carries the
      * previously cached values forward rather than overwriting them with blanks.
+     *
+     * ⚠️ **Defaulting to true means every caller that forgets is a heavy one, and five had.** The
+     * board, the Oracle, the lock widget and both desktop standby paths read nothing but `kp` and
+     * were asking for the whole payload; `force = false` hid it most of the time, because a warm
+     * cache costs nothing — but the moment the TTL had lapsed each of them pulled ~596 KB for one
+     * number, on paths that run unattended. All five pass `heavy = false` now. The default stays
+     * true so a NEW caller gets everything rather than silently missing a panel; the cost of
+     * getting it wrong in that direction is a wasted fetch, and in the other it is a blank screen.
+     *
+     * ⚠️ [heavy] is deliberately NOT part of the cache key. A light fetch writes a COMPLETE record
+     * — the carried-forward values above — so there is one entry to read whichever way it was
+     * filled. Keying on it would double the entries and leave the light callers unable to see
+     * anything the console had already fetched.
      */
     suspend fun fetch(
         force: Boolean,
@@ -54,8 +67,16 @@ class SpaceWeatherRepository(
         lon: Double? = null,
         heavy: Boolean = true,
     ): Fetched<SpaceWeather> {
+        // ⚠️ Locale.US, like every other cache key in this package. A bare `"%.0f".format(v)` takes
+        // the DEVICE locale, so the same coordinate spells itself differently depending on what
+        // language the phone is set to — a comma decimal separator here, Arabic-Indic digits there.
+        // Nothing breaks loudly: the key is hashed to a filename, so it stays stable while the
+        // locale does. It stops being stable the moment somebody changes the phone's language, and
+        // every entry written before then is orphaned rather than superseded.
         val key = if (lat != null && lon != null)
-            "space_weather_${"%.0f".format(lat)}_${"%.0f".format(lon)}" else "space_weather"
+            "space_weather_${String.format(java.util.Locale.US, "%.0f", lat)}" +
+                "_${String.format(java.util.Locale.US, "%.0f", lon)}"
+        else "space_weather"
         if (!force) {
             cache.read(key, ttl, SpaceWeather.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)

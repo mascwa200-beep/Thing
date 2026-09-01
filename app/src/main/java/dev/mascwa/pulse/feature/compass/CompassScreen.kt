@@ -25,8 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -88,7 +88,10 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            val animated by animateFloatAsState(reading.trueAzimuth, label = "azimuth")
+            // ⚠️ No `by`. The dial takes a lambda and reads it inside a `graphicsLayer` block, so the
+            // needle turns in the layer phase rather than recomposing this whole column — which, on a
+            // screen driven by a compass sensor, is every frame the phone is being held.
+            val animated = animateFloatAsState(reading.trueAzimuth, label = "azimuth")
             val loc = location
             val wp = activeWp
             val wpBearing: Float? = if (loc != null && wp != null)
@@ -103,7 +106,7 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
             }
 
             Box(Modifier.fillMaxWidth(0.86f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                CompassDial(rotationDeg = -animated, waypointBearing = wpBearing, sunAz = sunAz, moonAz = moonAz)
+                CompassDial(rotationDeg = { -animated.value }, waypointBearing = wpBearing, sunAz = sunAz, moonAz = moonAz)
                 // Center read-out (fixed).
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -197,13 +200,21 @@ private fun Row2(label: String, value: String) {
 }
 
 @Composable
-private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Float?, moonAz: Float?) {
+private fun CompassDial(rotationDeg: () -> Float, waypointBearing: Float?, sunAz: Float?, moonAz: Float?) {
     val c = Pulse.colors
     val tickColor = c.line.toArgb()
     val inkColor = c.ink.toArgb()
     val northColor = c.magenta.toArgb()
     val accent = c.accent
-    Canvas(Modifier.fillMaxWidth(0.92f).aspectRatio(1f).rotate(rotationDeg)) {
+    // ⚠️ Hoisted out of the draw, which runs on every frame the needle moves. A `Paint` is a
+    // comparatively heavy object and it is only ever mutated and re-read here, on Compose's single
+    // draw thread; `textSize` still comes from the measured radius inside the lambda. The cardinal
+    // table allocated a list, four `Pair`s and four boxed `Int`s per frame for four constants.
+    val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
+    // ⚠️ `graphicsLayer`'s lambda form, not `Modifier.rotate(...)`: `rotate` takes the angle by value,
+    // so the read would happen while the modifier chain is built — in composition — which is exactly
+    // what passing a lambda here exists to avoid.
+    Canvas(Modifier.fillMaxWidth(0.92f).aspectRatio(1f).graphicsLayer { rotationZ = rotationDeg() }) {
         val cx = size.width / 2
         val cy = size.height / 2
         val r = size.minDimension / 2 * 0.92f
@@ -222,15 +233,10 @@ private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Floa
             drawLine(if (major) accent else c.lineSoft, Offset(sx, sy), Offset(ex, ey), strokeWidth = if (major) 3f else 1.5f)
         }
         // Cardinal letters via native canvas (rotate with the dial).
-        val paint = Paint().apply {
-            isAntiAlias = true
-            textAlign = Paint.Align.CENTER
-            textSize = r * 0.16f
-        }
+        val paint = labelPaint.apply { textSize = r * 0.16f }
         val labelR = r * 0.66f
-        val cardinals = listOf("N" to 0, "E" to 90, "S" to 180, "W" to 270)
         drawContext.canvas.nativeCanvas.apply {
-            cardinals.forEach { (label, deg) ->
+            CARDINALS.forEach { (label, deg) ->
                 val rad = Math.toRadians(deg.toDouble())
                 val x = cx + (labelR * sin(rad)).toFloat()
                 val y = cy - (labelR * cos(rad)).toFloat() + paint.textSize / 3
@@ -264,3 +270,6 @@ private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Floa
     }
 }
 
+/** The four cardinal letters and their bearings. File-level so the dial's draw allocates nothing for
+ *  a table that cannot change. */
+private val CARDINALS = listOf("N" to 0, "E" to 90, "S" to 180, "W" to 270)

@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.settings
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import dev.mascwa.pulse.jarvis.inference.CloudProvider
+import dev.mascwa.pulse.data.health.HealthSettings
 import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -345,61 +346,6 @@ data class RemoteSettings(
     val deviceLabel: String = "",
 )
 
-/**
- * The HEALTH tab: who you are, where you are going, and how fast.
- *
- * These are the inputs [dev.mascwa.pulse.core.telemetry.MacroTargets] needs on every recomputation —
- * small, rarely changed, and useless without each other, which is what makes them settings rather than a
- * store. The weigh-ins and the food log are time series and live in `data/health`.
- *
- * ⚠️ Every field is a serialization key. Renaming one silently discards the *whole* blob's saved value on
- * every existing device, so a name that reads slightly wrong stays.
- *
- * ⚠️ These are personal but they are not credentials, so they are deliberately NOT added to
- * `allSecretValues()` or `SettingsBackup.redactSecrets` — a backup of your own app carrying your own
- * height is the point of a backup. Nothing here leaves the device by any other route.
- */
-@Serializable
-data class HealthSettings(
-    /** Centimetres. 0 = not told, which every consumer must treat as "cannot compute" rather than zero. */
-    val heightCm: Double = 0.0,
-
-    /**
-     * ⚠️ The YEAR of birth, not an age, and that is the whole reason this field is shaped like this. An
-     * age stored as a number is wrong within twelve months and then stays wrong for ever, quietly
-     * drifting the resting-rate floor that every calorie target sits on. A year is right until the
-     * calendar says otherwise. 0 = not told.
-     */
-    val birthYear: Int = 0,
-
-    /** [dev.mascwa.pulse.core.telemetry.Body.Sex] name. Unstated takes the higher resting rate — the safe direction. */
-    val sex: String = "UNSPECIFIED",
-
-    /** Kilograms. 0 = no goal, which means maintain. */
-    val goalKg: Double = 0.0,
-
-    /** Signed kilograms per week: negative loses, zero maintains, positive gains. */
-    val ratePerWeekKg: Double = 0.0,
-
-    /** [dev.mascwa.pulse.core.telemetry.MacroTargets.DietMode] name. */
-    val dietMode: String = "BALANCED",
-
-    /** Grams per kilogram of reference mass. 0 = whatever the diet mode says. */
-    val proteinGPerKg: Double = 0.0,
-
-    /** [dev.mascwa.pulse.core.telemetry.Expenditure.Activity] name — only used until the measurement takes over. */
-    val activity: String = "LIGHT",
-
-    /** [dev.mascwa.pulse.core.telemetry.BodyTrend.MassUnit] name. Display only; everything is stored in kg. */
-    val massUnit: String = "KG",
-
-    /** How far back the expenditure measurement looks. */
-    val expenditureWindowDays: Int = 28,
-
-    /** Whether the tab has ever been set up — decides between the welcome and the dashboard. */
-    val configured: Boolean = false,
-)
-
 /** The full, single source of truth for user configuration. */
 @Serializable
 data class AppSettings(
@@ -480,6 +426,16 @@ data class AppSettings(
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
 
+    /**
+     * Which day of the month the mobile data allowance resets.
+     *
+     * ⚠️ Nothing on the phone knows this — a carrier's billing cycle is not exposed to apps — so it
+     * has to be told, and the 1st is the only defensible default because it is what most accounts
+     * do. A day the month does not have (the 31st in April) resolves to that month's last;
+     * `BillingCycle` decides that once so no caller has to.
+     */
+    val dataCycleDay: Int = 1,
+
     // NAV map view (persisted so the map opens how you left it).
     val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
     val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
@@ -512,6 +468,26 @@ data class AppSettings(
     // LAN remote control from a paired desktop
     val remote: RemoteSettings = RemoteSettings(),
 
+    /**
+     * Mailboxes to count unread messages in. Empty = the widget's comms line asks nothing.
+     *
+     * ⚠️ Each carries a password. See [EmailAccount] for the three places that must know.
+     */
+    val emailAccounts: List<EmailAccount> = emptyList(),
+
+    /**
+     * Packages whose notifications count as waiting mail. Empty = nothing is counted.
+     *
+     * ⚠️ **Ticked by hand, and it starts empty on purpose.** Neither signal the platform offers is
+     * trustworthy enough to decide this: `CATEGORY_EMAIL` is optional metadata that plenty of mail
+     * apps never set, and a hardcoded allowlist goes stale invisibly. See `MailGlance`, which holds
+     * the rule and the reasoning; `MailGlance.LIKELY_MAIL` only decides what the picker offers first.
+     *
+     * ⚠️ Carries no credential — package names and nothing else — so unlike [emailAccounts] it stays
+     * out of `allSecretValues` and is restored by a backup like any other preference.
+     */
+    val mailApps: List<String> = emptyList(),
+
     // On-device assistant
     val health: HealthSettings = HealthSettings(),
 
@@ -523,6 +499,15 @@ data class AppSettings(
     // Bookkeeping
     val onboardingComplete: Boolean = false,
     val deviceGateAcknowledged: Boolean = false,
+    /**
+     * Whether the sky map opens following where the handset is aimed. Default ON.
+     *
+     * ⚠️ Default TRUE rather than the usual quiet answer, and the standalone star app's own
+     * preference makes the same choice for the same reason: a star map is held up at the sky, and
+     * opening in drag mode hides the whole pointing mode behind a chip nobody would think to press.
+     * Written by `SkyMapViewModel` through `SkyPreferences`, so both applications obey one rule.
+     */
+    val skyFollowByDefault: Boolean = true,
     /** On launch AND on every foreground return, auto-download a GREEN (CI-passed) update newer than
      *  the running build and launch the installer for the user's one-tap confirm. A sideloaded app
      *  can't install fully silently (no device-owner), so the single Android "Update" tap is the floor;
@@ -595,6 +580,10 @@ fun AppSettings.allSecretValues(): List<String> = listOf(
     apiKeys.brave,
     jarvis.githubToken, jarvis.modelToken, jarvis.cloudApiKey,
     spotify.accessToken, spotify.refreshToken, spotify.pendingVerifier,
+    // ⚠️ A mail password has no recognisable shape — it is whatever somebody typed — so the
+    // exact-match pass this list feeds is the ONLY thing that can keep one out of a debug report.
+    // A pattern scrubber cannot help here at all.
+    *emailAccounts.map { it.password }.toTypedArray(),
 ).map { it.trim() }.filter { it.isNotBlank() }
 
 /** Sensible International defaults for first launch. */

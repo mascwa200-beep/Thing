@@ -45,10 +45,12 @@ is public domain. Both are recorded in the `meta` table so the app can display t
 from __future__ import annotations
 
 import argparse
+import array
 import csv
 import gzip
 import io
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -109,6 +111,16 @@ SCALE_MICROGRAM = 1     # microgram-scale micros, stored as-is
 # quietly divides somebody's intake by a hundred.
 SCALE_MICRO_CENTI = 100  # microgram-scale micros x100 -> 0.01 ug
 
+import nutrient_set
+
+# ⚠️ **Loaded at import, before anything is downloaded, and a bad parse is fatal here.** These 29
+# nutrients are declared once, in `NutrientSet.kt`, because the app reads every one of their ids,
+# units and scales at runtime — a second table in Python would be the same facts twice, and the
+# failure mode is the worst kind: magnesium written under phosphorus's id across millions of rows
+# with nothing anywhere to notice. `tools/kb/ci_parity_lint.py` reads its allowlist out of Kotlin
+# for the same reason.
+EXTRAS = nutrient_set.load()
+
 SOURCE_OFF = 1
 SOURCE_USDA = 2
 
@@ -144,6 +156,27 @@ CREATE TABLE food (
   src       INTEGER NOT NULL
 );
 
+-- Every further nutrient, sparsely: a row only where a figure exists.
+--
+-- ⚠️ **A side table because 29 more columns on `food` would cost 128 MB of nothing.** SQLite
+-- spends a byte of record header on a column even when it is NULL. Measured both ways over
+-- 200,000 realistic rows and extrapolated to the real 4.5M: the widened shape is +127.9 MB
+-- carrying nothing, this one is +44.7 MB carrying every figure there is. The densest of the 29
+-- is recorded on 5.7% of products and most are near 2%.
+--
+-- ⚠️ **WITHOUT ROWID, which halves it again.** An ordinary rowid table would need a separate
+-- unique index on the pair, and that index holds a second copy of both key columns: measured at
+-- 4.27 MB against 1.98 MB for the same 121,147 rows. Here the primary key IS the B-tree, the same
+-- reasoning that makes `barcode INTEGER PRIMARY KEY` right for `food`.
+--
+-- `nutrient` is NutrientSet.Nutrient.id — a permanent number, never an ordinal.
+CREATE TABLE food_extra (
+  barcode  INTEGER NOT NULL,
+  nutrient INTEGER NOT NULL,
+  value    INTEGER NOT NULL,
+  PRIMARY KEY (barcode, nutrient)
+) WITHOUT ROWID;
+
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -153,6 +186,7 @@ COLUMNS = (
 ).split()
 
 INSERT = f"INSERT OR REPLACE INTO food ({','.join(COLUMNS)}) VALUES ({','.join('?' * len(COLUMNS))})"
+EXTRA_INSERT = "INSERT OR REPLACE INTO food_extra (barcode,nutrient,value) VALUES (?,?,?)"
 
 MAX_NAME = 90
 MAX_BRAND = 60
@@ -286,7 +320,23 @@ def clean(s: str | None, limit: int) -> str | None:
 class Row:
     """One product, ready to insert. Ordered to match COLUMNS."""
 
-    __slots__ = COLUMNS
+    # ⚠️ `extras` is NOT a column: it is the sparse side-table payload — the NutrientSet id and the
+    # stored integer, interleaved — and it travels with the row so a reader fills it in one place
+    # and the insert loop writes it in one place.
+    #
+    # ⚠️ **An `array("i")`, allocated lazily, and that is a measured decision rather than a taste.**
+    # `read_usda` holds every branded item in one dict while it makes three passes over the archive,
+    # so whatever each row carries is multiplied by about 1.9 million. Measured at that scale with
+    # fourteen figures on each row: a plain `dict` peaks at 2,535 MB, a list of interleaved ints at
+    # 1,963 MB, and this at **968 MB**, against 560 MB for a row carrying no extras at all. So the
+    # dict form added two gigabytes of resident memory to the largest structure in this builder —
+    # and the first CI run after these columns were introduced died in this step with no log and no
+    # failing command, which is what a runner losing a system resource looks like. That is an
+    # inference and not a proven cause; the reduction is worth making either way.
+    #
+    # ⚠️ A C int is exactly the right width by construction: ids run 1..29 and every value comes
+    # from `Nutrient.store`, which is bounded by `stored_ceiling` and can never exceed INT_MAX.
+    __slots__ = COLUMNS + ["extras"]
 
     # How many times each field was refused, and how many rows lost their whole nutrition block.
     # ⚠️ Class-level rather than passed around, because it belongs with the rule and the rule has to
@@ -300,6 +350,30 @@ class Row:
             setattr(self, c, None)
         self.barcode = barcode
         self.src = src
+        # None until something is actually recorded: most of the corpus records nothing, and an
+        # empty array per row is a hundred megabytes of nothing at this scale.
+        self.extras = None
+
+    def add_extra(self, nutrient_id: int, stored: int) -> None:
+        """Record one further nutrient.
+
+        ⚠️ Unlike the dict this replaced, a repeated id is APPENDED rather than overwritten. In the
+        data that is harmless — the insert is `INSERT OR REPLACE` on (barcode, nutrient), so the
+        last value wins exactly as a dict would have — and it can only arise from a duplicated row
+        in USDA's own `food_nutrient.csv`. The one visible effect is that `EXTRA_KEPT` would count
+        such a figure twice in the build report.
+        """
+        if self.extras is None:
+            self.extras = array.array("i")
+        self.extras.append(nutrient_id)
+        self.extras.append(stored)
+
+    def extra_pairs(self):
+        """The recorded nutrients as (id, stored) pairs, or nothing at all."""
+        e = self.extras
+        if not e:
+            return ()
+        return zip(e[0::2], e[1::2])
 
     def values(self):
         """The row as the INSERT wants it — sanitised, because this is the only way in.
@@ -341,9 +415,15 @@ OFF_FIELDS = {
     "fiber_100g", "sugars_100g", "saturated-fat_100g", "sodium_100g", "salt_100g",
     "calcium_100g", "iron_100g", "potassium_100g", "vitamin-a_100g", "vitamin-c_100g",
     "vitamin-d_100g", "cholesterol_100g", "trans-fat_100g",
-}
+} | {f"{n.off_field}_100g" for n in EXTRAS}
 
 KJ_PER_KCAL = 4.184
+
+# How many figures each further nutrient contributed, and how many were refused as unbelievable.
+# ⚠️ Reported for every one of the 29 whether it fired or not — a nutrient that yielded nothing is
+# the thing most worth knowing about, and a report listing only the ones that worked cannot say it.
+EXTRA_KEPT: dict[int, int] = {}
+EXTRA_REFUSED: dict[int, int] = {}
 
 
 def read_off(path: Path, limit: int | None, log):
@@ -414,6 +494,20 @@ def read_off(path: Path, limit: int | None, log):
             # parser here. Measured on the real export: present on 26.7% of rows carrying
             # nutrition, which is what makes a "1 package" portion worth offering at all.
             row.pack_g = mass(g(rec, "product_quantity"), ceiling=100_000.0)
+
+            # ⚠️ **Open Food Facts publishes every one of these in GRAMS**, whatever unit the app
+            # stores them in — `Nutrient.store` is the single conversion and it is the twin of
+            # `NutrientSet.fromGrams`/`sane`/`store` in Kotlin. An absent or unbelievable figure
+            # yields None and no row at all: absent is not zero, and the app renders the two
+            # differently on purpose.
+            for n in EXTRAS:
+                v = n.store(g(rec, f"{n.off_field}_100g") or None)
+                if v is not None:
+                    row.add_extra(n.id, v)
+                    EXTRA_KEPT[n.id] = EXTRA_KEPT.get(n.id, 0) + 1
+                elif (g(rec, f"{n.off_field}_100g") or "") != "":
+                    EXTRA_REFUSED[n.id] = EXTRA_REFUSED.get(n.id, 0) + 1
+
             yield row
 
 
@@ -443,6 +537,64 @@ USDA_NUTRIENTS = {
 }
 
 
+# ⚠️ **Measured, not recalled.** Both USDA generic datasets were downloaded and every nutrient id
+# they publish was enumerated, then each of the 29 was matched by NAME and its real coverage read
+# off. That is where these numbers come from; the file's own rule above — select by NUMBER, never by
+# name, because names drift between releases — still holds for the selection itself.
+#
+# ⚠️ **Three of the 29 are Open Food Facts only, and that is a measured absence rather than an
+# omission**: neither USDA dataset publishes ADDED SUGARS (it has only "Sugars, total including
+# NLEA"), IODINE (nothing at all), or POLYOLS (no sugar alcohol, sorbitol, xylitol or maltitol under
+# any name). Nothing here can fill those.
+#
+# ⚠️ The value's UNIT is NOT hardcoded. `nutrient.csv` states it per nutrient and the conversion is
+# derived from that — riboflavin arrives in milligrams where this app stores micrograms, and a
+# hardcoded scale is exactly how a thousandfold error gets into a column and stays plausible. A unit
+# this does not understand is SKIPPED and reported, never guessed at.
+USDA_EXTRA_NUMBERS = {
+    "209": "STARCH",
+    "210": "SUCROSE",
+    "211": "GLUCOSE",
+    "212": "FRUCTOSE",
+    "213": "LACTOSE",
+    "214": "MALTOSE",
+    "287": "GALACTOSE",
+    "645": "MONOUNSATURATED_FAT",
+    "646": "POLYUNSATURATED_FAT",
+    "304": "MAGNESIUM",
+    "305": "PHOSPHORUS",
+    "309": "ZINC",
+    "315": "MANGANESE",
+    "312": "COPPER",
+    "317": "SELENIUM",
+    "404": "VITAMIN_B1",
+    "405": "VITAMIN_B2",       # ⚠️ USDA publishes milligrams; this app stores micrograms.
+    "406": "NIACIN",
+    "410": "PANTOTHENIC_ACID",
+    "415": "VITAMIN_B6",
+    "417": "FOLATE",           # "Folate, total" — NOT 435 (DFE) or 432 (food), which are different figures.
+    "418": "VITAMIN_B12",      # NOT 578, which is "Vitamin B-12, added".
+    "323": "VITAMIN_E",        # alpha-tocopherol. NOT the gamma/beta/delta tocopherols beside it.
+    "430": "VITAMIN_K1",       # phylloquinone, the same substance the OFF column names.
+    "321": "BETA_CAROTENE",
+    "255": "WATER",
+}
+
+# How many grams one of each unit USDA may state is. ⚠️ Anything not here is refused rather than
+# assumed, because assuming grams for an unrecognised unit is a thousandfold error in the safe-
+# looking direction.
+GRAMS_PER_USDA_UNIT = {"g": 1.0, "mg": 1e-3, "\u00b5g": 1e-6, "ug": 1e-6, "mcg": 1e-6}
+
+EXTRA_BY_NAME = {n.name: n for n in EXTRAS}
+_unknown = sorted(set(USDA_EXTRA_NUMBERS.values()) - set(EXTRA_BY_NAME))
+if _unknown:
+    raise SystemExit(
+        f"build_food_db: USDA_EXTRA_NUMBERS names {_unknown}, which NutrientSet.kt does not declare.\n"
+        "  A name that resolves to nothing would silently contribute nothing, in a green build."
+    )
+USDA_EXTRA_SKIPPED: dict[str, int] = {}
+
+
 def read_usda(path: Path, limit: int | None, log):
     """Stream the USDA branded zip. Joins branded_food -> food_nutrient by fdc_id."""
     with zipfile.ZipFile(path) as zf:
@@ -464,10 +616,13 @@ def read_usda(path: Path, limit: int | None, log):
                 )
 
         # nutrient id -> nutrient number, so the selection above can key on the stable number.
-        num_of = {}
+        num_of, unit_of = {}, {}
         with zf.open(names["nutrient.csv"]) as fh:
             for r in csv.DictReader(io.TextIOWrapper(fh, "utf-8", errors="replace")):
                 num_of[r["id"]] = r.get("nutrient_nbr", "").strip()
+                # ⚠️ The unit the archive itself states, so no scale for a further nutrient is ever
+                # written down twice. See GRAMS_PER_USDA_UNIT.
+                unit_of[r["id"]] = r.get("unit_name", "").strip()
 
         # fdc_id -> barcode + serving, for branded items that actually carry a GTIN/UPC.
         wanted: dict[str, Row] = {}
@@ -501,13 +656,31 @@ def read_usda(path: Path, limit: int | None, log):
                 row = wanted.get(r.get("fdc_id", ""))
                 if row is None:
                     continue
-                spec = USDA_NUTRIENTS.get(num_of.get(r.get("nutrient_id", ""), ""))
-                if spec is None:
+                number = num_of.get(r.get("nutrient_id", ""), "")
+                spec = USDA_NUTRIENTS.get(number)
+                if spec is not None:
+                    field, scale = spec
+                    v = scaled(r.get("amount"), scale)
+                    if v is not None:
+                        setattr(row, field, v)
                     continue
-                field, scale = spec
-                v = scaled(r.get("amount"), scale)
+
+                extra = EXTRA_BY_NAME.get(USDA_EXTRA_NUMBERS.get(number, ""))
+                if extra is None:
+                    continue
+                # ⚠️ The archive states the unit; convert THROUGH grams, which is the one currency
+                # `Nutrient.store` speaks. An unknown unit is counted and dropped.
+                per_g = GRAMS_PER_USDA_UNIT.get(unit_of.get(r.get("nutrient_id", ""), "").lower())
+                if per_g is None:
+                    USDA_EXTRA_SKIPPED[extra.name] = USDA_EXTRA_SKIPPED.get(extra.name, 0) + 1
+                    continue
+                try:
+                    grams = float(r.get("amount") or "") * per_g
+                except (TypeError, ValueError):
+                    continue
+                v = extra.store(grams)
                 if v is not None:
-                    setattr(row, field, v)
+                    row.add_extra(extra.id, v)
 
         yield from wanted.values()
 
@@ -517,6 +690,112 @@ def read_usda(path: Path, limit: int | None, log):
 # ---------------------------------------------------------------------------------------------
 
 BATCH = 20_000
+
+ROOM_KOTLIN = (
+    Path(__file__).resolve().parents[2]
+    / "core/database/src/main/java/dev/mascwa/pulse/data/food/db/FoodDatabase.kt"
+)
+
+_ROOM_SCHEMA = re.compile(r"^\s*const val SCHEMA: Int = (\d+)\s*$", re.M)
+
+
+def room_schema() -> int:
+    """The `user_version` this database must declare, read from the app rather than restated.
+
+    ⚠️ A hard failure rather than a default. Guessing produces a file that builds, packages and
+    publishes perfectly and is then deleted by the app on the first open — which is exactly the
+    defect this function exists to fix, reintroduced silently.
+    """
+    src = ROOM_KOTLIN.read_text(encoding="utf-8")
+    found = _ROOM_SCHEMA.findall(src)
+    if len(found) != 1:
+        raise SystemExit(
+            f"build_food_db: expected exactly one `const val SCHEMA: Int = N` in {ROOM_KOTLIN.name}, "
+            f"found {len(found)}. Fix this reader rather than the Kotlin — the declaration is the "
+            "source of truth, and a database stamped with the wrong version is deleted on the phone."
+        )
+    return int(found[0])
+
+
+def build_search_index(cur, log) -> int:
+    """The inverted index that makes searching by name instant instead of a full table scan.
+
+    ⚠️ **FTS4, and FTS5 is not merely a worse choice — it cannot work at all.** Android builds its
+    own SQLite with `SQLITE_ENABLE_FTS3`, `SQLITE_ENABLE_FTS3_BACKWARDS` and `SQLITE_ENABLE_FTS4`
+    and no FTS5 — read out of `platform/external/sqlite`'s `dist/Android.bp` on `main`, not
+    recalled. SQLite parses the WHOLE schema when it prepares its first statement, so a database
+    containing an `fts5` virtual table would fail EVERY query on EVERY device, not just queries
+    against that table. The note in `FoodDao` rejecting FTS5 on size was rejecting it for the wrong
+    reason.
+
+    ⚠️ **What it buys, measured on 70,415 real Open Food Facts names rather than estimated.** The
+    scan the app does today — `instr(lower(name), …)` for each term, no index — averaged 18.9 ms
+    over ten realistic queries at that size; the same queries through `MATCH` averaged 0.7 ms. The
+    scan is linear in the table, so at 4.5 million rows it is over a second on a warm desktop SSD
+    and worse on a phone reading a 425 MB file cold from flash. `MATCH` barely moves.
+
+    ⚠️ **What it costs — and the small-sample estimate was PESSIMISTIC, which the real build settled.**
+    Sized on 70,415 names it came to 28.8 bytes per indexed row and was FALLING with scale (33.3 at
+    ten thousand, 30.4 at fifty, 28.8 at seventy) as the term dictionary amortises, so that was
+    recorded as a ceiling rather than a mid-point. At full scale it is **24.1 bytes a row: 58 MB over
+    2,541,457 products**, against the 74 MB the extrapolation implied — the trend held further than
+    the sample could show. Build time is five to seven seconds; the two runners disagree by that much
+    on identical input, which is why it is quoted as a range rather than as whichever figure happened
+    to be read. All of it is logged every run rather than left to a comment to claim.
+
+    ⚠️ `content=''` — contentless. Without it FTS keeps its own copy of every name and brand, which
+    is the table again. `matchinfo=fts3` drops the per-row `%_docsize` table, which nothing here
+    reads: ranking happens in Kotlin, in `FoodSearch.score`, so the index only has to answer which
+    rows contain the words.
+
+    ⚠️ Only rows with an energy figure, matching `FoodDao`'s own `kcal IS NOT NULL` on both search
+    paths. A row with a name and no numbers is worth returning for a SCANNED barcode — that is the
+    "recognised, tap to add the numbers" case — and not for a search somebody expects to log from.
+    Indexing them would make the index larger AND make the two paths disagree.
+
+    ⚠️ **THE COST FALLS ON THE LCARS APK TOO, and there is no way to give one application the index
+    and not the other.** Both workflows share ONE cached database — deliberately, so the two do not
+    each spend a quarter of an hour downloading 1.7 GB to build a byte-identical file — so whichever
+    builds it first saves it for the other. The nutrition app fetches it as a pack, where the index
+    is a one-time download; the LCARS application still bundles it in its APK, which its own updater
+    pulls in full on every build, so this adds the measured 58 MB to each of those.
+    It buys that application the same search, and the real answer to the download is to move it onto
+    the pack as well — which is a change to a daily driver that nobody has asked for.
+
+    ⚠️ Room never sees this table. Its `createAllTables` is `CREATE TABLE IF NOT EXISTS` over the
+    entities it knows, and its validator reads `PRAGMA table_info` per declared entity rather than
+    enumerating what is there — so an extra table is invisible to it. The app reaches this through
+    a raw query, and checks the table exists first rather than assuming, because a pack built
+    before this line still has to work.
+    """
+    log("building the name index…")
+    t0 = time.time()
+    cur.execute(
+        "CREATE VIRTUAL TABLE food_fts USING fts4(text, content='', matchinfo=fts3)"
+    )
+    cur.execute(
+        "INSERT INTO food_fts(docid, text) "
+        "SELECT barcode, name || ' ' || COALESCE(brand, '') FROM food "
+        "WHERE name IS NOT NULL AND kcal IS NOT NULL"
+    )
+    indexed = cur.execute("SELECT changes()").fetchone()[0]
+    # One segment instead of dozens: the merge is what makes a query a single b-tree descent, and
+    # it shrinks the file at the same time.
+    cur.execute("INSERT INTO food_fts(food_fts) VALUES('optimize')")
+
+    # ⚠️ Measured from the index's own shadow tables rather than from a file-size delta, which at
+    # this point is meaningless: the index is built before the VACUUM, so a before-and-after on the
+    # file would be reporting free-page churn as much as content. Every run printing the real number
+    # is what keeps the estimate this was decided on honest — it was 28.8 bytes a row on 70,415 real
+    # names, and if the true figure at four and a half million is much worse than that, the log says
+    # so rather than a comment continuing to claim otherwise.
+    seg = cur.execute("SELECT COALESCE(SUM(LENGTH(block)), 0) FROM food_fts_segments").fetchone()[0]
+    root = cur.execute("SELECT COALESCE(SUM(LENGTH(root)), 0) FROM food_fts_segdir").fetchone()[0]
+    cost = seg + root
+    per = cost / indexed if indexed else 0.0
+    log(f"  {indexed:,} products indexed in {time.time() - t0:.0f}s")
+    log(f"  index size {cost / 1048576:.0f} MB  ({per:.1f} bytes/row)")
+    return indexed
 
 
 def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int | None) -> dict:
@@ -540,6 +819,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"OFF   {off_path.name} ({off_path.stat().st_size / 1e6:.0f} MB gz)")
         t0 = time.time()
         batch = []
+        extra_batch = []
         for row in read_off(off_path, limit, log):
             stats["off"] += 1
             # ⚠️ **`values()` is what applies the bounds, so it has to come BEFORE `has_nutrition` is
@@ -552,13 +832,22 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
                 stats["off_nutrition"] += 1
                 complete.add(row.barcode)
             batch.append(vals)
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extra_pairs())
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
+                # ⚠️ The extras go in with the product batch, never afterwards from a list held
+                # over the whole stream: at ~2 million of them that list is the one structure in
+                # this builder big enough to matter.
+                if extra_batch:
+                    cur.executemany(EXTRA_INSERT, extra_batch)
+                    extra_batch.clear()
                 if stats["off"] % 500_000 == 0:
                     log(f"  {stats['off']:,} products  ({time.time() - t0:.0f}s)")
         if batch:
             cur.executemany(INSERT, batch)
+        if extra_batch:
+            cur.executemany(EXTRA_INSERT, extra_batch)
         con.commit()
         log(f"  {stats['off']:,} products in {time.time() - t0:.0f}s")
 
@@ -566,6 +855,7 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"USDA  {usda_path.name} ({usda_path.stat().st_size / 1e6:.0f} MB zip)")
         t0 = time.time()
         batch = []
+        extra_batch = []
         for row in read_usda(usda_path, limit, log):
             stats["usda"] += 1
             # ⚠️ Same order as above, and for the same reason.
@@ -579,11 +869,22 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
                 continue
             stats["replaced_by_usda"] += 1
             batch.append(vals)
+            # ⚠️ Only for rows that are actually inserted. A row skipped because Open Food Facts
+            # already has better numbers must not leave its further nutrients behind, pointing at a
+            # product row that says something else.
+            extra_batch.extend((row.barcode, k, v) for k, v in row.extra_pairs())
+            for k, _ in row.extra_pairs():
+                EXTRA_KEPT[k] = EXTRA_KEPT.get(k, 0) + 1
             if len(batch) >= BATCH:
                 cur.executemany(INSERT, batch)
                 batch.clear()
+                if extra_batch:
+                    cur.executemany(EXTRA_INSERT, extra_batch)
+                    extra_batch.clear()
         if batch:
             cur.executemany(INSERT, batch)
+        if extra_batch:
+            cur.executemany(EXTRA_INSERT, extra_batch)
         con.commit()
         log(f"  {stats['usda']:,} items, {stats['replaced_by_usda']:,} filled a gap "
             f"({time.time() - t0:.0f}s)")
@@ -597,6 +898,29 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         log(f"  {field:<10} ceiling {CEILINGS[field]:>12,}  refused {n:,}")
     log(f"  macros outweighed the food on {Row.IMPOSSIBLE_MACROS:,} rows "
         f"(nutrition dropped, name kept)")
+
+    # ⚠️ Every one of the 29 is named whether it contributed or not. A nutrient that yielded
+    # nothing at all is the single most useful line in this report — it means either the column
+    # moved or the whole feature is inert for it — and a report listing only what worked cannot
+    # tell that from a nutrient nobody has ever recorded.
+    if USDA_EXTRA_SKIPPED:
+        log("USDA figures dropped because their unit was not one this understands:")
+        for name, n in sorted(USDA_EXTRA_SKIPPED.items()):
+            log(f"  {name:<22} {n:,}")
+
+    kept_total = sum(EXTRA_KEPT.values())
+    log(f"further nutrients: {kept_total:,} figures across {len(EXTRAS)} nutrients")
+    for n in EXTRAS:
+        kept = EXTRA_KEPT.get(n.id, 0)
+        refused = EXTRA_REFUSED.get(n.id, 0)
+        seen = stats.get("off", 0) + stats.get("replaced_by_usda", 0)
+        share = (kept / seen * 100) if seen else 0.0
+        flag = "   <-- NOTHING" if kept == 0 else ""
+        log(f"  {n.id:>2} {n.name:<22} {kept:>10,}  {share:5.2f}%  refused {refused:,}{flag}")
+
+    con.commit()
+    search_rows = build_search_index(cur, log)
+    con.commit()
 
     total = cur.execute("SELECT COUNT(*) FROM food").fetchone()[0]
     with_nut = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL AND kcal > 0").fetchone()[0]
@@ -626,6 +950,13 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
         "built_at": time.strftime("%Y-%m-%d", time.gmtime()),
         "off_rows": str(stats.get("off", 0)),
         "usda_rows": str(stats.get("usda", 0)),
+        "extra_rows": str(cur.execute("SELECT COUNT(*) FROM food_extra").fetchone()[0]),
+        "extra_nutrients": str(len(EXTRAS)),
+        # ⚠️ Recorded because it CANNOT be read back. `SELECT COUNT(*)` on a contentless FTS4
+        # table is a "SQL logic error" — found by running the check that tried it — so the number
+        # of indexed products only exists at the moment of the INSERT. Without this the verify
+        # step could prove the index answers but not that it covers everything.
+        "search_rows": str(search_rows),
         "sources": "; ".join(contributed) or "none",
         "attribution": attribution + ".",
     }.items():
@@ -634,6 +965,25 @@ def build(off_path: Path | None, usda_path: Path | None, out: Path, limit: int |
 
     log("VACUUM…")
     cur.execute("VACUUM")
+
+    # ⚠️ **The version the app checks, and until this line nothing set it.** `FoodDatabase.usable`
+    # deletes any file on disk whose `user_version` is not `FoodDatabase.SCHEMA` — the guard that
+    # stops `fallbackToDestructiveMigration` quietly emptying a database somebody waited minutes to
+    # download. Every database this builder has ever produced carried version 0, so a DOWNLOADED
+    # pack was deleted on the first open with "this is for an older version of this app; download it
+    # again", permanently. Nothing in CI could see it: the file builds, packages, publishes and
+    # verifies, and the deletion happens on a phone.
+    #
+    # The bundled asset survived only because it takes a different route — a version-0 file makes
+    # Android's `SQLiteOpenHelper` call `onCreate`, and Room's `createAllTables` is `IF NOT EXISTS`,
+    # so the populated tables are left alone and Room stamps the version itself. `usable` never sees
+    # that file until after Room has fixed it.
+    #
+    # ⚠️ Read out of the Kotlin rather than written here, for the reason `nutrient_set` gives about
+    # `NutrientSet.kt`: the declaration is the source of truth and this is a reader. A hardcoded 2
+    # here would be a fourth spelling of a number the app already says is one too many.
+    cur.execute(f"PRAGMA user_version = {room_schema()}")
+    con.commit()
     con.close()
 
     size = out.stat().st_size
@@ -703,6 +1053,83 @@ def verify(out: Path) -> bool:
     withk = cur.execute("SELECT COUNT(*) FROM food WHERE kcal IS NOT NULL").fetchone()[0]
     print(f"energy sanity: {hot:,} of {withk:,} rows above 1000 kcal/100g "
           f"({100 * hot / max(withk, 1):.3f}%)")
+
+    # ⚠️ **The side table is checked against the Kotlin that defines it, not against itself.**
+    # Every nutrient id present has to be one this build knows, every value has to fit the column
+    # Room reads as a 32-bit Int, and — the one that matters most — the table must not be EMPTY.
+    # A silent under-parse upstream would ship a feature that does nothing, in a green build.
+    known = {n.id: n for n in EXTRAS}
+    extra_rows = cur.execute("SELECT COUNT(*) FROM food_extra").fetchone()[0]
+    distinct = cur.execute("SELECT COUNT(DISTINCT nutrient) FROM food_extra").fetchone()[0]
+    print(f"\nfurther nutrients: {extra_rows:,} figures, {distinct} of {len(known)} nutrients present")
+    if extra_rows == 0:
+        print("  FAIL: the side table is empty — the extraction did not run")
+        ok = False
+    stray = cur.execute(
+        "SELECT DISTINCT nutrient FROM food_extra WHERE nutrient NOT IN "
+        f"({','.join(str(i) for i in known)})"
+    ).fetchall() if known else []
+    if stray:
+        print(f"  FAIL: unknown nutrient ids in the side table: {[r[0] for r in stray]}")
+        ok = False
+    for nid, n in known.items():
+        hi = cur.execute("SELECT MAX(value) FROM food_extra WHERE nutrient=?", (nid,)).fetchone()[0]
+        if hi is not None and hi > n.stored_ceiling:
+            print(f"  FAIL: {n.name} holds {hi:,}, past its ceiling of {n.stored_ceiling:,}")
+            ok = False
+    # Every barcode in the side table must be a product this database actually has, or the figure
+    # is unreachable — a row nothing can ever join to.
+    orphans = cur.execute(
+        "SELECT COUNT(*) FROM food_extra WHERE barcode NOT IN (SELECT barcode FROM food)"
+    ).fetchone()[0]
+    if orphans:
+        print(f"  FAIL: {orphans:,} figures belong to barcodes not in the product table")
+        ok = False
+
+    # ⚠️ **The version the app checks, asserted rather than assumed.** Nothing set this for the life
+    # of the builder, and the cost was invisible from here: the file built, packaged, published and
+    # verified perfectly, and `FoodDatabase.usable` then deleted the downloaded copy on the phone
+    # because its `user_version` was 0 rather than the schema. This is the check that would have
+    # caught it, and it compares against the Kotlin rather than a number written here twice.
+    want = room_schema()
+    got = cur.execute("PRAGMA user_version").fetchone()[0]
+    print(f"\nschema version: {got} (the app expects {want})")
+    if got != want:
+        print("  FAIL: the app deletes any database whose user_version is not its own schema")
+        ok = False
+
+    # ⚠️ **A search index that silently failed to build is the worst kind of green.** The app checks
+    # for the table and falls back to the full-table scan when it is missing, so a database without
+    # one works — it just takes over a second per search instead of a few milliseconds, on a phone,
+    # with nothing anywhere saying why. So the index is asserted to exist AND to answer.
+    fts = cur.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='food_fts'"
+    ).fetchone()[0]
+    if not fts:
+        print("\nsearch index: MISSING")
+        print("  FAIL: name search would fall back to a full scan of every product")
+        ok = False
+    else:
+        indexed = int(
+            cur.execute("SELECT value FROM meta WHERE key='search_rows'").fetchone()[0]
+        )
+        searchable = cur.execute(
+            "SELECT COUNT(*) FROM food WHERE name IS NOT NULL AND kcal IS NOT NULL"
+        ).fetchone()[0]
+        print(f"\nsearch index: {indexed:,} of {searchable:,} searchable products")
+        # ⚠️ The count alone is not evidence it WORKS: a contentless FTS table with a broken
+        # tokenizer still holds rows. A word every corpus of retail food contains has to come back.
+        hits = cur.execute(
+            "SELECT COUNT(*) FROM food f JOIN food_fts x ON f.barcode = x.docid "
+            "WHERE x.food_fts MATCH 'chocolate'"
+        ).fetchone()[0]
+        print(f"  'chocolate' matches {hits:,} products")
+        if indexed != searchable:
+            print(f"  FAIL: {searchable - indexed:,} searchable products are not in the index")
+            ok = False
+        if searchable and hits == 0:
+            print("  FAIL: the index answers nothing — it is present but not usable")
+            ok = False
 
     con.close()
     print("\nVERIFY " + ("PASSED" if ok else "FAILED"))

@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +78,13 @@ import java.util.Calendar
  *  Provided app-wide from settings; never carries chat content. */
 val LocalJarvisFeedTopic = staticCompositionLocalOf { "" }
 
+/**
+ * ⚠️ `@Immutable` is a promise that these ten lambdas never change on a given instance, which is true
+ * — they are `val`s. It is only half the fix: the annotation says the TYPE is safe to compare by
+ * instance, and the call site has to hand back the SAME instance for that to buy anything. Both
+ * halves are here; either alone is worth nothing.
+ */
+@Immutable
 class HomeNav(
     val openNews: () -> Unit,
     val openMarkets: () -> Unit,

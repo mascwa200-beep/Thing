@@ -13,6 +13,7 @@ import com.google.mediapipe.tasks.components.containers.AudioData.AudioDataForma
 import com.google.mediapipe.tasks.core.BaseOptions
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.data.model.ModelFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -88,6 +89,27 @@ class AmbientAudioSampler(
     suspend fun close() = mutex.withLock {
         runCatching { classifier?.close() }
         classifier = null
+    }
+
+    /** How much of the disk this model is holding — see [ModelFile], including a half-fetched one. */
+    fun bytesOnDisk(): Long = ModelFile.bytes(context, MODEL_FILE)
+
+    /**
+     * Give the storage back.
+     *
+     * ⚠️ **Closes the classifier first**, for the reason [ModelFile] leaves to each owner: MediaPipe
+     * is handed a path, and deleting the file underneath a live classifier is not something this
+     * side can reason about from here. Closing first makes the question moot, and [ensureClassifier]
+     * re-opens lazily — so the only cost of discarding while sensing is running is one re-fetch.
+     *
+     * ⚠️ **Not enough on its own, and the caller has to know that.** A sampler that is still armed
+     * will simply download the model again on its next sip, so whoever offers this as a way to free
+     * space has to stand ambient sensing down as well — [dev.mascwa.pulse.feature.sensorium.SensoriumViewModel.discardModels]
+     * is the one place that does both.
+     */
+    suspend fun discardModel(): Boolean {
+        close()
+        return withContext(Dispatchers.IO) { ModelFile.discard(context, MODEL_FILE) }
     }
 
     private suspend fun ensureClassifier(): AudioClassifier {

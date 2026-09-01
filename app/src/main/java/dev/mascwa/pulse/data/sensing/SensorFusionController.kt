@@ -32,6 +32,26 @@ import kotlinx.coroutines.flow.asStateFlow
  * The movement EWMA carries the recorded perception-era fix: it smooths |accelG − 1| (deviation from
  * rest), never the raw ~1 g magnitude, so a still phone reads ~0 and a handling spike damps out.
  */
+/**
+ * Which of the continuous senses this phone actually has.
+ *
+ * ⚠️ **Nothing knew this before, and every reader of a null value had to guess what it meant.**
+ * [start] asks for five sensors and quietly skips any the phone does not expose, so a null
+ * `lightLux` meant either "no ambient-light sensor on this hardware" or "registered, no event yet"
+ * — indistinguishable, and the scanner rendered both by dropping the row entirely, which is a third
+ * thing again. Ambient-light and barometer are the two that phones genuinely ship without.
+ *
+ * Every field is what `getDefaultSensor` ACTUALLY returned, recorded at registration. It is not a
+ * capability table written from what a Pixel happens to have.
+ */
+data class SensorsPresent(
+    val accelerometer: Boolean = false,
+    val light: Boolean = false,
+    val pressure: Boolean = false,
+    val magnetometer: Boolean = false,
+    val proximity: Boolean = false,
+)
+
 data class FusionSnapshot(
     val movement: Float = 0f,
     val lightLux: Float? = null,
@@ -40,6 +60,16 @@ data class FusionSnapshot(
     val pressureDeltaHpa: Float? = null,
     val magneticUt: Float? = null,
     val proximityNear: Boolean? = null,
+    /**
+     * What this phone has, filled in by [SensorFusionController.start].
+     *
+     * ⚠️ **Null until `start()` has run, and that is a third state on purpose.** An all-false value
+     * would have been read as "this phone has no sensors at all" by any surface that renders it —
+     * which is exactly the conflation this field exists to end, reintroduced one layer up. The
+     * scanner can be open while the sensing service is stood down, so this case is reached in
+     * ordinary use, not only in theory.
+     */
+    val present: SensorsPresent? = null,
 )
 
 class SensorFusionController(private val context: Context) : SensorEventListener {
@@ -54,6 +84,7 @@ class SensorFusionController(private val context: Context) : SensorEventListener
     private var lastPressureSampleMs = 0L
 
     fun start() {
+        val got = mutableSetOf<Int>()
         listOf(
             Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_LIGHT, Sensor.TYPE_PRESSURE,
             Sensor.TYPE_MAGNETIC_FIELD, Sensor.TYPE_PROXIMITY,
@@ -62,8 +93,21 @@ class SensorFusionController(private val context: Context) : SensorEventListener
                 // NORMAL rate + a long batch latency: the hardware FIFO coalesces deliveries so the
                 // AP can sleep between batches — the whole point of a 24/7 registration being cheap.
                 sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, BATCH_LATENCY_US)
+                got += type
             }
         }
+        // ⚠️ Recorded from what the platform actually handed over, not from a table of what a Pixel
+        // has. This is the whole difference between a screen that can say "this phone has no
+        // barometer" and one that can only show a blank where the reading would have been.
+        _snapshot.value = _snapshot.value.copy(
+            present = SensorsPresent(
+                accelerometer = Sensor.TYPE_ACCELEROMETER in got,
+                light = Sensor.TYPE_LIGHT in got,
+                pressure = Sensor.TYPE_PRESSURE in got,
+                magnetometer = Sensor.TYPE_MAGNETIC_FIELD in got,
+                proximity = Sensor.TYPE_PROXIMITY in got,
+            ),
+        )
     }
 
     fun stop() {

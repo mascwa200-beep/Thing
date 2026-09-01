@@ -124,6 +124,44 @@ object MacroTargets {
         val goalKg: Double? = null,
     )
 
+    /**
+     * Whether exceeding one of the four numbers is a problem.
+     *
+     * ⚠️ **Not a matter of taste, and the planner's own behaviour is the evidence.** [plan] raises
+     * protein when it falls below [PROTEIN_MIN_G_PER_KG] and raises fat when it falls below the fat
+     * floor — that is what [AdjustmentKind.PROTEIN_RAISED] and [AdjustmentKind.FAT_RAISED] record.
+     * A number the planner pushes a person UP to is a floor, and eating past a floor is the point of
+     * it rather than a failure. Calories are the one genuinely binding budget; carbohydrate is the
+     * remainder, so going past it means the calories went somewhere, and calories already say that.
+     *
+     * ⚠️ This exists because both surfaces had the same root defect in opposite directions, neither
+     * of which is visible without asking this question. The LCARS macro tiles painted exceeding the
+     * protein target in the palette's `negative` — the colour that file otherwise uses only for
+     * REMOVE, ✕ and DELETE — so hitting more than your protein floor was rendered as a fault. The
+     * standalone progress bar clamps its fill at one, so six hundred calories over drew exactly the
+     * same full bar as landing on the target.
+     *
+     * ⚠️ And it matters beyond looks, which is why this is not cosmetic. This app measures
+     * expenditure FROM what you log. A day somebody eats over and does not log is a hole in the
+     * twenty-eight-day window that degrades the estimate for four weeks. A surface that treats an
+     * honest over-target day as an error is working against the app's own measurement.
+     */
+    enum class Bound {
+        /** A floor to reach. Going past it is not a fault, and is usually the intention. */
+        FLOOR,
+
+        /** A budget. Going past it is worth noticing — which is not the same as failing. */
+        BUDGET,
+    }
+
+    /** The four numbers a day is read against, and which way each one binds. */
+    enum class Macro(val bound: Bound) {
+        CALORIES(Bound.BUDGET),
+        PROTEIN(Bound.FLOOR),
+        FAT(Bound.FLOOR),
+        CARBS(Bound.BUDGET),
+    }
+
     data class Targets(
         val kcal: Int,
         val proteinG: Int,
@@ -360,6 +398,14 @@ object MacroTargets {
      *
      * ⚠️ Null rather than a negative or infinite number: "−14 weeks" would render, and a caller that
      * forgot to check would print it.
+     *
+     * ⚠️ **Not the same question as [GoalProjection.project], and the difference is which rate goes
+     * in.** This takes the rate the PLAN asks for, so it answers "if this plan works, how long is
+     * it" — a property of the plan, and the reason it belongs beside one. [GoalProjection] takes the
+     * rate the scale is actually showing, with its interval, so it answers "at the pace you are
+     * really moving, when do you arrive" — a property of the measurement. Both are worth having and
+     * the gap between them is the interesting part; what would be a defect is a surface quoting one
+     * without saying which, so every caller of either has to name its input.
      */
     fun weeksToGoal(currentKg: Double, goalKg: Double, ratePerWeekKg: Double): Double? {
         if (!currentKg.isFinite() || !goalKg.isFinite() || !ratePerWeekKg.isFinite()) return null

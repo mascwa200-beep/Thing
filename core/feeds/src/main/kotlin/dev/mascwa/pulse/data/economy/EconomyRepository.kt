@@ -28,10 +28,30 @@ class EconomyRepository(
                     async { runCatching { worldBank.series(ind, country) }.getOrNull() }
                 }.mapNotNull { it.await() }
             }
-            val name = series.firstOrNull { it.points.isNotEmpty() }?.countryName ?: country
-            val dash = EconomyDashboard(country, name, series)
+            // ⚠️ **A partial fetch must never shrink the dashboard.** Nineteen indicators are
+            // fetched at once through one gated client, so a rate limit or a moment's network
+            // trouble takes most of them together — and this used to write whatever survived
+            // straight over a complete cached copy and report a clean fresh fetch. Eighteen cards
+            // would vanish with nothing on screen to say why, and the impoverished version would
+            // then be served for the next twelve hours. Same rule, and the same reason, as
+            // `MarketsRepository.mergeWithCache`.
+            val previous = cache.readAny(key, EconomyDashboard.serializer())?.value
+            val merged = LinkedHashMap<String, IndicatorSeries>()
+            previous?.series?.forEach { merged[it.indicatorId] = it }
+            series.forEach { merged[it.indicatorId] = it }
+            // ⚠️ Nothing at all is a failure, not an empty dashboard. Caching one would tell the
+            // screen the country genuinely has no figures, and hold that answer for the whole TTL.
+            if (merged.isEmpty()) throw IllegalStateException("no economic series could be fetched")
+            // Declaration order, so a merged-in cached series lands where the screen expects it
+            // rather than after everything fetched this time.
+            val ordered = EconomyIndicator.entries.mapNotNull { merged[it.id] }
+            val name = ordered.firstOrNull { it.points.isNotEmpty() }?.countryName ?: country
+            val dash = EconomyDashboard(country, name, ordered)
             cache.write(key, dash, EconomyDashboard.serializer())
-            Fetched(dash, false)
+            // ⚠️ Reported STALE when anything had to be carried over, because that is what it is:
+            // some of what is on screen did not come from this fetch, and the banner is the only
+            // place a reader could ever learn that.
+            Fetched(dash, series.size < EconomyIndicator.entries.size)
         } catch (e: Exception) {
             cache.readAny(key, EconomyDashboard.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)

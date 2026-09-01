@@ -65,7 +65,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
                     )
                 }
             }
-            items(pending, key = { it.id }) { action ->
+            items(pending, key = { "pending_${it.id}" }) { action ->
                 ApprovalCard(action, c, onApprove = { vm.approve(action) }, onReject = { vm.reject(action.id) })
             }
 
@@ -82,7 +82,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
 
             if (versions.isNotEmpty()) {
                 item { SectionBar("HISTORY · tap to roll back") }
-                items(versions, key = { "${it.type}_${it.key}_${it.timestamp}" }) { v ->
+                items(versions, key = { "ver_${it.type}_${it.key}_${it.timestamp}" }) { v ->
                     VersionRow(v, c, onRollback = { vm.rollback(v) })
                 }
             }

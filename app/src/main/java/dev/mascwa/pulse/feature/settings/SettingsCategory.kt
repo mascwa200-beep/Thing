@@ -34,7 +34,18 @@ enum class SettingsCategory(
         "locale currency temperature wind precipitation clock 24 hour news"),
     NOTIFICATIONS("Notifications", "Alerts · check-ins · quiet hours", "NTF", Icons.Filled.Notifications,
         "push breaking emergency market weather safety flight survival tips digest oracle quiet hours"),
-    CONTENT("Content & feeds", "Refresh · watchlist · feeds · mutes", "FEED", Icons.Filled.ViewList,
+    // ⚠️ The blurb names mail, and the keywords deliberately do NOT. This is the one field that
+    // reaches both the master row and device search WITHOUT being read by SettingsScreen's `vis`,
+    // whose match is a plain substring over `title + keywords + the section's own keywords`. Five
+    // sections live under CONTENT, so a mail word in `keywords` or `title` would make searching
+    // "mail" inside Settings return all five — breaking the one surface that already worked in
+    // order to fix the two that did not. "watchlist" and "mutes" left the blurb for the keywords,
+    // where search still finds them.
+    //
+    // ⚠️ Both "mail" and "email" are spelled out because device search ranks through
+    // [dev.mascwa.pulse.core.telemetry.GuideSearch], whose wordMatch scores a prefix relation and
+    // nothing else — neither word is a prefix of the other, so one does not find the other.
+    CONTENT("Content & feeds", "Refresh · feeds · texts · mail · email", "FEED", Icons.Filled.ViewList,
         "refresh interval wifi articles watchlist crypto rss feed muted keywords"),
     SECURITY("Security & privacy", "Sensing · network · audit ledger", "SEC", Icons.Filled.Shield,
         "ambient camera mic microphone trusted network wifi ssid encryption https audit ledger"),

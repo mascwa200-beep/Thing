@@ -1,13 +1,20 @@
 *.iml
 .gradle/
 # Gradle's own Kotlin-compiler-daemon/session working directory at the repo root — same root cause as the
-# build/
+# build/ rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
+.kotlin/
 
 # Python bytecode from the tools/ scripts. Same class of gap as the leading-slash `build/` fixed
 # earlier: harmless while nothing here ever ran locally, real now that it does.
+#
+# ⚠️ These two lines were inserted INTO the middle of the two-line comment above, which left `# build/`
+# commented out on its own and appended the sentence's tail to the `*.pyc` line — so git read the whole
+# of `*.pyc rule below (only ever appears …)` as ONE pattern, which matches nothing. `*.pyc` has not
+# been ignored since. Nothing showed it, because every .pyc CPython writes lands inside a
+# `__pycache__/` directory that the line above already covers; a stray one written anywhere else was
+# committable. Keep a rule and its comment adjacent, and never split a wrapped comment to insert.
 __pycache__/
-*.pyc rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
-.kotlin/
+*.pyc
 /local.properties
 /.idea/
 .DS_Store
@@ -75,6 +82,24 @@ scratchpad/**/corpus.tsv
 
 # The offline food database: ~4.5M retail barcodes, 296 MB. Built by CI (or locally with
 # tools/food/build_food_db.py) and cached between runs — never committed, because GitHub hard-
-# rejects files over 100 MB and this repository has no LFS. The seed.tsv beside it IS committed.
+# rejects files over 100 MB and this repository has no LFS. The generic-food seed.tsv IS
+# committed, and lives in :core:health, whose assets both applications inherit.
 app/src/main/assets/food/food.db
 app/src/main/assets/food/food.db.gz
+# The standalone nutrition app packages its own copy of the same database, from the same cache.
+nutrition/src/main/assets/food/food.db
+nutrition/src/main/assets/food/food.db.gz
+
+# The packed Gaia star catalogue: 36.9M stars at G<15, about 295 MB. Built by CI (or locally with
+# tools/sky/build_catalogue.py) and cached between runs, for the same reason as the food database
+# above — GitHub hard-rejects files over 100 MB and this repository has no LFS.
+#
+# ⚠️ It was tracked until the deep tier landed, at 24.7 MB. Untracking it does NOT shrink `.git`:
+# the old blob stays in history for ever and only future growth is avoided. Said plainly rather
+# than implying a saving that is not there.
+#
+# ⚠️ The BRIGHT catalogue beside it — `stars.tsv`, 8,404 naked-eye stars — IS committed and must
+# stay so. Gaia saturates above about G = 3 and holds none of the fifteen brightest stars in the
+# sky, so the two files are the faint and bright halves of one picture rather than two versions
+# of the same thing.
+core/sky/src/main/assets/sky/stars.skycat

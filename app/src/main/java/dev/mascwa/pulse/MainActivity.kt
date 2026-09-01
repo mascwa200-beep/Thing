@@ -27,7 +27,7 @@ import dev.mascwa.pulse.core.device.DeviceGate
 import dev.mascwa.pulse.core.telemetry.HardwareAttestation
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.di.PulseViewModelFactory
-import dev.mascwa.pulse.ui.DeviceGateScreen
+import dev.mascwa.pulse.ui.DeviceNotice
 import dev.mascwa.pulse.ui.PulseApp
 import dev.mascwa.pulse.ui.theme.NightwireTheme
 import kotlinx.coroutines.Dispatchers
@@ -206,7 +206,18 @@ class MainActivity : ComponentActivity() {
                         null // attestation unavailable on this device → defer to the heuristic
                     }
                 }
-                val gated = !(attestationTrusted ?: heuristicOk) &&
+                // ⚠️ **A NOTICE, NOT A GATE — and this used to replace the whole application.**
+                // Until now a phone that was not a Pixel 10 Pro XL running GrapheneOS got
+                // `DeviceGateScreen` in front of everything, with "Exit" offered as a first-class
+                // choice. That is a block however politely it is worded, and it withheld every feed,
+                // the library, the assistant and the map — none of which depend on the hardware — for
+                // the sake of a handful of device-owner capabilities that were never load-bearing to
+                // any of it. `PulseApp` now always composes and the notice is drawn OVER it, once.
+                //
+                // ⚠️ The persisted flag keeps its old name. `deviceGateAcknowledged` is a field in the
+                // settings blob, i.e. a data contract — renaming it would silently reset the
+                // acknowledgement for everyone who has already dismissed this.
+                val showNotice = !(attestationTrusted ?: heuristicOk) &&
                     !acknowledged && !settings.deviceGateAcknowledged
 
                 // Ask for notification permission once on Android 13+.
@@ -261,44 +272,49 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    if (gated) {
-                        DeviceGateScreen(
+                    PulseApp(
+                        factory = factory,
+                        startRoute = pendingRouteState.value,
+                        isOnline = online,
+                        navigationRequests = app.container.navigationBus,
+                        onRouteVisit = { route ->
+                            // ⚠️ The BASE route, not the pattern. currentRoute hands over the
+                            // route PATTERN — "survival?guide={guide}" — and recording that
+                            // verbatim mints junk usage keys that never match FeatureCatalog,
+                            // so those features could never be counted or recommended.
+                            val base = route.substringBefore('?')
+                            app.container.usageRepository.record(base)
+                            app.container.usageRepository.log("nav", base)
+                        },
+                        onStartRouteConsumed = { pendingRouteState.value = null },
+                    )
+                    if (showNotice) {
+                        DeviceNotice(
                             result = gateResult,
                             grapheneOk = graphene.isGraphene,
                             osDetail = graphene.summary,
                             attestationOk = attestation?.verdict?.grapheneVerified,
                             attestationDetail = attestation?.verdict?.summary
                                 ?: attestation?.error,
-                            onContinue = {
+                            // The one sentence, from the one place that decides it — Settings renders
+                            // the same string beside the controls it disables.
+                            privilegeDetail = androidx.compose.runtime.remember {
+                                dev.mascwa.pulse.security.DevicePolicyController
+                                    .unavailableReason(this@MainActivity)
+                            },
+                            onDismiss = {
                                 acknowledged = true
                                 lifecycleScope.launch {
                                     app.container.settingsRepository.update { it.copy(deviceGateAcknowledged = true) }
                                 }
                             },
-                            onExit = { finish() },
-                        )
-                    } else {
-                        PulseApp(
-                            factory = factory,
-                            startRoute = pendingRouteState.value,
-                            isOnline = online,
-                            navigationRequests = app.container.navigationBus,
-                            onRouteVisit = { route ->
-                                // ⚠️ The BASE route, not the pattern. currentRoute hands over the
-                                // route PATTERN — "survival?guide={guide}" — and recording that
-                                // verbatim mints junk usage keys that never match FeatureCatalog,
-                                // so those features could never be counted or recommended.
-                                val base = route.substringBefore('?')
-                                app.container.usageRepository.record(base)
-                                app.container.usageRepository.log("nav", base)
-                            },
-                            onStartRouteConsumed = { pendingRouteState.value = null },
                         )
                     }
                     // (The visual "always watching" overlay was removed — J.A.R.V.I.S.'s awareness is
                     // non-visual now; the presence surfaces as a professional status feed instead.)
                     // Cold-open: opt-in (off by default to save startup RAM — the ~800-mote animation).
-                    // When on, it draws topmost and masks everything (app, gate, overlays) until it fades.
+                    // When on, it draws topmost and masks everything (the app, the device
+                    // notice, every overlay) until it fades.
                     // Toggle in Settings → Appearance ("Boot sequence").
                     if (settings.bootAnimation && !booted) {
                         BootScreen(onFinished = { booted = true })
@@ -364,6 +380,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         app.container.appForeground.value = true
+        dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "foregrounded")
         // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Reaching the foreground is both the evidence the update guard waits for and the moment to
@@ -381,29 +398,68 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * One store's write, and a record of it when it does not happen.
+     *
+     * ⚠️ **This is the worst place in the app for a swallowed failure and it swallowed nineteen.**
+     * These calls were bare `runCatching { }` with the result discarded, on the one path where no
+     * screen exists to say anything — the app is already going away, and what is buffered here is
+     * the health record, the assistant's memory and profile, the diary, the study deck and the
+     * Oracle's learning, none of which can be fetched again from anywhere. A failed write loses it
+     * silently and the next launch simply has less in it than the last one did.
+     *
+     * ⚠️ **And until now nothing it wrapped could fail.** Every store of this shape caught its own
+     * DataStore edit and discarded the `Result`, so no exception could reach here and this whole
+     * helper was unreachable — a reporter that had never once fired, under a KDoc describing what it
+     * would say when it did. Each store now keeps the outcome of its last write and `flushNow`
+     * rethrows it; the debounced background flush still swallows, because an exception thrown there
+     * escapes into a launched coroutine and takes the process with it.
+     *
+     * ⚠️ Still never throws, so one failing store cannot stop the eighteen behind it from writing —
+     * and `reportNonFatal` does not throw either, its own `write` being wrapped whole, which matters
+     * because the likeliest cause of a failed flush is a disk with nothing left on it.
+     *
+     * ⚠️ The tag carries the store name and nothing variable, so the per-tag rate limit gives one
+     * report per store per process rather than one every time the app is backgrounded.
+     */
+    private inline fun flush(name: String, write: () -> Unit) {
+        runCatching(write).onFailure { failure ->
+            app.container.crashReporter.reportNonFatal(
+                "flush.$name",
+                failure,
+                note = "The $name store could not be written to disk. Anything recorded since the " +
+                    "last successful write is lost.",
+            )
+        }
+    }
+
     override fun onStop() {
         app.container.appForeground.value = false
+        dev.mascwa.pulse.crash.Breadcrumbs.drop("app", "backgrounded")
         runCatching { hud?.stop() }
         hud = null
         // Best-effort: persist any buffered on-device learning before the process may be reclaimed.
         lifecycleScope.launch {
-            runCatching { app.container.usageRepository.flushNow() }
-            runCatching { app.container.cerebellumStore.flushNow() }
-            runCatching { app.container.procedureStore.flushNow() }
-            runCatching { app.container.profileStore.flushNow() }
-            runCatching { app.container.taskStore.flushNow() }
-            runCatching { app.container.memoryStream.flushNow() }
-            runCatching { app.container.diaryStore.flushNow() }
-            runCatching { app.container.interestStore.flushNow() }
-            runCatching { app.container.findingStore.flushNow() }
-            runCatching { app.container.securityAuditStore.flushNow() }
-            runCatching { app.container.oracleLearningStore.flushNow() }
-            runCatching { app.container.sensoriumStore.flushNow() }
-            runCatching { app.container.studyStore.flushNow() }
-            runCatching { app.container.bodyStore.flushNow() }
-            runCatching { app.container.foodLogStore.flushNow() }
-            runCatching { app.container.recipeStore.flushNow() }
-            runCatching { app.container.customFoodStore.flushNow() }
+            flush("usageRepository") { app.container.usageRepository.flushNow() }
+            flush("cerebellumStore") { app.container.cerebellumStore.flushNow() }
+            flush("procedureStore") { app.container.procedureStore.flushNow() }
+            flush("profileStore") { app.container.profileStore.flushNow() }
+            flush("taskStore") { app.container.taskStore.flushNow() }
+            flush("memoryStream") { app.container.memoryStream.flushNow() }
+            flush("diaryStore") { app.container.diaryStore.flushNow() }
+            flush("interestStore") { app.container.interestStore.flushNow() }
+            flush("findingStore") { app.container.findingStore.flushNow() }
+            flush("securityAuditStore") { app.container.securityAuditStore.flushNow() }
+            flush("oracleLearningStore") { app.container.oracleLearningStore.flushNow() }
+            flush("sensoriumStore") { app.container.sensoriumStore.flushNow() }
+            flush("studyStore") { app.container.studyStore.flushNow() }
+            flush("bodyStore") { app.container.bodyStore.flushNow() }
+            flush("foodLogStore") { app.container.foodLogStore.flushNow() }
+            flush("recipeStore") { app.container.recipeStore.flushNow() }
+            flush("trainingStore") { app.container.trainingStore.flushNow() }
+            flush("customFoodStore") { app.container.customFoodStore.flushNow() }
+            flush("plateStore") { app.container.plateStore.flushNow() }
+            flush("mailNoticeStore") { app.container.mailNoticeStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

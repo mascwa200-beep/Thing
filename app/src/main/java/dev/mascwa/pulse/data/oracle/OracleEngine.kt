@@ -1,6 +1,5 @@
 package dev.mascwa.pulse.data.oracle
 
-import android.os.StatFs
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
 import dev.mascwa.pulse.data.study.localDayIndex
 import dev.mascwa.pulse.core.telemetry.Insight
@@ -92,7 +91,7 @@ object OracleEngine {
                 .mapNotNull { q -> q.changePercent?.let { OracleMover(name = q.label, changePct = it, onWatchlist = true) } }
         }.getOrDefault(emptyList())
 
-        val kp = runCatching { container.spaceWeatherRepository.fetch(force = false).data.kp }.getOrNull()
+        val kp = runCatching { container.spaceWeatherRepository.fetch(force = false, heavy = false).data.kp }.getOrNull()
 
         val emergency = runCatching {
             container.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data
@@ -101,10 +100,11 @@ object OracleEngine {
         }.getOrNull()
 
         val dc = runCatching { container.deviceContextProvider.snapshot() }.getOrNull()
-        val storageFreePct = runCatching {
-            val st = StatFs(container.applicationContext.filesDir.path)
-            (st.availableBytes * 100 / st.totalBytes).toInt()
-        }.getOrNull()
+        // ⚠️ Through the one accessor rather than a second `StatFs` of its own. The old copy also
+        // divided by `totalBytes` unguarded, so a volume reporting no size threw and was swallowed
+        // as "unknown"; `freePct` returns null for that case explicitly, which is the same outcome
+        // arrived at on purpose.
+        val storageFreePct = runCatching { container.deviceContextProvider.storage()?.freePct }.getOrNull()
 
         val feat = runCatching {
             UsageInsights.featureForHour(container.usageRepository.snapshot(), hour)

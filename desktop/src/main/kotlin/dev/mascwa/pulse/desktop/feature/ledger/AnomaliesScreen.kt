@@ -101,7 +101,7 @@ fun AnomaliesScreen(
                 }
             }
 
-            items(state.anomalies, key = { it.id }) { AnomalyRow(it, onOpenScreen) }
+            items(state.anomalies, key = { "a-${it.id}" }) { AnomalyRow(it, onOpenScreen) }
 
             if (state.quiet.isNotEmpty()) {
                 item { SectionLabel("IN ITS USUAL RANGE", c.muted) }

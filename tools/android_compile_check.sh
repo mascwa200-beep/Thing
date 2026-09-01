@@ -35,6 +35,28 @@
 # live in a separate `-android` variant. `lifecycle-runtime-compose:2.8.7` unpacks to 229 bytes and
 # nothing else; `lifecycle-runtime-compose-android:2.8.7` is the one with the code in it. If a -l
 # resolves but the symbols still do not, try the `-android` suffix before concluding anything.
+#
+# `:core:health` — THE RECIPE, because believing it impossible cost a CI round
+# ---------------------------------------------------------------------------
+# ⚠️ The standing note in this repo said `:core:health` "is an Android library module that cannot be
+# built in this container". **That is wrong, and it is the module whose miss cost a round.** The
+# belief came from reaching for the plain KMP DataStore AAR, which is manifest-only (see above) —
+# every store in that module then reported hundreds of unresolved names and the conclusion drawn was
+# that the module was out of reach. With the `-android`/`-jvm` variant coordinates it compiles:
+#
+#   tools/android_compile_check.sh -s \
+#     -l androidx.datastore:datastore-preferences-android:1.1.1 \
+#     -l androidx.datastore:datastore-preferences-core-jvm:1.1.1 \
+#     -l androidx.datastore:datastore-core-android:1.1.1 \
+#     -l androidx.datastore:datastore-core-okio-jvm:1.1.1 \
+#     core/health/src/main/java/dev/mascwa/pulse/data/health/FoodLogStore.kt \
+#     core/health/src/main/java/dev/mascwa/pulse/data/health/FoodLogFiling.kt \
+#     $(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')
+#
+# -s is required (every store there is @Serializable); the sibling files a store references have to
+# be passed alongside it; and the whole of `:core:telemetry` goes on as sources, which is what the
+# grep produces. `tools/check_changed.sh` runs exactly this automatically for changed core/health
+# files, so the usual path is to run that rather than to retype the above.
 set -uo pipefail
 
 G=/opt/gradle-8.14.3/lib
@@ -96,6 +118,22 @@ if [ -n "${SERIALIZATION_PLUGIN:-}" ]; then
 fi
 [ $# -ge 1 ] || { echo "usage: $0 [-s] [-l group:artifact:version ...] [-m module/build/classes/kotlin/main ...] <file.kt> [more.kt ...]"; exit 64; }
 
+# ⚠️ **Forgetting -s on a file that uses @Serializable produces a page of convincing false findings,
+# and this says so rather than letting somebody chase them.** Without the plugin the compiler has no
+# generated `serializer()` and no generated members, so every property of every serializable class
+# reads as unresolved — which looks exactly like a real defect and cost several rounds once. It is a
+# notice, not a refusal: a caller may deliberately be checking something else in the same file.
+if [ -z "${SERIALIZATION_PLUGIN:-}" ]; then
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    if grep -q '@Serializable' "$f" 2>/dev/null; then
+      echo "note: $f uses @Serializable and -s was not passed — expect false 'unresolved reference'" >&2
+      echo "      reports on its generated members and on serializer(). Re-run with -s." >&2
+      break
+    fi
+  done
+fi
+
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "fetching the platform classes (~186 MB, once per cache) …" >&2
   url="https://repo1.maven.org/maven2/org/robolectric/android-all/$ANDROID_ALL_VERSION/android-all-$ANDROID_ALL_VERSION.jar"
@@ -127,7 +165,16 @@ for coord in "${libs[@]:-}"; do
       break
     fi
   done
-  case "$extra" in *"$art-$ver"*) ;; *) echo "could not resolve $coord"; exit 1 ;; esac
+  # ⚠️ NOTHING IS COMPILED past this point, so the message has to look like a failure. It exits 1,
+  # which is correct — but a caller that pipes this into `grep 'error:'` sees silence and reads it
+  # as a clean pass, because the compiler never ran to emit an error line. That happened once with a
+  # coordinate that does not exist (lifecycle-viewmodel-savedstate has no -android variant) and the
+  # run was reported as "0 errors" across five modules. Same family as the coroutines check below:
+  # a silent false pass is worse than no check at all, so say so unmistakably.
+  case "$extra" in *"$art-$ver"*) ;; *)
+    echo "COMPILE CHECK ABORTED — could not resolve $coord (nothing was compiled; this is NOT a pass)"
+    exit 1 ;;
+  esac
 done
 
 # ⚠️ The compiler's own -cp needs kotlin-stdlib + trove4j + annotations + kotlinx-coroutines. Omit
@@ -140,8 +187,15 @@ SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.j
 # which reads like a real finding and buries whatever you were actually checking. Cost two rounds
 # once. Kept alongside the coroutines/serialization jars for exactly the same reason.
 JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
+# ⚠️ kotlinx-serialization-JSON as well as -core, and the distinction is not cosmetic. `@Serializable`
+# and `KSerializer` live in core; `Json` itself lives in json, and `DiskCache` — which almost every
+# repository in this project reaches through — names `Json` directly. Without this the whole feeds
+# module fails on an unresolved `Json`, every `serializer()` after it cascades, and the report reads
+# as dozens of real findings in the file you were actually checking. Verified by control run: the
+# same file at HEAD, which CI compiles green, produced the identical errors until this line existed.
+SERJ=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-json-jvm-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$JSOUP$extra$module_cp"
+TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$SERJ:$JSOUP$extra$module_cp"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
       -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)

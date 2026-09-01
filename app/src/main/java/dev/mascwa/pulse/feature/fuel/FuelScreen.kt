@@ -89,7 +89,7 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
                         if (!data?.nationalPrices.isNullOrEmpty()) {
                             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
                             item { SectionLabel("National pump prices — ${data?.countryName ?: ""}") }
-                            items(data!!.nationalPrices, key = { it.fuel }) { PumpPriceCard(it) }
+                            items(data!!.nationalPrices, key = { "n_${it.fuel}" }) { PumpPriceCard(it) }
                         }
 
                         // Why there are no pump prices, when there are none.

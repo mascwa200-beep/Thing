@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Empty by design, exactly as :core:database's is. This module declares no permission and no
+  component: the Health Connect permissions belong to whichever application chooses to ask for
+  them, and ProgressPhotoStore's FileProvider authority is derived from the CONSUMER's own package
+  at runtime, so each application declares its own provider rather than inheriting one from here.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

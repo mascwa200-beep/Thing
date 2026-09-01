@@ -2,10 +2,14 @@ package dev.mascwa.pulse.feature.health
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -38,28 +43,41 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.BmrEquations
 import dev.mascwa.pulse.core.telemetry.Body
+import dev.mascwa.pulse.core.telemetry.CheckIn
 import dev.mascwa.pulse.core.telemetry.BodyTrend
+import dev.mascwa.pulse.core.telemetry.DashboardLayout
+import dev.mascwa.pulse.core.telemetry.Decimals
+import dev.mascwa.pulse.core.telemetry.EnergyBalance
 import dev.mascwa.pulse.core.telemetry.Expenditure
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.FoodPhrase
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Habits
 import dev.mascwa.pulse.core.telemetry.MacroTargets
+import dev.mascwa.pulse.core.telemetry.Maintenance
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.MealPhoto
 import dev.mascwa.pulse.core.telemetry.NutrientGuides
 import dev.mascwa.pulse.core.telemetry.IntakeWeek
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.NutritionLabel
+import dev.mascwa.pulse.core.telemetry.PeriodCompare
+import dev.mascwa.pulse.core.telemetry.MealDraft
+import dev.mascwa.pulse.core.telemetry.WeeklyPlan
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.createCameraImageUri
-import dev.mascwa.pulse.data.health.MealPhotoReader
+import dev.mascwa.pulse.data.health.MealPhotos
 import dev.mascwa.pulse.data.health.BodyStore
 import dev.mascwa.pulse.data.health.HealthConnectBridge
 import dev.mascwa.pulse.data.health.HealthDays
@@ -68,6 +86,7 @@ import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsDataRow
+import dev.mascwa.pulse.feature.common.LcarsDialog
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.LcarsFrame
@@ -85,7 +104,12 @@ import kotlin.math.roundToInt
 import java.time.LocalDate
 import java.time.ZoneId
 
-private val Pad = PaddingValues(13.dp)
+/**
+ * ⚠️ **Internal, and one definition for the whole tab.** It existed twice — here and in
+ * `RecipesBody` — and a third body was about to add a third copy. Every page in this tab has to
+ * inset by the same amount or the sub-tabs visibly jump as you move between them.
+ */
+internal val Pad = PaddingValues(13.dp)
 
 // =================================================================================== MACROS
 
@@ -97,6 +121,7 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
     // `LazyListScope.() -> Unit` lambda rather than a composable one, so a
     // `collectAsStateWithLifecycle()` inside it does not compile.
     val weekState by vm.week.collectAsStateWithLifecycle()
+    val prefs by vm.profile.collectAsStateWithLifecycle()
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
 
@@ -118,28 +143,61 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         val eaten = state.eatenToday
         val left = state.remaining!!
 
-        item {
+        // ⚠️ Every section's locals are computed HERE, above the loop, because a `when` branch
+        // cannot declare something the next branch needs and the order the branches run in is now
+        // whatever the reader arranged. Hoisting also revealed that the year was being read from
+        // the clock twice under two names.
+        val thisYear = LocalDate.now(ZoneId.systemDefault()).year
+        val guides = NutrientGuides.forDay(
+            eaten = eaten,
+            targetKcal = targets.kcal,
+            birthYear = state.profile.birthYear,
+            thisYear = thisYear,
+        ).mapNotNull { sv -> sv.guide.nutrient?.let { it to sv } }.toMap()
+        // ⚠️ Nothing logged means these totals are zero because the day is empty, not because the
+        // food had none of them — so the section is absent rather than showing four zeros and three
+        // explanations on a day nobody has eaten on yet.
+        val anythingLogged = eaten.kcal > 0.0
+        val micros = state.microsToday
+        val age = if (state.profile.birthYear > 0) thisYear - state.profile.birthYear else 0
+        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
+            .getOrDefault(Body.Sex.UNSPECIFIED)
+        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
+        val extras = state.extrasToday
+        val extrasPresent = NutrientSet.Nutrient.entries.filter { extras[it] != null }
+        val week = weekState
+        val set = plan as? MacroTargets.Plan.Set
+
+        DashboardLayout.arrange(MACRO_IDS, prefs.dashboardOrder, prefs.dashboardHidden.toSet())
+            .forEach { id -> when (id) {
+
+        MACRO_HEADLINE -> item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text(
                         if (left.overKcal) "${-left.kcal} OVER" else "${left.kcal} LEFT",
                         fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 34.sp,
-                        color = if (left.overKcal) c.negative else c.accent,
+                        // ⚠️ Amber rather than the delete colour. See `overColor` — over budget is
+                        // worth noticing and is not a malfunction, and a day rendered as a fault is
+                        // a day somebody stops logging.
+                        color = if (left.overKcal) c.amber else c.accent,
                     )
                     Text(
                         "of ${targets.kcal} calories — ${eaten.kcal.roundToInt()} logged",
                         fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
                     )
-                    MacroBar(eaten.kcal, targets.kcal.toDouble(), c.accent)
+                    // Calories are the one genuinely binding budget, so this is the one bar that
+                    // changes colour when it is passed — amber, matching the figure above it.
+                    MacroBar(eaten.kcal, targets.kcal.toDouble(), c.accent, c.amber)
                 }
             }
         }
 
-        item {
+        MACRO_TILES -> item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                MacroTile("PROTEIN", eaten.proteinG, targets.proteinG, c.positive, Modifier.weight(1f))
-                MacroTile("FAT", eaten.fatG, targets.fatG, c.amber, Modifier.weight(1f))
-                MacroTile("CARBS", eaten.carbG, targets.carbG, c.sky, Modifier.weight(1f))
+                MacroTile("PROTEIN", eaten.proteinG, targets.proteinG, c.positive, MacroTargets.Macro.PROTEIN, Modifier.weight(1f))
+                MacroTile("FAT", eaten.fatG, targets.fatG, c.amber, MacroTargets.Macro.FAT, Modifier.weight(1f))
+                MacroTile("CARBS", eaten.carbG, targets.carbG, c.sky, MacroTargets.Macro.CARBS, Modifier.weight(1f))
             }
         }
 
@@ -148,46 +206,71 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
         // caller. Which of them can be shown is NutrientGuides' judgement, not this screen's — two of
         // the three need a calorie target and one needs an adult birth year, and inventing either
         // would produce a bar that looks measured.
-        val guides = NutrientGuides.forDay(
-            eaten = eaten,
-            targetKcal = targets.kcal,
-            birthYear = state.profile.birthYear,
-            thisYear = LocalDate.now(ZoneId.systemDefault()).year,
-        )
-        if (guides.isNotEmpty() || eaten.sugarG > 0.0) {
-            item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
-        }
-        items(guides) { serving -> NutrientRow(serving.guide, serving.eaten) }
-        if (eaten.sugarG > 0.0) {
+        MACRO_REST -> {
+        if (anythingLogged) item { LcarsHeaderBar("THE REST OF WHAT YOU ATE") }
+        // ⚠️ **Every nutrient keeps its row whether or not a guide can be stated for it.** This used
+        // to render only what `forDay` returned, so with no birth year the sodium TOTAL — a real
+        // measured figure the app is holding — was not on the screen at all. That is this repo's
+        // recurring defect class, parsed-and-never-shown, and it hid exactly the two facts a reader
+        // could have fixed. An unguided row now carries `whyAbsent` where the comparison would be.
+        if (anythingLogged) {
+            items(NutrientGuides.Nutrient.entries) { n ->
+                val serving = guides[n]
+                if (serving != null) {
+                    NutrientRow(serving.guide, serving.eaten)
+                } else {
+                    NutrientTotalRow(
+                        label = n.label,
+                        value = "${n.eatenIn(eaten).roundToInt()} ${n.unit}",
+                        why = NutrientGuides.whyAbsent(
+                            n,
+                            targets.kcal,
+                            state.profile.birthYear,
+                            thisYear,
+                        ),
+                    )
+                }
+            }
             item { SugarRow(eaten.sugarG) }
+        }
         }
 
         // ⚠️ Vitamins and minerals, and the thing that makes them honest: how many of today's foods
         // actually reported each one. Only about a quarter of product records carry calcium, so a
         // total drawn from one food in six is not the day's calcium — and a screen that shows the
         // number without the denominator says it is.
-        val micros = state.microsToday
-        val year = LocalDate.now(ZoneId.systemDefault()).year
-        val age = if (state.profile.birthYear > 0) year - state.profile.birthYear else 0
-        val sex = runCatching { Body.Sex.valueOf(state.profile.sex) }
-            .getOrDefault(Body.Sex.UNSPECIFIED)
-        val present = Micronutrients.Micro.entries.filter { micros[it] != null }
-        if (present.isNotEmpty()) {
+        MACRO_VITAMINS -> if (present.isNotEmpty()) {
             item { LcarsHeaderBar("VITAMINS AND MINERALS") }
             items(present) { m -> MicroRow(m, micros, sex, age) }
+        }
+
+        // ⚠️ **Everything else the records happened to carry, and ONLY what they carried.** Twenty-
+        // nine further nutrients are declared; the densest of them is recorded on 5.7% of products
+        // and most are near 2%, so on an ordinary day this section is absent entirely — which is
+        // correct. A row per nutrient with a dash in it would be twenty-nine lines of nothing.
+        //
+        // ⚠️ No reference intake beside them, unlike the eight above, because there is none this app
+        // can honestly state for most of them. What each row CAN say is how much of the day it was
+        // drawn from, which is the same caveat and the more important one here.
+        MACRO_EVERYTHING -> if (extrasPresent.isNotEmpty()) {
+            item { LcarsHeaderBar("EVERYTHING ELSE RECORDED") }
+            items(extrasPresent) { n -> ExtraNutrientRow(n, extras) }
         }
 
         // The week, which is the question somebody actually has after a fortnight: whether the plan
         // is being followed at all. It is also what makes the calorie target trustworthy — an
         // expenditure measured from a log with four days missing is measured from a fiction.
-        val week = weekState
-        if (week != null) {
+        MACRO_WEEK -> if (week != null) {
             item { LcarsHeaderBar("THE LAST ${week.windowDays} DAYS") }
             item { WeekPanel(week, targets.kcal) }
         }
 
-        val set = plan as? MacroTargets.Plan.Set
-        if (set != null && set.adjustments.isNotEmpty()) {
+        MACRO_ROLLUP -> {
+            item { LcarsHeaderBar("STANDING BACK") }
+            item { RollUpPanel(vm) }
+        }
+
+        MACRO_HELD -> if (set != null && set.adjustments.isNotEmpty()) {
             item { LcarsHeaderBar("WHAT WAS HELD BACK") }
             items(set.adjustments) { adj ->
                 LcarsFrame(Modifier.fillMaxWidth(), accent = c.amber) {
@@ -196,6 +279,17 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        // ⚠️ Unreachable: arrange() only ever returns ids it was handed. Present because a card
+        // added to MACRO_IDS and not to this list would draw nothing at all, which is why the two
+        // sit in the same file.
+        else -> Unit
+        } }
+
+        item { ArrangeThisPage(vm) }
+
+        // ⚠️ Pinned below the arrangement rather than being one of the cards. It is the sentence
+        // that says these numbers are an estimate, and a page that could put it away would be a
+        // page that could hide its own caveat.
         item {
             Text(
                 MacroTargets.DISCLAIMER,
@@ -207,20 +301,57 @@ fun MacrosBody(vm: HealthViewModel, state: HealthViewModel.State) {
 }
 
 @Composable
-private fun MacroTile(label: String, eaten: Double, target: Int, tint: Color, modifier: Modifier = Modifier) {
+private fun MacroTile(
+    label: String,
+    eaten: Double,
+    target: Int,
+    tint: Color,
+    macro: MacroTargets.Macro,
+    modifier: Modifier = Modifier,
+) {
     val c = Pulse.colors
-    val left = target - eaten.roundToInt()
     LcarsFrame(modifier, padding = PaddingValues(start = 11.dp, end = 11.dp, top = 9.dp, bottom = 9.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
             Text(
                 "${eaten.roundToInt()}",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 19.sp,
-                color = if (left < 0) c.negative else tint,
+                color = overColor(eaten, target.toDouble(), macro, tint),
             )
             Text("of $target g", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-            MacroBar(eaten, target.toDouble(), tint)
+            MacroBar(eaten, target.toDouble(), tint, overColor(eaten, target.toDouble(), macro, tint))
         }
+    }
+}
+
+/**
+ * What colour a figure takes once it is past its target.
+ *
+ * ⚠️ **Was `c.negative` for all four numbers, and that was wrong in two directions at once.**
+ * Exceeding a FLOOR is the point of having one — the planner raises protein and fat UP to a minimum,
+ * which is what `AdjustmentKind.PROTEIN_RAISED` and `FAT_RAISED` record — so painting it in the
+ * palette's `negative` said that eating enough protein was a fault. And `negative` is not a warning
+ * colour in this file at all: it is what REMOVE, ✕ and DELETE THIS ONE are drawn in, so it read as
+ * "this destroys something".
+ *
+ * ⚠️ A budget past its mark takes AMBER, the colour this app already uses for "worth a look" — the
+ * WORTH A LOOK panel, a stale figure's vintage, an intake shift. Noticing is not failing, and the
+ * difference is load-bearing: this app measures expenditure from what you log, so a day somebody
+ * eats over and then does not log is a hole in the window that degrades the estimate for four weeks.
+ */
+@Composable
+private fun overColor(
+    eaten: Double,
+    target: Double,
+    macro: MacroTargets.Macro,
+    tint: Color,
+): Color {
+    val c = Pulse.colors
+    val over = target > 0.0 && eaten.roundToInt() > target.roundToInt()
+    if (!over) return tint
+    return when (macro.bound) {
+        MacroTargets.Bound.FLOOR -> tint
+        MacroTargets.Bound.BUDGET -> c.amber
     }
 }
 
@@ -372,6 +503,40 @@ private fun NutrientRow(guide: NutrientGuides.Guide, amount: Double) {
  * ceiling was withdrawn in 2015; trans fat has no allowance because the guidance is elimination,
  * and a budget on screen reads as permission to spend it. Those get the sentence and no bar.
  */
+/**
+ * One further nutrient across today, with the denominator that makes it honest.
+ *
+ * ⚠️ **No percentage of anything.** [MicroRow] above compares against a published reference intake
+ * and can say "62% of the guideline"; for most of these twenty-nine there is no figure current
+ * guidance states, and inventing one to fill the same shape would be the exact dishonesty this
+ * whole feature set is built to avoid. The number and where it came from is all there is to say.
+ */
+@Composable
+private fun ExtraNutrientRow(n: NutrientSet.Nutrient, day: NutrientSet.Day) {
+    val c = Pulse.colors
+    val tally = day[n] ?: return
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    n.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    "${Formatters.number(tally.total, 2)} ${n.unit.symbol}",
+                    fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink,
+                )
+            }
+            // ⚠️ The denominator, or nothing. `caveat` is silent once a figure is well covered,
+            // which is right: a line under every row is a line nobody reads, and its whole force
+            // is for the day a total came from one food in six.
+            day.caveat(n)?.let {
+                Text(it, fontFamily = ChakraPetch, fontSize = 10.sp, color = c.muted)
+            }
+        }
+    }
+}
+
 @Composable
 private fun MicroRow(
     m: Micronutrients.Micro,
@@ -410,11 +575,49 @@ private fun MicroRow(
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
                 )
             }
+            // ⚠️ `c.muted`, matching the other `day.caveat` site in this same file — which was
+            // already right and had drifted from this one. Amber is the caution colour; a note
+            // saying how many of today's foods recorded a nutrient is not a caution, it is the
+            // denominator, and two statements of the same kind of fact should not arrive in two
+            // colours.
             day.caveat(m)?.let { caveat ->
                 Text(
                     caveat,
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A total the app can measure and cannot yet compare, with the reason in place of the comparison.
+ *
+ * ⚠️ Shaped like [SugarRow] rather than [NutrientRow], and that is the point: no bar, because there
+ * is nothing to fill one against. A bar drawn at zero beside a real figure reads as "none of your
+ * allowance used", which is the opposite of "we cannot say".
+ *
+ * ⚠️ [why] comes from `NutrientGuides.whyAbsent` and is nullable because that function returns null
+ * when a guide DOES exist — a state this composable is never called in, but taking the value as it
+ * comes beats a `!!` at the call site.
+ */
+@Composable
+private fun NutrientTotalRow(label: String, value: String, why: String?) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                )
+                Text(
+                    value,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink2,
+                )
+            }
+            why?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp)
             }
         }
     }
@@ -454,18 +657,32 @@ private fun SugarRow(sugarG: Double) {
 /**
  * How much of a target is spent.
  *
- * ⚠️ Overshoot is drawn as a full bar in the warning colour rather than a bar past its end. A
- * proportional overrun would need the bar to keep growing off the tile, and the number above it already
- * says exactly how far over — the bar's job is the glance, not the measurement.
+ * ⚠️ Overshoot is drawn as a full bar rather than a bar past its end. A proportional overrun would
+ * need the bar to keep growing off the tile, and the number above it already says exactly how far
+ * over — the bar's job is the glance, not the measurement.
+ *
+ * ⚠️ **[overTint] defaults to [tint], and that default is the fix rather than a convenience.** This
+ * used to paint every overshoot in the palette's `negative`, which is what REMOVE, ✕ and DELETE THIS
+ * ONE are drawn in — so a bar that had passed its mark read as "this destroys something" whatever
+ * the number beside it said. Two of the four call sites hand in a tint their own caller has already
+ * reasoned about: [NutrientRow] knows a fibre target from a sodium limit, so it is already green
+ * when a target is met and red when a limit is passed, and the bar overriding that put the bar and
+ * the number in different colours for one fact. Falling back to the caller's own colour keeps them
+ * agreeing. Only a caller with something different to say passes [overTint].
  */
 @Composable
-private fun MacroBar(eaten: Double, target: Double, tint: Color) {
+private fun MacroBar(
+    eaten: Double,
+    target: Double,
+    tint: Color,
+    overTint: Color = tint,
+) {
     val c = Pulse.colors
     val frac = if (target > 0.0) (eaten / target).coerceIn(0.0, 1.0).toFloat() else 0f
     val over = target > 0.0 && eaten > target
     LcarsFillRow(
         segments = listOf(
-            (if (over) 1f else frac) to (if (over) c.negative else tint),
+            (if (over) 1f else frac) to (if (over) overTint else tint),
             (if (over) 0f else 1f - frac) to c.raise,
         ),
         modifier = Modifier.fillMaxWidth().height(6.dp),
@@ -474,6 +691,100 @@ private fun MacroBar(eaten: Double, target: Double, tint: Color) {
 }
 
 // =================================================================================== INTAKE
+
+/**
+ * A meal being assembled, and what committing it would do to the day.
+ *
+ * ⚠️ **One control, not two.** When nothing is being built this is a single button; once a plate is
+ * standing it becomes the plate. Offering "log" and "add to plate" side by side everywhere would
+ * make the choice ambiguous on every single food, and the mode meaningless.
+ *
+ * ⚠️ Nothing here refuses a commit or paints a meal red. The lines state arithmetic — see [MealDraft],
+ * and [MacroTargets.Bound] for why a surface that renders an honest over-budget meal as a failure
+ * is working against the measurement this whole app is built on.
+ */
+@Composable
+private fun PlatePanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    val staged by vm.plate.collectAsStateWithLifecycle()
+    val effect by vm.plateEffect.collectAsStateWithLifecycle()
+    val day by vm.shownDay.collectAsStateWithLifecycle()
+
+    if (!building) {
+        LcarsButton(
+            text = "BUILD A PLATE",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { vm.setBuildingPlate(true) },
+        )
+        return
+    }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(
+                "THE PLATE",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                MealDraft.summary(effect),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 15.sp,
+            )
+            if (staged.isEmpty()) {
+                Text(
+                    "Search for a food below, or type one in, and it goes here instead of straight " +
+                        "into the record.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+            staged.forEach { e ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            e.name,
+                            fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink, lineHeight = 15.sp,
+                        )
+                        Text(
+                            "${e.nutrients.kcal.roundToInt()} kcal · ${e.meal.label}" +
+                                // ⚠️ The day is named only when it is not the one on screen. Printing
+                                // it on every row would be noise; leaving it off the one row where it
+                                // differs is how a meal lands somewhere nobody is looking.
+                                if (e.dayStartMs != day) " · ${relativeDay(e.dayStartMs)}" else "",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        )
+                    }
+                    LcarsButton(text = "OFF", onClick = { vm.unstage(e.id) })
+                }
+            }
+            effect.lines.forEach { l ->
+                Text(
+                    l.sentence,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 14.sp,
+                    // ⚠️ Amber marks a BUDGET gone past and nothing else. A floor gone past is the
+                    // point of having one, and colouring it would be the exact defect
+                    // `MacroTargets.Bound` was written to end.
+                    color = if (
+                        l.verdict == MealDraft.Verdict.OVER &&
+                        l.macro.bound == MacroTargets.Bound.BUDGET
+                    ) c.amber else c.muted,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                LcarsButton(
+                    text = "LOG THE PLATE",
+                    enabled = staged.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                    onClick = { vm.commitPlate() },
+                )
+                LcarsButton(
+                    text = if (staged.isEmpty()) "STOP" else "CLEAR",
+                    modifier = Modifier.weight(0.6f),
+                    onClick = { vm.clearPlate() },
+                )
+            }
+        }
+    }
+}
 
 /**
  * The log itself: search the databases, scan a barcode, or type four numbers off a label.
@@ -493,7 +804,19 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     var fat by remember { mutableStateOf("") }
     var carb by remember { mutableStateOf("") }
     var grams by remember { mutableStateOf("") }
+    // ⚠️ The four figures a panel always states and which had no way in at all: neither nutrient
+    // picker covers them, because they live directly on NutritionDay.Nutrients rather than in
+    // either enum, and quickAdd never took them. Saturates and sugars are mandatory on a UK or EU
+    // label and sodium on a United States one.
+    var fibre by remember { mutableStateOf("") }
+    var sugar by remember { mutableStateOf("") }
+    var satFat by remember { mutableStateOf("") }
+    var sodium by remember { mutableStateOf("") }
     var keep by remember { mutableStateOf(false) }
+    // Whatever else was on the label, keyed by [LabelNutrient.key] and held as the text somebody
+    // typed rather than a parsed number — so a half-finished "0." is not silently a zero, and a
+    // field that is present but empty is still a nutrient they chose to add and have not filled in.
+    var labelled by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     // ⚠️ Read HERE, not inside the LazyColumn. A LazyColumn's content is a `LazyListScope.() -> Unit`
     // — an ordinary lambda, not a composable one — so `collectAsStateWithLifecycle()` inside it is a
@@ -501,14 +824,23 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
     // needs is hoisted into the composable that owns it.
     val day by vm.shownDay.collectAsStateWithLifecycle()
     val isToday = day == vm.todayStartMs()
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    // Hoisted with the rest, per the note above, and read in two places: the control that sets it
+    // and the empty state, which must not describe a marked fast as nothing.
+    val fasted by vm.fastedDay.collectAsStateWithLifecycle()
 
     fun reset() {
         name = ""; kcal = ""; protein = ""; fat = ""; carb = ""; grams = ""; keep = false
+        fibre = ""; sugar = ""; satFat = ""; sodium = ""
+        labelled = emptyMap()
     }
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
         item { DayStepper(vm) }
+        item { FastedDay(vm, entries, fasted) }
+        item { PlatePanel(vm) }
+        item { DescribeAMeal(vm, meal) }
         item { FindAFood(vm, meal) }
         item { PhotoOfAMeal(vm, meal) }
         item { EatenBefore(vm, meal) }
@@ -532,16 +864,38 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         NumberCell("C", carb, { carb = it }, Modifier.weight(1f))
                         NumberCell("GRAMS", grams, { grams = it }, Modifier.weight(1.2f))
                     }
-                    val energy = kcal.toDoubleOrNull()
-                    val weight = grams.toDoubleOrNull()?.takeIf { it > 0.0 }
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        NumberCell("FIBRE", fibre, { fibre = it }, Modifier.weight(1f))
+                        NumberCell("SUGARS", sugar, { sugar = it }, Modifier.weight(1f))
+                        NumberCell("SAT", satFat, { satFat = it }, Modifier.weight(1f))
+                        NumberCell("SODIUM MG", sodium, { sodium = it }, Modifier.weight(1.4f))
+                    }
+                    ReadTheLabel { eaten, ate ->
+                        kcal = fieldValue(eaten.kcal)
+                        protein = fieldValue(eaten.proteinG)
+                        fat = fieldValue(eaten.fatG)
+                        carb = fieldValue(eaten.carbG)
+                        fibre = fieldValue(eaten.fibreG)
+                        sugar = fieldValue(eaten.sugarG)
+                        satFat = fieldValue(eaten.satFatG)
+                        sodium = fieldValue(eaten.sodiumMg)
+                        grams = fieldValue(ate)
+                    }
+                    MoreFromTheLabel(
+                        typed = labelled,
+                        onChange = { key, v -> labelled = labelled + (key to v) },
+                        onRemove = { key -> labelled = labelled - key },
+                    )
+                    val energy = Decimals.parse(kcal)
+                    val weight = Decimals.parse(grams)?.takeIf { it > 0.0 }
                     // ⚠️ The numbers above are what was EATEN; the density is what a saved food has to
                     // be. Only the density can be impossible — two thousand calories is an ordinary
                     // day — so the check happens after the conversion and only when a weight exists.
                     val typedEaten = NutritionDay.Nutrients(
                         kcal = energy ?: 0.0,
-                        proteinG = protein.toDoubleOrNull() ?: 0.0,
-                        fatG = fat.toDoubleOrNull() ?: 0.0,
-                        carbG = carb.toDoubleOrNull() ?: 0.0,
+                        proteinG = Decimals.parse(protein) ?: 0.0,
+                        fatG = Decimals.parse(fat) ?: 0.0,
+                        carbG = Decimals.parse(carb) ?: 0.0,
                     )
                     val densityWrong = weight
                         ?.let { FoodPortion.per100gFrom(typedEaten, it) }
@@ -564,21 +918,39 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
                         },
                     )
                     LcarsButton(
-                        text = if (keep && weight != null) "LOG IT AND KEEP IT" else "LOG IT",
+                        text = when {
+                            building && keep && weight != null -> "PLATE IT AND KEEP IT"
+                            building -> "ADD TO THE PLATE"
+                            keep && weight != null -> "LOG IT AND KEEP IT"
+                            else -> "LOG IT"
+                        },
                         enabled = energy != null && energy > 0.0,
                         onClick = {
                             vm.quickAdd(
                                 name = name,
                                 kcal = energy ?: 0.0,
-                                proteinG = protein.toDoubleOrNull() ?: 0.0,
-                                fatG = fat.toDoubleOrNull() ?: 0.0,
-                                carbG = carb.toDoubleOrNull() ?: 0.0,
+                                proteinG = Decimals.parse(protein) ?: 0.0,
+                                fatG = Decimals.parse(fat) ?: 0.0,
+                                carbG = Decimals.parse(carb) ?: 0.0,
                                 meal = meal,
                                 grams = weight ?: 0.0,
                                 // ⚠️ `keep` can be true with the weight since cleared — the switch
                                 // does not reset itself when the field is emptied, and a save with no
                                 // weight is exactly what the core refuses. Re-checked at the call.
                                 keepAsFood = keep && weight != null,
+                                fibreG = Decimals.parse(fibre) ?: 0.0,
+                                sugarG = Decimals.parse(sugar) ?: 0.0,
+                                satFatG = Decimals.parse(satFat) ?: 0.0,
+                                sodiumMg = Decimals.parse(sodium) ?: 0.0,
+                                // ⚠️ A field left blank yields no key at all rather than a zero, and
+                                // that falls out of `toDoubleOrNull` rather than being enforced here.
+                                // It is the whole discipline of the sparse layer: a nutrient nobody
+                                // typed was not measured, and "0 mg magnesium" is a claim about a
+                                // food that nobody made. A typed 0 is different and is kept — "0 g
+                                // trans fat" is printed on labels and is a real measurement.
+                                micros = typedMicros(labelled),
+                                extras = typedExtras(labelled),
+                                toPlate = building,
                             )
                             reset()
                         },
@@ -620,8 +992,15 @@ fun IntakeBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
         if (entries.isEmpty()) {
             item {
+                // ⚠️ A marked fast says so HERE, not only on the control that set it. This is the
+                // screen somebody actually looks at, and a fast that reads "nothing logged" on it is
+                // indistinguishable from the lapse the mark exists to distinguish it from.
                 NotYet(
-                    if (isToday) "Nothing logged yet today." else "Nothing was logged that day.",
+                    when {
+                        fasted -> "Marked as a deliberate fast — a real day, worth nothing eaten."
+                        isToday -> "Nothing logged yet today."
+                        else -> "Nothing was logged that day."
+                    },
                 )
             }
             // ⚠️ Offered only on an EMPTY day, and it is the difference between a shortcut and a
@@ -692,6 +1071,51 @@ private fun StepButton(glyph: String, enabled: Boolean, onClick: () -> Unit) {
     )
 }
 
+/**
+ * Say that the day on screen was a deliberate fast.
+ *
+ * ⚠️ **Without this control the distinction it records did nothing at all.** `Expenditure` separates
+ * a day worth zero calories from a day nobody logged — a fast counts toward completeness and pulls
+ * the intake mean down honestly, a gap does neither and is priced as missing — and `FoodLogStore`
+ * has carried a fasted set the whole time with nothing anywhere able to put a day into it. Every
+ * fast was therefore read as a lapse, which is the opposite of what it was.
+ */
+@Composable
+private fun FastedDay(vm: HealthViewModel, entries: List<NutritionDay.Entry>, fasted: Boolean) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "A DELIBERATE FAST",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+                )
+                Text(
+                    when {
+                        fasted -> "Marked. This day counts as a real day worth nothing eaten."
+                        // ⚠️ Said BEFORE it is tried as well as after. The store refuses a day with
+                        // entries and the view model passes that refusal on — but a switch that
+                        // looks live and answers with a complaint is worse than one that explains.
+                        entries.isNotEmpty() -> "There is food logged here, so it cannot be a fast."
+                        else -> "Unmarked, this reads as a day you forgot rather than one you chose."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (fasted) c.ink else c.muted, lineHeight = 14.sp,
+                )
+            }
+            LcarsSwitch(
+                checked = fasted,
+                onCheckedChange = { vm.setFasted(it) },
+                enabled = fasted || entries.isEmpty(),
+            )
+        }
+    }
+}
+
 /** Repeat a previous day onto this one, which is how a routine gets logged in one tap. */
 @Composable
 private fun CopyDay(vm: HealthViewModel, day: Long) {
@@ -725,14 +1149,185 @@ private fun CopyDay(vm: HealthViewModel, day: Long) {
     }
 }
 
+/**
+ * One flat list of every nutrient a label can state and this app can hold.
+ *
+ * ⚠️ **It spans two enums, and that is deliberate rather than an oversight to converge.**
+ * [Micronutrients.Micro] holds eight figures that have a published reference intake to compare
+ * against — that comparison, and the two refusals inside `Micronutrients.reference`, are the whole
+ * reason that type exists. [NutrientSet.Nutrient] holds twenty-nine more that have no figure current
+ * guidance states. Folding them into one enum would mean either inventing guidelines for the
+ * twenty-nine or discarding the eight real ones, so the picker joins them and only the eight ever
+ * get a percentage drawn beside them.
+ *
+ * ⚠️ Sorted by label, not by declaration. Somebody hunting for magnesium is reading, and the
+ * declaration order encodes measured corpus coverage — useful to the builder, meaningless here.
+ */
+private class LabelNutrient(
+    val key: String,
+    val label: String,
+    val unit: String,
+    val micro: Micronutrients.Micro?,
+    val extra: NutrientSet.Nutrient?,
+)
+
+/**
+ * ⚠️ Keys are prefixed by which enum they came from. The two are disjoint today; a prefix means
+ * they can never collide even if a name were repeated, and it is what lets one typed map carry both.
+ */
+private val LabelNutrients: List<LabelNutrient> = buildList {
+    Micronutrients.Micro.entries.forEach { add(LabelNutrient("M:" + it.name, it.label, it.unit, it, null)) }
+    NutrientSet.Nutrient.entries.forEach {
+        add(LabelNutrient("E:" + it.name, it.label, it.unit.symbol, null, it))
+    }
+}.sortedBy { it.label.lowercase() }
+
+/**
+ * What was typed, as the vitamins and minerals.
+ *
+ * ⚠️ **A blank field yields no key**, which falls out of `toDoubleOrNull` rather than being
+ * enforced, and is the whole discipline of the sparse layer: absent means nobody measured it. A
+ * typed **0** is a different thing and is kept — "0 g trans fat" is printed on real labels.
+ */
+private fun typedMicros(typed: Map<String, String>): Micronutrients.Amounts =
+    Micronutrients.Amounts(
+        LabelNutrients.mapNotNull { n ->
+            val m = n.micro ?: return@mapNotNull null
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { m to it }
+        }.toMap(),
+    )
+
+/** The twin of [typedMicros] for the twenty-nine further nutrients. */
+private fun typedExtras(typed: Map<String, String>): NutrientSet.Amounts =
+    NutrientSet.Amounts(
+        LabelNutrients.mapNotNull { n ->
+            val e = n.extra ?: return@mapNotNull null
+            Decimals.parse(typed[n.key])?.takeIf { it.isFinite() && it >= 0.0 }?.let { e to it }
+        }.toMap(),
+    )
+
+/**
+ * The rest of what is printed on the packet, for the path where somebody is typing it in.
+ *
+ * ⚠️ **Nothing is shown until it is asked for.** Thirty-seven number fields under QUICK ADD would
+ * bury the four that matter, and the point of that card is that it is the path which never stops
+ * working — no signal, no barcode, a local bakery nobody has photographed. So the default is a
+ * single button, and each nutrient appears only once it has been picked.
+ *
+ * ⚠️ The figures here are what was **eaten**, exactly like the four macro cells above them, and the
+ * conversion to a density happens once — in the view model, against the same weight. Asking for
+ * per-hundred-gram figures here would be a second unit convention on one card.
+ */
 @Composable
-private fun NumberCell(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun MoreFromTheLabel(
+    typed: Map<String, String>,
+    onChange: (String, String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    val c = Pulse.colors
+    var picking by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val chosen = LabelNutrients.filter { typed.containsKey(it.key) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        chosen.forEach { n ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    n.label.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(Modifier.width(92.dp)) {
+                    LcarsField(
+                        value = typed[n.key].orEmpty(),
+                        onValueChange = { onChange(n.key, Decimals.keep(it, 8)) },
+                        placeholder = "0",
+                        showClear = false,
+                    )
+                }
+                Text(n.unit, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                Text(
+                    "REMOVE",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.amber,
+                    modifier = Modifier.clickable { onRemove(n.key) },
+                )
+            }
+        }
+        LcarsButton(
+            text = if (chosen.isEmpty()) "MORE FROM THE LABEL" else "ADD ANOTHER",
+            color = c.muted,
+            onClick = { query = ""; picking = true },
+        )
+    }
+
+    if (picking) {
+        LcarsDialog(title = "Add a nutrient", onDismiss = { picking = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                LcarsField(value = query, onValueChange = { query = it }, placeholder = "Search")
+                val q = query.trim()
+                val available = LabelNutrients.filter {
+                    !typed.containsKey(it.key) && (q.isBlank() || it.label.contains(q, ignoreCase = true))
+                }
+                if (available.isEmpty()) {
+                    Text(
+                        if (q.isBlank()) "Every one of them is already on the card."
+                        else "Nothing left matching that.",
+                        fontFamily = ChakraPetch, fontSize = 12.sp, color = c.muted,
+                    )
+                } else {
+                    // ⚠️ **A scrolling Column, and emphatically NOT a LazyColumn.** `LcarsDialog`
+                    // measures itself with `height(IntrinsicSize.Min)` — it is one of only two
+                    // intrinsic-forcing sites in the whole app — and a lazy list is a
+                    // `SubcomposeLayout`, which refuses an intrinsic query outright: "Asking for
+                    // intrinsic measurements of SubcomposeLayout layouts is not supported", read out
+                    // of the shipped compose-ui bytecode rather than recalled. It compiles perfectly
+                    // and throws the moment the dialog is opened. The message's own suggested
+                    // mitigation — a size modifier that fast-returns — does not apply either: a
+                    // `heightIn(max =)` is not a FIXED height, so `SizeNode` still delegates to the
+                    // child and the query reaches the lazy list anyway. Thirty-seven rows is nothing
+                    // to compose eagerly, so the honest fix is not to use a lazy list at all.
+                    //
+                    // Bounded all the same, because thirty-seven rows is taller than a phone and a
+                    // dialog that runs off the screen takes its own buttons with it.
+                    Column(
+                        Modifier
+                            .heightIn(max = 300.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        available.forEach { n ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    // Added with an empty value, not a zero: choosing to record a
+                                    // nutrient is not the same as saying the food has none of it.
+                                    .clickable { onChange(n.key, ""); picking = false }
+                                    .padding(vertical = 7.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(n.label, fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink)
+                                Text(n.unit, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun NumberCell(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
         LcarsField(
             value = value,
-            onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '.' }.take(6)) },
+            onValueChange = { onChange(Decimals.keep(it, 6)) },
             placeholder = "0",
             showClear = false,
         )
@@ -825,16 +1420,16 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     }
                     LcarsField(
                         value = entry,
-                        onValueChange = { entry = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                        onValueChange = { entry = Decimals.keep(it, 6) },
                         placeholder = "0.0",
                     )
                     LcarsButton(
                         text = "RECORD",
-                        enabled = entry.toDoubleOrNull()?.let { it > 0.0 } == true,
+                        enabled = Decimals.parse(entry)?.let { it > 0.0 } == true,
                         onClick = {
                             // Stored in kilograms always; the unit is a display choice, and converting
                             // at the boundary is what stops a pound ever reaching a core.
-                            entry.toDoubleOrNull()?.let { vm.recordWeighin(it / unit.perKg) }
+                            Decimals.parse(entry)?.let { vm.recordWeighin(it / unit.perKg) }
                             entry = ""
                         },
                     )
@@ -874,6 +1469,27 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
                     BodyTrend.rateSentence(trend.latest, unit, trend.hasRate),
                     fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink, lineHeight = 17.sp,
                 )
+            }
+        }
+
+        // ⚠️ Only when a goal is actually set. Somebody maintaining has not asked how long anything
+        // will take, and "no goal weight set" under every weigh-in is the kind of line that teaches
+        // people to stop reading the panel. Once a goal IS set, every answer is shown — including the
+        // refusals, because a missing date with no explanation reads as a fault rather than a reply.
+        if (state.profile.goalKg > 0.0) {
+            item {
+                LcarsFrame(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        LcarsHeaderBar(
+                            "GOAL",
+                            trailing = fmt(state.profile.goalKg * unit.perKg) + " " + unit.label,
+                        )
+                        Text(
+                            state.goalProjection.sentence,
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 16.sp,
+                        )
+                    }
+                }
             }
         }
 
@@ -926,6 +1542,9 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
         }
 
+        item { LcarsHeaderBar("WHAT HAS CHANGED") }
+        item { LookBackPanel(vm) }
+
         item { LcarsHeaderBar("MEASUREMENTS") }
         item { Measurements(vm) }
 
@@ -966,6 +1585,310 @@ fun BodyBody(vm: HealthViewModel, state: HealthViewModel.State) {
 // ==================================================================================== COACH
 
 /** The plan: where you are going, how fast, and what the app has actually measured about you. */
+
+/**
+ * The check-in: when the targets were last handed down, what moved, and when the next one is due.
+ *
+ * ⚠️ **This is the surface that makes a held target legible rather than mysterious.** The numbers on
+ * MACROS no longer move on their own — see `CheckIn` for why they used to and why that was wrong —
+ * and a plan that stopped changing with no explanation would read as the app having got stuck.
+ *
+ * ⚠️ The report is the STORED one, in the words the check-in used at the time. Recomputing it here
+ * against today's figures would answer a different question and would change every time somebody
+ * logged a meal, which is the drift this whole feature removes, reintroduced in the caption.
+ */
+@Composable
+private fun CheckInPanel(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val v = state.checkIn ?: return
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                "YOUR CHECK-IN",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.9.sp, color = c.muted,
+            )
+            Text(
+                when (v) {
+                    is CheckIn.Verdict.Hold -> when (v.daysUntilDue) {
+                        0 -> "New targets are due today."
+                        1 -> "These targets stand until tomorrow."
+                        else -> "These targets stand for another ${v.daysUntilDue} days."
+                    }
+                    // ⚠️ Present tense rather than "will be": by the time this draws, the collector
+                    // in the view model has already published, and a caption promising something
+                    // that has happened reads as a stuck screen.
+                    is CheckIn.Verdict.Publish -> v.why.sentence
+                },
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
+            )
+            state.checkInReport.forEach {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2, lineHeight = 16.sp)
+            }
+            Text(
+                "Your expenditure is measured every day; the targets are handed down once a week, so " +
+                    "you have a number you can shop and cook against.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+            if (state.livePlan is MacroTargets.Plan.Set) {
+                LcarsButton(text = "WORK THEM OUT NOW", onClick = { vm.recalculateNow() })
+            }
+        }
+    }
+}
+
+/**
+ * What weight and every recorded measurement have done since a date you pick.
+ *
+ * ⚠️ The one question anybody actually has about a tape measure, and the page recorded readings for
+ * months without offering it. Weight is compared on the smoothed trend rather than on two raw
+ * weigh-ins — see `HealthViewModel.lookBack` for why that is not a detail.
+ *
+ * ⚠️ A refusal prints as a refusal. `PeriodCompare` produces a sentence either way, and a kind with
+ * only one reading near the window says so rather than reporting a change of zero, which would read
+ * as "you held steady".
+ */
+@Composable
+private fun LookBackPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val look by vm.look.collectAsStateWithLifecycle()
+    val changes by vm.lookBack.collectAsStateWithLifecycle()
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(HealthViewModel.Look.entries.toList()) { l ->
+                    LcarsChip(l.label, selected = l == look, onClick = { vm.setLook(l) })
+                }
+            }
+            if (changes.isEmpty()) {
+                Text(
+                    "Nothing recorded yet. Weigh in, or add a measurement below, and this fills in.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+            changes.forEach { change ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        change.label.uppercase(),
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted,
+                    )
+                    Text(
+                        PeriodCompare.sentence(change),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 16.sp,
+                        // ⚠️ Down is not good and up is not bad — somebody putting muscle on wants
+                        // both to climb. The direction is stated in words; the colour only separates
+                        // a real reading from a refusal.
+                        color = if (change.known) c.ink else c.muted,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The food log added up a day, a week or a month at a time.
+ *
+ * ⚠️ A different question from the energy balance chart above, which is why both are here: that one
+ * asks what the balance was and needs weigh-ins to answer, this one asks whether you are eating more
+ * than you were and works for somebody who has never owned a scale.
+ *
+ * ⚠️ The bar is the bucket's MEAN, never its total. The newest bucket is almost always a part-week,
+ * and a total-height bar would show it collapsing every time somebody opened the page on a Tuesday.
+ */
+@Composable
+private fun RollUpPanel(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val grain by vm.grain.collectAsStateWithLifecycle()
+    val buckets by vm.rollUp.collectAsStateWithLifecycle()
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PeriodCompare.Grain.entries.forEach { g ->
+                    LcarsChip(g.label.uppercase(), selected = g == grain, onClick = { vm.setGrain(g) })
+                }
+            }
+            val shown = buckets.filter { it.loggedDays > 0 }.takeLast(12)
+            if (shown.isEmpty()) {
+                Text(
+                    "Nothing logged over this stretch yet.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+                return@Column
+            }
+            val steps = remember(shown) { PeriodCompare.steps(shown) }
+            val peak = shown.mapNotNull { it.mean }.maxOrNull() ?: 1.0
+            shown.forEachIndexed { i, b ->
+                val mean = b.mean ?: return@forEachIndexed
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            bucketLabel(b.startMs, grain),
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                            modifier = Modifier.width(58.dp),
+                        )
+                        Text(
+                            "${Formatters.number(mean, 0)} kcal a day",
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // ⚠️ The denominator, because a part-week is a real thing and this is where
+                        // somebody would otherwise read one as a bad week.
+                        Text(
+                            "${b.loggedDays}/${b.days}",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp,
+                            color = if (b.completeness < 0.6) c.amber else c.faint,
+                        )
+                    }
+                    LcarsFillRow(
+                        segments = listOf(
+                            (mean / peak).toFloat().coerceIn(0f, 1f) to c.accent,
+                            (1f - (mean / peak).toFloat()).coerceIn(0f, 1f) to c.raise,
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(5.dp),
+                        gap = 1.5.dp,
+                    )
+                    steps.getOrNull(i)?.let { step ->
+                        if (abs(step) >= 25.0) {
+                            Text(
+                                (if (step > 0) "+" else "") + "${Formatters.number(step, 0)} a day on the one before",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp,
+                                color = if (step > 0) c.amber else c.positive,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A bucket's date, at the coarseness it was bucketed by.
+ *
+ * ⚠️ Formatted with the device's own locale and zone, because these are dates a person reads. Every
+ * other date in this tab does the same.
+ */
+private fun bucketLabel(startMs: Long, grain: PeriodCompare.Grain): String {
+    val d = java.time.Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    return when (grain) {
+        PeriodCompare.Grain.DAY -> d.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+        PeriodCompare.Grain.WEEK -> d.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+        PeriodCompare.Grain.MONTH -> d.format(java.time.format.DateTimeFormatter.ofPattern("MMM yy"))
+    }
+}
+
+/**
+ * What you ate against what you burned, over an interval you choose.
+ *
+ * ⚠️ **The expenditure line is the reading that was in force each day, not today's figure drawn
+ * backwards**, and that distinction is the whole reason this chart is worth drawing — see
+ * [EnergyBalance] for why a single figure measured over the interval would agree with the scale by
+ * construction. It steps weekly because that is when the app publishes new targets.
+ *
+ * ⚠️ The intake series is split into contiguous RUNS rather than drawn as one line. A day nobody
+ * logged is a gap in the record, and joining across it would draw a smooth line through a fortnight
+ * of no data that reads exactly like a fortnight of steady eating. The split itself is
+ * `EnergyBalance.intakeRuns`, in the core, because both applications plot this series and both have
+ * to break it in the same places.
+ *
+ * ⚠️ Splitting costs nothing here because [LcarsTimeChart] draws no legend of its own — the key
+ * below is ours. It also drops any run of fewer than two points, so a single logged day marooned
+ * between two gaps is not plotted, which is the right answer for a chart made of lines and the
+ * reason the core keeps such a run rather than discarding it.
+ */
+@Composable
+private fun BalancePanel(vm: HealthViewModel, unit: BodyTrend.MassUnit) {
+    val c = Pulse.colors
+    val span by vm.balanceSpan.collectAsStateWithLifecycle()
+    val reading by vm.balance.collectAsStateWithLifecycle()
+    val loading by vm.balanceLoading.collectAsStateWithLifecycle()
+
+    // Asked for once when the page appears, and again whenever the span changes — never hung off the
+    // state flow, which would re-read four months of the food log on every logged meal.
+    LaunchedEffect(Unit) { if (vm.balance.value == null) vm.loadBalance() }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                EnergyBalance.Span.entries.forEach { s ->
+                    LcarsChip(s.label, selected = s == span, onClick = { vm.setBalanceSpan(s) })
+                }
+            }
+
+            val r = reading
+            when {
+                r == null && loading -> Text(
+                    "Working it out…",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+
+                r == null -> Text(
+                    "Nothing to show for this interval.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+
+                r is EnergyBalance.Reading.NotYet -> Text(
+                    r.why,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+
+                r is EnergyBalance.Reading.Ready -> {
+                    val eatenRuns = remember(r) { EnergyBalance.intakeRuns(r.days) }
+                    val burned = remember(r) { EnergyBalance.burnSeries(r.days) }
+                    LcarsTimeChart(
+                        series = eatenRuns.map { ChartSeries("EATEN", it, c.accent, filled = true) } +
+                            listOf(ChartSeries("BURNED", burned, c.positive)),
+                        modifier = Modifier.fillMaxWidth().height(132.dp),
+                        valueFormat = { Formatters.number(it, 0) },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Legend("EATEN", c.accent)
+                        Legend("BURNED", c.positive)
+                    }
+
+                    LcarsDataRow("EATEN", "${Formatters.number(r.intakeKcal, 0)} kcal")
+                    LcarsDataRow("BURNED", "${Formatters.number(r.expenditureKcal, 0)} kcal")
+                    LcarsDataRow(
+                        if (r.balanceKcal < 0) "UNDER" else "OVER",
+                        "${Formatters.number(abs(r.balanceKcal), 0)} kcal over ${r.pairedDays} days",
+                    )
+
+                    Text(
+                        EnergyBalance.summary(r, unit),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 16.sp,
+                    )
+                    EnergyBalance.reconciliation(r, unit)?.let { line ->
+                        // ⚠️ Amber only when there is genuinely something to look into. A gap inside
+                        // the estimate's own width is the ordinary case, and colouring it would put a
+                        // warning on the screen of somebody doing everything right.
+                        val remarks = (r.gapPerDayKcal ?: 0.0).let { abs(it) > EnergyBalance.REMARK_SDS * r.sdKcal }
+                        Text(
+                            line,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            color = if (remarks) c.amber else c.muted, lineHeight = 14.sp,
+                        )
+                    }
+                    Text(
+                        "The burn line is what the measurement said at the time, re-taken every week " +
+                            "from the record up to that day — not today's figure drawn backwards.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint, lineHeight = 13.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Legend(label: String, tint: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.height(3.dp).width(14.dp).background(tint))
+        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = Pulse.colors.muted)
+    }
+}
+
 @Composable
 fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
     val c = Pulse.colors
@@ -974,6 +1897,7 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { Notice(vm) }
+        item { CheckInPanel(vm, state) }
         item {
             LcarsFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -1001,9 +1925,47 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
                         )
                     }
+                    // ⚠️ **Where the formula half comes from**, and shown whether or not anything
+                    // has been measured yet — on the first day the whole figure IS the formula, so
+                    // that is when saying so matters most. `BmrEquations` kept the equation label
+                    // and the adaptation factor precisely "so a surface can say, not imply"; both
+                    // were computed and discarded a line later until this read them.
+                    //
+                    // ⚠️ Hoisted to locals before the null tests. `State` is declared in
+                    // `:core:health`, and Kotlin will not smart-cast a public property across a
+                    // module boundary.
+                    val restingNow = state.resting
+                    val formulaNow = state.formula
+                    if (restingNow != null) {
+                        Text(
+                            buildString {
+                                if (formulaNow != null) {
+                                    append("The formula on its own says ")
+                                    append(formulaNow.kcal.roundToInt())
+                                    append(" kcal a day, from a resting ")
+                                    append(restingNow.kcal.roundToInt())
+                                    append(". ")
+                                }
+                                append(BmrEquations.describe(restingNow))
+                            },
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                        )
+                    }
+                    // ⚠️ Here rather than in the walking panel, because this is the figure it
+                    // qualifies. A measured number that lags with no explanation reads as a broken
+                    // one, and this is the explanation.
+                    if (state.intakeShift.changed) {
+                        Text(
+                            state.intakeShift.sentence,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp,
+                        )
+                    }
                 }
             }
         }
+
+        item { LcarsHeaderBar("ENERGY BALANCE") }
+        item { BalancePanel(vm, unit) }
 
         item { LcarsHeaderBar("PACE") }
         item {
@@ -1053,6 +2015,13 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
         }
         item { ProteinPreference(vm, state) }
 
+        item { LcarsHeaderBar("WHAT THE SCALE CAN TELL YOU") }
+        item { MaintenanceRead(vm, state) }
+
+        item { LcarsHeaderBar("YOUR WEEK") }
+        item { ProgramModeRow(vm, state) }
+        item { WeekShape(vm, state) }
+
         item { LcarsHeaderBar("HOW ACTIVE, ROUGHLY") }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1069,6 +2038,21 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
                             color = if (on) c.accent else c.ink2,
                         )
                     }
+                }
+                // ⚠️ Offered, never applied. The value it would replace is one the person typed,
+                // and it only ever points upward — see `Expenditure.suggestedActivity`.
+                state.stepSuggestion?.let { suggested ->
+                    LcarsButton(
+                        "YOUR STEPS SUGGEST ${suggested.name.replace('_', ' ')}",
+                        onClick = { vm.setActivity(suggested) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (state.stepShift.changed) {
+                    Text(
+                        state.stepShift.sentence,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                    )
                 }
                 Text(
                     "Only used until the measurement takes over, and it is coarse by nature — which is " +
@@ -1138,18 +2122,186 @@ fun CoachBody(vm: HealthViewModel, state: HealthViewModel.State) {
             }
 
             val goal = p.goalKg
-            if (goal > 0.0 && state.person != null) {
-                val weeks = MacroTargets.weeksToGoal(state.person.kg, goal, set.effectiveRatePerWeekKg)
+            // ⚠️ Hoisted to a local rather than smart-cast: `person` is a public property of a class
+            // in :core:health, and Kotlin refuses to smart-cast a public property declared in another
+            // module — nothing stops that module publishing a different value on the second read.
+            val person = state.person
+            if (goal > 0.0 && person != null) {
+                val weeks = MacroTargets.weeksToGoal(person.kg, goal, set.effectiveRatePerWeekKg)
                 item {
                     LcarsDataRow(
                         label = "To ${fmt(goal * unit.perKg)} ${unit.label}",
-                        value = weeks?.let { "about ${it.roundToInt()} weeks" } ?: "not at this pace",
+                        // ⚠️ "if the plan holds" is not padding. BODY carries a second count-down,
+                        // built from the rate the scale is actually showing rather than the one the
+                        // plan asks for, and the two will differ — that gap is the useful part. A
+                        // reader shown both without being told which is which concludes the app is
+                        // broken. See `MacroTargets.weeksToGoal` against `GoalProjection.project`.
+                        value = weeks?.let { "about ${it.roundToInt()} weeks if the plan holds" }
+                            ?: "not at this pace",
                     )
                 }
             }
         }
     }
 }
+
+/**
+ * Whether measured expenditure has moved, when a rate becomes visible, and the way off a deficit.
+ *
+ * ⚠️ **Every sentence here comes out of the core verbatim.** They exist mostly to REFUSE — two
+ * readings share their data, a change is slower than the scale's own noise, maintaining has no
+ * change to confirm — and a screen that rephrased them would eventually rephrase a refusal into a
+ * claim, which is the one thing this whole subsystem is built not to do.
+ */
+@Composable
+private fun MaintenanceRead(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            when (val r = state.recovery) {
+                is Maintenance.Recovery.Measured -> r.sentence
+                is Maintenance.Recovery.TooSoon -> r.sentence
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+        Text(
+            when (val f = state.confirmation) {
+                is Maintenance.Confirmation.InDays -> f.sentence
+                is Maintenance.Confirmation.Never -> f.sentence
+            },
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+
+        // ⚠️ Offered only when it would RAISE the target — ending a deficit is what this is for, and
+        // a button labelled about deficits that stepped somebody down would be the wrong action
+        // wearing the right words. The other case is said in prose by `Maintenance.stepUp`.
+        val measuredNow = state.expenditure?.kcal
+        val targetNow = state.targets?.kcal
+        if (measuredNow != null && targetNow != null && state.profile.ratePerWeekKg < 0.0) {
+            val step = Maintenance.stepUp(targetNow, measuredNow)
+            if (step.deltaKcal > 0) {
+                LcarsButton(
+                    "STOP LOSING — EAT AT WHAT WAS MEASURED",
+                    onClick = { vm.setRatePerWeekKg(0.0) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    step.sentence,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Who owns the calories: the app, the two of you, or you.
+ *
+ * ⚠️ The subtitle is [WeeklyPlan.Mode.ownsTheTotal] rather than a sentence written here, so the two
+ * applications cannot end up describing the same three modes differently. Three words on their own
+ * are a picker nobody moves off the default.
+ */
+@Composable
+private fun ProgramModeRow(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            WeeklyPlan.Mode.entries.forEach { m ->
+                LcarsChip(m.label, state.programMode == m, { vm.setProgramMode(m) })
+            }
+        }
+        Text(
+            state.programMode.ownsTheTotal,
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+        )
+    }
+}
+
+/**
+ * The week itself: which days are heavy, what each one asks for, and every limit that bit.
+ *
+ * ⚠️ The day toggles are drawn only under the collaborative mode. They do nothing under the other
+ * two — a coached week is flat because nothing has told it otherwise, a manual week because the
+ * person owns the number — and a control that is present and inert is worse than one that is absent.
+ *
+ * ⚠️ Every [WeeklyPlan.Limit] is printed. The per-day floor and the heavy-day cap are what stand
+ * between somebody and a plan that is arithmetically fine and not eatable, and a guard rail that
+ * works silently leaves the reader wondering why their swing is smaller than the one they asked for.
+ */
+@Composable
+private fun WeekShape(vm: HealthViewModel, state: HealthViewModel.State) {
+    val c = Pulse.colors
+    val week = state.week
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (state.programMode == WeeklyPlan.Mode.COLLABORATIVE) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                WEEKDAY_LABELS.forEachIndexed { index, name ->
+                    val on = index in state.profile.heavyDays
+                    LcarsFrame(
+                        Modifier.weight(1f).clickable { vm.toggleHeavyDay(index) },
+                        accent = if (on) c.accent else c.line,
+                        padding = PaddingValues(vertical = 6.dp),
+                    ) {
+                        Text(
+                            name,
+                            fontFamily = JetBrainsMono, fontSize = 10.sp,
+                            color = if (on) c.accent else c.ink2,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+            // ⚠️ Offered, never applied on its own — the training log may disagree with a choice
+            // somebody made deliberately, and moving calories between days unasked is a decision
+            // rather than a suggestion. Silent when the two already agree, or a row that repeats
+            // what is already set teaches the reader to skip it.
+            val trained = vm.heavyDaysFromTraining()
+            if (trained.isNotEmpty() && trained != state.profile.heavyDays.toSet()) {
+                LcarsButton(
+                    "USE THE ${trained.size} DAYS YOU TRAINED",
+                    { vm.applyTrainingDays() },
+                    color = c.muted,
+                )
+            }
+            Text(
+                "Tap the days you train. The same weekly total moves onto them.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+        }
+
+        if (week == null) {
+            Text(
+                "No plan to spread yet.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
+            return@Column
+        }
+
+        Text(
+            WeeklyPlan.sentence(week),
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink, lineHeight = 15.sp,
+        )
+        week.days.forEach { day ->
+            // ⚠️ `valueColor`, not an accent: `LcarsDataRow` has no accent parameter, which reading
+            // its declaration settled before this compiled anywhere.
+            LcarsDataRow(
+                WEEKDAY_LABELS[day.index],
+                "${day.kcal} kcal  ${day.targets.proteinG}p ${day.targets.fatG}f ${day.targets.carbG}c",
+                valueColor = if (day.kind == WeeklyPlan.DayKind.HEAVY) c.accent else c.ink,
+            )
+        }
+        week.limits.forEach {
+            Text(
+                it.sentence,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, lineHeight = 14.sp,
+            )
+        }
+    }
+}
+
+/** ⚠️ Index 0 is Monday, and it is this file that decides that — `WeeklyPlan` has no calendar in it. */
+private val WEEKDAY_LABELS = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
 /**
  * Where you are heading, and how long it takes at the pace you picked.
@@ -1170,7 +2322,7 @@ private fun GoalField(vm: HealthViewModel, state: HealthViewModel.State) {
     var focused by remember { mutableStateOf(false) }
 
     fun commit() {
-        val typed = text.toDoubleOrNull()
+        val typed = Decimals.parse(text)
         when {
             text.isBlank() -> vm.setGoalKg(0.0)
             typed != null && typed > 0.0 -> vm.setGoalKg(typed / unit.perKg)
@@ -1186,7 +2338,7 @@ private fun GoalField(vm: HealthViewModel, state: HealthViewModel.State) {
             )
             LcarsField(
                 value = text,
-                onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                onValueChange = { text = Decimals.keep(it, 6) },
                 placeholder = "optional",
                 // ⚠️ LcarsField's `modifier` IS the text field's own, so a focus observer here really
                 // sees the field rather than a wrapper around it.
@@ -1263,10 +2415,10 @@ fun HabitsBody(vm: HealthViewModel) {
     val habits by vm.habits.collectAsStateWithLifecycle()
     val steps by vm.steps.collectAsStateWithLifecycle()
 
-    StepSensor(vm)
+    val source = StepSensor(vm)
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = Pad, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        item { StepsPanel(steps) }
+        item { StepsPanel(steps, source) }
         items(Habits.Habit.entries.toList(), key = { it.name }) { h ->
             StreakRow(h, habits[h])
         }
@@ -1365,7 +2517,7 @@ private fun ExportPanel(vm: HealthViewModel) {
  * request has a visible reason.
  */
 @Composable
-private fun StepSensor(vm: HealthViewModel) {
+private fun StepSensor(vm: HealthViewModel): StepSource {
     val context = LocalContext.current
     val container = (context.applicationContext as PulseApplication).container
     val scope = rememberCoroutineScope()
@@ -1385,12 +2537,26 @@ private fun StepSensor(vm: HealthViewModel) {
             ask.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
+    // ⚠️ The remedy travels in the returned value. The automatic ask above fires once per entry
+    // into the composition and is not a route anybody controls, and Android shows nothing at all
+    // for a request made after two refusals — so without a control on the panel, one Deny was a
+    // dead end with no way back to a step count.
+    val allow = { runCatching { ask.launch(Manifest.permission.ACTIVITY_RECOGNITION) }; Unit }
+
     // ⚠️ Keyed on the grant, and it owns the controller. `newTelemetryController()` is a FACTORY —
     // it hands back a fresh listener that has to be started and, more importantly, stopped, or the
     // sensor stays registered after the tab is gone. DisposableEffect is the shape that guarantees
     // the second half; a LaunchedEffect would start it and never take it down.
-    if (!granted) return
+    if (!granted) return StepSource(Habits.StepSilence.NO_PERMISSION, allow)
     val vmRef = rememberUpdatedState(vm)
+
+    // ⚠️ Asked only after the grant, which dodges a question no build machine can settle: whether
+    // `getDefaultSensor` filters out a sensor whose permission the app lacks is runtime behaviour.
+    // Asking after the grant makes "this phone has no pedometer" a certainty when it is said.
+    val counter = remember(context) {
+        context.getSystemService(SensorManager::class.java)?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    }
+
     DisposableEffect(granted) {
         val controller = container.newTelemetryController()
         controller.start()
@@ -1402,10 +2568,17 @@ private fun StepSensor(vm: HealthViewModel) {
             controller.stop()
         }
     }
+    return StepSource(
+        if (counter == null) Habits.StepSilence.NO_SENSOR else Habits.StepSilence.WAITING,
+        allow,
+    )
 }
 
+/** Why the step count is silent, and what can be done about it. See [Habits.StepSilence]. */
+private data class StepSource(val kind: Habits.StepSilence, val allow: () -> Unit)
+
 @Composable
-private fun StepsPanel(steps: Habits.Steps?) {
+private fun StepsPanel(steps: Habits.Steps?, source: StepSource) {
     val c = Pulse.colors
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1414,18 +2587,24 @@ private fun StepsPanel(steps: Habits.Steps?) {
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
             )
             // ⚠️ Null is "cannot tell", not zero. Showing 0 to somebody who has walked all morning
-            // because the permission was refused is worse than saying the count is unavailable.
+            // because the permission was refused is worse than saying the count is unavailable —
+            // and this used to say "the pedometer is not reporting" for all three of the reasons
+            // there can be no count, which is a claim about the hardware and false for two of them.
+            // The sentences come from `Habits` so this panel and the standalone app's cannot drift.
             Text(
                 Habits.describe(steps)
-                    ?: if (steps == null) "No step count — the pedometer is not reporting."
-                    else "Nothing much yet today.",
+                    ?: if (steps != null) "Nothing much yet today." else Habits.explain(source.kind),
                 fontFamily = ChakraPetch, fontSize = 20.sp, color = c.ink,
             )
+            if (steps == null && source.kind == Habits.StepSilence.NO_PERMISSION) {
+                LcarsButton(text = "ALLOW IT", onClick = source.allow)
+            }
             if (steps?.partial == true) {
                 Text(
                     "The phone restarted, so the steps before that are not recoverable — the counter " +
                         "begins again from zero and nothing recorded the old total.",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                    // ⚠️ A fact about the phone, not a caution and nothing the reader did.
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
                 )
             }
         }
@@ -1515,14 +2694,14 @@ private fun Measurements(vm: HealthViewModel) {
             }
             LcarsField(
                 value = cm,
-                onValueChange = { cm = it.filter { ch -> ch.isDigit() || ch == '.' }.take(5) },
+                onValueChange = { cm = Decimals.keep(it, 5) },
                 placeholder = "centimetres",
             )
             LcarsButton(
                 text = "RECORD ${kind.label.uppercase()}",
-                enabled = cm.toDoubleOrNull()?.let { it > 0.0 } == true,
+                enabled = Decimals.parse(cm)?.let { it > 0.0 } == true,
                 onClick = {
-                    cm.toDoubleOrNull()?.let { vm.recordMeasurement(kind, it) }
+                    Decimals.parse(cm)?.let { vm.recordMeasurement(kind, it) }
                     cm = ""
                 },
             )
@@ -1568,9 +2747,11 @@ private fun ProgressPhotos(vm: HealthViewModel) {
     var viewing by remember { mutableStateOf<String?>(null) }
 
     val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        // ⚠️ Recorded only on success. A cancelled capture leaves a zero-byte file behind, and an
-        // index row pointing at one renders as a thumbnail that can never load.
-        pending?.let { if (ok) vm.photoTaken(it) }
+        // ⚠️ Recorded only on success — an index row pointing at a zero-byte file renders as a
+        // thumbnail that can never load. But the other branch is not nothing: a cancelled capture
+        // leaves the file the camera app already created, with no row pointing at it, and this used
+        // to walk away from it.
+        pending?.let { if (ok) vm.photoTaken(it) else vm.photoCancelled(it) }
         pending = null
     }
 
@@ -1782,18 +2963,26 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
     val shot by vm.mealShot.collectAsStateWithLifecycle()
     var pending by remember { mutableStateOf<android.net.Uri?>(null) }
 
+    // What the next photograph should be ADDED TO, empty for a fresh start. Held beside `pending`
+    // because the launcher's callback fires long after the button was pressed, and the decision to
+    // append was made at the press.
+    var addTo by remember { mutableStateOf<List<MealPhotos.Proposal>>(emptyList()) }
+
     val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         // ⚠️ Read only on success. A cancelled capture leaves a zero-byte file behind, and decoding
         // one produces a null bitmap — which would surface as "that photograph could not be read"
         // for a photograph nobody took.
         val uri = pending
+        val onto = addTo
         pending = null
-        if (ok && uri != null) vm.readMealPhoto(context, uri)
+        addTo = emptyList()
+        if (ok && uri != null) vm.readMealPhoto(context, uri, onto)
     }
 
-    fun shoot() {
+    fun shoot(onto: List<MealPhotos.Proposal> = emptyList()) {
         val uri = createCameraImageUri(context) ?: return
         pending = uri
+        addTo = onto
         capture.launch(uri)
     }
 
@@ -1846,7 +3035,14 @@ private fun PhotoOfAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
                         LcarsButton(text = "CLOSE", onClick = { vm.clearMealShot() })
                     }
                 }
-                is HealthViewModel.MealShot.Plate -> PlateReview(st, meal, vm, onRetake = { shoot() })
+                is HealthViewModel.MealShot.Plate -> PlateReview(
+                    st, meal, vm,
+                    onRetake = { shoot() },
+                    // ⚠️ Passes the proposals already on screen, so the next photograph is added to
+                    // them rather than replacing them. A meal on several dishes is photographed one
+                    // dish at a time and reviewed as one list.
+                    onAnother = { shoot(st.proposals) },
+                )
             }
         }
     }
@@ -1865,6 +3061,7 @@ private fun PlateReview(
     meal: NutritionDay.Meal,
     vm: HealthViewModel,
     onRetake: () -> Unit,
+    onAnother: () -> Unit,
 ) {
     val c = Pulse.colors
     val loggable = plate.proposals.count { it.loggable }
@@ -1901,9 +3098,20 @@ private fun PlateReview(
             enabled = loggable > 0,
             onClick = { vm.logPlate(meal) },
         )
+        // ⚠️ RETAKE replaces this list; ANOTHER DISH adds to it. Two words apart and opposite in
+        // effect, so they are named for what they do rather than both being "take a photo".
         LcarsButton(text = "RETAKE", onClick = onRetake)
+        LcarsButton(text = "+ ANOTHER DISH", onClick = onAnother)
         LcarsButton(text = "DISCARD", onClick = { vm.clearMealShot() })
     }
+    // ⚠️ Said where the button is, because the failure it prevents is silent and doubles a meal.
+    // Nothing here can tell one plate photographed twice from two plates of the same thing, so the
+    // list is only ever appended to and the reader is the one who knows which happened.
+    Text(
+        "ANOTHER DISH adds to the list above rather than replacing it — for a meal spread over " +
+            "several plates. Photograph the same plate twice and it will be listed twice.",
+        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+    )
 }
 
 /**
@@ -1915,7 +3123,7 @@ private fun PlateReview(
  */
 @Composable
 private fun PlateRow(
-    proposal: MealPhotoReader.Proposal,
+    proposal: MealPhotos.Proposal,
     onGrams: (Double) -> Unit,
     onDrop: () -> Unit,
 ) {
@@ -1946,7 +3154,7 @@ private fun PlateRow(
                 value = text,
                 onChange = {
                     text = it
-                    it.toDoubleOrNull()?.let(onGrams)
+                    Decimals.parse(it)?.let(onGrams)
                 },
                 modifier = Modifier.width(GRAMS_W),
             )
@@ -1979,6 +3187,127 @@ private fun PlateRow(
 }
 
 private val GRAMS_W = 78.dp
+
+// --------------------------------------------------------------------------- describing a meal
+
+/**
+ * A whole meal in one line of ordinary English.
+ *
+ * ⚠️ **Nothing is logged until the list has been read.** The parser is deterministic and good at the
+ * shapes people write, and it is still reading somebody's words — so what it understood is shown
+ * first, item by item, with the record each one matched. That readback is the feature. A field that
+ * silently turned a sentence into six entries would put figures nobody checked into the record every
+ * target in this tab is measured from.
+ *
+ * ⚠️ **An unmatched line stays on screen with its name and a way to search for it.** Dropping it
+ * quietly would leave the day looking complete and short by whatever it was.
+ */
+@Composable
+private fun DescribeAMeal(vm: HealthViewModel, meal: NutritionDay.Meal) {
+    val c = Pulse.colors
+    val state by vm.describe.collectAsStateWithLifecycle()
+    val building by vm.buildingPlate.collectAsStateWithLifecycle()
+    var text by remember { mutableStateOf("") }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "DESCRIBE A MEAL",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            Text(
+                "Say it the way you would say it. It comes apart into things to log, and nothing " +
+                    "goes in until you have read the list.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+            )
+            LcarsField(
+                text,
+                { text = it },
+                placeholder = "two eggs, a slice of toast and 200g of chicken",
+                singleLine = false,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                LcarsButton(
+                    text = "▸ READ IT",
+                    enabled = text.isNotBlank() && !state.busy,
+                    onClick = { vm.describeMeal(text) },
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.items.isNotEmpty()) {
+                    LcarsButton(
+                        text = "START AGAIN",
+                        onClick = { text = ""; vm.clearDescribed() },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            if (state.busy) {
+                Text("Looking each one up…", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            state.items.forEachIndexed { i, row -> DescribedRow(vm, i, row) }
+            if (state.note.isNotBlank()) {
+                Text(
+                    state.note,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber, lineHeight = 13.sp,
+                )
+            }
+            if (state.ready > 0) {
+                LcarsButton(
+                    text = if (building) "▸ ADD ${state.ready} TO THE PLATE"
+                    else "▸ LOG ${state.ready} TO ${meal.label.uppercase()}",
+                    onClick = { vm.logDescribed(meal, toPlate = building) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One thing that was read, and the record it found.
+ *
+ * ⚠️ [HealthViewModel.Described.food] and `grams` are hoisted to locals before the null test. The
+ * type is declared in `:core:health`, and Kotlin will not smart-cast a public property across a
+ * module boundary — the trap this repository has paid for three times, and one none of the local
+ * gates can see.
+ */
+@Composable
+private fun DescribedRow(vm: HealthViewModel, index: Int, row: HealthViewModel.Described) {
+    val c = Pulse.colors
+    val food = row.food
+    val grams = row.grams
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            // The core's own words for what was understood — "a serving" where nothing was stated,
+            // rather than "1 serving", because those are different claims.
+            Text(
+                FoodPhrase.describe(row.item),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            Text(
+                when {
+                    food != null && grams != null ->
+                        "${food.display} · ${fmt(grams)} g · " +
+                            "${fmt(FoodPortion.eaten(food.per100g, grams).kcal)} kcal"
+                    // Matched, but the record never said what one of them weighs, so nothing can.
+                    food != null -> "${food.display} — no serving weight on record. Say it in grams."
+                    else -> "Nothing matched “${row.item.name}”."
+                },
+                fontFamily = JetBrainsMono, fontSize = 9.sp,
+                color = if (row.ready) c.muted else c.amber,
+                lineHeight = 13.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!row.ready) {
+            LcarsButton(text = "FIND", onClick = { vm.searchDescribed(index) })
+        }
+        LcarsButton(text = "DROP", onClick = { vm.dropDescribed(index) })
+    }
+}
 
 // ------------------------------------------------------------------------------- finding a food
 
@@ -2188,7 +3517,7 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
     var unit by remember(food.id) { mutableStateOf(units.first()) }
     var amount by remember(food.id) { mutableStateOf(if (unit == FoodPortion.Unit.GRAM) "100" else "1") }
 
-    val value = amount.replace(',', '.').toDoubleOrNull()
+    val value = Decimals.parse(amount)
     val grams = value?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
     val eaten = grams?.let { FoodPortion.eaten(food.per100g, it) }
 
@@ -2215,12 +3544,16 @@ private fun PortionPicker(food: Food, meal: NutritionDay.Meal, vm: HealthViewMod
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
         }
+        // ⚠️ One button that changes what it says, rather than two side by side. A plate is a mode
+        // the person deliberately turned on and can see standing above this; offering "log" and "add
+        // to plate" together would make the mode meaningless and the choice ambiguous every time.
+        val building by vm.buildingPlate.collectAsStateWithLifecycle()
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             LcarsButton(
-                text = "LOG TO ${meal.label.uppercase()}",
+                text = if (building) "ADD TO THE PLATE" else "LOG TO ${meal.label.uppercase()}",
                 enabled = eaten != null,
                 modifier = Modifier.weight(1f),
-                onClick = { if (value != null) vm.logPortion(food, value, unit, meal) },
+                onClick = { if (value != null) vm.logPortion(food, value, unit, meal, toPlate = building) },
             )
             LcarsButton(text = "BACK", modifier = Modifier.weight(0.5f), onClick = { vm.pick(null) })
         }
@@ -2276,6 +3609,201 @@ private fun EatenBefore(vm: HealthViewModel, meal: NutritionDay.Meal) {
                 "Tap to log it again to ${meal.label.lowercase()}.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
+        }
+    }
+}
+
+
+/**
+ * Read the panel off a packet, rather than picking eight numbers out of it by hand.
+ *
+ * ⚠️ **The parser is the feature; the typing is not.** [NutritionLabel] holds the traps: a comma
+ * that is a decimal point in most of the world, energy stated twice with kilojoules first,
+ * saturates that read as the total fat, salt that is not sodium, and a per-serving panel that never
+ * says what a serving weighs and so cannot honestly become a density. Each of those is a wrong
+ * number nobody would question. The text can come from anywhere and the arithmetic is the same.
+ *
+ * ⚠️ **On-device text recognition is a measured absence, not an oversight.** Google's ML Kit text
+ * recognition depends on play-services-base even in its bundled form, and this device runs
+ * GrapheneOS — the same reason barcode scanning here is ZXing. What remains is Tesseract, meaning
+ * a trained-data blob of roughly twenty megabytes plus native code for four architectures, on an
+ * artefact the updater re-downloads whole on every build. That is a size decision, so it is the
+ * owner's to make rather than one to slip in.
+ *
+ * Inline rather than a dialog on purpose: [LcarsDialog] measures with `IntrinsicSize.Min`, and a
+ * panel that wants a multi-line field and a variable number of lines beneath it is the wrong shape
+ * for that. The disclosure matches [MoreFromTheLabel] directly above it.
+ */
+@Composable
+private fun ReadTheLabel(onUse: (NutritionDay.Nutrients, Double) -> Unit) {
+    val c = Pulse.colors
+    var open by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+    var ate by remember { mutableStateOf("100") }
+
+    LcarsButton(text = if (open) "CLOSE THE LABEL" else "READ A LABEL", onClick = { open = !open })
+    if (!open) return
+
+    val reading = NutritionLabel.read(text)
+    val override = Decimals.parse(weight)?.takeIf { it.isFinite() && it > 0.0 }
+    val per100 = reading?.let { NutritionLabel.per100g(it, override) }
+    val ateG = Decimals.parse(ate)?.takeIf { it.isFinite() && it > 0.0 }
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            "Type or paste the panel, one line per figure. Kilojoules, comma decimals and salt " +
+                "rather than sodium are all handled.",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+        )
+        LcarsField(
+            value = text,
+            onValueChange = { text = it.take(2000) },
+            placeholder = "Energy 1046 kJ / 250 kcal",
+            singleLine = false,
+            showClear = false,
+        )
+        if (reading != null) {
+            Text(
+                NutritionLabel.summary(reading),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            // ⚠️ Only when the panel is per serving and never says what one weighs. The core refuses
+            // rather than assuming a hundred grams, so this is the one thing that unblocks it — and
+            // it is asked for rather than guessed at.
+            if (per100 == null) {
+                NumberCell("A SERVING WEIGHS (G)", weight, { weight = it }, Modifier.fillMaxWidth())
+            }
+        }
+        NumberCell("YOU ATE (G)", ate, { ate = it }, Modifier.fillMaxWidth())
+        LcarsButton(
+            text = "USE THESE FIGURES",
+            enabled = per100 != null && ateG != null,
+            onClick = {
+                val d = per100 ?: return@LcarsButton
+                val g = ateG ?: return@LcarsButton
+                // Bounded by physics on the way through, exactly as a scanned food is.
+                onUse(FoodPortion.eaten(FoodPortion.sane(d), g), g)
+                open = false
+                text = ""
+                weight = ""
+            },
+        )
+    }
+}
+
+/**
+ * A figure as a field would hold it: no trailing zero, blank when there is nothing to say.
+ *
+ * ⚠️ `toString`, never a format string: [NumberCell] keeps only digits and a point, so on a
+ * comma-decimal device a formatted figure would arrive stripped of its separator and mean ten times
+ * what it said. Half-up rather than `kotlin.math.round`, which is banker's rounding and changes
+ * direction with the digit before it.
+ */
+private fun fieldValue(v: Double): String {
+    if (!v.isFinite() || v <= 0.0) return ""
+    val r = kotlin.math.floor(v * 10.0 + 0.5) / 10.0
+    return if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
+}
+
+
+// ------------------------------------------------------------------------ arranging the MACROS page
+
+private const val MACRO_HEADLINE = "headline"
+private const val MACRO_TILES = "tiles"
+private const val MACRO_REST = "rest"
+private const val MACRO_VITAMINS = "vitamins"
+private const val MACRO_EVERYTHING = "everything"
+private const val MACRO_WEEK = "week"
+private const val MACRO_ROLLUP = "rollup"
+private const val MACRO_HELD = "held"
+
+/**
+ * Every card this page can draw, in the order it ships with, named as a person would name it.
+ *
+ * ⚠️ **The order here IS the default**, so it is considered rather than however the file grew: what
+ * is left first because that is the question the page exists to answer, then the macros, then the
+ * detail, then the week, then the standing-back view which is the only card not about today.
+ *
+ * ⚠️ These ids are persisted. Renaming one drops that card out of every arrangement already saved
+ * on a device — the card comes back, because [DashboardLayout.arrange] appends what it has never
+ * heard of, but wherever the person had put it does not.
+ *
+ * ⚠️ The ids are deliberately this page's own and not the standalone application's. The two draw
+ * different cards under different names and each keeps its arrangement in its own settings, so they
+ * never meet; sharing a vocabulary would only invite one to be edited for the other's sake.
+ */
+private val MACRO_CARDS: List<Pair<String, String>> = listOf(
+    MACRO_HEADLINE to "WHAT IS LEFT",
+    MACRO_TILES to "PROTEIN, FAT AND CARBS",
+    MACRO_REST to "THE REST OF WHAT YOU ATE",
+    MACRO_VITAMINS to "VITAMINS AND MINERALS",
+    MACRO_EVERYTHING to "EVERYTHING ELSE RECORDED",
+    MACRO_WEEK to "THE LAST FEW DAYS",
+    MACRO_ROLLUP to "STANDING BACK",
+    MACRO_HELD to "WHAT WAS HELD BACK",
+)
+
+private val MACRO_IDS: List<String> = MACRO_CARDS.map { it.first }
+
+/**
+ * Move the cards about, or put one away.
+ *
+ * ⚠️ Collapsed, and at the foot of the page. It is a control for something done once, and a
+ * permanent row of arrows on a page read every day is the page arranging itself against the reader.
+ *
+ * ⚠️ It lists cards that are put away as well as cards showing, or there is no way back and a hide
+ * control has quietly become a delete control.
+ */
+@Composable
+private fun ArrangeThisPage(vm: HealthViewModel) {
+    val c = Pulse.colors
+    var open by remember { mutableStateOf(false) }
+    val prefs by vm.profile.collectAsStateWithLifecycle()
+    val hidden = prefs.dashboardHidden.toSet()
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            DashboardLayout.describe(MACRO_IDS, prefs.dashboardOrder, hidden).uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+        )
+        LcarsButton(
+            text = if (open) "DONE" else "ARRANGE THIS PAGE",
+            onClick = { open = !open },
+        )
+        if (!open) return@Column
+
+        val order = DashboardLayout.editable(MACRO_IDS, prefs.dashboardOrder)
+        order.forEachIndexed { i, id ->
+            val away = id in hidden
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    MACRO_CARDS.firstOrNull { it.first == id }?.second ?: id,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (away) c.muted else c.ink,
+                    modifier = Modifier.weight(1f),
+                )
+                StepButton("▲", enabled = i > 0) { vm.moveCard(MACRO_IDS, id, -1) }
+                StepButton("▼", enabled = i < order.lastIndex) { vm.moveCard(MACRO_IDS, id, 1) }
+                Text(
+                    if (away) "SHOW" else "HIDE",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp,
+                    color = c.accent,
+                    modifier = Modifier
+                        .clickable { if (away) vm.showCard(id) else vm.hideCard(id) }
+                        .padding(7.dp),
+                )
+            }
+        }
+
+        // ⚠️ Only when it would change something. A reset that resets nothing teaches people the
+        // control does nothing, and then it is not reached for when it would have helped.
+        if (!DashboardLayout.isDefault(MACRO_IDS, prefs.dashboardOrder, hidden)) {
+            LcarsButton(text = "PUT IT BACK AS IT CAME", onClick = { vm.resetDashboard() })
         }
     }
 }

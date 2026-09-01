@@ -45,4 +45,98 @@
         <item name="android:visibility">gone</item>
     </style>
 
+    <!--
+      The board's roles, for `widget_board.xml` only.
+
+      ⚠️ These ARE named by role, where `WidgetLine.Row` deliberately is not — and the difference is
+      the shape of the content, not a change of mind. A ranked list of insights is variable in
+      length and order, so its slots must be generic or the running order is frozen at every size.
+      A dashboard is not that: its regions are a designed arrangement, and a header, a section
+      label and a cell value are genuinely different things that never trade places. Naming them
+      here is what lets the XML hold the design instead of the Kotlin rebuilding it every render.
+
+      Everything still inherits `WidgetLine`, so the drop shadow — the only guarantee of contrast
+      over an arbitrary wallpaper, since the widget paints no plate — cannot be forgotten on a row.
+    -->
+    <style name="WidgetLine.Board">
+        <item name="android:layout_marginTop">1dp</item>
+        <item name="android:textColor">@color/nw_ink</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+    <!-- Place · date · conditions. The one line that is always drawn. -->
+    <style name="WidgetLine.Board.Header">
+        <item name="android:layout_marginTop">0dp</item>
+        <item name="android:textColor">@color/nw_accent</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:visibility">visible</item>
+    </style>
+
+    <!--
+      The header's clock. Inherits Header by the dot convention, so the accent colour, the size and
+      — load-bearing on a transparent widget over an unknown wallpaper — the drop shadow all come
+      with it, and cannot drift away from the text it sits beside.
+
+      ⚠️ It overrides `layout_width` because WidgetLine sets `match_parent`, which in a horizontal
+      row would take the whole line and push the header out of view entirely.
+    -->
+    <style name="WidgetLine.Board.Header.Clock">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_marginStart">8dp</item>
+    </style>
+
+    <!--
+      "some feeds could not answer". Small, so it never competes with the reading — but in the
+      negative colour, because it is the one line on the board that is about the widget itself
+      rather than about the world.
+    -->
+    <style name="WidgetLine.Board.Degraded">
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textColor">@color/nw_negative</item>
+        <item name="android:textSize">9sp</item>
+    </style>
+
+    <!-- MAJOR INDICES, KEY STOCKS, ECON… — small, spaced, and never the point. -->
+    <style name="WidgetLine.Board.Section">
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:textColor">@color/nw_muted</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:letterSpacing">0.10</item>
+    </style>
+
+    <style name="WidgetLine.Board.Dim">
+        <item name="android:textColor">@color/nw_muted</item>
+        <item name="android:textSize">10sp</item>
+    </style>
+
+    <!-- A cell in an instrument strip: what it is, then what it did. -->
+    <style name="WidgetLine.Board.CellLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginTop">0dp</item>
+        <item name="android:textColor">@color/nw_muted</item>
+        <item name="android:textSize">9sp</item>
+    </style>
+
+    <style name="WidgetLine.Board.CellValue">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!--
+      A hairline. ⚠️ An ImageView with no image, coloured by its background — a bare `View` is NOT
+      on the RemoteViews whitelist (verified: `@RemoteView` appears on LinearLayout, FrameLayout,
+      GridLayout, ImageView, ProgressBar, TextClock and TextView, and not on View). Same trick the
+      notification's rail already uses.
+    -->
+    <style name="WidgetBoardRule">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:layout_marginTop">5dp</item>
+        <item name="android:layout_marginBottom">3dp</item>
+        <item name="android:background">@color/nw_line</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
 </resources>

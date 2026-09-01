@@ -1,0 +1,93 @@
+package dev.mascwa.pulse.data.health
+
+import dev.mascwa.pulse.data.reader.ReaderRepository
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * Everything the health view model needs, as one value each application assembles for itself.
+ *
+ * ⚠️ **The property names deliberately match the LCARS application's container member-for-member,
+ * and that is the whole trick.** The view model reads `c.foodLogStore`, `c.bodyStore` and so on in
+ * forty-four places; shaping this like the thing it replaces meant the constructor's type changed
+ * and not one of those call sites did. It is the same move as keeping the package name when these
+ * files were carved out of `:app` — make the new thing look like the old one and the diff collapses
+ * to the handful of lines that genuinely differ.
+ *
+ * ⚠️ **The last four are the reason this type exists at all.** The nine stores above them already
+ * live in this module and could have been passed individually, but settings, connectivity and meal
+ * photographs are supplied differently by the two applications — one keeps its preferences in a
+ * DataStore blob alongside forty other sections and has a vision model, the other has neither — so
+ * they arrive as a flow, a lambda, a lambda and a nullable interface rather than as concrete types
+ * the shared code would then have to depend on.
+ */
+class HealthDeps(
+    val foodLogStore: FoodLogStore,
+    val bodyStore: BodyStore,
+    val progressPhotoStore: ProgressPhotoStore,
+    val healthConnect: HealthConnectBridge,
+    val customFoodStore: CustomFoodStore,
+    val recipeStore: RecipeStore,
+    val plateStore: PlateStore,
+    val trainingStore: TrainingStore,
+    val foodRepository: FoodRepository,
+    val healthExporter: HealthExporter,
+    val healthImporter: HealthImporter,
+
+    /**
+     * Reading a recipe off a web page.
+     *
+     * ⚠️ **Not nullable, unlike [mealPhotoReader], and the difference is worth stating.** A vision
+     * model is a capability one application has and the other does not; a web page is neither, and
+     * both applications already build an `HttpClient`, so there is no honest state in which this is
+     * absent. Making it optional would invite a surface that silently does nothing.
+     */
+    val readerRepository: ReaderRepository,
+
+    /** The health section of whatever this application calls its settings. */
+    val healthSettings: Flow<HealthSettings>,
+
+    /**
+     * Apply an edit to that section and persist it.
+     *
+     * ⚠️ A read-modify-write handed to the caller rather than a plain setter, because in the LCARS
+     * application this section is one field of a much larger blob and the write has to preserve the
+     * other forty. What that costs the shared code is nothing; what a setter would have cost is a
+     * dependency on the whole settings type.
+     */
+    val updateHealth: suspend ((HealthSettings) -> HealthSettings) -> Unit,
+
+    /**
+     * Whether the device currently has a network.
+     *
+     * ⚠️ A function rather than a Boolean: it is read at the moment a lookup is about to go out, and
+     * a value captured when the screen opened would answer for a network that has since gone.
+     */
+    val isOnline: () -> Boolean,
+
+    /**
+     * Reading a photograph of a plate, or **null** where the application cannot.
+     *
+     * ⚠️ Null is a real state and not a defect — see [MealPhotos]. The standalone nutrition app
+     * carries no vision model, so the surface has to say the feature is unavailable rather than
+     * offer a button that silently does nothing.
+     */
+    val mealPhotoReader: MealPhotos?,
+
+    /**
+     * Leave a mark on the trail a fault report carries in front of it.
+     *
+     * ⚠️ **A lambda rather than a dependency on `Breadcrumbs`, for the reason the four above it are
+     * lambdas.** The ring lives in `:core:update` beside the crash reporter, and this module has no
+     * business depending on the updater to say what was being done a moment ago. Each application
+     * passes its own `Breadcrumbs::drop`.
+     *
+     * ⚠️ **Defaulted to nothing, so a caller that does not care is not forced to care** — and so
+     * that adding the parameter changed no existing construction. A no-op trail costs one call.
+     *
+     * ⚠️ **The content rule travels with it: a category and an action, never a subject.**
+     * `crumb("log", "portion")` says what happened; `crumb("log", "cheese sandwich")` puts a food
+     * diary into the one thing these applications send off the phone, one entry at a time. Nothing
+     * typed, no food name, no weight, no note.
+     */
+    val crumb: (String, String) -> Unit = { _, _ -> },
+)

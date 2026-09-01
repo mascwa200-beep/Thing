@@ -100,17 +100,21 @@ class JarvisMemoryViewModel(
     fun refreshLedgerStatus() {
         viewModelScope.launch {
             val line = runCatching {
-                val v = auditLedger.verify()
-                val signed = auditLedger.headSignatureValid()
-                val anchorMs = auditLedger.anchorTimeMs()
-                buildList {
-                    add(if (v.valid) "chain intact" else "⚠ BROKEN at #${v.brokenAtSeq}")
-                    when (signed) {
+                val h = auditLedger.health()
+                // ⚠️ See the note in SettingsViewModel: `verify()` answers about the chain in memory,
+                // and an unreadable blob leaves an EMPTY one behind, which verifies as intact. The
+                // two readouts word this for themselves but no longer each decide what the facts are.
+                if (h.unreadable) {
+                    "⚠ STORED RECORD UNREADABLE — nothing new is being written" +
+                        (if (h.unwritten > 0) " · ${h.unwritten} held in memory only" else "")
+                } else buildList {
+                    add(if (h.verification.valid) "chain intact" else "⚠ BROKEN at #${h.verification.brokenAtSeq}")
+                    when (h.signatureValid) {
                         true -> add("hardware-signed")
                         false -> add("⚠ signature invalid")
                         null -> {}
                     }
-                    if (anchorMs != null) add("anchored ${DateUtils.getRelativeTimeSpanString(anchorMs)}")
+                    h.anchorMs?.let { add("anchored ${DateUtils.getRelativeTimeSpanString(it)}") }
                 }.joinToString(" · ")
             }.getOrDefault("")
             _ledgerStatus.value = line

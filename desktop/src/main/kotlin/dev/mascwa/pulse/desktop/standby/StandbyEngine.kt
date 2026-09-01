@@ -142,7 +142,7 @@ class StandbyEngine(
             }
             val kpJob = async {
                 source(StandbyDiagnostics.Source.SPACE, outcomes) {
-                    space.fetch(force = false).also { sawFetch(it.timestampEpochMs) }.data.kp
+                    space.fetch(force = false, heavy = false).also { sawFetch(it.timestampEpochMs) }.data.kp
                 }
             }
             val issJob = async {

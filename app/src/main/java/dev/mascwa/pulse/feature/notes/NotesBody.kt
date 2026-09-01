@@ -7,13 +7,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,47 +62,63 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
         title = ""; body = ""; editingId = null; category = vm.categories.first()
     }
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        // ---- ADD ENTRY ----
-        LcarsHeaderBar(if (editingId == null) "Add Entry" else "Edit Entry")
-        LcarsFrame(Modifier.fillMaxWidth()) {
-            Column {
-                NoteField(title, { title = it }, "Title", c)
-                Box(Modifier.fillMaxWidth().padding(top = 8.dp)) { NoteField(body, { body = it }, "Details…", c, single = false) }
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    vm.categories.forEach { cat ->
-                        CatChip(cat, selected = cat == category, c = c) { category = cat }
-                    }
-                }
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier
-                            .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-                            .clickable {
-                                if (title.isNotBlank() || body.isNotBlank()) {
-                                    val id = editingId
-                                    if (id == null) vm.add(title, body, category)
-                                    else vm.update(id, title, body, category)
-                                    clearComposer()
-                                }
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+    // ⚠️ **Lazy, because this store has no cap and that is a deliberate decision.** `NotesStore`
+    // refuses to evict what somebody wrote, which is right — and it means the library is as long as
+    // the person has been using the app. A `Column` with `verticalScroll` composes and measures every
+    // row on entry, so a few hundred notes is a few hundred rows built before the first frame, on
+    // whatever phone this is. A `LazyColumn` builds the ones on screen.
+    //
+    // ⚠️ The composer is the FIRST ITEM rather than a header pinned above the list, so the scroll
+    // behaves exactly as it did — it scrolls away with the content. Its text lives in this function's
+    // `remember`s and `NoteField` is fully stateless, so being scrolled out of the viewport disposes
+    // the field and loses nothing; scrolling back re-composes it with the same text.
+    //
+    // ⚠️ Every key is prefixed by hand. One lazy scope holding a composer, per-category headers and
+    // per-note rows is exactly the shape that crashed this app once, when a route constant collided
+    // with a literal item key — see `LazyKeyTest`, which is the gate against it recurring.
+    LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        item(key = "notes:composer") {
+            // ---- ADD ENTRY ----
+            LcarsHeaderBar(if (editingId == null) "Add Entry" else "Edit Entry")
+            LcarsFrame(Modifier.fillMaxWidth()) {
+                Column {
+                    NoteField(title, { title = it }, "Title", c)
+                    Box(Modifier.fillMaxWidth().padding(top = 8.dp)) { NoteField(body, { body = it }, "Details…", c, single = false) }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            if (editingId == null) "▸ FILE ENTRY" else "▸ SAVE CHANGES",
-                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                            letterSpacing = 1.5.sp, color = c.accent,
-                        )
+                        vm.categories.forEach { cat ->
+                            CatChip(cat, selected = cat == category, c = c) { category = cat }
+                        }
                     }
-                    if (editingId != null) {
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(
-                            Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                            Modifier
+                                .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                                .clickable {
+                                    if (title.isNotBlank() || body.isNotBlank()) {
+                                        val id = editingId
+                                        if (id == null) vm.add(title, body, category)
+                                        else vm.update(id, title, body, category)
+                                        clearComposer()
+                                    }
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                         ) {
-                            Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
+                            Text(
+                                if (editingId == null) "▸ FILE ENTRY" else "▸ SAVE CHANGES",
+                                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                                letterSpacing = 1.5.sp, color = c.accent,
+                            )
+                        }
+                        if (editingId != null) {
+                            Box(
+                                Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) {
+                                Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
+                            }
                         }
                     }
                 }
@@ -110,18 +127,20 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
 
         // ---- LIBRARY (grouped) ----
         if (notes.isEmpty()) {
-            Text(
-                "No entries yet — file a note above. Everything stays on this device.",
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
-            )
+            item(key = "notes:empty") {
+                Text(
+                    "No entries yet — file a note above. Everything stays on this device.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+                )
+            }
         } else {
             val grouped = notes.groupBy { it.category }
             val order = vm.categories + grouped.keys.filterNot { it in vm.categories }
             order.forEach { cat ->
-                val items = grouped[cat] ?: return@forEach
-                LcarsHeaderBar(cat, trailing = items.size.toString())
-                items.forEach { note ->
+                val inCategory = grouped[cat] ?: return@forEach
+                item(key = "notes:head:" + cat) { LcarsHeaderBar(cat, trailing = inCategory.size.toString()) }
+                items(inCategory, key = { "notes:row:" + it.id }) { note ->
                     NoteRow(
                         note, c,
                         editing = note.id == editingId,
@@ -138,7 +157,7 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            Box(Modifier.padding(bottom = 24.dp))
+            item(key = "notes:tail") { Box(Modifier.padding(bottom = 24.dp)) }
         }
     }
 }

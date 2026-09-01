@@ -203,6 +203,19 @@ class EmergencyWatchService : Service() {
         private const val STATE_KEY = "notify_state"
 
         /** A minute. Fast enough to matter, slow enough that the battery cost is a rounding error. */
+        /**
+         * ⚠️ **Sixty seconds, at every device tier, deliberately — do not "optimise" this.**
+         *
+         * The rest of this work makes a weak or hot phone do less: the sensing ladder throttles, the
+         * background worker skips its discretionary passes, animations stop. This one does not, and
+         * the reason is in this file's own header — riding a longer interval "could deliver a tornado
+         * warning a quarter of an hour late". A life-safety poll stretched because the phone is cheap
+         * is precisely the trade the potato work is NOT asking for: the point is that a bad phone
+         * still WORKS, not that it stops warning you.
+         *
+         * The cost is one location read and one CAP fetch a minute, which is the smallest item in
+         * this application by a wide margin.
+         */
         private const val POLL_MS = 60_000L
 
         private const val WATCHING = "Watching for official alerts in your area."

@@ -1,0 +1,56 @@
+# Baseline profile — profile-guided AOT for the standalone star map.
+#
+# ⚠️ **This application has a stronger claim on one than either of the others, and the reason is
+# the draw loop.** The nutrition app's profile helps its startup; here the renderer runs sixty times
+# a second for as long as the map is open, so the methods in it are hot by definition rather than by
+# guess — a projection per visible star, a bucket walk per frame, and a Milky Way sample per pixel
+# of a small bitmap. Interpreting that cold on a slow CPU is exactly what a phone with no
+# co-processor cannot absorb.
+#
+# ⚠️ androidx.profileinstaller is what makes this work AT ALL. On Play, profiles are delivered by the
+# store; this APK is sideloaded from a GitHub release, so that path does not exist and the library's
+# startup initializer is the only thing that writes the profile for ART to read. It is declared in
+# build.gradle.kts on the same commit as this file, and one without the other is inert.
+#
+# ⚠️ The release build must stay non-debuggable for any of this to apply. It is — buildTypes.release
+# sets no isDebuggable, and the debug applicationIdSuffix does not change that.
+#
+# Lines that match nothing are warned-and-skipped by AGP, never fatal.
+
+# --- Startup entry points: compile every method (HSPL = hot / startup / post-startup) ------------
+HSPLdev/mascwa/sky/MainActivity;->**(**)**
+HSPLdev/mascwa/sky/SkyApplication;->**(**)**
+HSPLdev/mascwa/sky/**->**(**)**
+
+# --- The renderer, which is the whole reason this file is worth writing -------------------------
+# Every method here is on the per-frame path: collect, project, batch, draw. Nothing in this package
+# is reachable except through a frame, so there is no risk of pre-compiling something unused.
+HSPLdev/mascwa/pulse/sky/**->**(**)**
+
+# --- The view model, which runs its whole load before the first sky is drawn ---------------------
+# Parsing the bright catalogue, opening the deep one, reading the constellation shapes, the deep-sky
+# layer and the Milky Way raster: startup work by definition.
+HSPLdev/mascwa/pulse/feature/sky/**->**(**)**
+HSPLdev/mascwa/pulse/data/sky/**->**(**)**
+
+# --- The projection and the glyph rules, which are called per star per frame --------------------
+HSPLdev/mascwa/pulse/core/telemetry/SkyProjection**->**(**)**
+HSPLdev/mascwa/pulse/core/telemetry/SkyPointing**->**(**)**
+HSPLdev/mascwa/pulse/core/telemetry/StarGlyph**->**(**)**
+HSPLdev/mascwa/pulse/core/telemetry/StarNames**->**(**)**
+HSPLdev/mascwa/pulse/core/telemetry/MilkyWay**->**(**)**
+HSPLdev/mascwa/pulse/core/telemetry/DeepSky**->**(**)**
+
+# --- Class presence only for the rest of the shared core, and that is deliberate ----------------
+#
+# ⚠️ The same reasoning the nutrition profile records: :core:telemetry holds far more than this
+# application can reach — a food-portion calculator, a news ranker, a live-TV channel table — and
+# AOT-compiling all of it would pay install time and disk for code that is never called. The
+# class-presence rule loads and verifies ahead of time without compiling every method, which is the
+# right trade for the ephemeris and the reference circles: used once per change of time or place,
+# not once per frame.
+Ldev/mascwa/pulse/core/telemetry/**
+Ldev/mascwa/pulse/sky/**
+Ldev/mascwa/pulse/data/sky/**
+Ldev/mascwa/pulse/feature/sky/**
+Ldev/mascwa/sky/**

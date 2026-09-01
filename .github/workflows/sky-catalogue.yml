@@ -1,0 +1,96 @@
+name: Star Catalogue
+
+run-name: "Star catalogue — warm the cache${{ inputs.smoke_magnitude && format(' (smoke test at G<{0})', inputs.smoke_magnitude) || '' }}"
+
+# Build the packed Gaia catalogue and leave it in the shared Actions cache, so neither build workflow
+# ever has to pay for it.
+#
+# ⚠️ **A WARMER, NOT A DEPENDENCY.** Both build workflows still build the catalogue themselves on a
+# cache miss, so nothing anywhere depends on anyone having remembered to run this. What it buys is
+# that the expensive first run happens ONCE, deliberately, instead of twice at the same moment in two
+# workflows that are also trying to compile two applications.
+#
+# ⚠️ **Why that matters is politeness as much as time.** A cold G<15 build is on the order of 1,100
+# to 1,900 requests to the ESA archive over the best part of an hour — the archive is a research
+# facility rather than a CDN, and this repository has twice earned a durable rate-limit ban by
+# bursting at a public service. One crawler is a browser's worth of traffic. Two at once is not.
+#
+# Run it after changing the depth, the builder, or the record format — anything that moves the cache
+# key. Then push, and both builds find the entry already warm. How to run it depends on where this
+# file has reached; see the trigger note below.
+
+on:
+  # ⚠️ **A push trigger on this file ALONE, because `workflow_dispatch` does not work from a feature
+  # branch.** GitHub registers dispatchable workflows from the DEFAULT branch only — measured, not
+  # assumed: the API lists four workflows here and every one of their URLs points at `blob/main`, and
+  # dispatching this one answered 404 while it existed on the branch and not on `main`. So the button
+  # will appear once this reaches `main`, and until then editing the file is the way to run it.
+  #
+  # That is cheaper than it sounds. The action's guard reads the catalogue's header, so once the
+  # cache is warm a run of this finishes in about a minute; only a genuine change of depth or of the
+  # builder costs the full fetch. And the path list is exactly this file, so nothing else can start
+  # an hour of work by accident.
+  push:
+    paths:
+      - ".github/workflows/sky-catalogue.yml"
+  workflow_dispatch:
+    inputs:
+      smoke_magnitude:
+        description: >-
+          Leave EMPTY for the real thing. Set a bright magnitude (8 is about 100k stars and two
+          minutes) to prove the whole path — fetch, pack, cache, header check — before committing an
+          hour to it. It writes its own cache entry under its own key and cannot disturb the real one.
+        required: false
+        default: ""
+
+concurrency:
+  # ⚠️ Deliberately NOT `cancel-in-progress`. Everywhere else in this repository a newer push should
+  # supersede an older one; here the run IS the expensive thing, and cancelling an hour of fetching
+  # thirty seconds before it saves its cache would be the worst possible outcome.
+  group: sky-catalogue
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # A cold G<15 build measured at roughly 45–60 minutes of fetching plus a few minutes of packing.
+    # The ceiling is generous because the archive's response time is not ours to control; the point
+    # of the limit is that a wedged run cannot sit there for GitHub's default six hours.
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ⚠️ Written as truthiness rather than `== ''`, because on a PUSH event there is no `inputs`
+      # context at all: null and the empty string are both falsy, which is unambiguous, where the
+      # equality form leans on GitHub coercing null to '' for the comparison.
+      #
+      # ⚠️ Two steps rather than one with a conditional input, because a composite action's `default`
+      # applies only when an input is ABSENT — passing an empty string would override it with empty
+      # and the action would have to re-state the number in a shell expression. Two guarded steps
+      # keep the depth stated in exactly one place, which is the whole reason the action exists.
+      - name: The star catalogue
+        if: ${{ !inputs.smoke_magnitude }}
+        uses: ./.github/actions/star-catalogue
+
+      - name: The star catalogue (smoke test)
+        if: ${{ inputs.smoke_magnitude }}
+        uses: ./.github/actions/star-catalogue
+        with:
+          magnitude: ${{ inputs.smoke_magnitude }}
+
+      - name: Say what is now cached
+        run: |
+          set -euo pipefail
+          out=core/sky/src/main/assets/sky/stars.skycat
+          {
+            echo "### Star catalogue"
+            echo ""
+            echo "\`$(du -h "$out" | cut -f1)\` — cached for the LCARS and Star Map builds."
+            echo ""
+            echo "Push now and neither of them will fetch anything."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # ⚠️ Also as an annotation. A phone screenshot showed this repository's step summaries
+          # rendering nowhere at all on the mobile client, twice over, so a summary alone is not a
+          # way to tell anybody anything.
+          echo "::notice::star catalogue cached: $(du -h "$out" | cut -f1)"

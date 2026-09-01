@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      ⚠️ **One permission, and each one added later should have to justify itself here.** The LCARS
+      application asks for the microphone, the camera, location, the calendar, body sensors,
+      device-admin and the right to draw over other apps — none of which a nutrition tracker needs to
+      open a database and add up what somebody ate. The camera arrives with the barcode scanner and
+      nothing before it.
+
+      ⚠️ ACTIVITY_RECOGNITION is what makes the step counter work at all: without it
+      `TYPE_STEP_COUNTER` delivers no events on API 29 and later, so the sensor reads as a phone with
+      no pedometer rather than as a refused permission. It is requested on the one screen that shows
+      steps, not at startup.
+    -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!--
+      ⚠️ **This was missing entirely, and its absence was silent.** The app reaches Open Food Facts
+      whenever a scanned barcode is not in the bundled database, and without INTERNET that request
+      cannot leave the phone — so the fallback the food repository is built around had never once
+      worked, and could not, on any build. Nothing reported it: a lookup that fails for want of a
+      permission and a lookup that fails because the product genuinely is not published look
+      identical from the screen. The self-update path would have been dead in exactly the same way.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      ⚠️ Needed by the updater, which refuses to pull a very large APK over a metered connection.
+      `getNetworkCapabilities` answers null without this, which reads as "metered" — so the app
+      would quietly never update itself, with nothing on any screen to say why.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      ⚠️ The camera is for the barcode scanner and nothing else. No frame is stored, uploaded or kept:
+      each one is decoded in memory and dropped, and only the digits on the packet leave the screen.
+      Requested on the scanner itself rather than at startup, so the reason is visible when it is asked.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      ⚠️ `required="false"`, or this app would be hidden on the store from every phone without a
+      pedometer — which is most of the cheap ones, and exactly the phones "works on every type of
+      phone" was asked about. Steps are one card; the rest of the app does not need the sensor.
+    -->
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
+
+    <!-- Same reasoning: a phone with no camera loses one button, not the app. -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <!--
+      ⚠️ **Weight and steps, and nothing else.** A permission absent from here cannot be requested at
+      all, however the code asks — so these three ARE the reach of the Health Connect integration,
+      and the bridge derives the set it requests from the same record types so the two cannot drift
+      into a request that could never be granted. Nothing about food, sleep, exercise or heart rate
+      is asked for, and the panel says so before offering the button.
+
+      ⚠️ `:core:health` deliberately ships an EMPTY manifest and says why: the permissions belong to
+      whichever application chooses to ask for them. Declaring them there would have every consumer
+      inherit a request it never made.
+    -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+
+    <!--
+      ⚠️ **Without this the provider is invisible and Health Connect reports as absent on a phone
+      that has it.** `getSdkStatus` resolves the provider BY PACKAGE, and Android 11's package
+      visibility hides it from an app that has not declared the query — so the call returns
+      SDK_UNAVAILABLE, indistinguishable from a device that genuinely lacks it, on the one call the
+      whole integration is gated behind.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <!--
+          ⚠️ **The LCARS application, and without this entry this app cannot tell that LCARS is the
+          thing keeping it updated.** `getInstallSourceInfo` reports the installing package only
+          when the caller can see it; package visibility filters it to null otherwise, which is
+          indistinguishable from having been sideloaded by hand. That distinction is the whole
+          point — it decides whether the update card asks for a GitHub token or explains that
+          nothing is needed.
+
+          ⚠️ `.debug` is part of the name: that module's RELEASE build carries the suffix so a
+          sideload updates in place. See UpdateRepository.LCARS_PACKAGE, which is where this string
+          is defined for the code; this manifest cannot reference a Kotlin constant, so the two are
+          a pair that has to be kept in step by hand.
+        -->
+        <package android:name="dev.mascwa.pulse.debug" />
+    </queries>
+
+    <!--
+      ⚠️ **`android:name` was absent, and its absence meant no fault before the first frame could
+      ever be recorded.** Without an application class the earliest code this app ran was
+      `MainActivity.onCreate`, so a store whose file was corrupt or a dependency that threw while
+      being constructed killed the app with nothing written and nothing to read afterwards — which
+      is precisely the class of failure that makes an app look broken from launch.
+    -->
+    <application
+        android:name=".NutritionApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Nutrition">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          ⚠️ **Each application declares its own, and `:core:health` says why in its manifest.**
+          `ProgressPhotoStore.uriFor` builds the authority from the CONSUMER's package at runtime
+          — the package name followed by ".fileprovider" — so an authority inherited from the library
+          would not match the one asked for — the camera would be handed a Uri no provider owns and
+          every capture would fail with a permission error rather than anything that names the cause.
+          The applicationId placeholder below resolves to the same value the runtime reads, debug
+          suffix included.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

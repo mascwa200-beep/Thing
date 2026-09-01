@@ -260,7 +260,7 @@ fun ViewscreenScreen(
                         )
                     }
                 }
-                items(shelves.rows.size, key = { shelves.rows[it].id }) { idx ->
+                items(shelves.rows.size, key = { "shelf" + shelves.rows[it].id }) { idx ->
                     val row = shelves.rows[idx]
                     TheaterShelfRow(
                         label = row.label,

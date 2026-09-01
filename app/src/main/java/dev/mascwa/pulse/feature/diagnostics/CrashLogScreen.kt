@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.crash.CrashEntry
+import dev.mascwa.pulse.crash.FaultKind
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -181,9 +182,14 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    DATE_FMT.format(Date(entry.timeMs)),
+                                    // ⚠️ The kind is on the row, not only inside the file. A handled
+                                    // failure listed under "CRASH LOG" with nothing to mark it reads
+                                    // as a crash — which is a claim about the app that is not true,
+                                    // and would make a quiet database miss look like an outage.
+                                    (if (entry.kind == FaultKind.FATAL) "CRASH · " else "FAULT · ") +
+                                        DATE_FMT.format(Date(entry.timeMs)),
                                     fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp,
-                                    color = c.sky,
+                                    color = if (entry.kind == FaultKind.FATAL) c.magenta else c.sky,
                                 )
                                 IconButton(onClick = { share(context, vm.read(entry)) }) {
                                     Icon(Icons.Filled.Share, contentDescription = "Share", tint = c.accent)

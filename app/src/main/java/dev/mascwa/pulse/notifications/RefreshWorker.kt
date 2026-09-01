@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.DeviceClass
 import dev.mascwa.pulse.core.telemetry.QuietHours
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -31,6 +32,25 @@ class RefreshWorker(
     override suspend fun doWork(): Result {
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
+
+        // ⚠️ **How much of this pass the phone can afford.** Before this, all eighteen items ran on
+        // every tick with no battery, thermal, memory or doze check anywhere in the file — including
+        // two cloud reasoning loops, a StrongBox keypair generation and a network round-trip to a
+        // timestamping authority. A phone that is hot, restricted, dozing or simply cheap now does
+        // less, and says so.
+        //
+        // ⚠️ Read here and used ONLY below the notification gates. Everything above them — the two
+        // service self-heals, the widget refresh, the app update — is not discretionary, and a device
+        // tier placed above them would be the same mistake those comments already argue against.
+        val probe = runCatching { container.deviceProbe.probe() }.getOrNull()
+        val devTier = probe?.let { DeviceClass.tierOf(it) } ?: DeviceClass.Tier.FULL
+        val devPressure = probe?.let { DeviceClass.pressureOf(it) } ?: DeviceClass.Pressure.NONE
+        val work = DeviceClass.workTier(devTier, devPressure, probe?.backgroundRestricted, probe?.deviceIdle)
+        val fullWork = work == DeviceClass.WorkTier.ALL
+        val anyWork = work != DeviceClass.WorkTier.MINIMAL
+        // Warm caches instead of forced fetches once the phone is struggling: the board still
+        // publishes, it just stops paying for six live requests to do it.
+        val forceFetch = anyWork
 
         // Sensorium self-heal — BEFORE the notification gates (service liveness isn't a notification
         // preference). A background FGS start can be refused by the OS; then the next app-open arms
@@ -63,6 +83,11 @@ class RefreshWorker(
         // and the check that does sit below these gates only ever posted a note about it.
         val buildWaiting = installNewestBuild(settings)
 
+        // ⚠️ And the companion, for the same reason and one more: the standalone nutrition app
+        // CANNOT keep itself current without the owner's help, and this app can. See
+        // [updateCompanion].
+        updateCompanion()
+
         // ⚠️ Above the notification gates for the same reason as everything else up here, and AFTER
         // the app update on purpose: both want the same Wi-Fi, and being on the newest build matters
         // more than having one more optional payload. The provisioner takes at most one item per
@@ -85,7 +110,11 @@ class RefreshWorker(
 
         // The board's overlay signals, gathered across the passes below and rendered by BriefEngine as the
         // single LCARS notification's ALERT row.
-        var opsNotice: String? = null
+        // Seeded from the device budget so a trimmed pass accounts for itself on the board's ALERT
+        // row. Set first on purpose: a real event below (a new build, a shipped change, a finding)
+        // is more worth saying than "this refresh was trimmed", and should overwrite it.
+        var opsNotice: String? =
+            DeviceClass.workNotice(work, devTier, devPressure, probe?.backgroundRestricted, probe?.deviceIdle)
         var securityNotice: String? = null
         var securityCritical = false
         var safetyNotice: Pair<String, String>? = null
@@ -120,7 +149,7 @@ class RefreshWorker(
 
         // --- Computer autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
         // interest or the device itself, record ONE finding via the agent's `finding` tool, then notify. ---
-        if (jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
+        if (fullWork && jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
             runCatching {
                 val now = System.currentTimeMillis()
                 run {
@@ -152,13 +181,13 @@ class RefreshWorker(
         // --- Mnemosyne reflection: synthesise recent episodic observations into higher-level REFLECTION
         // memories (cloud-gated; silent — surfaces in the Memory screen). No cooldown — `since` inside the
         // engine is a bookmark of what's already been reflected on, not a suppression timer. ---
-        if (jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
+        if (fullWork && jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
             runCatching { container.reflectionEngine.reflectIfDue() }
         }
 
         // --- Blackbox ledger: periodic RFC-3161 anchor (opt-in, throttled ~daily, best-effort) so the head
         // is independently timestamped between manual anchors. Sends only a hash to a public TSA. ---
-        if (settings.autoAnchorLedger) {
+        if (fullWork && settings.autoAnchorLedger) {
             runCatching {
                 val now = System.currentTimeMillis()
                 val head = container.auditLedgerStore.headHash()
@@ -179,7 +208,13 @@ class RefreshWorker(
         // change — bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost — is a real security
         // event; identical verdicts are deduped so the append-only log isn't spammed). Local-only probe, no
         // network — no time throttle, so a posture change is caught as soon as the next tick runs. ---
-        runCatching {
+        //
+        // ⚠️ Skipped at MINIMAL, and it is the most expensive local pass here: `DeviceAttestation.run`
+        // GENERATES A STRONGBOX EC KEYPAIR to read the attestation extension out of it, every tick.
+        // A posture change is a real security event, so this is the last of the three local passes
+        // to go — but on a phone that is too hot or has been restricted, minting a hardware key on a
+        // timer is exactly the discretionary work that should wait for the next pass.
+        if (anyWork) runCatching {
             val now = System.currentTimeMillis()
             val report = container.deviceAttestation.run()
             val v = report.verdict
@@ -208,7 +243,11 @@ class RefreshWorker(
         }
 
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
-        runCatching {
+        //
+        // ⚠️ Skipped at MINIMAL. It enumerates every installed package, which on the main thread once
+        // froze the Security Audit screen outright (see `hasUsageAccess`); it is cheap enough here
+        // because it is off the main thread, and it is still the second-heaviest local pass.
+        if (anyWork) runCatching {
             container.securityAuditStore.load()
             val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
             if (lastScan > 0) {
@@ -241,7 +280,7 @@ class RefreshWorker(
         // --- Cache warm-ups for the board's rows (fresh data; BriefEngine reads warm caches). Each is
         // gated on its row toggle so a hidden row costs no network. ---
         if (prefs.showMarketsRow) {
-            runCatching { container.marketsRepository.fetchAll(force = true) }
+            runCatching { container.marketsRepository.fetchAll(force = forceFetch) }
         }
         if (prefs.showWeatherRow) {
             runCatching { resolveWeather(settings) }
@@ -249,14 +288,40 @@ class RefreshWorker(
             // products are ~546 KB of a ~596 KB refresh and nothing in the background path reads
             // them, so fetching them every 15 minutes was ~57 MB a day for one number. The console
             // still gets the full set; a light pass carries the cached heavy values forward.
-            runCatching { container.spaceWeatherRepository.fetch(force = true, heavy = false) }
+            runCatching { container.spaceWeatherRepository.fetch(force = forceFetch, heavy = false) }
+        }
+
+        // ⚠️ Read ONCE and shared by the two passes below. `current()` is a last-known fix rather
+        // than a GPS wake, but it is still a permission-checked binder call, and asking twice for
+        // one number is the shape that quietly doubles a background pass's cost.
+        val here = runCatching { container.locationProvider.current() }.getOrNull()
+
+        // --- The water where you are: tides on a coast, lake level on the Great Lakes. ---
+        // ⚠️ Warmed HERE and never in the widget. The widget has four seconds a source and reads
+        // `cached()`, which cannot touch the network; this is the only thing that fills it. A tide
+        // prediction is computed months ahead so it keeps for a day, and a lake level is a live
+        // observation so it keeps for an hour — the repository decides which, by station.
+        //
+        // ⚠️ `force = false`, deliberately, where the rows above use `forceFetch`. Those are hourly
+        // or better and their whole point is to be current; this worker runs every fifteen minutes,
+        // and forcing here would ask NOAA ninety-six times a day for a tide table that changes once.
+        if (here != null) {
+            runCatching { container.waterRepository.fetch(here.latitude, here.longitude, force = false) }
+        }
+
+        // --- Unread texts and mail for the widget's comms line. ---
+        // ⚠️ Warmed HERE for the same reason the water is: each mailbox is a TLS round trip, and
+        // the widget reads `cached()`, which never touches the network. Costs nothing when no
+        // account has been added — the mailbox list is simply empty.
+        if (settings.emailAccounts.isNotEmpty() || container.commsRepository.canReadSms()) {
+            runCatching { container.commsRepository.refresh(settings.emailAccounts) }
         }
 
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---
         runCatching {
-            val loc = container.locationProvider.current()
+            val loc = here
             if (loc != null) {
-                val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = true).data
+                val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = forceFetch).data
                 val radiusM = settings.safetyRadiusKm * 1000.0
                 val already = state.safetyAlertedIds.toMutableSet()
                 val severe = safety.incidents.filter {
@@ -409,6 +474,71 @@ class RefreshWorker(
      * press a button for work already done.
      */
     private data class PendingBuild(val versionCode: Int, val waitingBecause: String)
+
+    /**
+     * Keep the standalone nutrition app current, with nothing asked of the owner.
+     *
+     * ⚠️ **The companion cannot do this for itself, and that is not a gap in it.** Its releases are
+     * in the same private repository, so its own updater needs a GitHub token pasted into it; and it
+     * is not a device owner and not the installer of record, so its first install would show the
+     * system's confirmation. Both are input. THIS app has the token already, is provisioned as a
+     * device owner, and installs the companion through the same [dev.mascwa.pulse.core.util.installApk]
+     * path the Settings control uses — so a commit made from here is not confirmed at all. The
+     * capability was entirely present; the only thing missing was anything that ran it without a tap.
+     *
+     * ⚠️ **The installed version IS the loop-breaker, and this is the one place that gets to be
+     * simple.** [installNewestBuild] needs a persisted `unconfirmedUpdateCode` because it replaces
+     * the very process asking the question, so "did it land?" cannot be read directly. Here the
+     * target is a different package and the platform will simply say what version of it is
+     * installed. No stored state, nothing to get out of step, and an install that fails leaves the
+     * old version reported — so the next pass retries rather than being blocked, which is the right
+     * direction for a package whose failure cannot take this app down with it.
+     *
+     * ⚠️ **A package that is not installed is left alone.** `getPackageInfo` throwing is the answer
+     * "the owner does not have this app", and putting it on their phone because a release exists
+     * would be installing software nobody asked for. Getting the companion in the first place stays
+     * a deliberate act — Settings ▸ System ▸ GET THE NUTRITION APP — and this only ever maintains
+     * what that act already put there.
+     *
+     * ⚠️ **Ordered cheapest-first with the network last**, exactly as the self-update pass is: the
+     * local package query and the Wi-Fi check both sit in front of a request, so a phone on mobile
+     * data never pays for a check it could not act on. The APK is about 180 MB.
+     *
+     * ⚠️ **Known trade, stated rather than guarded:** replacing a package kills its process, so if
+     * the owner happens to be logging a meal at the moment this commits, the nutrition app restarts.
+     * Detecting that would mean querying `UsageStatsManager` for another package's foreground state,
+     * which rests on a permission the owner may never have granted — so it would be machinery that
+     * usually cannot answer, guarding a window of a few seconds that opens a handful of times a day.
+     * An update that never happens is the worse failure, and it is the one the owner asked me to fix.
+     */
+    private suspend fun updateCompanion() {
+        val pkg = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_PACKAGE
+        val installed = installedVersionCode(pkg) ?: return
+        if (!container.connectivityObserver.isUnmetered.value) return
+        runCatching {
+            // The green gate lives in `check()` — it reports only a build whose CI run passed.
+            // ⚠️ Its own `available` cannot be the test here: that repository is built with
+            // `currentVersionCode = 0` so the manual control can always offer the newest, which
+            // means every published build reads as "available". The comparison that matters is
+            // against what is actually on the phone, and it is made here.
+            val info = container.nutritionUpdateRepository.check().available ?: return@runCatching
+            if (info.versionCode.toLong() <= installed) return@runCatching
+            val file = container.nutritionUpdateRepository.download(info) { }
+            dev.mascwa.pulse.core.util.installApk(applicationContext, file, pkg)
+        }
+    }
+
+    /**
+     * The version of another installed package, or null if it is not installed.
+     *
+     * ⚠️ This app holds `QUERY_ALL_PACKAGES`, so it can genuinely see the companion — a note on
+     * `AppContainer.nutritionUpdateRepository` used to claim the opposite, and that claim is what
+     * made the whole of [updateCompanion] look impossible. `longVersionCode` is API 28 and this
+     * module's floor is 31, so there is no branch to write.
+     */
+    private fun installedVersionCode(pkg: String): Long? = runCatching {
+        applicationContext.packageManager.getPackageInfo(pkg, 0).longVersionCode
+    }.getOrNull()
 
     /**
      * Push the widget, so it is not left waiting on the OS's thirty-minute floor.

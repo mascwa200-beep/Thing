@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -59,7 +60,7 @@ class InterestStore(
     val interestsFlow: StateFlow<List<Interest>> = _flow.asStateFlow()
 
     private suspend fun ensureLoaded(): List<Interest> = mutex.withLock {
-        interests ?: run {
+        interests ?: withContext(Dispatchers.IO) {
             val raw = context.interestsDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -137,9 +138,27 @@ class InterestStore(
         runCatching { context.interestsDataStore.edit { it.remove(prefsKey) } }
     }
 
+    /**
+     * The outcome of the most recent write, so an explicit [flushNow] can report a failure it would
+     * otherwise swallow.
+     *
+     * ⚠️ **Both callers of [flushNow] already wrap it in a reporter that could never fire.** Every
+     * store of this shape catches its own DataStore edit and discards the `Result`, so the "the
+     * store could not be written to disk; anything recorded since is lost" report in `MainActivity`
+     * and `NutritionContainer` was structurally unreachable — a claim in a KDoc that nothing could
+     * make true. The debounced background flush still swallows, deliberately: an exception thrown
+     * there escapes into a launched coroutine and takes the process with it.
+     */
+    @Volatile
+    private var lastWrite: Result<*>? = null
+
     suspend fun flushNow() {
         flushJob?.cancel()
+        // ⚠️ Cleared first: [flush] returns early when nothing is owed, and a stale failure
+        // from an earlier write would then be reported against a write no longer outstanding.
+        lastWrite = null
         flush()
+        lastWrite?.getOrThrow()
     }
 
     private fun scheduleFlush() {
@@ -149,8 +168,10 @@ class InterestStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { interests?.let { Stored(it) } } ?: return
-        runCatching {
-            context.interestsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                context.interestsDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 
