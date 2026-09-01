@@ -707,7 +707,10 @@ fun SettingsScreen(
                     "unread texts sms email imap mail inbox accounts notification access gmail outlook",
                 )
             ) item {
-                PrefSection("Texts & mail", initiallyExpanded = false) {
+                // ⚠️ No `initiallyExpanded = false`. This was the ONE section of the twenty-two in
+                // this file that rendered collapsed, so the whole of "link your mail" was a bare
+                // header you had to know to tap — and the owner reported not being able to find it.
+                PrefSection("Texts & mail") {
                     PrefInfo(
                         "Unread counts",
                         // ⚠️ `subtitle`, not the positional second parameter — that one is `value`,

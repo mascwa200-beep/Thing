@@ -1,0 +1,3 @@
+# Regenerated from the source files by run.sh on every run — a committed copy could only ever
+# be stale, and --control deliberately leaves the PRE-FIX strings here until the next plain run.
+*.tsv
