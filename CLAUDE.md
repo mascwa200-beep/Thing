@@ -12256,3 +12256,167 @@ question is unanswered for every other asset the app opens by name. The sky and 
 because those paths are fragile; this one exists because its consumer is silent. Nothing
 systematically asks "does every `assets.open(...)` reach the APK", and deriving that list from the
 source is the obvious shape if it is ever worth doing.
+
+### THE WIDGET REACHES THE MOCKUP, AND EMAIL LINKS WITH NO PASSWORD (this session, PR #464)
+
+Owner: *"ensure that you … manage to get the full scope of the actual widget that was in that one
+reference image, with every feature hopefully, and also I was hoping that it would be like easier to
+just link the email without having to do like some key or this or that or the other thing. also you
+can use ultra code, you just can't burn through the usage like it doesn't matter."* Two binding
+AskUserQuestion answers: email = **read the phone's mail notifications** (chosen over "notifications
+*and* IMAP", so IMAP is to be retired), and the mid-height widget is **left as it is**.
+
+⚠️ **"You can't burn through the usage" is the constraint that governed the whole arc, and it
+overrides the ultracode directive.** Zero subagents and zero workflows. Every check below is local
+kotlinc + JUnit, a compile against the real `android.jar`, a typed probe, or CI.
+
+**Seven CI-green commits: W1 clock · W2 per-outlet news · W3 calendar column · W4 the widget stops
+hiding its failures · M1 the mail core · M2 the store and read path · M3 the listener, the grant and
+the picker.**
+
+#### The widget half — and the two defects were worth more than the features
+
+- ⚠️ **The board could not report a dead feed AT ALL.** `degradedLine` was folded only into the ROW
+  list and the board received `foot = sysLine` instead — so on BOTH tall breakpoints, the surface
+  this whole arc exists to fill, a source that threw was indistinguishable from a quiet day. It has
+  its own view now, deliberately **not** gated on `full`: a failure notice that appears at one
+  height and not the other is half a diagnostic. That one line is the stated exception to "leave
+  mid-size as is" — it draws nothing unless something has actually failed.
+- ⚠️ **And on the row form it was truncated, with the notice first to go.** Twenty-one `rows +=`
+  sites against twenty slots, plus the notice appended at the end, and a bare `rows.take(limit)`.
+  The comment above it said it went last *"so it never pushes real content off a small widget"* —
+  but going last is precisely what made it the first row dropped. `WidgetDiagnostics.fit` places it
+  **above** the cut and sheds a real row from the tail, where the caller appends in descending
+  consequence. Restoring the shipped `(rows + notice).take(cap)` fails exactly the two tests that
+  name it, returning "row 20" where the notice should be — the plan demanded a test that fails
+  against today's code, and that is it.
+- ⚠️ **`rule_6` was in the wrong place.** Declared between pair_0 and pair_1 while `render` has
+  always drawn it as the separator before the footer, so the hairline appeared in the MIDDLE of the
+  two-column block and the footer had none above it. Not a compile error and not a crash: a line in
+  the wrong place is only ever visible on a phone.
+- **`AppSettings.use24HourClock` was a DEAD SETTING** — declared, given a `PrefSwitch` the owner can
+  flip, and read by nobody. The board's `TextClock` is its first and only reader. ⚠️ Honouring an
+  app preference means setting **both** `format12Hour` and `format24Hour` to the same pattern, since
+  a TextClock picks the 24-hour one only when the DEVICE is in 24-hour mode. And `setCharSequence`
+  reaches a view method only if it is `@RemotableViewMethod` — a miss throws `ActionException` **on
+  the device** while compiling perfectly, so the three remotable TextClock methods were read out of
+  the platform bytecode rather than recalled.
+- **Per-outlet news costs zero new I/O** — the provider already fetched the TOP list and threw away
+  everything but `.firstOrNull()`. New `BreakingNews.perOutlet`; ⚠️ the tempting shortcut (passing
+  `source` as `select`'s existing `key`) is subtly wrong, because that dedupe is first-occurrence
+  over input order, so each outlet would be represented by an arbitrary article rather than its
+  newest. The battery moved into THIS PHONE where the mockup puts it and the footer kept the
+  connection, because both regions draw only at full height and leaving the combined line in the
+  footer would print the same percentage a few centimetres below itself.
+
+⚠️ **A CORRECTION TO MY OWN PLAN, recorded rather than acted on.** It listed "the Kp number is not
+printed" and that is **wrong**: `SpaceWeatherExplainers.kp` returns `"Kp ${trimNum(k)} — ${band}"`,
+so the widget has always rendered `SPC  Kp 3.4 — Unsettled`. I read the call site and inferred the
+headline was the band alone instead of reading the function. No change was needed and none was made.
+
+#### The mail half — what the number means is the whole design
+
+`core:telemetry/MailGlance.kt` (15 tests) + `data/comms/{MailNotices, MailNoticeStore,
+NotificationAccess, MailNotificationListener}` + `feature/settings/MailAppPicker.kt`.
+
+- ⚠️ **It says "N new", never "N unread", and `Glance.line` is the only phrasing in the app.** They
+  are different quantities — a mail read on a laptop is unread nowhere and its notification may
+  still be sitting there; a notification swiped away is gone while the mail is not. **And no total
+  is ever computed across this and SMS**: texts are counted exactly from the content provider, and a
+  combined figure would be wrong in a way neither half is.
+- ⚠️ **Counts only. `Notice` has nowhere to put a sender or a subject**, and the reason is concrete:
+  `DebugUploader` uploads logcat, the breadcrumb ring and the recent activity log, and `SecretScrub`
+  structurally cannot protect a person's name — its strong pass matches exact values out of the
+  settings blob, and a name is not in it; its pattern pass looks for credential *shapes*, and
+  "Re: your test results" has none. Refusing to hold it is the only real protection.
+- **The four ways the count comes out wrong on a real phone**, each a rule and each negative-tested:
+  a permanent foreground notification is not waiting mail (K-9 and FairEmail would give a stuck
+  "1 new" for ever); a badge on every child is not multiplied by its children (three children
+  carrying 57 would read 171); a summary stating zero is worth **one**, not none; and a replayed
+  notification is not new mail (dedupe by the platform's own key, because a rebind hands back what
+  is already on the shade). Groups bucket on `groupKey`, not the package — an app running two
+  accounts would otherwise lose one.
+- **Three double-count vectors against SMS, all barred**: `CATEGORY_MESSAGE` never counts; the
+  default SMS package is barred **before** the ticked set is consulted, because RCS through Google
+  Messages can post with no category at all; and the picker starts empty and never seeds a messaging
+  package.
+- ⚠️ **NEITHER platform signal gates anything — the user picks.** `CATEGORY_EMAIL` is optional
+  metadata plenty of mail apps never set, and a hardcoded allowlist goes stale *invisibly*.
+  `MailGlance.LIKELY_MAIL` decides the picker's ORDER and never its membership, and **only apps that
+  have actually notified are offered** — ticking one that never notifies is a control that cannot
+  work. The listener records the whole shade on connect so the list is populated immediately.
+- ⚠️ **THE MANIFEST LINE THAT FAILS SILENTLY.** Every other service here is `exported="false"`, and
+  copying that means the system binder can never reach the component: no error, no log, no crash —
+  a feature that never counts anything, which reads as a bug in the counting. It must be
+  `exported="true"` **with** `android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"`,
+  which is what protects it, since only the system holds that permission.
+- **A snapshot, never an accumulator.** Every trigger recomputes from `getActiveNotifications()`;
+  posts and removals are *triggers*, not data. A snapshot cannot drift, so removals missed while the
+  process was dead and posts replayed across a rebind all self-correct. This runs for every
+  notification on the phone, so the callbacks do a package check against a `@Volatile` field — the
+  alternative being a Keystore-decrypted settings read per notification — then a debounced hand-off.
+- ⚠️ **A DataStore of its own, not `DiskCache`**: that cache LRU-prunes at 8 MB and its own KDoc says
+  nothing in it is a system of record, but this snapshot has **no upstream to refetch from**.
+  `read()` answers **null the moment the grant is gone**, and is deliberately *not* aged out — a
+  count with no new mail since Tuesday is days old and still exactly right.
+- ⚠️ **Three states on the Settings row, not two**, and whether it is running is inferred from
+  EVIDENCE (has it ever read the shade?) rather than a `@Volatile` flag, which would be false on
+  every freshly-started process — exactly when somebody is reading that screen. The row re-reads on
+  `ON_START`, because access is granted in a SYSTEM page and the moment that matters is the return.
+- ⚠️ Store reads are gated on the grant, and not merely to save work: the first read **creates** the
+  DataStore file, and `AppContainer` says in writing that a phone which never grants access never
+  has it on disk.
+
+#### Verification techniques worth reusing
+
+- ⚠️ **Split the platform-facing half into its own file so it CAN be gated locally.** The listener
+  and the picker reach the app container, so neither compiles standalone — but `MailNotices` does,
+  and it is exactly where getting a platform API wrong is plausible and invisible. Every signature
+  (`sbn.key`, `groupKey`, `isOngoing`, `FLAG_GROUP_SUMMARY`, `Notification.number`,
+  `Telephony.Sms.getDefaultSmsPackage`) is confirmed against the real `android.jar` in a minute.
+  Same split, same stated reason, as `TranscriptSeal`.
+- ⚠️ **For what cannot be split: compile against stubs COPIED VERBATIM from the real declarations.**
+  `PulseApplication`, `AppContainer`, `SettingsRepository`, `AppSettings`, `PrefSwitch`, `PrefInfo`,
+  `PrefClickable`, `LcarsDialog` — ten files then report **frontend clean** against the real
+  platform, real Compose, real DataStore and real lifecycle artifacts. Negative-tested by renaming
+  `PrefSwitch`'s `onChange` to `onCheckedChange`, which it caught by name. A stub written from
+  memory asserts that the wrong thing is fine, and that has cost this repo a CI round before.
+- A **typed probe** compiled AND RAN the widget's exact `buildList` expression against the real core:
+  3 → `MAIL  3 new`, 0 → nothing, null → nothing.
+
+#### ⚠️ TWO NEW FALSE-POSITIVE SHAPES FOR `tools/android_resolve_check.sh`, both now in its own header
+
+1. **Its caveat block claimed the "argument type mismatch: actual type is X, but X was expected"
+   false positive "never" happens for `core/telemetry`. That is false and was measured to be
+   false.** A `?.let { add(...) }` inside a `buildList` reports
+   `Function1<String, Boolean>` vs `Function1<T, R>` — and the control that settles it is
+   `TaskBoard.focus`, a core function the same file already imports and that ships green in CI,
+   reproducing it identically.
+2. **The complaint set is NOT monotone, so a "NEW" line can name code you did not touch and that is
+   not even in the target set.** The core is compiled every run, and a compilation carrying more
+   error-typed symbols gives up earlier and therefore reports LESS — so adding a file lets the
+   compiler get further and surfaces complaints that were always latent. Measured: a `MatchGroup`
+   mismatch that is `supergroups[category]` in `Curriculum.kt`. **Grep for a complaint's construct
+   in your own diff before chasing it.** A NEW file bites hardest, having no baseline at all.
+
+#### ⚠️ M4 — RETIRING IMAP — IS DELIBERATELY NOT DONE
+
+The owner's choice settles the END STATE, and the plan sequences this last and marks it vetoable for
+a reason that still holds: **M1–M3 are entirely on-device-unverified.** Removing the working IMAP
+path before the replacement is proven would leave the owner with no mail count at all if notification
+listeners misbehave on GrapheneOS, or if their mail app does not notify. It is one commit whenever
+they confirm — and the honest loss to state when it happens is that an account with no app on the
+phone (a work IMAP box read only on a desktop) becomes invisible.
+
+#### ⚠️ Owner-verify on the Pixel — CI compiles a widget, it never draws one or reads a notification
+
+1. **The header should show a ticking clock** that updates without the widget refreshing, and it
+   should follow Settings' own 24-hour switch rather than the device's.
+2. **Three different outlets** on the news lines, not one headline; and a **calendar column** with
+   real events (refused `READ_CALENDAR` should say so rather than showing a blank).
+3. **Resize the widget to full height**: THIS PHONE should carry power, data and storage; SYS should
+   be at the bottom; and the hairline should sit above SYS rather than in the middle of the columns.
+4. **Settings → Texts & mail → "Switch on notification access"**, then come back — the row should
+   change on its own. Tick your mail app and check the count against the app itself. The picker
+   should show what each ticked app is contributing, which is where a wrong tick shows up.
+5. **If a feed fails, the tall widget should now say so.** Nothing else in this arc surfaces that.
