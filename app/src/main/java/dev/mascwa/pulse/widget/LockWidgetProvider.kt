@@ -17,6 +17,7 @@ import dev.mascwa.pulse.core.device.MobileData
 import dev.mascwa.pulse.core.telemetry.BreakingNews
 import dev.mascwa.pulse.core.telemetry.DayPart
 import dev.mascwa.pulse.core.telemetry.Geodesy
+import dev.mascwa.pulse.core.telemetry.MailGlance
 import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
@@ -672,6 +673,12 @@ class LockWidgetProvider : AppWidgetProvider() {
                             // "this app may not look" is a fact about the app, so a missing
                             // permission draws nothing rather than a reassuring 0.
                             c2.sms?.let { add("TEXTS  $it unread") }
+                            // ⚠️ "new", not "unread", and the word comes from the core rather than
+                            // from here. This counts what the phone's mail apps notified about and
+                            // that has not been cleared, which is a different quantity from the
+                            // IMAP rows below — so it is its own line and is never summed with
+                            // them. Absent until notification access is granted.
+                            MailGlance.line(c2.notifiedMail)?.let { add("MAIL  $it") }
                             c2.mailboxes.take(2).forEach { box ->
                                 val label = box.label.take(12).uppercase()
                                 // A mailbox that could not answer says so rather than vanishing —

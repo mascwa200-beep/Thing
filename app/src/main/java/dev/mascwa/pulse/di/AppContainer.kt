@@ -335,8 +335,19 @@ class AppContainer(private val appContext: Context) {
      * ⚠️ The mail half is one TLS round trip per account and must never sit in the widget's
      * four-second budget: `RefreshWorker` calls `refresh` and the widget reads `cached`.
      */
+    /**
+     * The last count of waiting mail worked out from the notification shade.
+     *
+     * ⚠️ Lazy, so a phone that never grants notification access never has this DataStore on disk at
+     * all: nothing constructs it until something asks, and the only asker is the read path below.
+     */
+    val mailNoticeStore: dev.mascwa.pulse.data.comms.MailNoticeStore by lazy {
+        dev.mascwa.pulse.data.comms.MailNoticeStore(appContext, json)
+    }
     val commsRepository: dev.mascwa.pulse.data.comms.CommsRepository by lazy {
-        dev.mascwa.pulse.data.comms.CommsRepository(appContext, diskCache)
+        // The narrow thing rather than the store, so CommsRepository keeps compiling against
+        // nothing but the platform — see the parameter's own note.
+        dev.mascwa.pulse.data.comms.CommsRepository(appContext, diskCache) { mailNoticeStore.read()?.total }
     }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 

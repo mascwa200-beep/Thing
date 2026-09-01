@@ -237,7 +237,29 @@ fi
 # Settle it the documented way rather than shrugging: a typed probe compiled against the COMPILED
 # classes of both modules, which has only one definition of each. If the probe compiles and runs,
 # the complaint was this.
-# (`:core:telemetry` is passed as SOURCES, so it never has this problem — only feeds does.)
+#
+# ⚠️ This paragraph used to end "(`:core:telemetry` is passed as SOURCES, so it never has this
+# problem — only feeds does.)" **That is false and was measured to be false.** The mismatch can name
+# a STDLIB type rather than a module one, and it fires on a `:core:telemetry` value too: a
+# `?.let { add(...) }` inside a `buildList`, whose receiver is a core call, reports
+#   argument type mismatch: actual type is 'kotlin.Function1<kotlin.String, kotlin.Boolean>',
+#   but 'kotlin.Function1<T, R>' was expected.
+# Reproduced with `TaskBoard.focus(...)`, a core function already imported by the target file and
+# shipping green in CI, so it is the gate and not the code. `let`'s `T` simply cannot be pinned in a
+# compilation holding two definitions of something in its chain. Same remedy: a typed probe.
+#
+# ⚠️ **AND THE COMPLAINT SET IS NOT MONOTONE, so a "NEW" line can name code you did not touch and
+# that is not even in the target set.** The core is compiled every run, and a compilation carrying
+# more error-typed symbols gives up earlier and therefore reports LESS. Add a file and the compiler
+# gets further, and complaints that were always latent in `core/telemetry` appear for the first
+# time. Measured: adding a new app file surfaced
+#   argument type mismatch: actual type is 'kotlin.text.MatchGroup', but 'kotlin.String' was expected.
+# which is `supergroups[category]` in `Curriculum.kt` — a map lookup the compiler re-resolves onto
+# `MatchGroupCollection.get` once the map's own type has gone bad. Before chasing a complaint, grep
+# for its construct in your diff; if it is not there, it is not yours.
+#
+# ⚠️ A NEW FILE has no baseline at all, so this bites hardest there: HEAD cannot be checked out for
+# a file that does not exist in it, and the two compilations therefore hold different file sets.
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
 # ⚠️ JUnit is here because this gate is routinely handed `src/test` files alongside the source they
 # cover, and without it EVERY test file reports `unresolved reference 'junit'` plus one line per

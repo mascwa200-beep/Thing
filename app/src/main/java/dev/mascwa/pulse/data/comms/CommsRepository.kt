@@ -37,6 +37,17 @@ class CommsRepository(
     private val appContext: Context,
     private val cache: DiskCache,
     private val imap: ImapClient = ImapClient(),
+    /**
+     * How much mail the phone's own apps have notified about, or null when this app may not read
+     * the shade. See `MailGlance` for what that number means and why it is not "unread".
+     *
+     * ⚠️ **A lambda rather than the store itself, and that is the same reasoning as [refresh] taking
+     * accounts instead of the whole `AppSettings`.** `MailNoticeStore` reaches DataStore and the
+     * telemetry core; taking it here would make this file one that only CI can type-check, and the
+     * KDoc above records that as a property worth keeping. The default makes every existing
+     * construction — and every test — carry on meaning what it did.
+     */
+    private val readNotifiedMail: suspend () -> Int? = { null },
 ) {
 
     /** One mailbox's answer, kept so the widget can read it without a network. */
@@ -55,6 +66,17 @@ class CommsRepository(
         val sms: Int? = null,
         val mailboxes: List<MailboxState> = emptyList(),
         val checkedAtMs: Long = 0,
+        /**
+         * Mail the phone's own mail apps have notified about and that has not been cleared.
+         *
+         * ⚠️ **A different quantity from [MailboxState.unread], and never added to it.** That one is
+         * a true server-side unread count from IMAP; this one is what the shade is showing. The same
+         * mailbox can appear in both — a Gmail account added here and the Gmail app installed — so
+         * summing them would count one inbox twice, and the two numbers legitimately disagree.
+         *
+         * Defaulted, so a cached blob written before this field existed still decodes.
+         */
+        val notifiedMail: Int? = null,
     )
 
     /** Whether the app may count texts. Absent without it — never a zero. */
@@ -98,10 +120,12 @@ class CommsRepository(
         val boxes = accounts.map { account ->
             async { ask(account) }
         }
+        val notified = async { runCatching { readNotifiedMail() }.getOrNull() }
         val comms = Comms(
             sms = sms.await(),
             mailboxes = boxes.map { it.await() },
             checkedAtMs = System.currentTimeMillis(),
+            notifiedMail = notified.await(),
         )
         runCatching { cache.write(KEY, comms, Comms.serializer()) }
         comms
@@ -113,13 +137,19 @@ class CommsRepository(
      * ⚠️ SMS is re-read here rather than taken from the cache: it is a local query costing nothing,
      * and the cached value could be half an hour old when the answer is on the phone right now. The
      * mailboxes are the part that has to be cached.
+     *
+     * The notified-mail count is re-read for exactly the same reason — it is a local file, and it is
+     * written by a listener that runs on its own schedule rather than on the worker's, so the cached
+     * copy is behind by construction. It is also the field that answers null when notification
+     * access has been revoked, and a stale cached number would keep reporting after that.
      */
     suspend fun cached(): Comms? {
         val held = runCatching { cache.readAny(KEY, Comms.serializer())?.value }.getOrNull()
         val sms = unreadSms()
+        val notified = runCatching { readNotifiedMail() }.getOrNull()
         return when {
-            held != null -> held.copy(sms = sms)
-            sms != null -> Comms(sms = sms)
+            held != null -> held.copy(sms = sms, notifiedMail = notified)
+            sms != null || notified != null -> Comms(sms = sms, notifiedMail = notified)
             else -> null
         }
     }

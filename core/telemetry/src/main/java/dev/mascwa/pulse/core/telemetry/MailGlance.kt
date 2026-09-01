@@ -101,15 +101,22 @@ object MailGlance {
 
     /** The whole reading. */
     data class Glance(val apps: List<App>, val total: Int) {
-        /**
-         * The one phrasing, or null when there is nothing to say.
-         *
-         * ⚠️ "new", never "unread" — see this file's KDoc. Null rather than "0 new", because zero
-         * here means "nothing has been notified", which on a phone with notifications switched off
-         * is not a statement about the mailbox at all.
-         */
-        val line: String? get() = if (total <= 0) null else "$total new"
+        /** The one phrasing — see [MailGlance.line]. */
+        val line: String? get() = line(total)
     }
+
+    /**
+     * The one phrasing, or null when there is nothing to say.
+     *
+     * ⚠️ "new", never "unread" — see this file's KDoc. Null rather than "0 new", because zero here
+     * means "nothing has been notified", which on a phone with notifications switched off is not a
+     * statement about the mailbox at all; and null for null, which is "this app may not look".
+     *
+     * A function beside [Glance] rather than only a property on it, because the count reaches the
+     * widget as a bare number through the comms cache — the whole `Glance` is not carried across —
+     * and a second `"$n new"` written at that call site is how one phrasing becomes two.
+     */
+    fun line(total: Int?): String? = if (total == null || total <= 0) null else "$total new"
 
     /**
      * What is waiting, per app and in total.

@@ -185,6 +185,18 @@ class MailGlanceTest {
     }
 
     @Test
+    fun `the phrasing is the same whether the whole reading or a bare number is in hand`() {
+        // ⚠️ The count reaches the widget as a bare Int through the comms cache — the Glance itself
+        // is not carried across — so the free function is the one somebody would otherwise
+        // reimplement at that call site, and the two must agree by construction rather than by
+        // both happening to say "new" today.
+        assertEquals(MailGlance.summarise(List(2) { notice() }, watching(GMAIL)).line, MailGlance.line(2))
+        assertEquals("2 new", MailGlance.line(2))
+        assertNull("nothing notified is not a statement about the mailbox", MailGlance.line(0))
+        assertNull("and neither is 'this app may not look'", MailGlance.line(null))
+    }
+
+    @Test
     fun `the picker's seed list never offers a messaging app`() {
         // Seeding one would put a texts app at the top of a list of mail apps, and one hurried tick
         // would then count every text twice. The list orders the picker and does nothing else, so
