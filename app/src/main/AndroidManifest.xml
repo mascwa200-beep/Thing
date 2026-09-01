@@ -357,6 +357,31 @@
         </service>
 
         <!--
+            Counts waiting mail by reading what the phone's own mail apps have notified about — the
+            whole of linking email without a password. No network, no credential, no account.
+
+            ⚠️ **exported="true" here is REQUIRED and is the opposite of every other service in this
+            file, and getting it wrong fails silently.** The system binds this component; with
+            exported="false" the binder simply cannot reach it, and there is no error, no log and no
+            crash — just a feature that never counts anything, which reads as a bug in the counting
+            rather than in this declaration. What protects it is the permission below:
+            BIND_NOTIFICATION_LISTENER_SERVICE is held by the system and by nothing else, so no other
+            app on the device can bind to it.
+
+            There is no runtime permission dialog for any of this and no way to request one. The
+            only route is the user switching the app on in the system's notification-access page.
+        -->
+        <service
+            android:name=".data.comms.MailNotificationListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
             LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the
             service must never be startable by another app on the device. Its inbound surface is the TCP
             socket it opens, which is guarded by pairing + signatures + a private-address check, not by

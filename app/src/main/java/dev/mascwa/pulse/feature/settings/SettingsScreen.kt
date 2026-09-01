@@ -702,7 +702,11 @@ fun SettingsScreen(
             }
 
             // ----- What is waiting for you: unread texts and unread mail -----
-            if (vis(SettingsCategory.CONTENT, "unread texts sms email imap mail inbox accounts")) item {
+            if (vis(
+                    SettingsCategory.CONTENT,
+                    "unread texts sms email imap mail inbox accounts notification access gmail outlook",
+                )
+            ) item {
                 PrefSection("Texts & mail", initiallyExpanded = false) {
                     PrefInfo(
                         "Unread counts",
@@ -726,6 +730,13 @@ fun SettingsScreen(
                     } else {
                         PrefInfo("Unread texts", "Counting")
                     }
+                    // Mail with no password at all, from the notification shade. Its own rows,
+                    // above the IMAP mailboxes, because it is the one most people want and the one
+                    // that needs nothing typed in.
+                    MailNotificationRows(
+                        chosen = s.mailApps,
+                        onChosenChange = { picked -> vm.update { st -> st.copy(mailApps = picked) } },
+                    )
                     s.emailAccounts.forEachIndexed { i, acct ->
                         PrefClickable(
                             acct.display,
@@ -1357,6 +1368,13 @@ fun SettingsScreen(
                         s.jarvis.reflectionEnabled,
                     ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
                     PrefClickable(
+                        "Clear mail counts",
+                        subtitle = "Forget how much mail is waiting and which of your apps have been " +
+                            "seen to notify. The count comes back on its own; the list of apps is " +
+                            "the part worth forgetting. On-device only.",
+                        onClick = { vm.clearMailNotices() },
+                    )
+                    PrefClickable(
                         "Clear what the Oracle learned",
                         subtitle = "Forget which advisories you act on. The Oracle keeps a tally per rule " +
                             "and ranks by it; clearing puts every rule back on equal footing. On-device only.",
@@ -1785,18 +1803,6 @@ private fun AddWatchRow(onAdd: (WatchItem) -> Unit) {
             dismissText = "CANCEL",
         )
     }
-}
-
-/** Body copy inside a dialog — the app's own monospace, not Material's body style. */
-@Composable
-private fun DialogBody(text: String) {
-    Text(
-        text,
-        fontFamily = JetBrainsMono,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        color = Pulse.colors.ink2,
-    )
 }
 
 @Composable

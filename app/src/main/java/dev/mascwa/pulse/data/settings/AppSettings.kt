@@ -475,6 +475,19 @@ data class AppSettings(
      */
     val emailAccounts: List<EmailAccount> = emptyList(),
 
+    /**
+     * Packages whose notifications count as waiting mail. Empty = nothing is counted.
+     *
+     * ⚠️ **Ticked by hand, and it starts empty on purpose.** Neither signal the platform offers is
+     * trustworthy enough to decide this: `CATEGORY_EMAIL` is optional metadata that plenty of mail
+     * apps never set, and a hardcoded allowlist goes stale invisibly. See `MailGlance`, which holds
+     * the rule and the reasoning; `MailGlance.LIKELY_MAIL` only decides what the picker offers first.
+     *
+     * ⚠️ Carries no credential — package names and nothing else — so unlike [emailAccounts] it stays
+     * out of `allSecretValues` and is restored by a backup like any other preference.
+     */
+    val mailApps: List<String> = emptyList(),
+
     // On-device assistant
     val health: HealthSettings = HealthSettings(),
 

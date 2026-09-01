@@ -42,6 +42,7 @@ class SettingsViewModel(
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
     private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
+    private val mailNotices: dev.mascwa.pulse.data.comms.MailNoticeStore,
     private val study: dev.mascwa.pulse.data.study.StudyStore,
     private val python: dev.mascwa.pulse.data.python.PythonRuntime,
 ) : ViewModel() {
@@ -458,6 +459,17 @@ class SettingsViewModel(
     /** Forget which advisories the user acts on — every Oracle rule back to equal footing. */
     fun clearOracleLearning() {
         viewModelScope.launch { oracleLearning.clear() }
+    }
+
+    /**
+     * Forget the mail counts and which apps have been seen to notify.
+     *
+     * ⚠️ The count itself is rebuilt from the shade the next time the listener connects, so the
+     * part worth clearing is the SEEN list — a record of which of your apps have notified you,
+     * which is the only thing here that a person might not want kept.
+     */
+    fun clearMailNotices() {
+        viewModelScope.launch { mailNotices.clear() }
     }
 
     /** Forget the episodic memory stream (timestamped observations & reflections). */

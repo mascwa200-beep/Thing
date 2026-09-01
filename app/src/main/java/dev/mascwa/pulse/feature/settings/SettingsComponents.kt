@@ -209,3 +209,20 @@ fun <T> PrefRadioGroup(
         }
     }
 }
+
+/**
+ * Body copy inside a dialog — the app's own monospace, not Material's body style.
+ *
+ * `internal` so a dialog defined in a sibling file styles its prose identically. Two copies of this
+ * is how one screen's dialogs come to look like a different application from the next's.
+ */
+@Composable
+internal fun DialogBody(text: String) {
+    Text(
+        text,
+        fontFamily = JetBrainsMono,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        color = Pulse.colors.ink2,
+    )
+}

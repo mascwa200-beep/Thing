@@ -59,12 +59,27 @@ class MailNoticeStore(
     @Serializable
     private data class StoredApp(val pkg: String, val waiting: Int)
 
+    /**
+     * An app that has been seen to notify, and whether it has ever claimed to be mail.
+     *
+     * ⚠️ A package name and a boolean. Nothing about what it notified, or when, or how often — the
+     * picker needs a list to offer and nothing more, and anything richer would be a log of when the
+     * user's apps talk to them.
+     */
+    @Serializable
+    private data class StoredSeen(val pkg: String, val everEmail: Boolean = false)
+
     @Serializable
     private data class Stored(
         val apps: List<StoredApp> = emptyList(),
         /** When the listener last recomputed. Kept for the diagnostics surface, not for expiry. */
         val atMs: Long = 0,
+        /** Everything that has notified since access was granted, for the picker. Defaulted. */
+        val seen: List<StoredSeen> = emptyList(),
     )
+
+    /** One candidate for the picker: has it notified, and did it call itself mail? */
+    data class SeenApp(val pkg: String, val everEmail: Boolean)
 
     private val prefsKey = stringPreferencesKey("mail_notices_json")
     private val mutex = Mutex()
@@ -98,6 +113,74 @@ class MailNoticeStore(
 
     /** When the listener last recomputed, or 0 if it never has. For the diagnostics surface. */
     suspend fun lastRecomputedMs(): Long = ensureLoaded().atMs
+
+    /**
+     * What the picker can offer, newest observation last.
+     *
+     * ⚠️ Not gated on the grant, unlike [read]. This is a list of app names the user is about to be
+     * shown so they can choose from it, not a reading taken from the shade — and a picker that
+     * emptied itself the moment access was revoked would give somebody nothing to look at on the
+     * screen that explains how to grant it again.
+     */
+    suspend fun seen(): List<SeenApp> = ensureLoaded().seen.map { SeenApp(it.pkg, it.everEmail) }
+
+    /**
+     * Record that a package notified, and whether it called itself mail.
+     *
+     * ⚠️ `everEmail` only ever goes from false to true. An app that sets `CATEGORY_EMAIL` on some
+     * notifications and not others — a sync summary against a per-message alert, say — would
+     * otherwise flicker in and out of the picker's suggested half depending on what happened to be
+     * on the shade when it was last opened.
+     *
+     * ⚠️ **Nothing is written for an app already recorded**, which is what keeps this off the hot
+     * path: the common case is a notification from a package seen a hundred times before, and it
+     * costs a list scan and no write at all.
+     *
+     * ⚠️ Capped, and the eviction policy is therefore oldest-DISCOVERED rather than
+     * least-recently-seen — an app is only ever appended on first sight, and re-ordering it on
+     * every notification is precisely the write this avoids. The cap is generous enough that it
+     * should never bind on a real phone; it exists so the list cannot grow with the install list
+     * for ever, not to make a judgement about which apps matter. Being evicted only means the app
+     * is missing from the picker — an app already ticked carries on counting.
+     */
+    fun noticeSeen(pkg: String, isEmail: Boolean) = noticeSeenAll(listOf(SeenApp(pkg, isEmail)))
+
+    /**
+     * The same, for a whole shade at once.
+     *
+     * ⚠️ One lock and one scheduled write for the lot. The listener records every notification it
+     * can see the moment it connects, so the picker has something to offer immediately rather than
+     * being empty until the next mail arrives — and doing that one package at a time would launch a
+     * coroutine per notification on a shade that can hold fifty.
+     */
+    fun noticeSeenAll(apps: List<SeenApp>) {
+        val wanted = apps.filter { it.pkg.isNotBlank() }
+        if (wanted.isEmpty()) return
+        scope.launch {
+            ensureLoaded()
+            val changed = mutex.withLock {
+                val current = held ?: Stored()
+                val byPkg = LinkedHashMap<String, Boolean>()
+                current.seen.forEach { byPkg[it.pkg] = it.everEmail }
+                var any = false
+                for (app in wanted) {
+                    val known = byPkg[app.pkg]
+                    // Nothing to write for a package already recorded, unless this is the first
+                    // time it has called itself mail. That is what keeps this off the hot path.
+                    if (known != null && (known || !app.everEmail)) continue
+                    byPkg[app.pkg] = app.everEmail || (known == true)
+                    any = true
+                }
+                if (any) {
+                    held = current.copy(
+                        seen = byPkg.entries.map { StoredSeen(it.key, it.value) }.takeLast(MAX_SEEN),
+                    )
+                }
+                any
+            }
+            if (changed) scheduleFlush()
+        }
+    }
 
     /**
      * Replace the whole snapshot.
@@ -170,5 +253,8 @@ class MailNoticeStore(
          * it reconnects, so a snapshot missed by a killed process is rebuilt rather than gone.
          */
         const val FLUSH_DELAY_MS = 5_000L
+
+        /** How many notifying packages the picker will remember. See [noticeSeen]. */
+        const val MAX_SEEN = 300
     }
 }
