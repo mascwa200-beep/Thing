@@ -12420,3 +12420,119 @@ phone (a work IMAP box read only on a desktop) becomes invisible.
    change on its own. Tick your mail app and check the count against the app itself. The picker
    should show what each ticked app is contributing, which is where a wrong tick shows up.
 5. **If a feed fails, the tall widget should now say so.** Nothing else in this arc surfaces that.
+
+### "I CAN'T FIND IT" — the mail setting was findable four ways and none of them worked (this session, `b1c0d032`)
+
+Owner's reply to the arc above, in full: **"I can't find it"**, and via AskUserQuestion they named
+the thing — **the mail setting**. **Zero subagent and zero workflow spend**, per the standing
+plan-usage constraint, which overrides plan mode's own instruction to dispatch Explore/Plan agents
+as it has for every arc since.
+
+⚠️ **The report was literally true, and I measured it rather than taking my own word for it: typing
+"email" into the app's own search returned NOTHING.** The setting was reachable the whole time. Three
+of the four ways a person looks for something failed, each for a different reason:
+
+| how you look | before |
+|---|---|
+| scan the ten Settings rows | the section lives under CONTENT, whose row read *"Content & feeds — Refresh · watchlist · feeds · mutes"* |
+| land on that page | it was the **only one of 22 `PrefSection` call sites** passing `initiallyExpanded = false` — a bare header you had to know to tap |
+| device search | `DeviceSearchIndex` indexes `"${cat.blurb} ${cat.keywords}"`; neither held a mail word |
+| MENU search | the Settings entry's terms were `preferences options config toggles setup` |
+| the Settings search box | ✅ **worked** — the surface this change must not break |
+
+#### ⚠️ WHICH FIELD TAKES THE WORDS IS THE WHOLE DESIGN
+
+`vis()` (`SettingsScreen.kt:168`) matches a plain **substring** over
+`"title + keywords + the section's own keywords"`, and **five** sections live under CONTENT (Data &
+refresh, Texts & mail, Markets watchlist, Custom RSS feeds, Muted keywords). So a mail word in
+`keywords` or `title` makes searching "mail" *inside* Settings return **all five** — breaking the one
+surface that already worked in order to fix the two that did not.
+
+**`blurb` is the only field that reaches both the master row and device search while `vis` never
+reads it.** Measured against the three readers:
+
+| field | master row | device search | `vis` |
+|---|---|---|---|
+| `blurb` | ✅ | ✅ | — |
+| `keywords` | — | ✅ | ✅ |
+| `title` | ✅ | ✅ (result title) | ✅ |
+
+⚠️ **Both "mail" and "email" must be spelled out.** Device search ranks through `GuideSearch`, whose
+`wordMatch` scores 2 for an exact word and 1 only when one word is a **prefix** of the other at ≥4
+characters — neither is a prefix of the other, so one word does not find the other.
+
+⚠️ **Width measured, not guessed.** The blurb is JetBrainsMono 10sp (0.6 em ⇒ 6dp/char) in a
+`weight(1f)` column after 32dp of row padding, a 22dp icon, a 14dp gutter and the "›" — about 280dp
+on a 360dp phone ⇒ **~46 characters** before it wraps. The new string is **38**, now the longest of
+the ten and still inside the budget. "watchlist" and "mutes" left the blurb for the keywords, where
+search still finds them.
+
+#### The verification, and it is the reusable part
+
+**`scratchpad/mailfind/run.sh`** extracts the literals out of `SettingsCategory.kt`,
+`SettingsScreen.kt` and `Directory.kt` and runs the **shipped** `GuideSearch` + `DeviceSearch` over
+them — stronger than a unit test, because it checks what is in the tree rather than a paraphrase.
+`--control` restores the pre-fix strings, and the two runs together are the evidence:
+
+    query          before                          after
+    email          NOTHING                         Settings, Settings · Content & feeds
+    mail           NOTHING                         Settings, Settings · Content & feeds
+    texts          NOTHING                         Settings, Settings · Content & feeds
+    inbox          NOTHING                         Settings
+    unread mail    NOTHING                         Settings, Settings · Content & feeds
+    mail settings  Settings, · System, · Interface  Settings, Settings · Content & feeds
+
+And the surface that worked is unchanged: "mail", "email", "texts", "sms" and "inbox" each still
+return **exactly 1 of the 5** CONTENT sections. ⚠️ For contrast **"watchlist" and "rss" return 5 of
+5** — pre-existing, because those words sit in `cat.keywords`, and precisely what mail words there
+would have done. That contrast is what turns the design argument above into a measurement.
+
+⚠️ Two results worth expecting rather than chasing: **"sms" also returns Safety (SOS)**, correctly —
+that feature really does send SMS; and **device search for "email" returns two rows** (Settings, and
+Settings · Content & feeds). Both are right; the second is the precise one.
+
+#### Considered and rejected, each on evidence
+
+⚠️ **A MENU entry pointing at `settings?cat=content`** — one tap, its own name, and three silent
+defects: `MainActivity.kt:285` records usage as `route.substringBefore('?')`, so an argumented route
+can **never** be marked visited and `UsageInsights.recommend()` would offer it as untried for ever;
+`SiblingRail.kt:53,72` compares `entry.route == here` where `here` is argument-stripped, so it would
+**never highlight** and would stay clickable while you are on it, pushing a second Settings copy onto
+the back stack — the "back button is broken" shape that file's own comment warns about; and it would
+add a literal to `SHORTCUT_ROUTES`, which is only ever consulted after `substringBefore('?')`.
+
+⚠️ **A second MENU entry on the plain route** — `ENTRY_OF` is `associateBy { it.route }`, so the
+later entry wins and `menuLabel(Routes.SETTINGS)` would return "Texts & mail" for the whole Settings
+screen, everywhere the app names that feature.
+
+⚠️ **Mail words on `SECURITY.keywords`** — a plausible place to hunt, since this grants a permission.
+A category's keywords make the **category** match, and opening `settings?cat=security` shows only
+SECURITY sections — landing the searcher on a page that does not contain the thing. Worse than no
+match at all.
+
+#### Also corrected
+
+**`PrefSection`'s comment claimed "All sections start COLLAPSED by default"**, which the default
+argument one line below (`initiallyExpanded: Boolean = true`) flatly contradicts. Not harmless: it
+let a collapsed section read as the house style, and the one section that had been given `false` —
+by `6cc6be5f`, the earlier comms arc, not by M3 — was the whole of "link your mail". **No caller
+passes `false` today.**
+
+#### ⚠️ The systemic gap — recorded, deliberately not fixed
+
+**Every section's `vis()` keywords are visible ONLY to the Settings search box.** Device search sees
+`cat.blurb + cat.keywords` and nothing else, so any section naming something its category does not is
+findable inside Settings and **invisible from the app's main search**. There are **30** `vis()` call
+sites. Neither structural fix belongs in a "make the mail setting findable" change: folding section
+keywords into `cat.keywords` pollutes exactly as measured above, and lifting the 30 literals out of
+the composable into data so `DeviceSearchIndex` can read them is its own refactor.
+
+#### ⚠️ Owner-verify on the Pixel
+
+0. **Settings → System — is the installed build 2167 or higher?** Build #2166 published at 00:40 UTC
+   and auto-update installs "the next time you leave the app"; on anything older the mail row does
+   not exist in the installed app at all, and that is the whole answer.
+1. Open **Settings**: the fifth row should read *"Content & feeds — Refresh · feeds · texts · mail ·
+   email"*. Tap it; **"Texts & mail" should already be open**.
+2. **MENU** search "email", and the **SEARCH** screen for "email" — both should reach Settings.
+3. Ask the Computer to "open my mail settings".
