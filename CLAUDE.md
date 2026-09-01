@@ -12527,6 +12527,17 @@ sites. Neither structural fix belongs in a "make the mail setting findable" chan
 keywords into `cat.keywords` pollutes exactly as measured above, and lifting the 30 literals out of
 the composable into data so `DeviceSearchIndex` can read them is its own refactor.
 
+#### Shipped
+
+**LCARS #2167 (run 33461537412) fully green on `b1c0d032`** — every step, published to `latest`.
+Unit tests 3m38s, release APK 9m35s, whole run 16m35s. Each gate printed its own evidence:
+`kept: dev.mascwa.pulse.BuildConfig`, `kept: dev.mascwa.pulse.data.media.JsRuntime`, sentinel
+correctly absent; `stations.tsv: 189028 bytes`; food database 488 MB; all six sky assets present.
+**APK 661 MB (694,099,348 bytes)** — 596 bytes above the previous build, which is what a change made
+entirely of strings and comments plus a new version code looks like. The handoff commit that follows
+is docs-only and, per `paths-ignore`, triggered no run — verified in practice as well as on paper,
+since the build already in flight was not superseded under `cancel-in-progress`.
+
 #### ⚠️ Owner-verify on the Pixel
 
 0. **Settings → System — is the installed build 2167 or higher?** Build #2166 published at 00:40 UTC
