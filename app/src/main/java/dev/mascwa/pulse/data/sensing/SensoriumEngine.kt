@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.sensing
 
+import dev.mascwa.pulse.core.telemetry.AmbientSituation
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvMetrics
 import dev.mascwa.pulse.core.telemetry.EnvReading
@@ -12,15 +13,19 @@ import dev.mascwa.pulse.core.telemetry.SenseFrame
 import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.core.telemetry.SensoriumBaseline
 import dev.mascwa.pulse.core.telemetry.SensoriumEvents
+import dev.mascwa.pulse.core.telemetry.SituationRead
+import dev.mascwa.pulse.data.calendar.CalendarRepository
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.notifications.Notifier
 import dev.mascwa.pulse.security.WifiPolicyController
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * The Sensorium's conductor: the service calls [step] on every heartbeat, and the engine decides —
@@ -62,6 +67,14 @@ class SensoriumEngine(
      * definitions that can disagree about the same place.
      */
     private val wifi: WifiPolicyController,
+    /**
+     * The device diary, for the one signal that separates a meeting from a quiet cafe.
+     *
+     * ⚠️ Read on its own slow cadence and dispatched to IO — `upcoming` is a blocking
+     * ContentResolver query rather than a suspend function, and this engine's `step` runs on
+     * `Dispatchers.Default`. That is a trap this repository has already walked into once.
+     */
+    private val calendar: CalendarRepository,
 ) {
     private val _reading = MutableStateFlow(EnvReading())
     /** The live fused environmental read — the scanner's centerpiece, Computer's context line. */
@@ -77,6 +90,15 @@ class SensoriumEngine(
      * often to carry facts most turns do not need.
      */
     val phone: StateFlow<SenseContext> = _phone.asStateFlow()
+
+    private val _situation = MutableStateFlow(SituationRead())
+    /**
+     * What the person appears to be DOING — the read the acting layer will hang off.
+     *
+     * ⚠️ It is fed its own previous value, which is what gives [AmbientSituation] its hysteresis and
+     * what carries `sinceMs`. Nothing else may write it.
+     */
+    val situation: StateFlow<SituationRead> = _situation.asStateFlow()
 
     private val _anomalies = MutableStateFlow<List<EnvAnomaly>>(emptyList())
     /** What's unusual right now vs the learned normal (empty while the baseline is young). */
@@ -106,6 +128,9 @@ class SensoriumEngine(
     private var scenesAtMs = 0L
     private var soundDbfs: Float? = null
     private var soundDbfsAtMs = 0L
+
+    private var calendarBusy: Boolean? = null
+    private var calendarAtMs = 0L
 
     private var lastLux: Float? = null
     private var lastMagUt: Float? = null
@@ -253,8 +278,15 @@ class SensoriumEngine(
         // Posture rides the accelerometer this class already reads; away-from-home is the same pair
         // of reads the Oracle makes, so the two cannot end up disagreeing about the same place.
         _phone.value = runCatching {
-            senseContext.read(posture = snap.posture, awayFromHome = awayFromHome())
+            senseContext.read(
+                posture = snap.posture,
+                awayFromHome = awayFromHome(),
+                calendarBusy = calendarBusyNow(nowMs),
+            )
         }.getOrDefault(SenseContext())
+
+        // --- and what all of it adds up to ---
+        _situation.value = AmbientSituation.read(fused, _phone.value, hour, nowMs, _situation.value)
 
         // --- learn + judge (throttled so dense heartbeats don't over-weight one moment) ---
         if (nowMs - lastBaselineMs >= BASELINE_GAP_MS) {
@@ -289,6 +321,33 @@ class SensoriumEngine(
      * an unreadable SSID read as "away" switched somebody's Wi-Fi off inside their own house — so
      * "away" is only ever a positive fact about a network that was actually read.
      */
+    /**
+     * Is something on the calendar RIGHT NOW?
+     *
+     * ⚠️ **Null when the calendar cannot be read, never false.** `canRead` exists precisely because
+     * `upcoming` returns an empty list for three different situations — refused, unavailable, and a
+     * genuinely clear diary — and [AmbientSituation] requires a positive `true` before it will call
+     * anything a meeting. A refusal read as "nothing on" would simply mean the meeting rule never
+     * fires, which is a quiet failure rather than a loud one.
+     *
+     * ⚠️ All-day entries are excluded, matching `DayAhead`'s own convention. A holiday or a birthday
+     * spans the whole day, so counting it would say "in a meeting" from midnight to midnight.
+     *
+     * ⚠️ The horizon is short on purpose. The Instances table returns every instance OVERLAPPING the
+     * window, so anything running now is included however long ago it started; a wide horizon would
+     * only spend the row cap on events that have not begun.
+     */
+    private suspend fun calendarBusyNow(nowMs: Long): Boolean? {
+        if (calendarAtMs > 0L && nowMs - calendarAtMs < CALENDAR_GAP_MS) return calendarBusy
+        calendarAtMs = nowMs
+        calendarBusy = runCatching {
+            if (!calendar.canRead()) return@runCatching null
+            withContext(Dispatchers.IO) { calendar.upcoming(nowMs, CALENDAR_HORIZON_MS, max = 20) }
+                .any { !it.allDay && it.startMs <= nowMs && nowMs < it.endMs }
+        }.getOrNull()
+        return calendarBusy
+    }
+
     private suspend fun awayFromHome(): Boolean? = runCatching {
         val home = settings.current().security.homeSsids
         if (home.isEmpty()) null
@@ -342,5 +401,9 @@ class SensoriumEngine(
         const val NOTABLE_COOLDOWN_MS = 30 * 60_000L
         const val LOG_COOLDOWN_MS = 60 * 60_000L
         const val MEMORY_PER_DAY = 10
+        /** How often the diary is consulted. A meeting does not start between two heartbeats. */
+        const val CALENDAR_GAP_MS = 5 * 60_000L
+        /** See [calendarBusyNow] — wide enough to catch anything in progress, no wider. */
+        const val CALENDAR_HORIZON_MS = 2 * 60 * 60_000L
     }
 }

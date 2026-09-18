@@ -23,6 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +38,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.AudioRoute
 import dev.mascwa.pulse.core.telemetry.DndFilter
+import dev.mascwa.pulse.core.telemetry.ElapsedPhrase
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
@@ -43,6 +47,8 @@ import dev.mascwa.pulse.core.telemetry.Posture
 import dev.mascwa.pulse.core.telemetry.PressureTrend
 import dev.mascwa.pulse.core.telemetry.SenseContext
 import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.core.telemetry.Situation
+import dev.mascwa.pulse.core.telemetry.SituationRead
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.sensing.FusionSnapshot
 import dev.mascwa.pulse.data.sensing.SensorsPresent
@@ -55,6 +61,7 @@ import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlinx.coroutines.delay
 
 /**
  * The SENSORIUM scanner — the live environmental sweep: what the ship's senses read right now (fused
@@ -78,6 +85,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
     val lookNote by vm.lookNote.collectAsStateWithLifecycle()
     val phone by vm.phone.collectAsStateWithLifecycle()
+    val situation by vm.situation.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -86,6 +94,20 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     // See refreshModelBytes: the classifiers usually land while this screen is open, so a figure
     // read once at construction would report zero for the rest of the session.
     LaunchedEffect(Unit) { vm.refreshModelBytes() }
+
+    // ⚠️ A ticking clock, because reading the wall clock during composition would freeze.
+    // `situation` is a StateFlow of a data class, so it only emits when a FIELD changes — and a
+    // situation that is holding steady is exactly the case where nothing changes. Left to
+    // recomposition the card would have said "started 2 minutes ago" for the whole eight hours
+    // somebody was asleep. The tick is coarse because ElapsedPhrase is coarse, and it runs only
+    // while this screen is composed.
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(SITUATION_TICK_MS)
+            nowMs = System.currentTimeMillis()
+        }
+    }
 
     PulseScaffold(
         title = "Sensorium",
@@ -115,6 +137,9 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                         onLook = { vm.lookNow() },
                     )
                 }
+                // ⚠️ Above the facets on purpose: the fused reading is the raw material and this is
+                // the conclusion, and a person opening this screen wants the conclusion first.
+                item { SituationCard(situation, nowMs) }
                 item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
                 item { InstrumentsCard(fusion, reading) }
@@ -452,6 +477,87 @@ private fun InstrumentsCard(f: FusionSnapshot, reading: EnvReading) {
 }
 
 /**
+ * What all of it adds up to — the read the acting layer will hang off.
+ *
+ * ⚠️ **The evidence is on screen because it has to be.** Everything downstream of this can change
+ * what the phone does, and a person has to be able to see WHY it did. "Driving" on its own is
+ * unarguable-with; "Driving · moving at vehicle speed, audio over Bluetooth" can be recognised as
+ * wrong by the person it is wrong about, which is the only debugging this feature will ever get.
+ */
+@Composable
+private fun SituationCard(s: SituationRead, nowMs: Long) {
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "SITUATION", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = c.accent,
+            )
+            Spacer(Modifier.weight(1f))
+            // ⚠️ A count of points rather than a percentage. Confidence here is a scale and not a
+            // probability — see AmbientSituation.CONFIDENT — and dressing it up as "83%" would claim
+            // a precision the scoring does not have.
+            if (s.situation != Situation.UNKNOWN) {
+                Text(
+                    "◼".repeat((s.confidence * 5f).toInt().coerceIn(1, 5)),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent,
+                )
+            }
+        }
+        Text(
+            when (s.situation) {
+                Situation.DRIVING -> "Driving"
+                Situation.WALKING -> "Walking"
+                Situation.POCKETED -> "Put away"
+                Situation.ASLEEP -> "Asleep"
+                Situation.AT_DESK -> "Using the phone"
+                Situation.IN_A_MEETING -> "In a meeting"
+                Situation.IN_COMPANY -> "With people"
+                Situation.AT_HOME_IDLE -> "At home, phone down"
+                Situation.OUT_AND_ABOUT -> "Out and about"
+                Situation.UNKNOWN -> "Not sure"
+            },
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Black, fontSize = 20.sp,
+            color = if (s.situation == Situation.UNKNOWN) c.muted else c.ink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (s.situation == Situation.UNKNOWN) {
+            // ⚠️ Said out loud rather than left as a blank card. Not knowing is the commonest correct
+            // answer here and it is not a fault, but a screen that goes quiet about it looks broken.
+            Text(
+                "Nothing has reached the bar. That is usually right — most of what a phone can sense " +
+                    "is consistent with several different lives.",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            return@Column
+        }
+        Text(
+            s.evidence.joinToString(" · "),
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (s.sinceMs > 0L && nowMs > s.sinceMs) {
+            Text(
+                "started ${ElapsedPhrase.describe(nowMs - s.sinceMs)}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (s.contenders.isNotEmpty()) {
+            Text(
+                "or possibly ${s.contenders.joinToString(", ") { it.name.lowercase().replace('_', ' ') }}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/**
  * What the phone knows about ITSELF, beside what the instruments know about the room.
  *
  * ⚠️ **Every row says something, and the ways of saying nothing are kept apart.** This is the same
@@ -575,6 +681,15 @@ private fun EventRow(e: SensoriumStore.StoredEvent) {
         Text(relative(e.atMs), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
     }
 }
+
+/**
+ * How often the "started … ago" line is refreshed while the scanner is open.
+ *
+ * ⚠️ Deliberately coarse. [ElapsedPhrase] speaks in minutes and hours, so a faster tick would
+ * recompose the card for a string that cannot have changed; slower and the first minute of a new
+ * situation would read "now" for too long to believe.
+ */
+private const val SITUATION_TICK_MS = 20_000L
 
 private fun relative(atMs: Long): String {
     val mins = (System.currentTimeMillis() - atMs) / 60_000L

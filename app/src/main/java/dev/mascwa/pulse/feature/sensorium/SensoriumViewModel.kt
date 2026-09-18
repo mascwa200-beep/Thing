@@ -30,6 +30,9 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
     /** What the phone knows about itself — see [dev.mascwa.pulse.core.telemetry.SenseContext]. */
     val phone = c.sensoriumEngine.phone
 
+    /** What the person appears to be doing — see [dev.mascwa.pulse.core.telemetry.AmbientSituation]. */
+    val situation = c.sensoriumEngine.situation
+
     private val _lookNote = MutableStateFlow<String?>(null)
 
     /**

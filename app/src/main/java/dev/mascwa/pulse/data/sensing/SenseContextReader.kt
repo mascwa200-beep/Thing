@@ -107,10 +107,16 @@ class SenseContextReader(
      * is already registered there and a second registration would be a second cost for the same
      * numbers. [awayFromHome] is passed in for the same reason: the app already derives it for the
      * Oracle, and re-deriving it here would be a second definition of the same place.
+     *
+     * ⚠️ [calendarBusy] is passed in rather than read here because it is the one thing in this class
+     * that costs a permission AND blocks: `CalendarRepository.upcoming` is a ContentResolver query,
+     * not a suspend function, so it has to be dispatched to IO and cached on a slower cadence than
+     * this reader runs at. The engine owns that; this class stays a set of cheap synchronous reads.
      */
     fun read(
         posture: Posture? = null,
         awayFromHome: Boolean? = null,
+        calendarBusy: Boolean? = null,
     ): SenseContext {
         val pm = runCatching { app.getSystemService(Context.POWER_SERVICE) as? PowerManager }.getOrNull()
         val km = runCatching { app.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager }.getOrNull()
@@ -142,6 +148,7 @@ class SenseContextReader(
             route = am?.let { runCatching { routeOf(it) }.getOrNull() },
             dnd = runCatching { dndOf() }.getOrNull(),
             awayFromHome = awayFromHome,
+            calendarBusy = calendarBusy,
         )
     }
 

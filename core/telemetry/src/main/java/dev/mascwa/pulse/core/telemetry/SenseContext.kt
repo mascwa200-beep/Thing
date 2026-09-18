@@ -120,8 +120,9 @@ enum class Attention { IN_USE, PRESENT, AWAY, UNKNOWN }
  * evidence rather than inventing it.
  *
  * Nothing here costs a permission. Screen, lock, power, thermal, audio and Do Not Disturb are all
- * free reads; [awayFromHome] is already derived elsewhere in the app for the Oracle and is passed
- * in rather than read a second time.
+ * free reads; [awayFromHome] and [calendarBusy] are derived elsewhere in the app and are passed in
+ * rather than read a second time. The calendar is the one thing here that DOES cost a permission,
+ * and it stays null without it.
  */
 data class SenseContext(
     /** `PowerManager.isInteractive` — the screen is on, whatever is showing on it. */
@@ -166,6 +167,18 @@ data class SenseContext(
      * this says something about a place, and they are not the same question.
      */
     val awayFromHome: Boolean? = null,
+    /**
+     * The calendar says something is on RIGHT NOW.
+     *
+     * ⚠️ It arrives here with both a producer and a consumer, and it was deliberately cut from an
+     * earlier draft that had neither. A field on a hot-path data class that nothing writes is the
+     * defect class this whole arc exists to remove, and adding one while removing five would have
+     * been a poor trade.
+     *
+     * ⚠️ Null when READ_CALENDAR has not been granted, which must not read as "nothing on" —
+     * [AmbientSituation] requires a positive `true` before it will call anything a meeting.
+     */
+    val calendarBusy: Boolean? = null,
 ) {
 
     /**
@@ -249,6 +262,7 @@ data class SenseContext(
             DndFilter.TOTAL_SILENCE -> parts += "do not disturb"
             else -> {}
         }
+        if (calendarBusy == true) parts += "something on the calendar"
         if (awayFromHome == true) parts += "away from home"
         if (idle == true) parts += "dozing"
         return parts.joinToString(" · ")

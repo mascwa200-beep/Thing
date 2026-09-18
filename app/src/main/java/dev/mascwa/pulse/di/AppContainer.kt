@@ -914,7 +914,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sensing.SensoriumEngine(
             sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
             memoryStream, notifier, settingsRepository, locationProvider,
-            senseContextReader, wifiPolicyController,
+            senseContextReader, wifiPolicyController, calendarRepository,
         )
     }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
