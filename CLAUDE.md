@@ -12821,3 +12821,219 @@ S8 (the proactive channels, and the Oracle finally reading the environment line 
 and discarding since it was written).** `MAX_TIER` in `SensoriumService` is the one constant that
 opens S6, and `AmbientRules.permit` already keeps refusals with their sentences so the difference
 between "switched off" and "broken" is visible before it changes.
+
+### THE ACTING LAYER — S1–S8, and the Sensorium gets a motor cortex (this session cont.)
+
+S0 repaired what was already collected; these seven slices give it somewhere to go. The arc is
+**complete** — every slice of `robust-baking-dewdrop.md` shipped. ⚠️ **Zero subagent and zero
+workflow spend across all eight**, per the owner's standing *"you can use ultra code, you just can't
+burn through the usage"* — which overrides the ultracode directive AND plan mode's own instruction
+to dispatch Explore/Plan agents. Every check was local kotlinc + JUnit, `javap` against a real
+published jar, the gate chain, or CI.
+
+⚠️ **The paragraph at the end of the S0 section above is now STALE in one detail**: it says
+`MAX_TIER` in `SensoriumService` is "the one constant that opens S6". There is no such constant —
+the tiers are opened by two user switches through `AmbientRules.tierFor`. Left standing as the
+record of what was planned; corrected here because a future session would hunt for it.
+
+**The shape, and why it is not the Oracle.** An `Insight` is momentary advice ranked for a human and
+recomputed on a ~15-minute worker; an actuation is **stateful** — it must be released, reversed,
+held across a process death, and react in seconds on the Sensorium heartbeat. Mixing them would put
+a bug in the app's headline feature.
+
+    EnvReading ─▶ AmbientSituation (S2) ─▶ AmbientRules (S3) ─▶ AmbientActuator (S4) ─▶ scanner (S5)
+                  what you are DOING        situation → holds     reconcile, hold/release
+                  + its evidence            inside a closed list  + survive a process death
+
+#### ⚠️ The six safety rules, and where each one lives
+
+Three are arithmetic in `AmbientReconcile`/`AppSuspension` where CI holds them; three are about a
+process and a disk and live in `AmbientActuator`. **Transition-only** (never re-assert, never stomp a
+manual change). **Guaranteed release** — `AmbientIntent.untilMs` is DERIVED from the action's own
+`maxHoldMs` and there is nowhere to ask for longer, so the ceiling lives with the capability rather
+than with whoever last edited a rule. **Survive death** (below). **Sensing down ⇒ release
+everything.** **Never block an emergency.** **Everything visible and undoable.**
+
+⚠️ **`AmbientAction` is a CLOSED ENUM and that IS the safety model.** The decision layer cannot
+express arbitrary execution — no free text, no package name from a rule — so the worst any rule can
+reach for is a member of that list, and widening the blast radius means editing it and tripping
+`the closed list cannot express anything destructive`. Same property, same reason, as
+`RemoteProtocol`'s allowlist. **Every member is a HOLD, never a deed**: announcing and speaking are
+deliberately absent, because mixing a one-way announcement among things that must be undone is how a
+release loop ends up with nothing to undo.
+
+⚠️ **THERE IS NO ACTION THAT SWITCHES THE EARS OFF, and the absence is the point.** A first draft had
+`STAND_SENSING_DOWN` and had ASLEEP ask for it — which reads as thrift and is not:
+`cadenceFor(STANDDOWN)` sets `micIntervalSec = 0`, documented as OFF, and a smoke alarm is a thing
+this app hears with the microphone. It would have deafened the phone every night, for hours, in the
+one stretch where nobody else is listening either. Held by absence, so no rule can reach for it
+however it is written later.
+
+#### ⚠️ Five actions were DELETED rather than implemented, on measurement
+
+Two PHONE and four OWNER were declared and asked for by **nothing** — the declared-and-never-used
+shape this whole arc exists to remove, shipped inside the arc itself. The reasoning is recorded where
+each used to be declared, because "write a rule for it" was the alternative and each fails on merit:
+
+| gone | why |
+|---|---|
+| `REQUEST_DND` | the meeting rule had already decided against it in writing; `HOLD_NON_URGENT` stops OUR notices where DND stops everyone's — a far larger claim for the same benefit |
+| `RAISE_ALARM_VOLUME` | **as wired it could not have worked** — it moved `STREAM_ALARM` and nothing in this path plays there; and `EmergencyKlaxon` already captures that stream, two capture-and-restores interleaving into a phone stuck at maximum for ever |
+| `DISABLE_CAMERA` | system-wide through device policy, so the situation that wants it is the one where the owner may urgently need a camera |
+| `HIDE_STATUS_BAR` | takes the clock, the battery and every other app's notices |
+| `BLOCK_SCREENSHOTS` | protects a viewer from their own screen — not something an ambient reading can infer |
+| `SHORTEN_SCREEN_TIMEOUT` | wants `setMaximumTimeToLock`, which `DevicePolicyController` does not have, for situations where the screen is already off |
+
+**One OWNER action survives** — `SUSPEND_DISTRACTING_APPS`, asked for by driving, and the point is
+that holding back a notice stops the phone asking for attention while pausing the apps stops it being
+worth reaching for. Inventing a rule to justify a declared action is the tail wagging the dog.
+
+#### ⚠️ Safety rule 5 is arithmetic, in a module with no Android in it
+
+`core:telemetry/AppSuspension.kt` (+11 tests). "No action may impede an emergency call" is not a
+thing to remember at a call site: **suspending the phone app is exactly how you would impede one, and
+the platform will do it if asked.** `DevicePolicyController.setPackagesSuspended`'s own KDoc says the
+CALLER filters; this is that filter and it is the only one. **An unidentifiable dialler or launcher
+refuses the WHOLE list** — not "suspend everything else and hope". A feature that declines to run is
+a disappointment; a phone that cannot dial 999 is not. Deliberately not a denylist of "distracting"
+apps: judging which of somebody's apps distract them is not a thing this layer can know, and a list
+of names goes stale the week it ships.
+
+#### ⚠️ Survive death is the single most dangerous failure in the design
+
+The held set is persisted and `reconcileFromDisk` runs before anything else. It had **one caller**,
+inside the service loop — enough while every hold was in-memory, and not enough the moment the PHONE
+tier shipped: a force-stop while the torch was lit, followed by sensing being switched off or the
+service simply never starting again, leaves the torch burning with nothing alive that knows to undo
+it. `PulseApplication.onCreate` now calls it too, with a `loaded` guard so whichever of the two
+racing callers wins does the reconcile and the other is a no-op — a blanket release landing on top of
+live holds is the failure that guard prevents. It costs one background read and creates no file.
+
+⚠️ **The release replays through the SAME effect lambda as the assert**, which is what makes a
+crash-recovery release work at all: a process that did not assert the hold still lets it go. A tier
+wired anywhere else would be a tier nothing releases.
+
+#### ⚠️ Two rules were split into the core purely so CI could hold them
+
+The `MailNotices`/`TranscriptSeal` pattern, twice more. **`RingerPolicy`** (S6): the ringer decision
+is three branches that would be unexercisable inside a class needing an `AudioManager`, and it
+carries safety rule 1. **`AmbientRules.tierFor`** (S7): the tiers are a LADDER, so permitting OWNER
+permits PHONE with it — reading only the owner switch would let somebody who never turned the phone
+tier on find their ringer silenced, having consented to something else entirely. Both are tested over
+their whole input space; what is left in the app is reading an Int or two booleans.
+
+⚠️ **`SILENCE_RINGER` says vibrate because it SETS vibrate.** Going to silent needs the
+notification-policy grant, which this app does not ask for — so the actuator stops at VIBRATE and the
+label has to stop there too. "Silenced the ringer" on a phone that is still buzzing is the app
+claiming more than it did.
+
+⚠️ **The meeting rule only asks when the ringer is measurably ON**, which makes transition-only
+structural rather than left to the actuator: every action is a hold, so silencing a ringer somebody
+had already silenced themselves means the RELEASE turns it back on — a phone ringing out loud at the
+end of a meeting because this layer "undid" something it never did. A null ringer is UNKNOWN and is
+likewise left alone: an actuator that cannot read the current state cannot restore it either.
+
+#### ⚠️ Safety is exempt from the settle gate, and the torch is gated on darkness
+
+A smoke alarm that has to sound for ninety seconds before the phone reacts is a phone that reacted
+too late. What protects against a false positive there is `SensoriumEvents.ALERT_MIN_CONF`, applied
+where the sound is recognised, so waiting again would pay the cost twice for nothing.
+⚠️ **Only a FIRE alarm gets the bright response.** `SensoriumEvents` raises three ALERTs — smoke/CO,
+breaking glass, a gunshot-like sound — and for the other two the same response could be exactly
+wrong: a phone that lights a torch while somebody is hiding from whoever broke the window has made
+their situation worse. Nothing is lost, because the engine already raises an urgent board line for
+every alert; what this rule decides is only the PHYSICAL response.
+
+#### ⚠️ The capability filter takes a vararg, and that is not generality for its own sake
+
+`minusWhatThisHandsetCannotDo` moves what this handset cannot physically do from `allowed` into
+`refused` **with its reason** — "no torch on this phone" is the same kind of fact as "that tier is
+switched off", arriving from a different direction, and a reader wants one list of "asked for, not
+allowed". Filtering instead would leave a rule that fires, a hold that never appears, and nothing
+saying why. A tier's capability check is the thing most likely to be forgotten when a new tier lands,
+so it takes a list: adding a tier is one argument at the call site.
+
+⚠️ **`cannotDo` returns the REASON, not a Boolean, and the three-valued muddle is why.** `false` would
+mean both "this phone has no torch" and "that is an APP-tier action, ask somebody else", so using it
+as a filter refuses everything.
+
+⚠️ The filter moved to its own file, which has the useful side effect of importing **no Android at
+all** — so the app module gets a real JUnit test for it. Splitting a file so its rule carries no
+platform type is the difference between a rule CI holds and a rule nobody can run.
+
+#### The scanner, deliberately before the invasive tiers
+
+S5 shipped ahead of S6/S7 so you can watch it think before it can act on the phone. It renders
+`refused` **generically**, as a list of sentences — which is why S7's owner tier needed no screen
+change at all: "would pause distracting apps · this app is not this device's owner" appears on its
+own. `whyQuiet` explains every quiet case worst-first (an UNKNOWN reading must NOT be reported as
+waiting to settle, which would send somebody away to wait for something that is never coming).
+
+#### ⚠️ What is asserted and read by nothing, said plainly
+
+`SPEAK_DONT_BUZZ` is asked for by driving and **has no consumer**. There is no honest one at that
+tier: the only thing that volunteers speech is `maybeSpeakProactive`, gated on the user's own
+`speakProactive` and on quiet hours, and overriding either would be this layer countermanding a
+preference rather than reading one. Its real consumer is the announcement slice. ⚠️ That is a
+different judgement from DELETING `STAND_SENSING_DOWN`: that one would have been actively harmful, and
+an action that is merely inert costs nothing but the note saying so.
+
+#### The ledger, and where the line is
+
+APP- and PHONE-tier transitions go to the actuator's own `history`, NOT `AuditLedgerStore` — that is
+a hash-chained append-only record whose four producers are all genuinely security events, and whose
+attestation producer dedupes **specifically so the log is not spammed**. "Stopped speaking aloud
+because you are in a meeting" is not that kind of event. ⚠️ **The OWNER tier DOES write it**, in the
+container's effect lambda: a device-owner power used with **no human in the loop** is the same class
+of event as the `devicepolicy.*` entries Settings writes when somebody flips a toggle by hand, and
+arguably more worth recording for having been automatic. Recorded there rather than in `OwnerHolds`
+so a hold this handset could not carry out is not recorded as though it had been.
+
+#### S8 — the announcement, and D5 finally closes
+
+An ALERT may speak aloud, gated **only** on `speakProactive` — not on quiet hours and not on
+`STAY_SILENT`, because a RED alert is never held. And `OracleSignals.envDescription` — computed,
+`describe()`d and handed to the Oracle **for nothing** since it was written — is now read by
+`focusMoment`, so the one bridge from sensing to the proactive layer stops being a dead wire.
+
+#### Verification, and an eighth way a green test proves nothing
+
+2751 core tests + 6 new app-module tests, all run locally. **Every load-bearing rule
+negative-tested** across the arc against a baseline asserted green first, each perturbation asserted
+to have matched the source, each restore byte-compared, the harness restoring under a shell
+`trap … EXIT`. The whole owner/phone tier compiles clean against the real platform classes (186
+files), with that gate itself negative-tested by a planted typo which it caught by name.
+
+⚠️ **The seven recorded ways gain an eighth: an EXPECTATION LIST that names tests the perturbation
+cannot reach.** One S0 case came back "asleep" and the guard was fine — I had listed two tests that
+build their fixture directly and so can never be reached by a change to the function being perturbed.
+That is the "fixture never reached the branch" mechanism applied to the expectation rather than to the
+test. **Trace which code path each named test actually exercises before listing it.**
+
+⚠️ **Two harness traps bit again this arc, both already recorded and both still expensive.**
+`grep -L` **exits 1 when a file MATCHED** — its status tracks matches, not output — so a perfectly
+correct listing of the core's sources kills a `set -e` script silently, and the `|| true` that guards
+it is load-bearing. And an **empty grep over a command that never ran is indistinguishable from a
+clean pass**: assert the perturbation applied and print an explicit verdict line, never infer one
+from silence.
+
+⚠️ **Two standing false positives in `tools/check_changed.sh` for this package**, both proven rather
+than shrugged at: the import gate reports `HoldEffect` as unimported in `AmbientActuator.kt`, where it
+is **declared at line 36 of that same file**; and the resolve gate reports six Android platform
+symbols in `OwnerHolds.kt`, which is a NEW file with no baseline to cancel against — settled by the
+real compile above, which is far stronger evidence than that gate can produce.
+
+#### ⚠️ Owner-verify on the Pixel — CI compiles this and cannot sense anything
+
+1. **Put the phone in a pocket.** POCKETED with its evidence, and it must stop claiming how bright the
+   room is.
+2. **Drive somewhere.** DRIVING should appear — it was structurally impossible before S0 — and
+   interruptions should go quiet.
+3. **Let a rule act, then press RELEASE.** The board line should name what it did and why.
+4. ⚠️ **The one that matters most: let something be held, then force-stop the app.** Reopening must
+   release it. That is safety rule 3, and it is the failure that would leave the torch burning.
+5. **Turn sensing off mid-hold** — everything should release.
+6. Settings → Ambient sensing: **"Let it change the phone"** and, above it, **"Let it pause other apps
+   while driving"** — the second needs the first as well, and on a phone that is not a device owner it
+   will say so rather than looking broken.
+7. Watch battery for a day at defaults on the Galaxy A16; the sensing ladder is the lever.
