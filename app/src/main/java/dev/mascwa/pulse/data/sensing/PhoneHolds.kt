@@ -4,8 +4,6 @@ import android.content.Context
 import android.media.AudioManager
 import androidx.core.content.getSystemService
 import dev.mascwa.pulse.core.telemetry.AmbientAction
-import dev.mascwa.pulse.core.telemetry.AmbientDecision
-import dev.mascwa.pulse.core.telemetry.AmbientRefusal
 import dev.mascwa.pulse.core.telemetry.RingerPolicy
 import dev.mascwa.pulse.data.sensors.SurvivalTools
 
@@ -51,7 +49,7 @@ import dev.mascwa.pulse.data.sensors.SurvivalTools
 class PhoneHolds(
     private val context: Context,
     private val tools: SurvivalTools,
-) {
+) : HoldCapability {
 
     private val audio get() = context.getSystemService<AudioManager>()
 
@@ -85,7 +83,7 @@ class PhoneHolds(
      * about. Without it, a phone with no flash records "turned the torch on", the scanner shows it
      * held with an undo, and the room stays dark: the app claiming more than it did.
      */
-    fun cannotDo(action: AmbientAction): String? = when (action) {
+    override fun cannotDo(action: AmbientAction): String? = when (action) {
         AmbientAction.TORCH_ON ->
             if (runCatching { tools.torchAvailable() }.getOrDefault(false)) null
             else "this phone has no torch"
@@ -126,27 +124,4 @@ class PhoneHolds(
         RingerPolicy.Mode.VIBRATE -> AudioManager.RINGER_MODE_VIBRATE
         RingerPolicy.Mode.SILENT -> AudioManager.RINGER_MODE_SILENT
     }
-}
-
-/**
- * The same decision with anything this particular handset cannot carry out moved from `allowed` into
- * `refused`, each with the reason.
- *
- * ⚠️ **Moved rather than dropped, and that is the point.** `AmbientRules.permit` already keeps what
- * it refused so the scanner can say "would pause your distracting apps · device-owner controls are
- * off" instead of going quiet, and "no torch on this phone" is the same kind of fact arriving from a
- * different direction. Filtering it away instead would leave a rule that fires, a hold that never
- * appears and nothing anywhere saying why.
- *
- * ⚠️ It is deliberately NOT inside [AmbientRules.permit]. That function is pure and lives in a
- * module with no Android in it — which is what lets CI hold every tier rule — and what a given
- * handset physically has is not something a pure function can be told without being handed the
- * handset. So the tier decision stays in the core and the hardware decision stays here, and they
- * compose.
- */
-fun AmbientDecision.minusWhatThisHandsetCannotDo(phone: PhoneHolds): AmbientDecision {
-    val blocked = allowed.mapNotNull { i -> phone.cannotDo(i.action)?.let { AmbientRefusal(i, it) } }
-    if (blocked.isEmpty()) return this
-    val barred = blocked.mapTo(mutableSetOf()) { it.intent.action }
-    return copy(allowed = allowed.filter { it.action !in barred }, refused = refused + blocked)
 }

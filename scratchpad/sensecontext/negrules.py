@@ -16,6 +16,24 @@ TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry/AmbientRule
 
 CASES = [
     (
+        "the owner tier needs the phone switch too (the ladder)",
+        "        actOnApps && actOnPhone -> ActionTier.OWNER",
+        "        actOnApps -> ActionTier.OWNER",
+        ["the tiers are a ladder, so a deeper tier needs every switch below it"],
+    ),
+    (
+        "the floor is what you get with nothing switched on",
+        "        else -> ActionTier.APP\n    }\n\n    private fun whyRefused",
+        "        else -> ActionTier.PHONE\n    }\n\n    private fun whyRefused",
+        ["the tiers are a ladder, so a deeper tier needs every switch below it"],
+    ),
+    (
+        "driving reaches the owner tier and is refused below it",
+        "        intent(s, AmbientAction.SUSPEND_DISTRACTING_APPS, \"you are driving\", ActionUrgency.IMPORTANT),\n    )",
+        "    )",
+        ["driving is the one rule that reaches the owner tier"],
+    ),
+    (
         "nothing acts on a situation that has only just appeared",
         "        return s.nowMs - r.sinceMs >= SETTLE_MS",
         "        return true",

@@ -127,12 +127,28 @@ enum class AmbientAction(
     SUSPEND_DISTRACTING_APPS(
         ActionTier.OWNER, "paused distracting apps", "let those apps open again", 2 * HOUR,
     ),
-    DISABLE_CAMERA(ActionTier.OWNER, "switched the camera off", "switch the camera back on", 2 * HOUR),
-    HIDE_STATUS_BAR(ActionTier.OWNER, "switched the status bar off", "put the status bar back", 2 * HOUR),
-    BLOCK_SCREENSHOTS(ActionTier.OWNER, "blocked screenshots", "allow screenshots again", 2 * HOUR),
-    SHORTEN_SCREEN_TIMEOUT(
-        ActionTier.OWNER, "shortened the screen timeout", "put the timeout back", 8 * HOUR,
-    ),
+    // ⚠️ **There were five here and the other four are gone, on the same evidence that removed the
+    // two above: no situation asked for any of them.** Measured repo-wide before deleting — only a
+    // test constructed one, to exercise `permit`'s tier refusal — and a member no rule asks for
+    // widens what this closed list can express while delivering nothing at all.
+    //
+    // It is worth being specific, because "write a rule for it" was the alternative and each of the
+    // four fails on its merits rather than on effort:
+    //
+    //  - DISABLE_CAMERA is SYSTEM-WIDE through device policy, so the situation that wants it
+    //    (privacy, somewhere sensitive) is the same situation where the owner may urgently need a
+    //    camera. Guessing wrong costs them the shot.
+    //  - HIDE_STATUS_BAR takes the clock, the battery and every other app's notices with it, which
+    //    is a large claim for whatever small distraction it removes.
+    //  - BLOCK_SCREENSHOTS protects a viewer from their own screen, which is not a thing the person
+    //    holding the phone has asked for and not a thing an ambient reading can infer.
+    //  - SHORTEN_SCREEN_TIMEOUT wants `setMaximumTimeToLock`, which does not exist in
+    //    `DevicePolicyController` at all — and its natural situations (pocketed, asleep) are both
+    //    ones where the screen is already off, so it would spend a device-owner power on nothing.
+    //
+    // Inventing a rule to justify a declared action is the tail wagging the dog. Any of the four is
+    // one line to bring back, which is exactly the deliberate reviewed act adding an enum member
+    // should be.
 }
 
 /**
@@ -286,6 +302,28 @@ object AmbientRules {
         }
     }
 
+    /**
+     * The deepest tier the rules may act at, from the user's own switches.
+     *
+     * ⚠️ **The ladder, and the reason it is a rule rather than an expression at the call site.**
+     * [permit] compares ordinals, so permitting OWNER permits PHONE with it — which means reading
+     * only the owner switch would let somebody who never turned the phone tier on find their ringer
+     * silenced, having consented to something else entirely. Every rung on is a rung somebody asked
+     * for, and that is a property worth a test rather than a line in a service.
+     *
+     * ⚠️ [ActionTier.APP] is the floor and has no switch. An app declining to interrupt you is not a
+     * power that needs permission, and making it refusable would allow a state where the layer
+     * senses everything and may do nothing at all.
+     *
+     * ⚠️ Booleans rather than the settings object, because this module has no Android in it — which
+     * is the whole reason the rule can be held here at all.
+     */
+    fun tierFor(actOnPhone: Boolean, actOnApps: Boolean): ActionTier = when {
+        actOnApps && actOnPhone -> ActionTier.OWNER
+        actOnPhone -> ActionTier.PHONE
+        else -> ActionTier.APP
+    }
+
     private fun whyRefused(tier: ActionTier) = when (tier) {
         ActionTier.PHONE -> "phone controls are switched off"
         ActionTier.OWNER -> "device-owner controls are switched off"
@@ -357,6 +395,13 @@ object AmbientRules {
         intent(s, AmbientAction.HOLD_NON_URGENT, "you are driving", ActionUrgency.IMPORTANT),
         intent(s, AmbientAction.SPEAK_DONT_BUZZ, "you are driving"),
         intent(s, AmbientAction.PAUSE_VIDEO, "you are driving"),
+        // ⚠️ The one device-owner action with a situation that genuinely wants it, and driving is
+        // that situation: holding back a notice stops the phone asking for attention, and pausing
+        // the apps stops it being worth reaching for in the first place. It is the only rule in this
+        // file that reaches the OWNER tier, and it is refused outright unless the user has turned
+        // that tier on for themselves — which is why asking for it costs nothing on a phone where
+        // that switch is off, beyond a line saying it would have.
+        intent(s, AmbientAction.SUSPEND_DISTRACTING_APPS, "you are driving", ActionUrgency.IMPORTANT),
     )
 
     /**

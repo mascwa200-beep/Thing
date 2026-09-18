@@ -934,6 +934,22 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * The OWNER tier's one effect — pausing the apps that are not a way back out.
+     *
+     * ⚠️ It builds its own [dev.mascwa.pulse.security.DevicePolicyController] rather than sharing
+     * one, and that costs nothing worth sharing: the class holds a system-service handle and a
+     * `ComponentName`, owns no state and reads nothing at construction. Settings already makes its
+     * own for the same reason. What must not be duplicated is the DECISION about which packages may
+     * be paused, and that lives once in `AppSuspension`, in a module with no Android in it.
+     */
+    val ownerHolds: dev.mascwa.pulse.data.sensing.OwnerHolds by lazy {
+        dev.mascwa.pulse.data.sensing.OwnerHolds(
+            appContext,
+            dev.mascwa.pulse.security.DevicePolicyController(appContext),
+        )
+    }
+
+    /**
      * The acting layer: what the ambient rules want, made to happen and undone again.
      *
      * ⚠️ **A phone that never switches sensing on never has a holds file on disk** — the same
@@ -959,11 +975,40 @@ class AppContainer(private val appContext: Context) {
                 // PAUSED in it. Leaving it connected and muted would spend the data anyway.
                 runCatching { dev.mascwa.pulse.feature.live.LiveVideoController.stop(appContext) }
             }
-            // ⚠️ Handed every action rather than filtered here. Whether a PHONE-tier hold is allowed
-            // at all is `AmbientRules.permit`'s decision, made once against the user's own switch —
-            // a second gate at the call site is a second place for the two to disagree about what is
-            // switched on. [PhoneHolds] ignores what is not its own.
+            // ⚠️ Handed every action rather than filtered here. Whether a PHONE- or OWNER-tier hold
+            // is allowed at all is `AmbientRules.permit`'s decision, made once against the user's
+            // own switches — a second gate at the call site is a second place for the two to
+            // disagree about what is switched on. Each tier ignores what is not its own.
             runCatching { phoneHolds.run(action, asserting) }
+            // ⚠️ And the OWNER tier is reached the same way, which is what makes the release work
+            // after a crash: `reconcileFromDisk` replays every held action through this one lambda,
+            // so a process that did not assert the hold still lets it go. A tier wired anywhere else
+            // would be a tier nothing releases.
+            runCatching { ownerHolds.run(action, asserting) }
+            // ⚠️ **Safety rule 6 for the one tier that earns it, and the actuator's own KDoc names
+            // this as where it belongs.** That file explains at length why APP-tier transitions go
+            // to its own history instead: "stopped speaking aloud because you are in a meeting" is
+            // not a security event, and a routine app behaviour landing several times a day in a
+            // hash-chained append-only log would drown the four things in it that matter. A
+            // device-owner power used with no human in the loop is the opposite case — it is the
+            // same class of event as the `devicepolicy.*` entries Settings already writes when
+            // somebody flips the USB or camera toggle by hand, and arguably more worth recording
+            // for having been automatic.
+            //
+            // ⚠️ Here rather than inside `OwnerHolds`, so a hold that this handset could not carry
+            // out is not recorded as though it had been. `minusWhatThisHandsetCannotDo` has already
+            // moved those into `refused`, so nothing that reaches this lambda was refused — and
+            // `OwnerHolds.run` swallowing a `SecurityException` internally would be invisible from
+            // in there anyway.
+            if (action.tier == dev.mascwa.pulse.core.telemetry.ActionTier.OWNER) {
+                runCatching {
+                    auditLedgerStore.record(
+                        dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
+                        "ambient.${if (asserting) "hold" else "release"}",
+                        action.name,
+                    )
+                }
+            }
         }
     }
 

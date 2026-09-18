@@ -946,7 +946,7 @@ fun SettingsScreen(
                 }
             }
 
-            if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer")) item {
+            if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer driving ringer torch pause apps")) item {
                 PrefSection("Ambient sensing (Sensorium)") {
                     PrefSwitch(
                         "Environment sensing",
@@ -1043,6 +1043,31 @@ fun SettingsScreen(
                             "itself.",
                         checked = s.sensing.actOnPhone,
                         onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(actOnPhone = v)) } },
+                    )
+                    // ⚠️ The top rung, and it is its own switch rather than a deeper setting on the
+                    // one above. Silencing a ringer is something the person could have done in two
+                    // taps; pausing every app but the ways out is a power the OS reserves for a
+                    // device owner. Consenting to the first must not quietly consent to the second —
+                    // which is also why `SensoriumService.tierFor` requires BOTH to be on.
+                    //
+                    // ⚠️ It is shown even when this app is not the device owner, deliberately: the
+                    // subtitle says so, and the scanner names the same reason on the refused hold.
+                    // A control that vanishes teaches nothing; one that explains itself does.
+                    PrefSwitch(
+                        title = "Let it pause other apps while driving",
+                        subtitle = if (vm.isDeviceOwner) {
+                            "Needs the switch above as well. While you are driving, everything but " +
+                                "the phone app, your home screen, Settings and the keyboard is " +
+                                "paused — and let go again when you stop. It can never pause the " +
+                                "phone app, so you can always call for help."
+                        } else {
+                            "Needs Device-Owner provisioning, which this phone does not have — so " +
+                                "it will ask and the scanner will say it could not. Provisioned, it " +
+                                "pauses everything but the phone app, your home screen, Settings " +
+                                "and the keyboard while you are driving."
+                        },
+                        checked = s.sensing.actOnApps,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(actOnApps = v)) } },
                     )
                 }
             }

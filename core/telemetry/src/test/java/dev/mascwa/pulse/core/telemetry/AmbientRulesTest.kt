@@ -239,9 +239,38 @@ class AmbientRulesTest {
                 AmbientAction.HOLD_NON_URGENT,
                 AmbientAction.SPEAK_DONT_BUZZ,
                 AmbientAction.PAUSE_VIDEO,
+                AmbientAction.SUSPEND_DISTRACTING_APPS,
             ),
             out,
         )
+    }
+
+    /**
+     * ⚠️ **The only rule in the file that reaches the device-owner tier, so this is the only place
+     * the ladder can be tested against a real rule rather than a hand-built intent.** What it holds
+     * is that asking costs nothing: on a phone where the owner switch is off, the other three
+     * driving holds still apply and the fourth is refused with a sentence — which is the whole
+     * reason the rules say what they WANT and [AmbientRules.permit] says what they may have.
+     */
+    @Test
+    fun `driving is the one rule that reaches the owner tier, and it is refused until that tier is on`() {
+        val wanted = AmbientRules.decide(signals(Situation.DRIVING))
+
+        val off = AmbientRules.permit(wanted, ActionTier.PHONE)
+        assertEquals(
+            listOf(AmbientAction.SUSPEND_DISTRACTING_APPS),
+            off.refused.map { it.intent.action },
+        )
+        assertTrue("a refusal with no sentence is indistinguishable from a fault",
+            off.refused.single().why.isNotBlank())
+        // ⚠️ The point of the refusal: the rest of the rule is unaffected. A tier gate that took
+        // the whole situation's holds down with it would make turning the owner tier off cost far
+        // more than the one action it governs.
+        assertEquals(3, off.allowed.size)
+
+        val on = AmbientRules.permit(wanted, ActionTier.OWNER)
+        assertTrue(on.refused.isEmpty())
+        assertTrue(AmbientAction.SUSPEND_DISTRACTING_APPS in on.allowed.map { it.action })
     }
 
     @Test
@@ -360,9 +389,23 @@ class AmbientRulesTest {
         // ⚠️ APP is the floor and has no switch. An app declining to buzz you is not a power that
         // needs a permission, and making it refusable would mean the layer could be switched into a
         // state where it senses everything and may do nothing at all.
-        val d = AmbientRules.permit(AmbientRules.decide(signals(Situation.DRIVING)), ActionTier.APP)
-        assertEquals(3, d.allowed.size)
-        assertTrue(d.refused.isEmpty())
+        //
+        // ⚠️ Stated over EVERY situation, and as "no APP-tier intent is refused" rather than "no
+        // intent is refused". The first version asserted the latter and counted driving's three
+        // holds — which meant it failed the moment a rule reached a higher tier, reporting a rule
+        // change as a violation of a property that had not been violated. An assertion wider than
+        // the rule it names is a test that goes off for the wrong reason.
+        for (what in Situation.entries) {
+            val wanted = AmbientRules.decide(signals(what, phone = ringing, events = listOf(alarm)))
+            val d = AmbientRules.permit(wanted, ActionTier.APP)
+            val appTier = wanted.filter { it.action.tier == ActionTier.APP }
+            assertTrue(
+                "$what had an app-tier hold refused at the floor",
+                d.refused.none { it.intent.action.tier == ActionTier.APP },
+            )
+            assertEquals("$what lost an app-tier hold", appTier.size, d.allowed.size)
+            assertTrue(d.allowed.all { it.action.tier == ActionTier.APP })
+        }
     }
 
     @Test
@@ -376,6 +419,34 @@ class AmbientRulesTest {
         val on = AmbientRules.permit(wanted, ActionTier.PHONE)
         assertTrue(on.refused.isEmpty())
         assertTrue(AmbientAction.SILENCE_RINGER in on.allowed.map { it.action })
+    }
+
+    /**
+     * ⚠️ **Stated over all four combinations rather than case by case**, because the defect this
+     * guards is a missing rung rather than a wrong answer: reading only the owner switch would let
+     * somebody who never turned the phone tier on find their ringer silenced, having consented to
+     * something else entirely. A test that checked three of the four would pass on exactly that.
+     */
+    @Test
+    fun `the tiers are a ladder, so a deeper tier needs every switch below it`() {
+        assertEquals(ActionTier.APP, AmbientRules.tierFor(actOnPhone = false, actOnApps = false))
+        assertEquals(ActionTier.PHONE, AmbientRules.tierFor(actOnPhone = true, actOnApps = false))
+        assertEquals(ActionTier.OWNER, AmbientRules.tierFor(actOnPhone = true, actOnApps = true))
+        // ⚠️ The one that matters: the owner switch alone reaches NOTHING. Anything else here is a
+        // phone whose ringer can be silenced by somebody who only ever agreed to pausing apps.
+        assertEquals(ActionTier.APP, AmbientRules.tierFor(actOnPhone = false, actOnApps = true))
+    }
+
+    @Test
+    fun `the floor is reachable with every switch off, and is never refusable`() {
+        // Both halves of "APP has no switch": it is what you get with nothing on, and nothing can
+        // produce a tier below it — so the layer can never be put into a state where it senses
+        // everything and may do nothing at all.
+        val tiers = listOf(false, true).flatMap { p ->
+            listOf(false, true).map { a -> AmbientRules.tierFor(actOnPhone = p, actOnApps = a) }
+        }
+        assertTrue(ActionTier.APP in tiers)
+        assertTrue(tiers.all { it.ordinal >= ActionTier.APP.ordinal })
     }
 
     @Test

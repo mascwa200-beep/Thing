@@ -53,7 +53,7 @@ fun interface HoldEffect {
  * - **Everything visible and undoable.** [holds] is every hold with its reason and its undo;
  *   [history] is every transition with the sentence for it; [releaseByHand] is the button.
  *
- * ## ⚠️ APP tier only, and the refusals are kept rather than dropped
+ * ## ⚠️ The refusals are kept rather than dropped
  *
  * [apply] takes the whole [AmbientDecision], including everything refused — for being out of tier,
  * or because this particular handset cannot do it at all — so a surface can say "would have paused
@@ -90,8 +90,13 @@ fun interface HoldEffect {
  * design note says identical verdicts are deduped **specifically so the append-only log is not
  * spammed**. "Stopped speaking aloud because you are in a meeting" is not that kind of event, and a
  * routine app behaviour landing in the blackbox several times a day would drown the four things in
- * it that matter. APP-tier transitions go to [history], which is what the scanner reads. The ledger
- * is the right home for the device-owner tier, and that is where it should be wired in.
+ * it that matter. APP- and PHONE-tier transitions go to [history], which is what the scanner reads.
+ *
+ * ⚠️ **The device-owner tier DOES write it, and that promise is now kept rather than deferred** —
+ * see the effect lambda in `AppContainer`, where the tier is checked. A device-owner power used with
+ * no human in the loop is the same class of event as the `devicepolicy.*` entries Settings writes
+ * when somebody flips a toggle by hand. Wired there rather than here because this class deliberately
+ * knows nothing about which actions are effects, only that some are.
  */
 class AmbientActuator(
     private val context: Context,

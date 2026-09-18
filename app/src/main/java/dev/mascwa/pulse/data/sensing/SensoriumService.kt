@@ -255,7 +255,12 @@ class SensoriumService : Service() {
                     )
                     acting.apply(
                         AmbientRules.permit(AmbientRules.decide(signals), tierFor(settings))
-                            .minusWhatThisHandsetCannotDo(c.phoneHolds),
+                            // ⚠️ Every tier that has a capability check, not only the ones switched
+                            // on. A tier that is off has already been refused above and cannot
+                            // reach here — but an owner-tier hold that IS permitted and cannot be
+                            // carried out (this app is not the device owner, which is almost every
+                            // install) would otherwise be recorded as held while nothing happened.
+                            .minusWhatThisHandsetCannotDo(c.phoneHolds, c.ownerHolds),
                         now,
                         // ⚠️ Computed here, where the signals already are. Quiet is the common and
                         // correct state for this layer; what it must never be is unexplained.
@@ -435,14 +440,23 @@ class SensoriumService : Service() {
          * interrupt you is not a power that needs permission — and making it refusable would allow a
          * state where the layer senses everything and may do nothing at all.
          *
-         * ⚠️ The device-owner tier is NOT reachable from here yet, and that is deliberate rather
-         * than unfinished: those actions suspend apps and disable cameras, and they want a switch
-         * each rather than one that opens all of them together. Until then [AmbientRules.permit]
-         * keeps what it refused, with the sentence for it, so the scanner can say "would pause your
-         * distracting apps · device-owner controls are switched off" instead of going quiet.
+         * ⚠️ **The ladder itself is [AmbientRules.tierFor], not this function.** What is left here is
+         * reading two booleans off the settings object — the half that needs an Android type — while
+         * the rule that the owner tier needs BOTH switches lives in a module CI can run. It is the
+         * same split, for the same reason, as `RingerPolicy` against `PhoneHolds`: a rule written
+         * inside a class that needs a `Context` is a rule nothing can test.
+         *
+         * ⚠️ There is deliberately ONE owner switch rather than one per action, because after the
+         * rule audit there is exactly one owner action left: the other four were removed for having
+         * no situation that wanted them. A switch per action would be four controls, three of which
+         * govern nothing. If a second owner action is ever added, this is where it stops being
+         * honest.
          */
         private fun tierFor(settings: AppSettings): ActionTier =
-            if (settings.sensing.actOnPhone) ActionTier.PHONE else ActionTier.APP
+            AmbientRules.tierFor(
+                actOnPhone = settings.sensing.actOnPhone,
+                actOnApps = settings.sensing.actOnApps,
+            )
 
         private const val CHANNEL_ONGOING = "sensorium_ongoing"
         private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_SENSORIUM

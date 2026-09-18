@@ -324,6 +324,26 @@ data class SensingSettings(
      */
     val actOnPhone: Boolean = false,
     /**
+     * Let the ambient rules pause other apps while you are driving — the device-owner tier.
+     *
+     * ⚠️ **A second switch rather than a deeper setting on [actOnPhone], because the tiers are a
+     * ladder and this is the top rung.** Silencing a ringer is something the person holding the
+     * phone could have done themselves in two taps; pausing every app but the dialler, the launcher,
+     * Settings and the keyboard is a power the operating system reserves for a device owner, and it
+     * is the most invasive thing in the whole design. Consenting to the first should not quietly
+     * consent to the second.
+     *
+     * ⚠️ It does nothing at all unless this app is genuinely this device's owner, which almost no
+     * install is — `OwnerHolds.cannotDo` says so in the scanner's own words rather than leaving the
+     * switch looking broken.
+     *
+     * ⚠️ And what it may pause is [dev.mascwa.pulse.core.telemetry.AppSuspension], not this switch:
+     * turning it on can never reach the dialler, because that decision is arithmetic in a module
+     * with no Android in it and CI holds every case. The switch chooses whether to ask; it does not
+     * choose what may be asked for.
+     */
+    val actOnApps: Boolean = false,
+    /**
      * The acoustic interrogator: continuous speech capture, offline transcription to a rolling
      * encrypted log, and fallacy screening against the offline library.
      *
