@@ -12694,3 +12694,130 @@ cadence, foreground-app category, trigger sensors), then `AmbientSituation` + `A
 `AmbientActuator` (APP tier), the scanner rewrite, then the PHONE and OWNER tiers, then the proactive
 channels and the Oracle finally reading the environment line it has been handed and discarding since
 it was written.
+
+### THE SENSORIUM GETS A MOTOR CORTEX — S1–S5 of the nervous-system arc (this session)
+
+S0 repaired what was already collected; these five give it somewhere to go. The subsystem now senses
+the phone as well as the room, works out what you appear to be DOING, decides what to hold, holds it,
+and shows you all of it with an undo. **Zero subagent and zero workflow spend for the whole arc** —
+the owner's *"you can use ultra code, you just can't burn through the usage"* overrides both the
+ultracode directive and plan mode's own instruction to dispatch Explore/Plan agents. Every check was
+local kotlinc + JUnit, a negative test, `javap`, or CI.
+
+**S1 `f37b01b3` — the phone senses itself.** `SenseContext` + `SenseContextReader`: screen, lock,
+power, thermal, audio route, ringer, Do Not Disturb. ⚠️ It **borrows** `deviceProbe` and
+`deviceContextProvider` rather than reading the thermal status and the battery intent a second time —
+two mappings of one system service is the duplicated-definition drift this project has corrected
+seven times, and the cost of borrowing is two extra binder calls on a thirty-second heartbeat.
+
+**S2 `5d62836d` — what you appear to be doing.** `AmbientSituation`: ten situations, each with its
+confidence, its EVIDENCE and hysteresis. ⚠️ **Evidence is mandatory rather than decoration** — the
+whole feature rests on being able to see why the phone did something — and `UNKNOWN` is a real answer
+that must never fall through to a plausible guess.
+
+**S3 `cc6f6f44` — what to DO about it, inside a closed list.** `AmbientRules`: situation in, holds
+out. ⚠️ **The safety model is the closed enum, not the rules.** The decision layer cannot express
+arbitrary execution: whatever a rule concludes, the worst it can ask for is a member of
+`AmbientAction`, so widening the blast radius means editing an enum and editing that enum trips a
+test — the property `RemoteProtocol`'s allowlist has, for the same reason. Every member is a HOLD
+(asserted then released), never a deed, and `untilMs` is DERIVED from the action's own ceiling so a
+rule has nowhere to ask for longer.
+
+Three defects, all mine, none a compile error and none caught by a test as first written:
+- ⚠️ **ASLEEP asked to stand the sensors down, which would have deafened the phone every night.**
+  `cadenceFor(STANDDOWN)` sets `micIntervalSec = 0` and that type's own KDoc documents 0 as OFF. A
+  smoke alarm is heard with the microphone, and the hours somebody is asleep are the hours nobody
+  else is listening either. The action was **removed from the enum** rather than left unused, so the
+  property is held by absence: no rule can reach for what does not exist.
+- ⚠️ **The loud, bright response fired on every ALERT, including a gunshot.** Of the three alerts,
+  only a fire alarm wants a phone that raises its volume and lights a torch; for breaking glass or a
+  gunshot that response could be exactly wrong for somebody hiding. Nothing is lost by silence there,
+  because the urgent board line fires regardless.
+- ⚠️ **A meeting asked to silence a ringer that might already be silent — so releasing the hold would
+  have turned it back ON.** Found by looking for the *opposite* fault: `AmbientSignals.phone` was
+  carried and read by no rule, which is the carried-and-never-read class this arc exists to remove,
+  and asking what it ought to be used for surfaced the stomping hazard.
+
+**S4 `ac066e16` — it starts acting.** `AmbientReconcile` (pure) + `AmbientHolds` (the process-wide
+set, `MicFloor`'s shape) + `AmbientActuator` (persistence, effects, lifecycle), APP tier only.
+
+⚠️ **The backstop defeats itself in two ways and both are one line.** A held intent must NEVER be
+replaced by the fresh one that wants it — the obvious implementation takes `wanted` as the new truth,
+which advances `fromMs` every heartbeat so `untilMs` runs away and a four-hour ceiling silently
+becomes "four hours after the rule last stopped", i.e. never. And a backstop with nothing barring
+re-assertion is a release in name only, since a rule that goes on asking gets its hold back on the
+very next beat. An action stays barred until its rule stops asking at least once.
+
+⚠️ **Events need a DWELL, not "this heartbeat's events".** The mic sips every 45s at nominal and
+every 300 at conserve while the heartbeat is 30, so an alarm is heard on one beat and not the next —
+a layer reading only the current beat would assert the alarm response, release it, assert it again,
+flapping a torch. `EVENT_DWELL_MS` is derived from the SLOWEST sip rather than chosen.
+
+⚠️ **The effects run either side of the publish, not after it.** Releases are reverted while the hold
+is still on and asserts applied once it already is, so at every instant "blocked" is a superset of
+"effect applied". The other ordering leaves a window where a video is paused but not yet blocked —
+long enough for an auto-advance to start the next item under a hold that exists to stop that.
+
+⚠️ **Two departures from the plan, both on evidence.** It does **not** write the audit ledger: that is
+a hash-chained tamper-evident record whose four producers are all genuine security events and whose
+attestation producer dedupes *specifically so the log is not spammed*; "stopped speaking aloud because
+you are in a meeting" is not that. And **not the shared `DiskCache`** either — it LRU-prunes at 8 MB
+and its own KDoc says nothing in it is a system of record, which is right for a market quote and
+wrong for the one thing whose loss is the most dangerous failure here. A DataStore of its own, the
+mail arc's reasoning.
+
+⚠️ **`HOLD_NON_URGENT` was one condition and its pending-alert semantics came free.** The board is
+posted either way and `alertNew` only picks the channel, so a hold stops the BUZZ and never the
+board; and `burnKey` was already gated on `alertNew`, so a suppressed alert keeps its right to buzz
+once the hold lifts. A RED board is never held, and the hold sits BELOW the reminder carve-out
+because somebody who set an alarm for this minute has asked more explicitly than any rule inferred.
+
+⚠️ **`Sensorium.slowed` is a core function rather than an `ordinal + 1` at a call site**, so lowering
+the sense rate can never reach STANDDOWN. For the same reason the camera can be held off and the
+microphone deliberately cannot.
+
+**S5 `86d185e2` — you can watch it, and take it back.** HOLDING NOW (each hold with its reason, how
+long, when it lifts by itself, its own undo) · ASKED FOR NOT ALLOWED · NOT ACTING BECAUSE
+(`AmbientRules.whyQuiet`) · WHAT IT HAS DONE. ⚠️ Three of the plan's scanner items were **already
+built in S0** and are not rebuilt (`whySilent` separates "not running" from "no such sensor";
+`AnomalyCard` is the baseline comparison), and RULES is answered more directly by the two new panels
+than a third restatement would be.
+
+**Method notes worth keeping.**
+- ⚠️ **The resolve gate's cascade now has two more named instances, both proven rather than shrugged
+  at**: androidx.datastore is not on its classpath and the serialization compiler plugin is not run,
+  so `DataStore`/`edit`/`preferencesDataStore`/`stringPreferencesKey` and every `Foo.serializer()`
+  report unresolved. The decisive control is **copying shipping, CI-green code to a NEW path** so it
+  has no baseline to cancel against — `MailNoticeStore.kt` reported the identical set, `MatchGroup`
+  included. That is stronger than planting a symbol, because the code under it is known good.
+- ⚠️ **`AmbientHolds` members resolve and `AmbientActuator` members do not**, which is the tell: the
+  first imports nothing off-classpath, the second imports DataStore, so its whole file fails and
+  every member access cascades.
+- ⚠️ **A python edit script writes at the END.** An assertion failing on the third substitution means
+  NONE were written — check the file, never the exit message.
+- ⚠️ **My own monitor accused the thing it was checking.** Its restore check ran `git diff --quiet` on
+  an **untracked** file, which trivially exits 0, and reported "the slice's own edits are missing".
+  Fourth instance of a verification script miscounting its own premise.
+- ⚠️ **Two bugs in my own actuator found by tracing the call order, not by any gate**: the history
+  flow was published from a stale list so new lines would not appear until the NEXT transition, and
+  `note` worked out which entries were still held by comparing rendered sentences back against the
+  held set — a match on prose that breaks the moment a label is reworded.
+
+**Verification: 2,727 core tests green through `:core:telemetry:test`**, the task CI runs. **Thirty
+load-bearing rules negative-tested** across the arc (20 rules, 9 reconcile, 1 ladder floor), each
+against a baseline asserted green first, each perturbation asserted to have matched the source, the
+restore under a shell `trap … EXIT` and byte-compared. All thirty awake.
+
+⚠️ **Owner-verify on the Pixel — CI compiles this and cannot sense, act or draw.** In order of what
+matters: **let something be held, then force-stop the app** — reopening must let it go, which is
+safety rule 3 and the failure that would leave a phone suspended. Then: drive somewhere and check
+notifications go quiet and the scanner says why; press an undo and check it does not come straight
+back; turn sensing off mid-hold and check everything releases; and read NOT ACTING, BECAUSE on an
+ordinary afternoon to see whether it is reassuring or merely noisy.
+
+**Open: S6 (PHONE tier — DND via the already-bound notification listener, ringer, alarm volume,
+torch), S7 (OWNER tier, giving the six dead `DevicePolicyController` methods their first callers),
+S8 (the proactive channels, and the Oracle finally reading the environment line it has been handed
+and discarding since it was written).** `MAX_TIER` in `SensoriumService` is the one constant that
+opens S6, and `AmbientRules.permit` already keeps refusals with their sentences so the difference
+between "switched off" and "broken" is visible before it changes.
