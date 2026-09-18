@@ -17,6 +17,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifier
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.data.model.ModelFile
 import java.io.File
 import java.util.Collections
@@ -186,6 +187,9 @@ class AmbientCameraSampler(
         const val BURST_MS = 3_200L
         const val FRAME_GAP_MS = 900L
         const val MAX_RESULTS = 6
-        const val SCORE_THRESHOLD = 0.20f
+
+        /** ⚠️ Derived from the fusion core's own floor — see [AmbientAudioSampler.SCORE_THRESHOLD],
+         *  which this was 0.20 against 0.30 for the same reason and with the same cost. */
+        const val SCORE_THRESHOLD = Sensorium.MIN_CONF
     }
 }

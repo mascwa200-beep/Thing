@@ -46,6 +46,11 @@ class SensoriumStore(
         val nm: Float = 0f, val nd: Float = 0f, val lm: Float = 0f, val ld: Float = 0f,
         val mm: Float = 0f, val md: Float = 0f, val cm: Float = 0f, val cd: Float = 0f,
         val n: Int = 0,
+        // ⚠️ Defaulted, so every blob already on disk decodes: an existing cell comes back with
+        // zero learned light and zero learned crowd samples, which is the right answer for a
+        // baseline whose per-metric history was never recorded. The two senses re-learn; nothing
+        // claims to know what it cannot show it measured.
+        val ls: Int = 0, val cs: Int = 0,
     )
 
     @Serializable
@@ -81,7 +86,7 @@ class SensoriumStore(
         }
         baseline = BaselineState(
             stored.cells.mapValues { (_, c) ->
-                BaselineCell(c.nm, c.nd, c.lm, c.ld, c.mm, c.md, c.cm, c.cd, c.n)
+                BaselineCell(c.nm, c.nd, c.lm, c.ld, c.mm, c.md, c.cm, c.cd, c.n, c.ls, c.cs)
             },
         )
         events = stored.events.toMutableList()
@@ -155,6 +160,7 @@ class SensoriumStore(
                     StoredCell(
                         c.noiseMean, c.noiseDev, c.lightMean, c.lightDev,
                         c.motionMean, c.motionDev, c.crowdMean, c.crowdDev, c.samples,
+                        c.lightSamples, c.crowdSamples,
                     )
                 },
                 events = events.toList(),

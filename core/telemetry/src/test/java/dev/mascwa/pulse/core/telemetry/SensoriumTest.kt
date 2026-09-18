@@ -455,4 +455,159 @@ class SensoriumTest {
     fun aDefaultReadingClaimsNoBrightnessItNeverMeasured() {
         assertEquals(LightState.UNKNOWN, EnvReading().light)
     }
+
+    // --- a covered phone ------------------------------------------------------------------------
+    //
+    // ⚠️ The proximity sensor was sampled, carried into the frame and read by nothing, so a phone in
+    // a pocket reported a pitch-dark ROOM. Same class of fabrication as the missing light sensor,
+    // one step further on, and the fix is the same: fold it into LightState rather than expecting
+    // every consumer to remember to check.
+
+    @Test
+    fun aCoveredSensorReportsNoBrightnessRatherThanADarkRoom() {
+        val pocket = Sensorium.distill(SenseFrame(lightLux = 1f, proximityNear = true))
+        assertEquals(LightState.UNKNOWN, pocket.light)
+        assertTrue(pocket.covered)
+        // The same lux with nothing against the glass is a genuine reading and must still be made.
+        assertEquals(LightState.DARK, Sensorium.distill(SenseFrame(lightLux = 1f)).light)
+    }
+
+    @Test
+    fun theSpokenLineSaysCoveredAndDropsTheBrightnessWord() {
+        val line = Sensorium.distill(
+            SenseFrame(lightLux = 1f, proximityNear = true, movement = 0.01f),
+        ).describe()
+        assertTrue(line.contains("covered"))
+        assertFalse(line.contains("dark"))
+        // Not "pocketed": all the sensor knows is that something is against the glass, and
+        // face-down on a table reads identically.
+        assertFalse(line.contains("pocket"))
+    }
+
+    @Test
+    fun proximityFarIsNotCovered() {
+        assertFalse(Sensorium.distill(SenseFrame(proximityNear = false)).covered)
+        assertFalse(Sensorium.distill(SenseFrame()).covered)
+    }
+
+    @Test
+    fun aCoveredPhoneCannotBeReadAsOutdoorsFromItsLightSensor() {
+        // Unreachable in practice — an occluded sensor never sees 20,000 lux — but the guard is what
+        // keeps the intent true if the threshold is ever lowered.
+        assertEquals(
+            EnvSetting.UNKNOWN,
+            Sensorium.distill(SenseFrame(lightLux = 20000f, proximityNear = true)).setting,
+        )
+    }
+
+    // --- access points count buildings, not people ----------------------------------------------
+
+    @Test
+    fun aDenseAccessPointCountIsAWeakIndoorPriorAndNothingMore() {
+        val r = Sensorium.distill(SenseFrame(wifiApCount = 40))
+        assertEquals(EnvSetting.INDOOR, r.setting)
+        // ⚠️ The killer case, and the reason this is not wired to `social`: forty access points is
+        // an ordinary apartment building, and the person in it is alone in a room.
+        assertEquals(SocialDensity.ALONE, r.social)
+    }
+
+    @Test
+    fun aSparseAccessPointCountAssertsNothing() {
+        assertEquals(EnvSetting.UNKNOWN, Sensorium.distill(SenseFrame(wifiApCount = 6)).setting)
+        assertEquals(EnvSetting.UNKNOWN, Sensorium.distill(SenseFrame(wifiApCount = 0)).setting)
+    }
+
+    @Test
+    fun realEvidenceAlwaysBeatsTheAccessPointCount() {
+        // Standing in a city street with forty APs in range: the camera saw sky and trees, and that
+        // must win. The prior sits at the bottom of the list precisely so it can only ever fill a
+        // gap, never contradict something measured.
+        assertEquals(
+            EnvSetting.OUTDOOR,
+            Sensorium.distill(
+                SenseFrame(sceneLabels = labels("sky", "tree"), wifiApCount = 40),
+            ).setting,
+        )
+        assertEquals(
+            EnvSetting.VEHICLE,
+            Sensorium.distill(
+                SenseFrame(soundLabels = labels("engine"), movement = 0.2f, wifiApCount = 40),
+            ).setting,
+        )
+    }
+
+    // --- the soundscape stops being keyword-only ------------------------------------------------
+
+    @Test
+    fun everyLevelBandHasAWord() {
+        // Either side of each threshold (-60 / -45 / -33 / -22).
+        assertEquals(NoiseProfile.SILENT, Sensorium.levelProfile(-70f))
+        assertEquals(NoiseProfile.QUIET, Sensorium.levelProfile(-50f))
+        assertEquals(NoiseProfile.CALM, Sensorium.levelProfile(-40f))
+        assertEquals(NoiseProfile.LIVELY, Sensorium.levelProfile(-28f))
+        assertEquals(NoiseProfile.LOUD, Sensorium.levelProfile(-10f))
+        assertEquals(null, Sensorium.levelProfile(null))
+    }
+
+    @Test
+    fun aLoudRoomTheClassifierHasNoWordForIsNoLongerQuiet() {
+        // The reported defect: nothing recognised, so the reading assumed silence.
+        assertEquals(NoiseProfile.QUIET, Sensorium.distill(SenseFrame()).noise)
+        assertEquals(NoiseProfile.LOUD, Sensorium.distill(SenseFrame(soundDbfs = -15f)).noise)
+    }
+
+    @Test
+    fun aMeasuredLevelNeverQuietensAReadingTheClassifierNamed() {
+        // music + shouting + traffic is loudHits 3 → LOUD by keyword. A quiet meter must not
+        // demote it: a named sound carries meaning a number does not.
+        val named = labels("music", "shouting", "traffic")
+        assertEquals(NoiseProfile.LOUD, Sensorium.distill(SenseFrame(soundLabels = named)).noise)
+        assertEquals(
+            NoiseProfile.LOUD,
+            Sensorium.distill(SenseFrame(soundLabels = named, soundDbfs = -70f)).noise,
+        )
+    }
+
+    @Test
+    fun aMeasuredLevelMayRaiseAReadingTheClassifierUnderstated() {
+        // birdsong alone is calmHits 1 → CALM, at ordinal 2.
+        assertEquals(NoiseProfile.CALM, Sensorium.distill(SenseFrame(soundLabels = labels("bird"))).noise)
+        assertEquals(
+            NoiseProfile.LOUD,
+            Sensorium.distill(SenseFrame(soundLabels = labels("bird"), soundDbfs = -12f)).noise,
+        )
+    }
+
+    @Test
+    fun anAbsentLevelLeavesEveryReadingExactlyWhereItWas() {
+        // The property that makes this safe to ship without a calibrated microphone: a null level
+        // is byte-for-byte the old behaviour on every shape of input.
+        val shapes = listOf(
+            SenseFrame(),
+            SenseFrame(soundLabels = labels("silence")),
+            SenseFrame(soundLabels = labels("bird", "wind")),
+            SenseFrame(soundLabels = labels("speech")),
+            SenseFrame(soundLabels = labels("music", "shouting", "traffic")),
+        )
+        val expected = listOf(
+            NoiseProfile.QUIET, NoiseProfile.SILENT, NoiseProfile.CALM,
+            NoiseProfile.CALM, NoiseProfile.LOUD,
+        )
+        shapes.zip(expected).forEach { (f, want) -> assertEquals(want, Sensorium.distill(f).noise) }
+    }
+
+    @Test
+    fun aSilentRoomReadsSilentRatherThanMerelyQuiet() {
+        // Nothing recognised, so the level is the only evidence there is and it decides outright.
+        // Taking the louder of the two here would floor every unrecognised sip at QUIET and the
+        // quiet end of the scale would be unreachable without the classifier naming "silence".
+        assertEquals(NoiseProfile.SILENT, Sensorium.distill(SenseFrame(soundDbfs = -75f)).noise)
+    }
+
+    @Test
+    fun aSipThatOnlyMeasuredALevelStillCountsAsHavingHeard() {
+        assertFalse(Sensorium.distill(SenseFrame()).heard)
+        assertTrue(Sensorium.distill(SenseFrame(soundDbfs = -50f)).heard)
+        assertTrue(Sensorium.distill(SenseFrame(soundLabels = labels("speech"))).heard)
+    }
 }

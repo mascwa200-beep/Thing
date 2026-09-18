@@ -27,8 +27,28 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
     val events = c.sensoriumStore.eventsFlow
     val fusion = c.sensorFusion.snapshot
 
-    /** Ask the eyes to look now — honored on the engine's next heartbeat. */
-    fun lookNow() = c.sensoriumEngine.requestLook()
+    private val _lookNote = MutableStateFlow<String?>(null)
+
+    /**
+     * What came of the last "▸ LOOK NOW", refusal included.
+     *
+     * ⚠️ At CONSERVE and STANDDOWN the camera cannot be triggered at all, so on a phone low on
+     * battery that button set a flag nothing would ever read and the screen said nothing whatsoever.
+     */
+    val lookNote: StateFlow<String?> = _lookNote.asStateFlow()
+
+    /** Ask the eyes to look now — honored on the engine's next heartbeat, or refused out loud. */
+    fun lookNow() {
+        viewModelScope.launch {
+            val r = runCatching { c.sensoriumEngine.requestLook() }.getOrNull()
+            _lookNote.value = r?.why ?: "could not ask the eyes to look"
+        }
+    }
+
+    /** Drop the note once it has been read, so it cannot linger into a later visit. */
+    fun clearLookNote() {
+        _lookNote.value = null
+    }
 
     private val _modelBytes = MutableStateFlow(0L)
 

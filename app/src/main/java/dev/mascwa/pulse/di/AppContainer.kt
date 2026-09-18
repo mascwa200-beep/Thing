@@ -830,7 +830,12 @@ class AppContainer(private val appContext: Context) {
             http,
             micBusy = {
                 voskSpeech.consoleActive.value ||
-                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking)
+                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking) ||
+                    // ⚠️ The interrogator takes the microphone OUTRIGHT — see [MicFloor], which says
+                    // so in as many words and which nothing here was consulting. A sip attempted
+                    // underneath it is a second AudioRecord on a device that may or may not permit
+                    // one, to produce labels from audio another subsystem is already holding.
+                    dev.mascwa.pulse.feature.media.MicFloor.interrogating.value
             },
         )
     }
@@ -896,7 +901,7 @@ class AppContainer(private val appContext: Context) {
     val sensoriumEngine: dev.mascwa.pulse.data.sensing.SensoriumEngine by lazy {
         dev.mascwa.pulse.data.sensing.SensoriumEngine(
             sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
-            memoryStream, notifier, settingsRepository,
+            memoryStream, notifier, settingsRepository, locationProvider,
         )
     }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,

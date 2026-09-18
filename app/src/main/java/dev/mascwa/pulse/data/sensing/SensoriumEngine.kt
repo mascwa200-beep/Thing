@@ -13,6 +13,7 @@ import dev.mascwa.pulse.core.telemetry.SensoriumBaseline
 import dev.mascwa.pulse.core.telemetry.SensoriumEvents
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.notifications.Notifier
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,13 @@ class SensoriumEngine(
     private val memoryStream: MemoryStreamStore,
     private val notifier: Notifier,
     private val settings: SettingsRepository,
+    /**
+     * Read ONLY through [LocationProvider.cachedSpeedMps], which cannot start a provider — see its
+     * own note. The invariant that this loop never wakes the GPS is unchanged; what changes is that
+     * a fix somebody else already took is no longer thrown away, so telling driving from walking
+     * stops depending on the microphone happening to hear an engine.
+     */
+    private val location: LocationProvider,
 ) {
     private val _reading = MutableStateFlow(EnvReading())
     /** The live fused environmental read — the scanner's centerpiece, Computer's context line. */
@@ -69,6 +77,8 @@ class SensoriumEngine(
     private var soundsAtMs = 0L
     private var scenes: List<PerceptLabel> = emptyList()
     private var scenesAtMs = 0L
+    private var soundDbfs: Float? = null
+    private var soundDbfsAtMs = 0L
 
     private var lastLux: Float? = null
     private var lastMagUt: Float? = null
@@ -80,10 +90,37 @@ class SensoriumEngine(
     private var memoryDay = 0
     private var memoryCountToday = 0
 
-    /** Ask the eyes to look now (scanner button / an external trigger). Honored on the next step
-     *  whenever the current level permits camera work at all. */
-    fun requestLook() {
+    /** What came of asking the eyes to look. [why] is always populated — a control that silently
+     *  does nothing is worse than one that refuses out loud. */
+    data class LookRequest(val accepted: Boolean, val why: String)
+
+    /**
+     * Ask the eyes to look now (scanner button / an external trigger).
+     *
+     * ⚠️ **It used to set a flag and say nothing, and at CONSERVE or STANDDOWN that flag could never
+     * be honoured** — `cameraOnTrigger` is false at both — so the scanner's "▸ LOOK NOW" was a button
+     * that did precisely nothing on a phone low on battery, with no feedback of any kind. Every
+     * refusal now names its own cause, and every one of them is a state the person can act on.
+     */
+    suspend fun requestLook(): LookRequest {
+        val s = runCatching { settings.current() }.getOrNull()
+        val now = System.currentTimeMillis()
+        val refusal = when {
+            s != null && !s.sensing.enabled -> "environment sensing is switched off"
+            s != null && !s.sensing.cameraSensing -> "ambient sight is switched off in Settings"
+            !camArmed.value -> "the eyes are on standby — grant the camera and arm them"
+            !Sensorium.cadenceFor(level.value).cameraOnTrigger ->
+                "the watch is at ${level.value.name.lowercase()} and is not spending the camera"
+            fusion.snapshot.value.proximityNear == true ->
+                "something is against the phone — the lens is covered"
+            now - lastCamMs < CAM_TRIGGER_MIN_GAP_MS ->
+                "it looked ${((now - lastCamMs) / 1000L)}s ago — bursts are spaced " +
+                    "${CAM_TRIGGER_MIN_GAP_MS / 1000L}s apart"
+            else -> null
+        }
+        if (refusal != null) return LookRequest(false, refusal)
         cameraTriggered = true
+        return LookRequest(true, "looking on the next heartbeat")
     }
 
     /**
@@ -99,12 +136,20 @@ class SensoriumEngine(
     ) {
         val snap = fusion.snapshot.value
 
+        val covered = snap.proximityNear == true
+
         // --- ears ---
         if (micAllowed && cadence.micIntervalSec > 0 && nowMs - lastMicMs >= cadence.micIntervalSec * 1000L) {
             lastMicMs = nowMs
             val s = audio.sip()
-            if (s.isNotEmpty()) {
-                sounds = s; soundsAtMs = nowMs
+            // ⚠️ The LEVEL is kept even when nothing was recognised, which is the whole point of
+            // measuring it: a loud room the classifier has no word for is exactly the case the
+            // fused reading used to call quiet.
+            if (s.labels.isNotEmpty()) {
+                sounds = s.labels; soundsAtMs = nowMs
+            }
+            if (s.dbfs != null) {
+                soundDbfs = s.dbfs; soundDbfsAtMs = nowMs
             }
         }
 
@@ -112,11 +157,20 @@ class SensoriumEngine(
         val lightJump = lastLux != null && snap.lightLux != null &&
             kotlin.math.abs(snap.lightLux - lastLux!!) > LIGHT_TRIGGER_LUX
         val startedMoving = wasStill && snap.movement >= Sensorium.MOVEMENT_THRESHOLD
-        if (lightJump || startedMoving) cameraTriggered = true
+        // ⚠️ Not while covered. Walking with the phone in a pocket is "motion after stillness" over
+        // and over, so the opportunistic ramp — whose whole justification is looking exactly when
+        // something is happening — would spend a camera burst every ninety seconds on the inside of
+        // a trouser leg, privacy indicator and all. The SCHEDULED burst is left alone: it is cheap,
+        // and a phone face-down on a desk is also "covered" while its rear lens has a perfectly good
+        // view of the ceiling, which no sensor on the phone can distinguish from a pocket.
+        if (!covered && (lightJump || startedMoving)) cameraTriggered = true
         val camDue = when {
             !camAllowed -> false
             cadence.cameraIntervalSec > 0 && nowMs - lastCamMs >= cadence.cameraIntervalSec * 1000L -> true
-            cameraTriggered && cadence.cameraOnTrigger && nowMs - lastCamMs >= CAM_TRIGGER_MIN_GAP_MS -> true
+            // A trigger raised before the phone went away is not dropped, only held: it fires when
+            // the lens is clear again, which is itself a good moment to look.
+            cameraTriggered && !covered && cadence.cameraOnTrigger &&
+                nowMs - lastCamMs >= CAM_TRIGGER_MIN_GAP_MS -> true
             else -> false
         }
         if (camDue) {
@@ -143,23 +197,27 @@ class SensoriumEngine(
         // --- fuse ---
         if (nowMs - soundsAtMs > LABEL_TTL_MS) sounds = emptyList()
         if (nowMs - scenesAtMs > LABEL_TTL_MS) scenes = emptyList()
+        // ⚠️ The level ages out FASTER than the labels. "There is traffic nearby" stays roughly true
+        // for minutes; "it is 42 dB in here" stops being true the moment somebody starts talking, and
+        // a stale one would be folded into the learned baseline as if it had just been measured.
+        if (nowMs - soundDbfsAtMs > LEVEL_TTL_MS) soundDbfs = null
         val cal = Calendar.getInstance().apply { timeInMillis = nowMs }
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         val weekend = cal.get(Calendar.DAY_OF_WEEK).let { it == Calendar.SATURDAY || it == Calendar.SUNDAY }
         val frame = SenseFrame(
             soundLabels = sounds,
             sceneLabels = scenes,
+            soundDbfs = soundDbfs,
             lightLux = snap.lightLux,
-            pressureHpa = snap.pressureHpa,
             pressureDeltaHpa = snap.pressureDeltaHpa,
-            magneticUt = snap.magneticUt,
             movement = snap.movement,
-            speedMps = null, // GPS deliberately not polled here — sensing must never wake the GPS
+            // ⚠️ From a fix ANOTHER app already took — `cachedSpeedMps` starts no provider, so the
+            // rule that this loop never wakes the GPS is intact. What it ends is `speedMps = null`,
+            // which made MotionState.DRIVING unreachable in the shipped app.
+            speedMps = runCatching { location.cachedSpeedMps() }.getOrNull(),
             wifiApCount = wifiCount,
             btDeviceCount = bleCount,
             proximityNear = snap.proximityNear,
-            hourOfDay = hour,
-            weekend = weekend,
         )
         val fused = Sensorium.distill(frame)
         _reading.value = fused
@@ -225,6 +283,8 @@ class SensoriumEngine(
 
     private companion object {
         const val LABEL_TTL_MS = 4 * 60_000L
+        /** Shorter than [LABEL_TTL_MS] on purpose — see the fuse step. */
+        const val LEVEL_TTL_MS = 90_000L
         const val LIGHT_TRIGGER_LUX = 120f
         const val CAM_TRIGGER_MIN_GAP_MS = 90_000L
         const val BASELINE_GAP_MS = 2 * 60_000L

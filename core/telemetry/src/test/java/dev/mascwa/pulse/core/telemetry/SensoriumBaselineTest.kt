@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -129,5 +130,84 @@ class SensoriumBaselineTest {
         repeat(40) { s = SensoriumBaseline.update(s, lit, 15, false) }
         val found = SensoriumBaseline.anomalies(s, lit.copy(light = 0.0f), 15, false)
         assertTrue(found.any { it.metric == "light" && it.text.contains("unusually dark") })
+    }
+
+    // --- a phone that never counted a device ----------------------------------------------------
+    //
+    // ⚠️ The same fault as light, one field further down, and NOT latent: `describeNormal` reads
+    // `crowdMean` directly, so with radio sensing off the line told you "alone" was normal for this
+    // hour of your life on a phone that had never looked.
+
+    @Test
+    fun anAbsentDeviceCountReachesTheMetricAsAbsence() {
+        // Where the fault actually lived: `btDeviceCount ?: 0` turned "nobody scanned" into a
+        // measured zero before the baseline ever saw it, so no amount of care downstream could help.
+        assertNull(EnvMetrics.of(EnvReading(), SenseFrame()).crowd)
+        assertEquals(5f, EnvMetrics.of(EnvReading(), SenseFrame(btDeviceCount = 5)).crowd!!, 1e-6f)
+    }
+
+    @Test
+    fun anUncountedCrowdIsNotLearnedAsZero() {
+        val busy = EnvMetrics(noise = 2f, light = 2.1f, motion = 0.02f, crowd = 8f)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, busy, 18, false) }
+        val learnedMean = s.cells[SensoriumBaseline.bucket(18, false)]!!.crowdMean
+        repeat(40) { s = SensoriumBaseline.update(s, busy.copy(crowd = null), 18, false) }
+        val after = s.cells[SensoriumBaseline.bucket(18, false)]!!
+        assertEquals(learnedMean, after.crowdMean, 1e-6f)
+        assertEquals(40, after.crowdSamples)
+        assertEquals(80, after.samples)
+    }
+
+    @Test
+    fun aNormalLineOmitsEverySenseItNeverMeasured() {
+        // Radio sensing off and no light sensor: noise and motion are all this phone can learn.
+        val bare = EnvMetrics(noise = 2f, light = null, motion = 0.02f, crowd = null)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, bare, 15, false) }
+        val line = SensoriumBaseline.describeNormal(s, 15, false)!!
+        assertTrue(line.contains("calm"))
+        // The two words that used to be stated as learned facts about a quantity nothing measured.
+        assertFalse(line.contains("alone"))
+        assertFalse(line.contains("dark"))
+    }
+
+    @Test
+    fun aNormalLineNamesEverySenseItDidMeasure() {
+        // log10(lux + 1) = 2.1 → about 125 lux → LIT.
+        val full = EnvMetrics(noise = 2f, light = 2.1f, motion = 0.02f, crowd = 6f)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, full, 15, false) }
+        val line = SensoriumBaseline.describeNormal(s, 15, false)!!
+        assertTrue(line.contains("calm"))
+        assertTrue(line.contains("lit"))
+        assertTrue(line.contains("a few people around"))
+    }
+
+    @Test
+    fun aSenseIsNotJudgedUntilItHasBeenLearnedFromEnoughOfItsOwnReadings() {
+        // The cell matures on noise and motion while the radio stays silent, then one burst arrives.
+        // Judging a crowd against a single sample is what a per-metric count exists to prevent.
+        val bare = EnvMetrics(noise = 2f, light = null, motion = 0.02f, crowd = null)
+        var s = BaselineState()
+        repeat(40) { s = SensoriumBaseline.update(s, bare, 20, false) }
+        s = SensoriumBaseline.update(s, bare.copy(crowd = 1f), 20, false)
+        val found = SensoriumBaseline.anomalies(s, bare.copy(crowd = 30f), 20, false)
+        assertTrue(found.none { it.metric == "crowd" })
+    }
+
+    @Test
+    fun aLateArrivingSenseTakesItsFirstReadingWhole() {
+        // ⚠️ Seeding used to key on the cell's shared sample count, so a light sensor that fired
+        // late had its first genuine reading blended against the zero the field was born with — at
+        // alpha 0.06 that is tens of samples spent climbing out of a value nothing measured.
+        val bare = EnvMetrics(noise = 2f, light = null, motion = 0.02f, crowd = null)
+        var s = BaselineState()
+        repeat(30) { s = SensoriumBaseline.update(s, bare, 9, false) }
+        s = SensoriumBaseline.update(s, bare.copy(light = 2.1f), 9, false)
+        val c = s.cells[SensoriumBaseline.bucket(9, false)]!!
+        assertEquals(2.1f, c.lightMean, 1e-6f)
+        assertEquals(0f, c.lightDev, 1e-6f)
+        assertEquals(1, c.lightSamples)
     }
 }

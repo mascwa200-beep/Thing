@@ -1004,6 +1004,31 @@ fun SettingsScreen(
                         checked = s.sensing.rememberEvents,
                         onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(rememberEvents = v)) } },
                     )
+                    // ⚠️ This setting has been stored, and read by the throttle ladder, since the
+                    // Sensorium shipped — with nothing anywhere able to change it. `Sensorium.level`
+                    // even documents the parameter as existing "so the user's own setting can reach
+                    // it". 25% is the ceiling because the ladder coerces it there: above that it
+                    // would sit at or past the conserve threshold and stand the watch down before it
+                    // ever throttled.
+                    SingleChoiceRow(
+                        title = "Stop sensing below",
+                        selected = s.sensing.standDownBatteryPct.coerceIn(1, 25),
+                        options = listOf(
+                            5 to "5% — squeeze every hour out of it",
+                            9 to "9% (default)",
+                            15 to "15%",
+                            20 to "20%",
+                            25 to "25% — protect the battery hard",
+                        ),
+                        onSelect = { v ->
+                            vm.update { it.copy(sensing = it.sensing.copy(standDownBatteryPct = v)) }
+                        },
+                    )
+                    PrefInfo(
+                        "Below that, on battery",
+                        subtitle = "The watch keeps its heartbeat and stops spending anything: no mic " +
+                            "sips, no camera bursts, no radio scans. A charger lifts it immediately.",
+                    )
                 }
             }
             if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {

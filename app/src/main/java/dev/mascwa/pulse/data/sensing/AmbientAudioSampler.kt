@@ -13,6 +13,7 @@ import com.google.mediapipe.tasks.components.containers.AudioData.AudioDataForma
 import com.google.mediapipe.tasks.core.BaseOptions
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.data.model.ModelFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -51,18 +52,28 @@ class AmbientAudioSampler(
     private val mutex = Mutex()
     private var classifier: AudioClassifier? = null
 
+    /**
+     * What one sip produced.
+     *
+     * ⚠️ **Two outputs, because a sip has always had two and one of them was being discarded.** The
+     * classifier can fail to name anything in a room that is plainly loud — it knows about a few
+     * hundred sounds and the world contains more — and the fused reading then called that room quiet.
+     * The level was in the capture buffer the whole time.
+     */
+    data class Sip(val labels: List<PerceptLabel> = emptyList(), val dbfs: Float? = null)
+
     fun hasMic(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
     /**
-     * Capture ~[CLIP_MS] of ambient audio and return its labels. Empty when the mic is ungranted or
-     * busy, the model is unavailable, or anything at all fails. Serialized — concurrent callers
-     * coalesce behind one sip at a time.
+     * Capture ~[CLIP_MS] of ambient audio and return what it heard. An empty [Sip] when the mic is
+     * ungranted or busy, the model is unavailable, or anything at all fails. Serialized — concurrent
+     * callers coalesce behind one sip at a time.
      */
-    suspend fun sip(): List<PerceptLabel> = mutex.withLock {
-        if (!hasMic() || micBusy()) return@withLock emptyList()
-        val c = runCatching { ensureClassifier() }.getOrNull() ?: return@withLock emptyList()
+    suspend fun sip(): Sip = mutex.withLock {
+        if (!hasMic() || micBusy()) return@withLock Sip()
+        val c = runCatching { ensureClassifier() }.getOrNull() ?: return@withLock Sip()
         withContext(Dispatchers.Default) {
             var recorder: AudioRecord? = null
             try {
@@ -71,18 +82,79 @@ class AmbientAudioSampler(
                 r.startRecording()
                 delay(CLIP_MS)
                 val audioData = AudioData.create(AudioDataFormat.create(r.format), SAMPLE_RATE)
-                audioData.load(r)
-                val cats = c.classify(audioData).classificationResults().firstOrNull()
-                    ?.classifications()?.firstOrNull()?.categories().orEmpty()
-                cats.filter { it.categoryName().isNotBlank() }
-                    .map { PerceptLabel(it.categoryName().lowercase(), it.score()) }
+                val loaded = audioData.load(r)
+                Sip(labels = classifyAll(c, audioData), dbfs = levelOf(audioData, loaded))
             } catch (_: Throwable) {
-                emptyList()
+                Sip()
             } finally {
                 runCatching { recorder?.stop() }
                 runCatching { recorder?.release() }
             }
         }
+    }
+
+    /**
+     * Every window of the clip, unioned by best score per label.
+     *
+     * ⚠️ **`classificationResults()` is one entry PER AUDIO WINDOW**, and only the first was being
+     * read — so a 1.6 s sip was classified as its opening fraction of a second and the rest thrown
+     * away. A doorbell in the second half of a sip simply did not exist.
+     *
+     * ⚠️ The inner `classifications().firstOrNull()` is a different thing and is correct as it
+     * stands: that list is one entry per OUTPUT HEAD, and YAMNet has exactly one. Do not "fix" it to
+     * match the loop above.
+     */
+    private fun classifyAll(c: AudioClassifier, audioData: AudioData): List<PerceptLabel> {
+        val best = mutableMapOf<String, Float>()
+        for (window in c.classify(audioData).classificationResults()) {
+            val cats = window.classifications().firstOrNull()?.categories().orEmpty()
+            for (cat in cats) {
+                val name = cat.categoryName().lowercase()
+                if (name.isBlank()) continue
+                val prev = best[name]
+                if (prev == null || cat.score() > prev) best[name] = cat.score()
+            }
+        }
+        return best.entries.sortedByDescending { it.value }.take(MAX_RESULTS)
+            .map { PerceptLabel(it.key, it.value) }
+    }
+
+    /**
+     * How loud the sip was, in dBFS, or null when that cannot honestly be said.
+     *
+     * Two refusals, and both are the house rule about absent measurements rather than caution:
+     *
+     * ⚠️ **A partly-filled ring is not a quiet room.** [AudioData] is a fixed-size ring and anything
+     * it was not given stays zero, so averaging over it after a short read reports a level biased
+     * toward silence — by an amount that depends on how short the read was, which is exactly the kind
+     * of wrong number nothing downstream could detect.
+     *
+     * ⚠️ **A buffer of exact zeros is a microphone that delivered nothing, not a silent one.** Real
+     * converters dither; digital silence is the signature of a hardware kill switch (the GrapheneOS
+     * mic toggle is one) or a capture refused after [hasMic] said yes. Reporting SILENT there would
+     * be a confident claim about a room nothing listened to.
+     *
+     * ⚠️ **Both refusals are decided from the DATA, not from [loaded].** `load(AudioRecord)` returns
+     * an int and nothing published says whether that counts floats or frames — and on an interleaved
+     * stereo capture those differ by a factor of two, which as a `loaded < buf.size` guard would
+     * refuse every reading for ever, silently. Counting how much of the ring is still exactly zero
+     * catches an underfill whatever the unit, and catches the dead microphone in the same test. A
+     * ring that is 90% filled biases the result by about 0.4 dB, so the threshold only has to catch
+     * gross underfill and can afford to be generous.
+     */
+    private fun levelOf(audioData: AudioData, loaded: Int): Float? {
+        if (loaded <= 0) return null
+        val buf = audioData.buffer ?: return null
+        if (buf.isEmpty()) return null
+        var sumSq = 0.0
+        var zeros = 0
+        for (v in buf) {
+            if (v == 0f) zeros++
+            sumSq += v.toDouble() * v.toDouble()
+        }
+        if (zeros > buf.size / 2 || sumSq <= 0.0) return null
+        val rms = kotlin.math.sqrt(sumSq / buf.size)
+        return (20.0 * kotlin.math.log10(rms)).toFloat()
     }
 
     /** Release the classifier (the service calls this on teardown; a later sip re-opens lazily). */
@@ -144,6 +216,14 @@ class AmbientAudioSampler(
         const val BUFFER_BYTES = SAMPLE_RATE * 4 * 2 // ~2 s of float PCM headroom
         const val CLIP_MS = 1_600L
         const val MAX_RESULTS = 6
-        const val SCORE_THRESHOLD = 0.25f
+
+        /**
+         * ⚠️ **DERIVED from the consumer's own floor, not a number of its own.** These were 0.25 here
+         * and 0.30 in [Sensorium.strong], so the classifier spent its six result slots on labels the
+         * fusion core then silently discarded: a sip in a busy room could return six categories and
+         * contribute three. Asking for the same floor the reader uses fills every slot with something
+         * usable, and makes the two impossible to drift apart.
+         */
+        const val SCORE_THRESHOLD = Sensorium.MIN_CONF
     }
 }

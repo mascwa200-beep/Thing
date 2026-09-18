@@ -72,6 +72,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val events by vm.events.collectAsStateWithLifecycle()
     val fusion by vm.fusion.collectAsStateWithLifecycle()
     val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
+    val lookNote by vm.lookNote.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -93,6 +94,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 item {
                     HeaderCard(
                         reading = reading, level = level, micArmed = micArmed, camArmed = camArmed,
+                        lookNote = lookNote,
                         onArm = {
                             val missing = buildList {
                                 if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) !=
@@ -110,7 +112,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 }
                 item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
-                item { InstrumentsCard(fusion) }
+                item { InstrumentsCard(fusion, reading) }
                 item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
                 item {
                     Text(
@@ -142,6 +144,7 @@ private fun HeaderCard(
     level: Sensorium.SenseLevel,
     micArmed: Boolean,
     camArmed: Boolean,
+    lookNote: String?,
     onArm: () -> Unit,
     onLook: () -> Unit,
 ) {
@@ -180,6 +183,16 @@ private fun HeaderCard(
                 ActionChip("▸ LOOK NOW", onLook)
             }
         }
+        // ⚠️ The button used to set a flag and say nothing at all, and at CONSERVE or STANDDOWN that
+        // flag could never be honoured — so on a phone low on battery it did precisely nothing, with
+        // no way to tell that from a camera that had looked and seen nothing worth naming.
+        if (lookNote != null) {
+            Text(
+                "◉ $lookNote",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
     }
 }
 
@@ -217,11 +230,26 @@ private fun FacetsCard(reading: EnvReading, present: SensorsPresent?) {
     ) {
         FacetRow("SETTING", reading.setting.name, if (reading.seen) "seen" else "inferred")
         FacetRow("MOTION", reading.motion.name, null)
-        FacetRow("SOUNDSCAPE", reading.noise.name, if (reading.heard) reading.soundTags.joinToString(", ") else "mic idle")
-        // ⚠️ Three different silences, and they used to render as one word. An unknown brightness
-        // says which it is: no such sensor on this phone, or a sensor that has not reported yet.
+        FacetRow(
+            "SOUNDSCAPE", reading.noise.name,
+            when {
+                reading.soundTags.isNotEmpty() -> reading.soundTags.joinToString(", ")
+                // Heard, and nothing it had a word for. That is a real reading of a real room and
+                // it used to be indistinguishable from a microphone nobody had opened.
+                reading.heard -> "nothing recognisable — read by level"
+                else -> "mic idle"
+            },
+        )
+        // ⚠️ FOUR different silences now, and they used to render as one word. An unknown brightness
+        // says which it is: no such sensor, a sensor that has not reported yet, the whole watch stood
+        // down — or the front of the phone is against something, which is the one where the sensor
+        // is working perfectly and its reading is simply not about the room.
         if (reading.light == LightState.UNKNOWN) {
-            FacetRow("LIGHT", "—", whySilent(present?.light, "ambient-light sensor"))
+            FacetRow(
+                "LIGHT", "—",
+                if (reading.covered) "covered — that reading is not the room"
+                else whySilent(present?.light, "ambient-light sensor"),
+            )
         } else {
             FacetRow("LIGHT", reading.light.name, null)
         }
@@ -358,7 +386,7 @@ private fun AnomalyCard(anomalies: List<EnvAnomaly>, normalLine: String?) {
 }
 
 @Composable
-private fun InstrumentsCard(f: FusionSnapshot) {
+private fun InstrumentsCard(f: FusionSnapshot, reading: EnvReading) {
     val c = Pulse.colors
     Column(
         Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
@@ -393,6 +421,15 @@ private fun InstrumentsCard(f: FusionSnapshot) {
             add(
                 "PROXIMITY" to (
                     f.proximityNear?.let { if (it) "covered" else "clear" } ?: silent(p?.proximity)
+                    ),
+            )
+            // The measured loudness behind the SOUNDSCAPE word, which was computed from the capture
+            // buffer and then thrown away. Not from the sensor snapshot: this one comes from the mic
+            // sampler, so its silence means "no sip has landed", never "no such hardware".
+            add(
+                "SOUND LEVEL" to (
+                    reading.soundDbfs?.let { "%.0f dBFS".format(java.util.Locale.US, it) }
+                        ?: "waiting for a sip"
                     ),
             )
         }

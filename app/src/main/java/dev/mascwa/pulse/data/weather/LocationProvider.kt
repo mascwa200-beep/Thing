@@ -119,6 +119,36 @@ class LocationProvider(private val context: Context) {
         }
     }
 
+    /**
+     * Ground speed from a fix somebody ELSE already took, or null.
+     *
+     * ⚠️ **This cannot wake the GPS and that is the entire point of it existing.**
+     * `getLastKnownLocation` reads whatever the platform is already holding — it starts no provider,
+     * powers no radio and costs nothing beyond a binder call. That is what lets the Sensorium, whose
+     * own loop is forbidden from asking for a fix, still tell driving from walking: until now
+     * [MotionState.DRIVING] was structurally unreachable in the shipped app, because the one place a
+     * speed could have come from passed a hardcoded null, and transit rested entirely on the
+     * microphone happening to hear an engine — which fails in an electric car, with music playing, or
+     * whenever no sip is due.
+     *
+     * ⚠️ **Elapsed realtime, not `getTime`.** A fix's wall-clock stamp moves when the clock does, and
+     * an NTP correction or a timezone-tracking device can make a fresh fix look hours old or a stale
+     * one look current. The monotonic clock cannot.
+     *
+     * ⚠️ **[maxAgeMs] is not politeness, it is correctness.** Speed is the fastest-changing thing a
+     * fix carries: the cached one from five minutes ago may have been taken at 70 km/h on a road the
+     * phone is now parked beside. Nothing refreshes it while the app is idle, so the honest answer
+     * then is null — and null is exactly today's behaviour, which is what makes this safe.
+     */
+    fun cachedSpeedMps(maxAgeMs: Long = SPEED_MAX_AGE_MS): Float? {
+        if (!hasPermission()) return null
+        val loc = runCatching { lastKnown() }.getOrNull() ?: return null
+        if (!loc.hasSpeed()) return null
+        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+        if (ageMs !in 0..maxAgeMs) return null
+        return loc.speed
+    }
+
     /** Freshest cached fix from any provider. */
     private fun lastKnown(): Location? {
         val lm = locationManager ?: return null
@@ -220,5 +250,8 @@ class LocationProvider(private val context: Context) {
     private companion object {
         const val FIX_TIMEOUT_MS = 8_000L
         const val GMS_PACKAGE = "com.google.android.gms"
+        /** How stale a cached fix may be before its speed says nothing about now — see
+         *  [cachedSpeedMps], where the reasoning lives. */
+        const val SPEED_MAX_AGE_MS = 2 * 60_000L
     }
 }
