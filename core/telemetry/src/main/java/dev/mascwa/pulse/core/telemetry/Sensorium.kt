@@ -534,6 +534,28 @@ object Sensorium {
         else -> null
     }
 
+    /**
+     * One step down the ladder, for [AmbientAction.LOWER_SENSE_RATE].
+     *
+     * ⚠️ **It stops at [SenseLevel.CONSERVE] and can never reach [SenseLevel.STANDDOWN], which is
+     * the whole reason this is a function in the core rather than an `ordinal + 1` at a call site.**
+     * `cadenceFor(STANDDOWN)` sets `micIntervalSec = 0`, and [Cadence]'s own KDoc documents 0 as OFF
+     * — so a step too far would switch the ears off under a name that says it slowed them down, and
+     * the ears are how this app hears a smoke alarm. That trap is named in [AmbientAction]'s own
+     * documentation as the convenient mistake for whoever wires the actuator; this makes it
+     * unreachable rather than merely warned about.
+     *
+     * ⚠️ It only ever slows. A phone already standing down for a flat battery stays there: the
+     * battery's claim on the ladder is stronger than any rule's, and "lower the rate" must not be a
+     * route to raising it.
+     */
+    fun slowed(level: SenseLevel): SenseLevel = when (level) {
+        SenseLevel.NOMINAL -> SenseLevel.SETTLED
+        SenseLevel.SETTLED -> SenseLevel.CONSERVE
+        SenseLevel.CONSERVE -> SenseLevel.CONSERVE
+        SenseLevel.STANDDOWN -> SenseLevel.STANDDOWN
+    }
+
     fun cadenceFor(level: SenseLevel): Cadence = when (level) {
         SenseLevel.NOMINAL -> Cadence(
             micIntervalSec = 45, cameraIntervalSec = 600, cameraOnTrigger = true,

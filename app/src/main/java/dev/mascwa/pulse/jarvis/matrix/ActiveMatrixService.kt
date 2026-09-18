@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
+import dev.mascwa.pulse.core.telemetry.AmbientAction
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.device.DeviceContextProvider
@@ -34,6 +35,7 @@ import dev.mascwa.pulse.core.telemetry.VoiceMachine.wakeHeard
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.wants
 import dev.mascwa.pulse.core.telemetry.WakePhrase
 import dev.mascwa.pulse.data.jarvis.db.Speaker
+import dev.mascwa.pulse.data.sensing.AmbientHolds
 import dev.mascwa.pulse.feature.media.MicFloor
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.agent.AgentOrchestrator
@@ -181,6 +183,12 @@ class ActiveMatrixService : Service() {
         if (voiceBusy) return
         val c = container ?: return
         if (runCatching { c.voskSpeech.consoleActive.value }.getOrDefault(false)) return
+        // ⚠️ VOLUNTEERED remarks only, which is narrower than this action's label suggests and is
+        // the right reading of it. Somebody in a meeting who ASKS the Computer a question has asked
+        // to be answered; what they have not asked for is the phone piping up unbidden. Every other
+        // `speak` call in this file answers something, so gating them here would be silencing a
+        // reply to a question the user just put — a different and much worse behaviour.
+        if (AmbientHolds.isHeld(AmbientAction.STAY_SILENT)) return
         val prefs = runCatching { c.settingsRepository.current() }.getOrNull() ?: return
         if (!prefs.jarvis.speakProactive || inQuietNow(prefs.notifications)) return
         runCatching { c.textToSpeech.speak(line) }

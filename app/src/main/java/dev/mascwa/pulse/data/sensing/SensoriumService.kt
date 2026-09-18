@@ -19,6 +19,10 @@ import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
+import dev.mascwa.pulse.core.telemetry.ActionTier
+import dev.mascwa.pulse.core.telemetry.AmbientAction
+import dev.mascwa.pulse.core.telemetry.AmbientRules
+import dev.mascwa.pulse.core.telemetry.AmbientSignals
 import dev.mascwa.pulse.core.telemetry.DeviceClass
 import dev.mascwa.pulse.core.telemetry.Sensorium
 import kotlinx.coroutines.CoroutineScope
@@ -143,12 +147,26 @@ class SensoriumService : Service() {
     private suspend fun loop() {
         val c = container ?: return
         val engine = c.sensoriumEngine
+        val acting = c.ambientActuator
         var level = Sensorium.SenseLevel.NOMINAL
         var lastNotifMs = 0L
+
+        // ⚠️ **Safety rule 3, and it runs before the first heartbeat rather than beside it.** A hold
+        // asserted by a process that then died — killed by the system, crashed, force-stopped — has
+        // nobody left alive to release it, and the only record that it existed is on disk. Every
+        // APP-tier hold happens to survive that by itself; the phone and device-owner tiers will
+        // not. Doing it here, while there is nothing for it to find, is what makes it already
+        // load-bearing on the day there is.
+        runCatching { acting.reconcileFromDisk(System.currentTimeMillis()) }
+
         while (scope.isActive) {
             runCatching {
                 val settings = c.settingsRepository.current()
                 if (!settings.sensing.enabled) {
+                    // ⚠️ Safety rule 4. A layer that cannot sense cannot justify holding anything,
+                    // so everything goes before the service does — and this is awaited rather than
+                    // fired off, because `stopSelf` is the last thing that happens to this process.
+                    runCatching { acting.standDown(System.currentTimeMillis(), "sensing was switched off") }
                     stopSelf()
                     return
                 }
@@ -179,18 +197,41 @@ class SensoriumService : Service() {
                 lastBatteryPct = device.batteryPct
                 lastCharging = device.isCharging
                 lastPowerSave = pm.isPowerSaveMode
+                // ⚠️ The acting layer can slow the ladder, and `slowed` is what stops that ever
+                // reaching STANDDOWN — where `micIntervalSec` is 0, which is OFF. Applied to the
+                // level rather than to the cadence so the readout and the sampling agree about
+                // which rung the watch is on.
+                if (AmbientHolds.isHeld(AmbientAction.LOWER_SENSE_RATE)) level = Sensorium.slowed(level)
                 engine.level.value = level
                 val cadence = Sensorium.cadenceFor(level)
 
                 engine.step(
                     cadence = cadence,
                     micAllowed = micArmed && settings.sensing.micSensing,
-                    camAllowed = camArmed && settings.sensing.cameraSensing,
+                    // ⚠️ The camera can be held off and the microphone deliberately cannot. Stopping
+                    // the eyes costs a scene label; stopping the ears costs the smoke alarm, which
+                    // is the one thing in this subsystem that has to work at three in the morning.
+                    camAllowed = camArmed && settings.sensing.cameraSensing &&
+                        !AmbientHolds.isHeld(AmbientAction.STOP_CAMERA_SIPS),
                     radioAllowed = settings.sensing.radioSensing &&
                         level != Sensorium.SenseLevel.CONSERVE && level != Sensorium.SenseLevel.STANDDOWN,
                 )
 
                 val now = System.currentTimeMillis()
+
+                // ---- and then act on what all that sensing concluded ----
+                runCatching {
+                    val wanted = AmbientRules.decide(
+                        AmbientSignals(
+                            situation = engine.situation.value,
+                            env = engine.reading.value,
+                            phone = engine.phone.value,
+                            events = engine.liveEvents.value,
+                            nowMs = now,
+                        ),
+                    )
+                    acting.apply(AmbientRules.permit(wanted, MAX_TIER), now)
+                }
                 if (now - lastNotifMs >= NOTIF_REFRESH_MS) {
                     lastNotifMs = now
                     updateOngoing(statusText())
@@ -297,6 +338,11 @@ class SensoriumService : Service() {
         runCatching { container?.senseContextReader?.stop() }
         val c = container
         scope.launch {
+            // ⚠️ Safety rule 4 again, on the other way out. This service is START_STICKY and can be
+            // killed and restarted by the system, so a teardown that left holds in force would have
+            // them survive on a phone with nothing sensing — exactly the state `reconcileFromDisk`
+            // exists to clean up after, reached the slow way instead of the fast one.
+            runCatching { c?.ambientActuator?.standDown(System.currentTimeMillis(), "the watch stopped") }
             runCatching { c?.ambientAudioSampler?.close() }
             runCatching { c?.ambientCameraSampler?.close() }
             runCatching { c?.sensoriumStore?.flushNow() }
@@ -309,6 +355,20 @@ class SensoriumService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+
+        /**
+         * The deepest tier this build will act at.
+         *
+         * ⚠️ **Deliberately a constant and deliberately [ActionTier.APP].** The phone and
+         * device-owner tiers are built and ready in [AmbientAction], and nothing may reach them
+         * until the scanner can show what is held and let go of it — you should be able to watch
+         * this layer think before it is allowed to touch the handset. When those tiers arrive this
+         * becomes a read of the user's own setting, and the rules do not change: [AmbientRules.permit]
+         * already keeps what was refused, with the sentence for it, precisely so the difference is
+         * visible rather than silent.
+         */
+        private val MAX_TIER = ActionTier.APP
+
         private const val CHANNEL_ONGOING = "sensorium_ongoing"
         private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_SENSORIUM
         private const val ACTION_STOP = "dev.mascwa.pulse.data.sensing.STOP"

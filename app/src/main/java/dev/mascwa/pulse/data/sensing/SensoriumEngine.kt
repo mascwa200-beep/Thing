@@ -138,6 +138,25 @@ class SensoriumEngine(
     private var bleCount: Int? = null
     private var wasStill = false
 
+    private val _liveEvents = MutableStateFlow<List<SenseEvent>>(emptyList())
+
+    /**
+     * Events still considered to be HAPPENING, for the acting layer.
+     *
+     * ⚠️ **Not "this heartbeat's events", and the difference is the whole point.** The mic sips
+     * every 45 seconds at nominal and every 300 at conserve, while the heartbeat is 30 — so an
+     * alarm is heard on one beat and not the next, and a layer reading only the current beat would
+     * assert the alarm response, release it, assert it again, flapping a torch and filling the
+     * history with noise. An alarm sounds for minutes; [EVENT_DWELL_MS] is longer than the slowest
+     * sip so the reading stays true between them.
+     *
+     * ⚠️ It is a DWELL, not a cool-down. [eventCooldownMs] stops the same event being ANNOUNCED
+     * twice; this says how long one goes on being a fact about the room.
+     */
+    val liveEvents: StateFlow<List<SenseEvent>> = _liveEvents.asStateFlow()
+
+    private val seenEvents = mutableListOf<Pair<SenseEvent, Long>>()
+
     private val eventCooldownMs = mutableMapOf<String, Long>()
     private var memoryDay = 0
     private var memoryCountToday = 0
@@ -309,6 +328,12 @@ class SensoriumEngine(
         lastMagUt = snap.magneticUt
         wasStill = snap.movement < Sensorium.HANDLING_THRESHOLD
         events.forEach { dispatch(it, nowMs) }
+
+        // Age the dwell window, then publish what is still live. Deduped by key so an alarm heard on
+        // three consecutive sips is one fact about the room rather than three.
+        seenEvents += events.map { it to nowMs }
+        seenEvents.removeAll { nowMs - it.second > EVENT_DWELL_MS }
+        _liveEvents.value = seenEvents.map { it.first }.distinctBy { it.key }
     }
 
     /**
@@ -396,6 +421,15 @@ class SensoriumEngine(
         const val LEVEL_TTL_MS = 90_000L
         const val LIGHT_TRIGGER_LUX = 120f
         const val CAM_TRIGGER_MIN_GAP_MS = 90_000L
+
+        /**
+         * How long an event goes on being a fact about the room — see [liveEvents].
+         *
+         * ⚠️ Derived from the SLOWEST sip rather than chosen: `cadenceFor(CONSERVE)` sips the mic
+         * every 300 seconds, so anything shorter than that guarantees a gap with no evidence in it
+         * and a hold that flaps. Six minutes leaves an overlap at every rung of the ladder.
+         */
+        const val EVENT_DWELL_MS = 360_000L
         const val BASELINE_GAP_MS = 2 * 60_000L
         const val ALERT_COOLDOWN_MS = 10 * 60_000L
         const val NOTABLE_COOLDOWN_MS = 30 * 60_000L

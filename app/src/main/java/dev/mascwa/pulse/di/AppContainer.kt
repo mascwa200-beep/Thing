@@ -917,6 +917,32 @@ class AppContainer(private val appContext: Context) {
             senseContextReader, wifiPolicyController, calendarRepository,
         )
     }
+    /**
+     * The acting layer: what the ambient rules want, made to happen and undone again.
+     *
+     * ⚠️ **Lazy, so a phone that never switches sensing on never has a holds file on disk** — the
+     * same reasoning as the mail-notice store. The only thing that builds it is
+     * [dev.mascwa.pulse.data.sensing.SensoriumService], which is itself opt-in.
+     *
+     * ⚠️ The effect lambda is deliberately the only coupling to anything playing. Exactly one
+     * APP-tier action needs a side effect rather than set membership — pausing is a thing that has
+     * to be DONE — and both controllers read
+     * [dev.mascwa.pulse.data.sensing.AmbientHolds] themselves to stay paused, which is what makes it
+     * a hold rather than a one-off. Nothing is resumed on release: video somebody stopped, or drove
+     * away from, must not start playing by itself.
+     */
+    val ambientActuator: dev.mascwa.pulse.data.sensing.AmbientActuator by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientActuator(appContext, json) { action, asserting ->
+            if (action == dev.mascwa.pulse.core.telemetry.AmbientAction.PAUSE_VIDEO && asserting) {
+                runCatching { dev.mascwa.pulse.feature.theater.OnDemandController.pause() }
+                // ⚠️ Stopped rather than paused, and that is forced rather than chosen: a live
+                // stream has no position to hold, which is why its own status vocabulary has no
+                // PAUSED in it. Leaving it connected and muted would spend the data anyway.
+                runCatching { dev.mascwa.pulse.feature.live.LiveVideoController.stop(appContext) }
+            }
+        }
+    }
+
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
      *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
     val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {

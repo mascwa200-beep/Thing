@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -610,4 +611,36 @@ class SensoriumTest {
         assertTrue(Sensorium.distill(SenseFrame(soundDbfs = -50f)).heard)
         assertTrue(Sensorium.distill(SenseFrame(soundLabels = labels("speech"))).heard)
     }
+    /**
+     * ⚠️ The rule [AmbientAction.LOWER_SENSE_RATE]'s own documentation calls the convenient mistake:
+     * a step too far reaches STANDDOWN, where `cadenceFor` sets `micIntervalSec = 0` — OFF — and the
+     * microphone is how this app hears a smoke alarm. The floor is what makes that unreachable
+     * rather than merely warned about.
+     */
+    @Test
+    fun `lowering the sense rate can never switch the ears off`() {
+        for (l in Sensorium.SenseLevel.entries) {
+            val out = Sensorium.slowed(l)
+            // Never faster: the battery's claim on the ladder outranks any rule's.
+            assertTrue("$l sped up to $out", out.ordinal >= l.ordinal)
+            // And never OFF, unless the battery had already put it there.
+            if (l != Sensorium.SenseLevel.STANDDOWN) {
+                assertNotEquals("$l was lowered all the way to standdown", Sensorium.SenseLevel.STANDDOWN, out)
+                assertTrue("$l stopped sipping", Sensorium.cadenceFor(out).micIntervalSec > 0)
+            }
+        }
+    }
+
+    @Test
+    fun `lowering the sense rate moves exactly one rung, and stops`() {
+        assertEquals(Sensorium.SenseLevel.SETTLED, Sensorium.slowed(Sensorium.SenseLevel.NOMINAL))
+        assertEquals(Sensorium.SenseLevel.CONSERVE, Sensorium.slowed(Sensorium.SenseLevel.SETTLED))
+        assertEquals(Sensorium.SenseLevel.CONSERVE, Sensorium.slowed(Sensorium.SenseLevel.CONSERVE))
+        assertEquals(Sensorium.SenseLevel.STANDDOWN, Sensorium.slowed(Sensorium.SenseLevel.STANDDOWN))
+        // Applying it repeatedly must settle rather than walk off the end.
+        var l = Sensorium.SenseLevel.NOMINAL
+        repeat(8) { l = Sensorium.slowed(l) }
+        assertEquals(Sensorium.SenseLevel.CONSERVE, l)
+    }
+
 }
