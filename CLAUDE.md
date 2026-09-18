@@ -1628,6 +1628,28 @@ Every runtime behaviour is **owner-verify on the Pixel** (CI can't run the store
   value-derived) so it dodges the neutrality trap; the positive counterpart to exertion draining you.
 
 ### PHONE PENALTIES — "neglect bites the phone" (owner ask, #349–#353 all merged, OPT-IN default OFF)
+⚠️ **EVERYTHING IN THIS SECTION WAS DELETED ALONG WITH THE LIFE-SIM GAME IT SERVED, AND IT READS AS
+PRESENT-TENSE FACT.** Each name checked individually rather than on one grep: `PhonePenalties`,
+`PhoneLock`, `PhonePenaltyController`, `PenaltyGateActivity`, `notifyPenaltyGate`,
+`phonePenaltyKiosk`, `lastPenaltyGateMs` and `TelemetryViewModel.phonePenalties` all return **zero
+files**. ⚠️ `TelemetryViewModel` itself DOES exist (`feature/tacnet`, a device readout) — a first
+draft of this flag said it did not, which is the recurring habit in miniature. ⚠️ **`LockoutActivity`
+is gone too**, so the "commitment lock" entry further down this file is a second phantom of the same
+family.
+
+What the deletion left behind is six `DevicePolicyController` methods whose only mention anywhere is
+their own declaration and the `dpm.` call inside it — `lockNow`, `setLockTaskPackages`,
+`setUserRestriction`, `setStatusBarDisabled`, `setScreenCaptureDisabled`, `setPackagesSuspended` —
+plus a `<force-lock/>` in `res/xml/device_admin.xml` whose comment named the dead caller until the
+Sensorium S0 slice corrected it.
+
+Left standing rather than rewritten, for the reason the log is always left standing — but flagged,
+because unlike an ordinary stale record this one describes a **safety-critical subsystem** (it can
+suspend every app on the phone) and a session that believed it exists would reason about a locking
+mechanism that is not there. **The reusable half is the design, not the code**: the two safety floors
+below — emergency calls always work, and a guaranteed eventual release so a bug cannot brick the
+phone — plus transition-only reconciliation, are exactly the rules the Sensorium's actuator inherits.
+
 Owner: "make the penalties more invasive to the phone — each tailored to revoke access to a thing until the
 need is taken care of," then chose **Harsher (kiosk)** intensity, then "seriously make it lock the apps / do
 whatever it wants." A neglected survival need now **revokes real Device-Owner capabilities** until you tend it.
@@ -12547,3 +12569,128 @@ since the build already in flight was not superseded under `cancel-in-progress`.
    email"*. Tap it; **"Texts & mail" should already be open**.
 2. **MENU** search "email", and the **SEARCH** screen for "email" — both should reach Settings.
 3. Ask the Computer to "open my mail settings".
+
+### THE SENSORIUM STOPS THROWING AWAY WHAT IT COLLECTS — S0 of the nervous-system arc (this session)
+
+Owner: *"Make the environment scanner more proactive and ensure that it actually controls something
+depending on what it senses and that what it senses isn't so limited and that what it reports back
+being sensed isn't so sparse and that it can affect the phone based on x or y or z or whatevs."*
+Four binding AskUserQuestion answers: reach = **everything including device-owner**; announcement =
+**a board line with an undo, and it may speak aloud for serious things**; sensing = **adaptive,
+wide, duty-cycled**; situations = **all four** (driving, put-away/asleep, company, safety).
+
+⚠️ **The standing "you can use ultra code, you just can't burn through the usage" instruction
+overrides BOTH the ultracode directive AND plan mode's own instruction to dispatch Explore/Plan
+agents.** Zero subagents and zero workflows this arc. Everything below is local kotlinc + JUnit,
+`javap` against a published AAR, or the local gate scripts.
+
+**The diagnosis.** The SENSORIUM shipped as a sensory cortex with no motor cortex. Measured, it can
+make exactly three things happen: one red board line for three sound rules, an episodic memory
+capped at 10/day, and a row in a 48-hour log. **Nothing in the whole app branches on `setting` or
+`motion`** — both are only ever `.name`-stringified or joined into `describe()`. Plan:
+`robust-baking-dewdrop.md`, slices S0–S8. **S0 is the repair slice and ships before any new
+capability**; it closes D1–D13 and is most of "what it senses isn't so limited" on its own.
+
+⚠️ **Five of thirteen `SenseFrame` fields were sampled, plumbed the whole way in, and read by
+nothing** — this repository's oldest defect class, in its newest subsystem. `proximityNear` (so a
+pocketed phone reported how bright the room was), `wifiApCount` (a `WifiManager.startScan()` every
+300 s, discarded), `pressureHpa`, `magneticUt`, `hourOfDay`, `weekend`. And `speedMps` was a
+hardcoded `null`, which made **`MotionState.DRIVING` structurally unreachable in the shipped app**.
+
+**What S0 changed, with the reasoning that is worth keeping:**
+
+- ⚠️ **A covered phone now reports no brightness, not a dark room.** The ambient-light sensor sits
+  beside the proximity sensor, so `proximityNear` means it is reading a pocket lining. Folded into
+  `LightState.UNKNOWN` rather than left for each consumer to check — the same decision, one step on,
+  that the no-light-sensor fix made. `EnvReading.covered` carries the occlusion separately.
+- ⚠️ **I caught a false claim in my own KDoc before it shipped, and it is the lesson of the arc.** I
+  wrote `Sensorium.enclosed(proximityNear, lightLux)` on the reasoning that "near AND dark is a
+  pocket; near AND lit is face-down on a desk, where the rear camera has a good view of the
+  ceiling". **Face-down presses the light sensor against the table too**, so both cases read near and
+  dark and are genuinely indistinguishable by any sensor on the phone. The function was deleted
+  rather than shipped with a corrected comment: it existed only to gate a camera decision that the
+  physics does not support, and a new unused function with a false KDoc is precisely the defect class
+  this slice exists to remove. What survived is narrower and true — **the opportunistic camera
+  TRIGGER is suppressed while covered** (walking with the phone in a pocket is "motion after
+  stillness" over and over, so the ramp would spend a burst every 90 s on the inside of a trouser
+  leg) while the scheduled burst is left alone.
+- ⚠️ **Access points count buildings, not people — so `wifiApCount` does NOT feed `social`, which is
+  what `SenseFrame`'s own KDoc claimed it did.** In an apartment building you see twenty or forty
+  neighbours' APs while completely alone in a room; implementing the documented wiring would have
+  shipped a lie. It is a **last-resort `EnvSetting` prior** instead, below every piece of real
+  evidence, so it can only ever turn UNKNOWN into INDOOR and can never override a scene the camera
+  saw. A test pins both halves.
+- **`LocationProvider.cachedSpeedMps`** — `getLastKnownLocation` starts no provider, so the "sensing
+  must never wake the GPS" invariant is intact while DRIVING becomes reachable. Bounded at two
+  minutes on **elapsed realtime, not `getTime`** (a wall clock moves; a cached fix five minutes old
+  may have been taken at 70 km/h on a road the phone is now parked beside). Stale ⇒ null ⇒ exactly
+  today's behaviour.
+- ⚠️ **`NoiseProfile` stops being keyword-only.** It was inferred entirely from labels YAMNet could
+  name, and `sound.isEmpty()` assumed quiet — so a loud room full of unrecognised sound read QUIET,
+  and the level was sitting in the capture buffer being thrown away. Two rules keep the widening
+  provably one-way: nothing recognised → the level decides; something recognised → the **louder** of
+  the two, never the quieter. **A null level leaves every reading byte-for-byte as it is today**,
+  which is what makes an uncalibrated microphone safe to ship against.
+- ⚠️ **`AudioData.load(AudioRecord)` returns an int and nothing published says whether it counts
+  floats or frames** — on an interleaved stereo capture those differ by two, so a `loaded < buf.size`
+  guard would refuse every level for ever, silently. **Decide from the DATA, not from an API contract
+  you cannot read**: counting how much of the ring is still exactly zero catches an underfill
+  whatever the unit, and catches a dead microphone (the GrapheneOS mic toggle) in the same test.
+- **`classificationResults()` is one entry per AUDIO WINDOW** and only the first was read, so a
+  1.6 s sip was classified as its opening fraction of a second. ⚠️ The inner
+  `classifications().firstOrNull()` is a *different* list — one per output head, and YAMNet has one —
+  and is correct as it stands. Both samplers' score thresholds are now **derived from
+  `Sensorium.MIN_CONF`** rather than being their own numbers (0.25 and 0.20 against a reader that
+  floors at 0.30, so the six result slots were being spent on labels the core then discarded).
+- ⚠️ **`EnvMetrics.crowd` repeated the exact `?: 0f` fault `light` was fixed for, and unlike that one
+  it was NOT latent**: `describeNormal` reads `crowdMean` directly, so with radio sensing off the
+  scanner stated "alone" as a learned fact about this hour of your life on a phone that had never
+  counted a device. `BaselineCell` gains **per-metric sample counts** — justified here where a
+  separate `lightSamples` was measured and rejected before, because `btDeviceCount` is null
+  *permanently* when radio sensing is off, not for a handful of samples. The counts also fix seeding:
+  an EWMA keyed on the shared count blended a late sense's first real reading against the zero the
+  field was born with.
+- **"▸ LOOK NOW" answers.** `cameraOnTrigger` is false at CONSERVE and STANDDOWN, so on a phone low
+  on battery that button set a flag nothing would ever read and the screen said nothing at all. Every
+  refusal now names a cause the person can act on. **`standDownBatteryPct` gets its first control** —
+  `Sensorium.level` documents the parameter as existing "so the user's own setting can reach it", and
+  it was stored, read, and unreachable. And `MicFloor.interrogating` is consulted at last, so a sip
+  cannot be attempted underneath the subsystem that takes the microphone outright.
+
+**⚠️ THE CLAUDE.md PHANTOM (D13), and there are two of them.** The PHONE PENALTIES section describes
+`PhonePenalties.kt`, `PhoneLock`, `PhonePenaltyController`, `PenaltyGateActivity`, `notifyPenaltyGate`
+and `AppSettings.phonePenaltyKiosk` in the present tense; **every one returns zero files**. They went
+with the life-sim game. `LockoutActivity` is gone too, so the commitment-lock entry is a second
+phantom of the same family. Both are flagged in place rather than rewritten, as the log always is —
+but flagged loudly, because that one describes a subsystem that can suspend every app on the phone.
+⚠️ A first draft of my own flag said `TelemetryViewModel` did not exist either; **it does**
+(`feature/tacnet`, a device readout) — what does not exist is its `phonePenalties` member. Check each
+name individually rather than on one grep.
+
+**Verification: 13 rules negative-tested** (`scratchpad/sensorium/neg.sh`), each against a baseline
+asserted green first, each perturbation asserted to have matched the source, the restore in a shell
+`trap … EXIT` and byte-compared. Core suite 31+11 → 45+17.
+
+⚠️ **One came back ASLEEP and the GUARD was fine — my EXPECTATION was wrong.** Case 7 perturbs
+`EnvMetrics.of`, and I listed two tests that build an `EnvMetrics` **directly** and therefore cannot
+be reached by a change to `of()`. That is the recorded "fixture never reached the branch" mechanism
+applied to an expectation list rather than to a test, and it is the seventh way a negative test can
+mislead: **trace which code path each named test actually exercises before listing it.** A separate
+case now covers the `update()` half the first perturbation could not reach.
+
+⚠️ **`PrefInfo`'s second positional parameter is the right-aligned VALUE, capped at two lines — not a
+subtitle.** Recorded here once already and hit again; a 48-character sentence belongs in the named
+`subtitle`, which renders under the title in the weighted column.
+
+⚠️ **Owner-verify on the Pixel — CI compiles this and cannot sense anything.** Put the phone in a
+pocket: the scanner should say **covered** and stop claiming how bright the room is. Drive somewhere:
+**DRIVING** should appear, which was impossible before. Sit in a loud room the classifier has no word
+for: the soundscape should no longer read QUIET, and INSTRUMENTS should show a **SOUND LEVEL** in
+dBFS. Press **▸ LOOK NOW** on a phone below 25% battery: it should refuse out loud instead of doing
+nothing. And Settings → Ambient sensing now has **"Stop sensing below"**.
+
+**Open: S1–S8 of the plan** — sense wider (screen/unlock, audio route, thermal, face-down, step
+cadence, foreground-app category, trigger sensors), then `AmbientSituation` + `AmbientRules` +
+`AmbientActuator` (APP tier), the scanner rewrite, then the PHONE and OWNER tiers, then the proactive
+channels and the Oracle finally reading the environment line it has been handed and discarding since
+it was written.
