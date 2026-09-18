@@ -74,6 +74,22 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         // callers of `createCameraImageUri` read the file once and abandon it, and a cancelled
         // capture belongs to no call site at all. See `pruneCameraCaptures` for why an hour.
         appScope.launch { dev.mascwa.pulse.core.util.pruneCameraCaptures(this@PulseApplication) }
+        // ⚠️ **Let go of whatever a dead process left holding — safety rule 3, and until now it only
+        // held if the scanner service happened to run again.** Its one caller was inside that
+        // service's loop, which is enough while every hold is in-memory and a fresh process starts
+        // empty. It stopped being enough the moment the PHONE tier shipped: silencing a ringer or
+        // lighting the torch is a real change to the device that outlives us, so a force-stop while
+        // one was held — followed by sensing being switched off, or the service simply never
+        // starting — leaves the phone on vibrate, or the torch burning, with nothing alive that
+        // knows to undo it. The torch is the worse of the two: its ten-minute backstop needs a
+        // process to fire it.
+        //
+        // Launch is the point that is always reached, which is the same reasoning as the two prunes
+        // above. It costs one background read on a phone holding nothing, and creates no file —
+        // `load` only reads, and the empty path returns before `persist`.
+        appScope.launch {
+            runCatching { container.ambientActuator.reconcileFromDisk(System.currentTimeMillis()) }
+        }
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
         // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).

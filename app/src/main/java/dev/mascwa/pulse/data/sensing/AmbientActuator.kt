@@ -167,6 +167,17 @@ class AmbientActuator(
      * more would be the layer acting on a situation it has not observed since before it died.
      */
     suspend fun reconcileFromDisk(nowMs: Long) = mutex.withLock {
+        // ⚠️ **Once per process, and the guard is what makes a second caller safe.** This releases
+        // whatever is on DISK, so calling it while this process is legitimately holding something
+        // would let go of a hold asserted seconds earlier — and there are now two callers racing:
+        // the application at startup and the service at loop start. [loaded] means "this process has
+        // read the disk", so whichever wins does the reconcile and the other becomes a no-op.
+        //
+        // ⚠️ It is also correct for a service restarted inside a LIVE process: `onDestroy` stood
+        // everything down on the way out, and if it did not, the in-memory state is still true and
+        // the loop's own reconcile of wanted-against-held handles it. What must never happen is a
+        // blanket release landing on top of live holds, which is exactly what this prevents.
+        if (loaded) return@withLock
         val stored = load()
         lines = stored.log.map { it.toLine() }
         val held = stored.held.mapNotNull { it.toIntent() }
