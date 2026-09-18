@@ -1029,6 +1029,21 @@ fun SettingsScreen(
                         subtitle = "The watch keeps its heartbeat and stops spending anything: no mic " +
                             "sips, no camera bursts, no radio scans. A charger lifts it immediately.",
                     )
+                    // ⚠️ The line between "this app will not interrupt you" and "this app changes
+                    // your phone". Everything above needs nobody's permission; this is a claim on
+                    // the handset and is somebody's to make deliberately. Off, the rules still run
+                    // and the scanner still shows what they WOULD do — see AmbientRules.permit,
+                    // which keeps refusals with their sentences rather than filtering them away.
+                    PrefSwitch(
+                        title = "Let it change the phone",
+                        subtitle = "Off, it only changes how this app behaves — holding back its own " +
+                            "notices, not speaking, pausing video. On, a meeting can set the ringer " +
+                            "to vibrate and a fire alarm in the dark can light the torch. Everything " +
+                            "it does is listed in the Environment Scanner with an undo, and lifts by " +
+                            "itself.",
+                        checked = s.sensing.actOnPhone,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(actOnPhone = v)) } },
+                    )
                 }
             }
             if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {

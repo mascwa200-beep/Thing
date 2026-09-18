@@ -25,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.AmbientRules
 import dev.mascwa.pulse.core.telemetry.AmbientSignals
 import dev.mascwa.pulse.core.telemetry.DeviceClass
 import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.data.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -229,7 +230,8 @@ class SensoriumService : Service() {
                         nowMs = now,
                     )
                     acting.apply(
-                        AmbientRules.permit(AmbientRules.decide(signals), MAX_TIER),
+                        AmbientRules.permit(AmbientRules.decide(signals), tierFor(settings))
+                            .minusWhatThisHandsetCannotDo(c.phoneHolds),
                         now,
                         // ⚠️ Computed here, where the signals already are. Quiet is the common and
                         // correct state for this layer; what it must never be is unexplained.
@@ -361,17 +363,20 @@ class SensoriumService : Service() {
     companion object {
 
         /**
-         * The deepest tier this build will act at.
+         * The deepest tier the rules may act at, from the user's own switch.
          *
-         * ⚠️ **Deliberately a constant and deliberately [ActionTier.APP].** The phone and
-         * device-owner tiers are built and ready in [AmbientAction], and nothing may reach them
-         * until the scanner can show what is held and let go of it — you should be able to watch
-         * this layer think before it is allowed to touch the handset. When those tiers arrive this
-         * becomes a read of the user's own setting, and the rules do not change: [AmbientRules.permit]
-         * already keeps what was refused, with the sentence for it, precisely so the difference is
-         * visible rather than silent.
+         * ⚠️ **[ActionTier.APP] is the floor and has no switch**, because an app declining to
+         * interrupt you is not a power that needs permission — and making it refusable would allow a
+         * state where the layer senses everything and may do nothing at all.
+         *
+         * ⚠️ The device-owner tier is NOT reachable from here yet, and that is deliberate rather
+         * than unfinished: those actions suspend apps and disable cameras, and they want a switch
+         * each rather than one that opens all of them together. Until then [AmbientRules.permit]
+         * keeps what it refused, with the sentence for it, so the scanner can say "would pause your
+         * distracting apps · device-owner controls are switched off" instead of going quiet.
          */
-        private val MAX_TIER = ActionTier.APP
+        private fun tierFor(settings: AppSettings): ActionTier =
+            if (settings.sensing.actOnPhone) ActionTier.PHONE else ActionTier.APP
 
         private const val CHANNEL_ONGOING = "sensorium_ongoing"
         private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_SENSORIUM

@@ -918,6 +918,17 @@ class AppContainer(private val appContext: Context) {
         )
     }
     /**
+     * The PHONE tier's two effects — the ringer and the torch.
+     *
+     * ⚠️ It borrows [survivalTools] for the torch rather than finding the flash-bearing camera a
+     * second time. That lookup already exists, is already lazy, and a second copy is the
+     * duplicated-definition drift this project has converged seven times.
+     */
+    val phoneHolds: dev.mascwa.pulse.data.sensing.PhoneHolds by lazy {
+        dev.mascwa.pulse.data.sensing.PhoneHolds(appContext, survivalTools)
+    }
+
+    /**
      * The acting layer: what the ambient rules want, made to happen and undone again.
      *
      * ⚠️ **A phone that never switches sensing on never has a holds file on disk** — the same
@@ -943,6 +954,11 @@ class AppContainer(private val appContext: Context) {
                 // PAUSED in it. Leaving it connected and muted would spend the data anyway.
                 runCatching { dev.mascwa.pulse.feature.live.LiveVideoController.stop(appContext) }
             }
+            // ⚠️ Handed every action rather than filtered here. Whether a PHONE-tier hold is allowed
+            // at all is `AmbientRules.permit`'s decision, made once against the user's own switch —
+            // a second gate at the call site is a second place for the two to disagree about what is
+            // switched on. [PhoneHolds] ignores what is not its own.
+            runCatching { phoneHolds.run(action, asserting) }
         }
     }
 

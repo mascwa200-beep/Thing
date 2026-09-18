@@ -55,8 +55,10 @@ fun interface HoldEffect {
  *
  * ## ⚠️ APP tier only, and the refusals are kept rather than dropped
  *
- * [apply] takes the whole [AmbientDecision], including what was refused for being out of tier, so a
- * surface can say "would pause your distracting apps · device-owner controls are switched off"
+ * [apply] takes the whole [AmbientDecision], including everything refused — for being out of tier,
+ * or because this particular handset cannot do it at all — so a surface can say "would have paused
+ * your distracting apps · device-owner controls are switched off", or "would have turned the torch
+ * on · this phone has no torch",
  * instead of silently doing nothing. That sentence is the entire reason [AmbientRules.permit] splits
  * them rather than filtering.
  *
@@ -208,7 +210,13 @@ class AmbientActuator(
     ) = mutex.withLock {
         if (!loaded) load()
         val r = AmbientReconcile.reconcile(state, decision.allowed, nowMs)
-        _refused.value = decision.refused.map { "would ${it.intent.action.label} · ${it.why}" }
+        // ⚠️ "would HAVE", because [AmbientAction.label] is documented past tense — it is written for
+        // the board line ("held back non-urgent notices"), and a bare "would" produced "would
+        // silenced the ringer" on screen. That was live rather than theoretical: the driving and
+        // meeting rules both ask for the ringer, and with the phone switch off it is refused and
+        // rendered on every drive. Checked against every label in the enum; all thirteen read
+        // correctly this way but one, and that one is noted where it is declared.
+        _refused.value = decision.refused.map { "would have ${it.intent.action.label} · ${it.why}" }
         _quiet.value = quietBecause
 
         // ⚠️ A quiet heartbeat can still have moved the bar — an action whose rule stopped asking

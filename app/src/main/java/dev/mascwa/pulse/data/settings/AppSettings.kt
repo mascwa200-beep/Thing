@@ -313,6 +313,17 @@ data class SensingSettings(
     /** Battery %, discharging, below which the whole stack stands down (heartbeat only). */
     val standDownBatteryPct: Int = 9,
     /**
+     * Let the ambient rules change the PHONE, not only this app's own behaviour.
+     *
+     * ⚠️ **Default OFF, and that is not timidity.** Everything below this switch is the app
+     * declining to interrupt you, which needs nobody's permission; above it the app silences a
+     * ringer and lights a torch, which is a claim on the handset somebody should make deliberately.
+     * The scanner already shows what the rules WOULD do while this is off — see
+     * `AmbientRules.permit`, which keeps refusals with their sentences rather than filtering them —
+     * so turning it on is an informed choice rather than a leap.
+     */
+    val actOnPhone: Boolean = false,
+    /**
      * The acoustic interrogator: continuous speech capture, offline transcription to a rolling
      * encrypted log, and fallacy screening against the offline library.
      *

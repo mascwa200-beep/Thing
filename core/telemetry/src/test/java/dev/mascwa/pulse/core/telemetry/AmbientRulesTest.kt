@@ -152,22 +152,37 @@ class AmbientRulesTest {
         // seconds before the phone reacts is a phone that reacted too late. What protects against a
         // false positive here is SensoriumEvents.ALERT_MIN_CONF, applied where the sound is
         // recognised, so waiting again would pay that cost twice for nothing.
-        val s = AmbientSignals(events = listOf(alarm), nowMs = t0)
+        // ⚠️ DARK on purpose. The torch is the only physical response the safety rule still has
+        // and it is gated on darkness, so a default-lit fixture would assert over an empty list and
+        // prove nothing — the "fixture never reached the branch" shape this repository keeps finding.
+        val s = AmbientSignals(
+            env = EnvReading(light = LightState.DARK), events = listOf(alarm), nowMs = t0,
+        )
         assertFalse("the fixture must be unsettled or this proves nothing", AmbientRules.settled(s))
         val out = AmbientRules.decide(s)
-        assertTrue(AmbientAction.RAISE_ALARM_VOLUME in out.map { it.action })
+        assertTrue("the safety rule produced nothing at all", out.isNotEmpty())
+        assertTrue(AmbientAction.TORCH_ON in out.map { it.action })
         assertTrue("an alarm is not routine", out.all { it.urgency == ActionUrgency.RED })
         assertTrue("the reason must say what was heard", out.all { alarm.detail in it.reason })
     }
 
     @Test
     fun `a merely notable sound is not an alarm`() {
+        // ⚠️ DARK, for the same reason the alarm test above is — and this one was WRITTEN without it
+        // and was a weak test as a result. The safety rule's only physical response is the torch and
+        // the torch is gated on darkness, so a default-lit fixture returns an empty list whether or
+        // not a notable sound reaches the rule: it would have passed against a rule that let
+        // EVERYTHING through. The negative-test harness is what surfaced that — the perturbation
+        // that admits every event failed a different test and left this one green.
         val doorbell = SenseEvent("sound.doorbell", "DOORBELL", "a doorbell", EventSeverity.NOTABLE)
-        assertTrue(AmbientRules.decide(AmbientSignals(events = listOf(doorbell), nowMs = t0)).isEmpty())
+        val dark = EnvReading(light = LightState.DARK)
+        assertTrue(
+            AmbientRules.decide(AmbientSignals(env = dark, events = listOf(doorbell), nowMs = t0)).isEmpty(),
+        )
     }
 
     @Test
-    fun `breaking glass is never answered by making the phone loud and bright`() {
+    fun `breaking glass is never answered by lighting the phone up`() {
         // ⚠️ SensoriumEvents raises three ALERTs — a fire alarm, breaking glass and a gunshot-like
         // sound — and only the first of them wants a loud, lit phone. For the other two the same
         // response could be exactly wrong: raising the volume and lighting a torch while somebody is
@@ -204,9 +219,11 @@ class AmbientRulesTest {
 
     @Test
     fun `an alarm while driving is acted on as well as the driving`() {
-        val s = signals(Situation.DRIVING, events = listOf(alarm))
+        val s = signals(
+            Situation.DRIVING, env = EnvReading(light = LightState.DARK), events = listOf(alarm),
+        )
         val out = actions(s)
-        assertTrue(AmbientAction.RAISE_ALARM_VOLUME in out)
+        assertTrue(AmbientAction.TORCH_ON in out)
         assertTrue(AmbientAction.HOLD_NON_URGENT in out)
     }
 
@@ -267,14 +284,26 @@ class AmbientRulesTest {
         }
     }
 
+    /**
+     * ⚠️ **The property is now held by ABSENCE, which is stronger than the rule it replaced.** This
+     * used to assert that the meeting rule did not ask for a `REQUEST_DND` that existed; that member
+     * is gone, so no rule can reach for it however anyone writes one later. What is left to guard is
+     * that nobody puts it back without meaning to — Do Not Disturb is a mode people set deliberately
+     * and notice the loss of, and HOLD_NON_URGENT already stops OUR notifications without making a
+     * claim on everyone else's.
+     */
     @Test
-    fun `a meeting silences the ringer and does not take over Do Not Disturb`() {
-        // ⚠️ Do Not Disturb is a mode people set deliberately and notice the loss of. Taking it over
-        // for something inferred from a diary entry is a larger liberty than the evidence supports,
-        // and silencing a ringer is exactly as reversible and says the same thing.
+    fun `a meeting silences the ringer, and nothing in the list can take over Do Not Disturb`() {
         val out = actions(signals(Situation.IN_A_MEETING, phone = ringing))
         assertTrue(AmbientAction.SILENCE_RINGER in out)
-        assertFalse(AmbientAction.REQUEST_DND in out)
+        assertTrue(AmbientAction.STAY_SILENT in out)
+        for (a in AmbientAction.entries) {
+            val named = "${a.name} ${a.label} ${a.undo}".lowercase()
+            assertFalse(
+                "$a can take over Do Not Disturb",
+                "do not disturb" in named || "dnd" in named,
+            )
+        }
     }
 
     @Test
@@ -401,7 +430,18 @@ class AmbientRulesTest {
             key = SensoriumEvents.KEY_SMOKE_ALARM, title = "ALARM HEARD",
             detail = "a smoke/fire/CO alarm is sounding nearby", severity = EventSeverity.ALERT,
         )
-        assertEquals(null, AmbientRules.whyQuiet(signals(Situation.UNKNOWN, forMs = 0L, events = listOf(alarm))))
+        // ⚠️ DARK, for the same reason as the safety tests above: the torch is the only physical
+        // response left and it is gated on darkness, so a lit fixture would make the rule produce
+        // nothing and this test would be asserting about a path it never reached.
+        assertEquals(
+            null,
+            AmbientRules.whyQuiet(
+                signals(
+                    Situation.UNKNOWN, forMs = 0L,
+                    env = EnvReading(light = LightState.DARK), events = listOf(alarm),
+                ),
+            ),
+        )
     }
 
 }

@@ -90,19 +90,45 @@ enum class AmbientAction(
     // ⚠️ None of these can stop an emergency call being made or an emergency broadcast arriving.
     // Silencing a ringer does not disconnect a radio, and Android lets an emergency alert through
     // Do Not Disturb by design. That is safety rule 5, and it holds because of what is ABSENT here.
-    SILENCE_RINGER(ActionTier.PHONE, "silenced the ringer", "let it ring again", 4 * HOUR),
-    REQUEST_DND(ActionTier.PHONE, "turned on Do Not Disturb", "turn Do Not Disturb off", 4 * HOUR),
+    // ⚠️ **It says vibrate because it sets vibrate.** Going all the way to silent needs the
+    // notification-policy grant, which this app does not ask for and which lives behind a system
+    // screen somebody would have to be sent hunting through — so the actuator stops at VIBRATE and
+    // the label has to stop there too. "Silenced the ringer" on a phone that is still buzzing is the
+    // app claiming more than it did, which is the shape this repository keeps having to correct.
+    SILENCE_RINGER(ActionTier.PHONE, "set the ringer to vibrate", "let it ring out loud", 4 * HOUR),
+    // ⚠️ **There is deliberately no REQUEST_DND, and its absence is the rule.** It was declared here
+    // and asked for by NOTHING — the declared-and-never-constructed shape this whole arc exists to
+    // remove, shipped in this very enum a slice ago. The meeting rule had already decided against it
+    // in writing (Do Not Disturb is a mode people set deliberately and notice the loss of) and no
+    // other situation wants it, because HOLD_NON_URGENT already stops OUR notifications where Do Not
+    // Disturb stops everyone's — a far larger claim on somebody's phone for the same benefit.
+    //
+    // Removed rather than left unused for the same reason STAND_SENSING_DOWN was: a member no rule
+    // asks for widens what this list can express and buys nothing, and the closed list's whole value
+    // is that the worst a rule can reach for is something in it. Putting it back should be a
+    // deliberate, reviewed act, which is exactly what adding an enum member is.
     TORCH_ON(ActionTier.PHONE, "turned the torch on", "turn the torch off", 10 * MINUTE),
-    RAISE_ALARM_VOLUME(
-        ActionTier.PHONE, "raised the alarm volume", "put the volume back", 30 * MINUTE,
-    ),
+    // ⚠️ **There is deliberately no RAISE_ALARM_VOLUME either, and the reason is stronger than the
+    // one for Do Not Disturb above: as wired it could not have worked.** It raised STREAM_ALARM, and
+    // nothing in this subsystem's alert path plays on that stream — the urgent board line goes out
+    // on the notification stream, which is a different volume entirely. So it would have moved a
+    // number nobody was listening to.
+    //
+    // And it could not safely have been made to work here. `EmergencyKlaxon` already captures and
+    // restores that exact stream, per instance, and two independent capture-and-restores interleave
+    // into a phone whose alarm volume is stuck at maximum for ever — the defect this repository
+    // has already shipped once on that very class and had to fix. If a physical alarm response is
+    // ever wanted it belongs with the component that already owns the stream, not beside it.
+    //
+    // Losing it costs the safety rule nothing it was actually delivering: the torch is the genuinely
+    // additive physical response, and every ALERT is already announced by an urgent board line.
 
     // ── OWNER ────────────────────────────────────────────────────────────────────────────────
     SUSPEND_DISTRACTING_APPS(
         ActionTier.OWNER, "paused distracting apps", "let those apps open again", 2 * HOUR,
     ),
     DISABLE_CAMERA(ActionTier.OWNER, "switched the camera off", "switch the camera back on", 2 * HOUR),
-    HIDE_STATUS_BAR(ActionTier.OWNER, "hid the status bar", "put the status bar back", 2 * HOUR),
+    HIDE_STATUS_BAR(ActionTier.OWNER, "switched the status bar off", "put the status bar back", 2 * HOUR),
     BLOCK_SCREENSHOTS(ActionTier.OWNER, "blocked screenshots", "allow screenshots again", 2 * HOUR),
     SHORTEN_SCREEN_TIMEOUT(
         ActionTier.OWNER, "shortened the screen timeout", "put the timeout back", 8 * HOUR,
@@ -162,7 +188,14 @@ data class AmbientIntent(
 /** What a set of intents is allowed to do right now, and what it is not. */
 data class AmbientDecision(
     val allowed: List<AmbientIntent> = emptyList(),
-    /** Wanted but out of tier, each with the sentence a surface should show. */
+    /**
+     * Wanted but not allowed, each with the sentence a surface should show.
+     *
+     * ⚠️ [permit] fills this with what was out of TIER. The app layer adds what this
+     * particular handset cannot physically do — a phone with no flash asked to light a torch —
+     * because both are the same fact arriving from different directions, and a reader wants one
+     * list of "asked for, not allowed" rather than two.
+     */
     val refused: List<AmbientRefusal> = emptyList(),
 )
 
@@ -289,12 +322,15 @@ object AmbientRules {
      * flat battery and nothing else; in a dark house with an alarm going off it is the difference
      * between finding the stairs and not.
      *
-     * ⚠️ **Only a FIRE alarm gets the loud, bright response, and the other two ALERT kinds
+     * ⚠️ **The response is the torch and nothing else.** It used to raise the alarm volume too, which
+     * moved a stream nothing in this path plays on — see the note where that action used to be.
+     *
+     * ⚠️ **Only a FIRE alarm gets the bright response, and the other two ALERT kinds
      * deliberately get nothing from this rule.** `SensoriumEvents` raises three: a smoke/CO alarm,
      * breaking glass and a gunshot-like sound. For a fire, being loud and lit is how somebody wakes
      * up and finds the door. For the other two the same response could be exactly wrong — a phone
-     * that raises its volume and lights a torch while somebody is hiding from whoever broke the
-     * window has made their situation worse, not better. Nothing is lost by saying nothing here:
+     * that lights a torch while somebody is hiding from whoever broke the window has made their
+     * situation worse, not better. Nothing is lost by saying nothing here:
      * `SensoriumEngine` already raises an urgent board line for EVERY alert, so glass and gunshots
      * are still announced. What this rule decides is only the PHYSICAL response, and for those two
      * the safe physical response is none.
@@ -304,9 +340,7 @@ object AmbientRules {
             it.severity == EventSeverity.ALERT && it.key == SensoriumEvents.KEY_SMOKE_ALARM
         } ?: return emptyList()
         val why = fire.detail
-        val out = mutableListOf(
-            intent(s, AmbientAction.RAISE_ALARM_VOLUME, why, ActionUrgency.RED),
-        )
+        val out = mutableListOf<AmbientIntent>()
         if (s.env.light == LightState.DARK) {
             out += intent(s, AmbientAction.TORCH_ON, "$why, and it is dark", ActionUrgency.RED)
         }

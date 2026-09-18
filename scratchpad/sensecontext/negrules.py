@@ -55,7 +55,7 @@ CASES = [
         "only a FIRE alarm gets the loud, bright answer",
         "            it.severity == EventSeverity.ALERT && it.key == SensoriumEvents.KEY_SMOKE_ALARM",
         "            it.severity == EventSeverity.ALERT",
-        ["breaking glass is never answered by making the phone loud and bright"],
+        ["breaking glass is never answered by lighting the phone up"],
     ),
     (
         "the torch is gated on darkness",
@@ -65,8 +65,8 @@ CASES = [
     ),
     (
         "an alarm is announced as RED and not as routine",
-        "            intent(s, AmbientAction.RAISE_ALARM_VOLUME, why, ActionUrgency.RED),",
-        "            intent(s, AmbientAction.RAISE_ALARM_VOLUME, why),",
+        "            out += intent(s, AmbientAction.TORCH_ON, \"$why, and it is dark\", ActionUrgency.RED)",
+        "            out += intent(s, AmbientAction.TORCH_ON, \"$why, and it is dark\")",
         ["an alarm is acted on immediately, with nothing else known"],
     ),
     (
@@ -90,11 +90,16 @@ CASES = [
         "        intent(s, AmbientAction.PAUSE_VIDEO, \"you are driving\"),\n        intent(s, AmbientAction.SILENCE_RINGER, \"you are driving\"),",
         ["driving quietens the phone and leaves the audio alone"],
     ),
+    # ⚠️ This case changed shape when REQUEST_DND was REMOVED from the enum. It used to add a
+    # `REQUEST_DND` intent to the meeting rule; with the member gone that perturbation would not
+    # compile, and a case that fails to compile proves nothing about the guard. Like the two enum
+    # cases below, it now plants the member back, because what is being guarded is the shape of the
+    # capability list rather than any decision made from it.
     (
-        "a meeting does not take over Do Not Disturb",
-        "        add(intent(s, AmbientAction.STAY_SILENT, \"your calendar says you are in something\"))",
-        "        add(intent(s, AmbientAction.STAY_SILENT, \"your calendar says you are in something\"))\n        add(intent(s, AmbientAction.REQUEST_DND, \"your calendar says you are in something\"))",
-        ["a meeting silences the ringer and does not take over Do Not Disturb"],
+        "nothing in the list can take over Do Not Disturb",
+        "    TORCH_ON(ActionTier.PHONE, \"turned the torch on\", \"turn the torch off\", 10 * MINUTE),",
+        "    REQUEST_DND(ActionTier.PHONE, \"turned on Do Not Disturb\", \"turn Do Not Disturb off\", 4 * HOUR),\n    TORCH_ON(ActionTier.PHONE, \"turned the torch on\", \"turn the torch off\", 10 * MINUTE),",
+        ["a meeting silences the ringer, and nothing in the list can take over Do Not Disturb"],
     ),
     # ⚠️ The transition-only rule, made structural. A hold is asserted and then RELEASED, so
     # silencing a ringer that was already silent means the release turns it back ON.
