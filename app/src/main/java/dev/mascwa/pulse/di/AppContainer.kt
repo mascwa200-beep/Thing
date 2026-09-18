@@ -915,6 +915,11 @@ class AppContainer(private val appContext: Context) {
             sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
             memoryStream, notifier, settingsRepository, locationProvider,
             senseContextReader, wifiPolicyController, calendarRepository,
+            // ⚠️ A lambda so that [textToSpeech] is READ only when an alarm is actually being
+            // spoken. Reading it binds a TTS service — see the note on `voicePreference` below —
+            // and passing it eagerly here would bind one on every phone the moment sensing starts,
+            // for a line most people will never hear.
+            speakAloud = { line -> runCatching { textToSpeech.speak(line) } },
         )
     }
     /**

@@ -75,6 +75,16 @@ class SensoriumEngine(
      * `Dispatchers.Default`. That is a trap this repository has already walked into once.
      */
     private val calendar: CalendarRepository,
+    /**
+     * Say something aloud. Defaults to doing nothing, which is what every test and every caller that
+     * has no voice gets.
+     *
+     * ⚠️ **A lambda rather than the engine itself, and that is not style.** `AppContainer` warns in
+     * writing that merely READING `textToSpeech` binds a TTS service, so taking one as a constructor
+     * parameter would bind it the moment sensing starts — on every phone, whether or not anything is
+     * ever spoken. A lambda touches it only when invoked, which here is only on an alarm.
+     */
+    private val speakAloud: (String) -> Unit = {},
 ) {
     private val _reading = MutableStateFlow(EnvReading())
     /** The live fused environmental read — the scanner's centerpiece, Computer's context line. */
@@ -396,6 +406,23 @@ class SensoriumEngine(
             notifier.notifyUrgentLine(
                 event.title, "Sensorium: ${event.detail}", "sensorium.${event.key}", red = true,
             )
+            // ⚠️ **Spoken as well as shown, and gated on ONE thing: has the user let the phone talk
+            // at all.** Not on quiet hours and not on `STAY_SILENT`, which is the opposite of how
+            // every other spoken line in this app is gated — and the reason is the one this
+            // repository already applies to the board: a RED item is never held, because an alarm
+            // sounding is precisely when interrupting somebody is right. A smoke alarm at three in
+            // the morning is the case quiet hours would suppress, and it is the case this exists
+            // for. `STAY_SILENT` gates VOLUNTEERED remarks by its own KDoc; an alarm is not one.
+            //
+            // ⚠️ It does not REPLACE the torch or the board line, it is added to them. TTS has to
+            // bind and start, which takes seconds a fire does not give you, so speech is the slowest
+            // of the three responses and must never be the only one.
+            //
+            // The per-key cooldown above is what stops this repeating: the speech sits under it
+            // rather than carrying a second throttle that could disagree with the first.
+            if (runCatching { settings.current().jarvis.speakProactive }.getOrDefault(false)) {
+                runCatching { speakAloud("${event.title}. ${event.detail}") }
+            }
         }
         if (event.severity != EventSeverity.LOG && settings.current().sensing.rememberEvents) {
             rememberEvent(event, nowMs)
