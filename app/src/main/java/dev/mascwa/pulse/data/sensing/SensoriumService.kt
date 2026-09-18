@@ -103,6 +103,27 @@ class SensoriumService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_RELEASE_ALL) {
+            // ⚠️ Releases and keeps sensing, which is the whole difference from Stop above. Somebody
+            // pressing this is saying "not that", not "stop watching" — and `releaseAllByHand` bars
+            // each released action from being re-asserted until its rule stops asking at least once,
+            // so the next heartbeat cannot simply put it all back and make the button look broken.
+            //
+            // On the application's scope for the same reason Stop is: this service's own scope dies
+            // with it, and a release that lost its race would leave the phone holding something
+            // nobody can see a reason for.
+            val app = application as? PulseApplication
+            val acting = app?.container?.ambientActuator
+            if (app != null && acting != null) {
+                app.appScope.launch {
+                    runCatching { acting.releaseAllByHand(System.currentTimeMillis()) }
+                    // Redraw at once rather than waiting out the refresh cadence: a button that
+                    // works and appears not to is indistinguishable from one that does not.
+                    runCatching { updateOngoing(statusText()) }
+                }
+            }
+            return START_STICKY
+        }
         val c = container ?: run { stopSelf(); return START_NOT_STICKY }
         // The enabled-toggle is enforced by every caller AND by the loop's first iteration (settings
         // reads are suspend, so a disabled sticky-restart runs one instant heartbeat and stops).
@@ -151,6 +172,9 @@ class SensoriumService : Service() {
         val acting = c.ambientActuator
         var level = Sensorium.SenseLevel.NOMINAL
         var lastNotifMs = 0L
+        // What the notification currently SHOWS as held. Loop-local like the rest of this state, so
+        // a restarted loop redraws once on its first heartbeat rather than trusting a stale field.
+        var lastHeld: Set<AmbientAction> = emptySet()
 
         // ⚠️ **Safety rule 3, and it runs before the first heartbeat rather than beside it.** A hold
         // asserted by a process that then died — killed by the system, crashed, force-stopped — has
@@ -238,7 +262,15 @@ class SensoriumService : Service() {
                         quietBecause = AmbientRules.whyQuiet(signals),
                     )
                 }
-                if (now - lastNotifMs >= NOTIF_REFRESH_MS) {
+                // ⚠️ A hold changing redraws AT ONCE, ahead of the cadence. The refresh interval is
+                // sized for a status line that drifts slowly; what the acting layer does is news,
+                // and news that arrives up to a refresh period late is how somebody comes to believe
+                // the phone did something for no reason. Comparing the rendered set rather than
+                // asking the actuator keeps this a read — `apply` reports nothing, and widening it
+                // to would put a notification concern into the reconciler.
+                val heldNow = AmbientHolds.held.value
+                if (heldNow != lastHeld || now - lastNotifMs >= NOTIF_REFRESH_MS) {
+                    lastHeld = heldNow
                     lastNotifMs = now
                     updateOngoing(statusText())
                 }
@@ -300,6 +332,20 @@ class SensoriumService : Service() {
     private fun hasPermission(perm: String): Boolean =
         ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
 
+    /**
+     * What the acting layer is holding right now, in one line, or null when it is holding nothing.
+     *
+     * ⚠️ Read from [AmbientHolds] rather than from the actuator's history: this answers "what is in
+     * force", which is a different question from "what has it done", and the history's newest line
+     * can be a RELEASE. A notification built from the history would announce a hold at the moment it
+     * was let go of.
+     */
+    private fun heldLine(): String? {
+        val held = AmbientHolds.held.value
+        if (held.isEmpty()) return null
+        return held.joinToString(" · ") { it.label }.replaceFirstChar { it.uppercase() }
+    }
+
     private fun ongoing(text: String): Notification {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -309,17 +355,37 @@ class SensoriumService : Service() {
             this, 1, Intent(this, SensoriumService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return NotificationCompat.Builder(this, CHANNEL_ONGOING)
+        val held = heldLine()
+        val body = if (held == null) text else "$held\n$text"
+        val b = NotificationCompat.Builder(this, CHANNEL_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_pulse)
             .setColor(ContextCompat.getColor(this, R.color.lcars_condition_routine))
             .setSubText("SENSORIUM")
-            .setContentTitle("Environment scanner")
-            .setContentText(text)
+            // ⚠️ The title says what is happening TO the phone when something is happening to it.
+            // "Environment scanner" over a phone whose ringer this just changed buries the one fact
+            // somebody needs, under the name of the thing that did it.
+            .setContentTitle(if (held == null) "Environment scanner" else "Environment scanner · acting")
+            .setContentText(body)
+            // ⚠️ BigText because the collapsed line truncates and several holds run long. The
+            // collapsed row is a summary somebody glances at; the expanded one has to be complete,
+            // or the undo sits under a sentence that stops mid-word.
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setOngoing(true)
             .setSilent(true)
             .setShowWhen(false)
             .setContentIntent(open)
             .addAction(0, "Stop", stop)
+        // ⚠️ Only offered when there is something to undo. An always-present button that does
+        // nothing on most presses is the dead-control shape this repository keeps correcting — and
+        // it is exactly what "▸ LOOK NOW" was on this same feature before it was made to say why.
+        if (held != null) {
+            val release = PendingIntent.getService(
+                this, 2, Intent(this, SensoriumService::class.java).setAction(ACTION_RELEASE_ALL),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            b.addAction(0, "Let it all go", release)
+        }
+        return b
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
@@ -381,6 +447,17 @@ class SensoriumService : Service() {
         private const val CHANNEL_ONGOING = "sensorium_ongoing"
         private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_SENSORIUM
         private const val ACTION_STOP = "dev.mascwa.pulse.data.sensing.STOP"
+
+        /**
+         * The undo, on the notification that reports the holds.
+         *
+         * ⚠️ Deliberately a SEPARATE action string from [ACTION_STOP] rather than an extra on it.
+         * `Intent.filterEquals` — which is what decides whether two `PendingIntent`s are the same
+         * one — compares the action and ignores extras, so two intents differing only by an extra
+         * are one PendingIntent and the last one built silently wins the payload. This repository
+         * has already shipped that defect once, on the radio notification.
+         */
+        private const val ACTION_RELEASE_ALL = "dev.mascwa.pulse.data.sensing.RELEASE_ALL"
         private const val EXTRA_FOREGROUND = "foreground_launch"
         private const val NOTIF_REFRESH_MS = 3 * 60_000L
 
