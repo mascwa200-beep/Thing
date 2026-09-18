@@ -13037,3 +13037,66 @@ real compile above, which is far stronger evidence than that gate can produce.
    while driving"** — the second needs the first as well, and on a phone that is not a device owner it
    will say so rather than looking broken.
 7. Watch battery for a day at defaults on the Galaxy A16; the sensing ladder is the lever.
+
+### PR #464 MERGED TO MAIN — and a CI cache trap that costs 100 minutes (this session)
+
+Owner: *"merge it into main, and push auto."* Merged as **`108288ee`**, and via
+AskUserQuestion the owner chose a **merge commit rather than a squash** — a deliberate
+departure, since main's history is otherwise 100% `Title (#NNN)`. Verified rather than
+assumed: **919 commits** landed (a squash would be 1), the merge commit has two real
+parents, and individual messages like the S7 commit are present on main.
+
+⚠️ **The PR was named after its smallest part, and that was worth fixing before merging.**
+Measured — star map 28,180 insertions, nutrition 6,659, the Sensorium acting layer 4,153,
+and the **widget, which the title was about, 1,893**. Retitled to *"Two standalone apps, an
+acting layer, and a situation board"* with a body covering all five arcs. Under a merge
+commit the PR title still reaches main (GitHub puts it on the second line), so a stale
+title is a false record on the shipping branch either way.
+
+#### ⚠️ A GITHUB ACTIONS CACHE MADE ON A FEATURE BRANCH IS INVISIBLE TO MAIN
+
+This is the finding worth carrying forward. A branch reads its own caches **and the default
+branch's**; main cannot read a *feature* branch's. So every bit of catalogue warming done on
+`claude/loving-edison-bd65oa` was invisible to `main`, and merging fired **three concurrent
+cold Gaia crawls** — LCARS, Sky and the warmer — at a research archive, ~2,200–3,000
+requests each. Exactly the discourtesy `sky-catalogue.yml` exists to prevent.
+
+⚠️ **Proof it is scoping and not key drift, rather than an inference:** the warmer saved
+`star-catalogue-g15-e597a88d…-dr3-v1`, and CLAUDE.md already records LCARS #2143 getting
+`Cache hit for:` that **byte-identical key** from the branch. Same key, and main still
+missed it.
+
+**Remedy, and it is permanent:** cancel the redundant builds by hand and keep the warmer —
+it is purpose-built, three steps, and saves the cache. Once **main** holds it, default-branch
+caches are visible to *every* branch, so this fixes it going forward rather than just today.
+The same scoping bit the food database: Nutrition #154 rebuilt it in 8m32s on main and
+banked it, so that one is warm now too.
+
+⚠️ **The cold-crawl range is wider than recorded: 3,902s (65m02s) here, against 6,021s and
+6,077s previously.** Those two were consistent enough to read as *the* figure; they are not.
+Archive load varies, and this run was the fastest despite sharing the archive with two other
+crawlers for its first twelve minutes.
+
+#### Two judgement calls, stated rather than buried
+
+**LCARS #2181 and Sky #38 were cancelled and deliberately NOT re-run.** `latest` already
+holds `app-release.apk` from build #2180 and `sky-latest` from Sky #37, both built from
+`7e6d4ce4` — whose content is **byte-identical** to the merge commit, since the merge changed
+no files. Re-running would publish new `versionCode`s for identical apps and cost the owner a
+pointless **662 MB + 291 MB** auto-download. So main is verified by transitivity from a fully
+green build of the same tree; the visible cost is two cancelled runs in main's history.
+
+**The dev branch was re-synced with `git merge --no-ff`, not a plain merge.** ⚠️ After a merge
+commit, main's tip has the dev tip as a parent, so a plain merge is a **fast-forward onto
+GitHub's commit** — and its committer really is `GitHub <noreply@github.com>`, confirmed, which
+is what the stop-hook flags. `--no-ff` keeps the branch tip ours (`7c5c2c1e`); the tree is
+identical to main, so the commit exists only to stop the branch reading as behind.
+
+⚠️ **Measured, closing an open question: that re-sync push fired NO builds.** Five runs exist on
+main at 20:30:34 and nothing at all for `7c5c2c1e` a minute later — so `paths-ignore` does skip
+a merge commit whose diff is empty, and a content-free re-sync costs nothing.
+
+**Green on main:** Nutrition #154, Desktop #312 (MSI published to `desktop-latest`), and the
+catalogue warmer. **Everything on-device remains owner-verify** — the checklist at the end of
+the acting-layer section above is unchanged, and safety rule 3 is still the one that matters
+most: let something be held, force-stop the app, and confirm reopening releases it.
