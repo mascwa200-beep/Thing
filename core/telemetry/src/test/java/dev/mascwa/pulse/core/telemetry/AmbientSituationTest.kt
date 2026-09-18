@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -461,5 +462,23 @@ class AmbientSituationTest {
         val r = read(EnvReading(motion = MotionState.DRIVING), SenseContext(route = AudioRoute.BLUETOOTH))
         assertEquals("Driving · moving at vehicle speed, audio over Bluetooth", r.describe())
         assertEquals("Not sure", SituationRead().describe())
+    }
+
+    /**
+     * ⚠️ The label was a ten-branch `when` in [SituationRead.describe] and a byte-identical SECOND
+     * copy in the scanner — two statements of one fact, which this repository has had to converge
+     * seven times before this one. It is a constructor parameter now, so a new situation cannot
+     * compile without naming itself; what this adds is that the name has to be a NAME, and that
+     * [SituationRead.describe] genuinely reads it rather than keeping a private copy.
+     */
+    @Test
+    fun `every situation says what to call it, and the line uses that`() {
+        val seen = mutableSetOf<String>()
+        for (s in Situation.entries) {
+            assertTrue("$s has no label", s.label.isNotBlank())
+            assertFalse("$s's label is its own enum name", s.label == s.name)
+            assertTrue("two situations share the label '${s.label}'", seen.add(s.label))
+            assertEquals(s.label, SituationRead(situation = s).describe())
+        }
     }
 }

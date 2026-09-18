@@ -14,19 +14,33 @@ package dev.mascwa.pulse.core.telemetry
  * reported, and where the evidence for the other is CLOSE it is named in
  * [SituationRead.contenders]. Where it is not close it is simply not reported, which is the same
  * judgement a person would make: a phone face-down and still is put away, whatever else is true.
+ *
+ * ⚠️ **[label] is a constructor parameter rather than a `when`, so a new situation cannot be added
+ * without naming itself.** It was a ten-branch `when` in [SituationRead.describe] AND a
+ * byte-identical second copy in the scanner — two statements of one fact, which this repository has
+ * had to converge seven times before this one. A `when` here would still compile with a branch
+ * missing from one copy; this does not compile at all.
  */
-enum class Situation {
+enum class Situation(
+    /**
+     * What to call this on a surface, in the words a person would use.
+     *
+     * ⚠️ Sentence case and no jargon on purpose: this is read by somebody asking why their phone
+     * went quiet, not by whoever wrote the rule. "Put away" rather than POCKETED.
+     */
+    val label: String,
+) {
     /** Moving at vehicle speed, or a cabin that sounds like one. Says nothing about who is driving. */
-    DRIVING,
+    DRIVING("Driving"),
 
     /** Moving at walking pace. */
-    WALKING,
+    WALKING("Walking"),
 
     /**
      * Something is against the front of the phone and it is not being looked at — a pocket, a bag,
      * face-down on a table. ⚠️ No sensor on a phone can tell those apart; see [EnvReading.covered].
      */
-    POCKETED,
+    POCKETED("Put away"),
 
     /**
      * Put away for the night.
@@ -37,7 +51,7 @@ enum class Situation {
      * instead. A daytime nap will not be recognised, and inventing a rule that claimed to recognise
      * it would be claiming a measurement nothing here makes.
      */
-    ASLEEP,
+    ASLEEP("Asleep"),
 
     /**
      * Settled somewhere with the phone in use.
@@ -45,22 +59,22 @@ enum class Situation {
      * ⚠️ "Desk" is shorthand. The evidence is *in use, still, and not covered*, which is equally a
      * sofa, a train seat or a kitchen counter — nothing here knows about furniture.
      */
-    AT_DESK,
+    AT_DESK("Using the phone"),
 
     /** The calendar says something is on, and the room agrees. */
-    IN_A_MEETING,
+    IN_A_MEETING("In a meeting"),
 
     /** Other people are around — voices, or a lot of Bluetooth devices. */
-    IN_COMPANY,
+    IN_COMPANY("With people"),
 
     /** On the home network, phone put down. */
-    AT_HOME_IDLE,
+    AT_HOME_IDLE("At home, phone down"),
 
     /** On a network that is not home. */
-    OUT_AND_ABOUT,
+    OUT_AND_ABOUT("Out and about"),
 
     /** Nothing reached the bar. Not a failure — usually the honest answer. */
-    UNKNOWN,
+    UNKNOWN("Not sure"),
 }
 
 /**
@@ -86,21 +100,9 @@ data class SituationRead(
     val sinceMs: Long = 0L,
 ) {
     /** "Driving · moving at vehicle speed, audio over Bluetooth" — one line for a surface. */
-    fun describe(): String {
-        val name = when (situation) {
-            Situation.DRIVING -> "Driving"
-            Situation.WALKING -> "Walking"
-            Situation.POCKETED -> "Put away"
-            Situation.ASLEEP -> "Asleep"
-            Situation.AT_DESK -> "Using the phone"
-            Situation.IN_A_MEETING -> "In a meeting"
-            Situation.IN_COMPANY -> "With people"
-            Situation.AT_HOME_IDLE -> "At home, phone down"
-            Situation.OUT_AND_ABOUT -> "Out and about"
-            Situation.UNKNOWN -> "Not sure"
-        }
-        return if (evidence.isEmpty()) name else "$name · ${evidence.joinToString(", ")}"
-    }
+    fun describe(): String =
+        if (evidence.isEmpty()) situation.label
+        else "${situation.label} · ${evidence.joinToString(", ")}"
 }
 
 /**

@@ -508,18 +508,10 @@ private fun SituationCard(s: SituationRead, nowMs: Long) {
             }
         }
         Text(
-            when (s.situation) {
-                Situation.DRIVING -> "Driving"
-                Situation.WALKING -> "Walking"
-                Situation.POCKETED -> "Put away"
-                Situation.ASLEEP -> "Asleep"
-                Situation.AT_DESK -> "Using the phone"
-                Situation.IN_A_MEETING -> "In a meeting"
-                Situation.IN_COMPANY -> "With people"
-                Situation.AT_HOME_IDLE -> "At home, phone down"
-                Situation.OUT_AND_ABOUT -> "Out and about"
-                Situation.UNKNOWN -> "Not sure"
-            },
+            // ⚠️ Read from the core rather than spelled here. This was a byte-identical copy of the
+            // ten-branch `when` in SituationRead.describe, so the same situation could have been
+            // called two different things depending on which surface you were looking at.
+            s.situation.label,
             fontFamily = ChakraPetch, fontWeight = FontWeight.Black, fontSize = 20.sp,
             color = if (s.situation == Situation.UNKNOWN) c.muted else c.ink,
             modifier = Modifier.padding(top = 4.dp),
