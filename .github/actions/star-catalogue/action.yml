@@ -69,30 +69,59 @@ outputs:
 runs:
   using: composite
   steps:
+    # ⚠️ The key is computed ONCE here and read by both the restore and the save below, because
+    # `hashFiles` plus a salt written out twice is a key that will one day differ by a character —
+    # and the failure would be silent, each half missing the other's entry and crawling the archive
+    # for the best part of an hour, for ever. The food database's own wiring records exactly this.
+    #
+    # ⚠️ The magnitude is IN THE KEY. The food database's comment records what happens without that:
+    # a change to *what* is fetched that does not move the builder's hash restores the stale artefact
+    # and the change does nothing at all, silently. Here the stale artefact would be a shallower sky
+    # that looks entirely correct.
+    #
+    # ⚠️ The two Kotlin files are in the hash because the builder READS them — the record layout out
+    # of `StarCatalogFormat.kt` and the tiling out of `SkyGrid.kt`. That is what stops the builder
+    # and the reader drifting; with only the builder hashed, a change to the magnitude scale or the
+    # number of bands would restore a catalogue laid out to the old rules and every star would decode
+    # into slightly the wrong place.
+    #
+    # The trailing salt is a manual rebuild switch, exactly as the food database's is. Gaia DR3 is a
+    # frozen release so its contents cannot move underneath us; bump the salt only to force a rebuild
+    # for some other reason.
+    #
+    # ⚠️ The whole expression below is on ONE line on purpose. An expression spanning lines inside a
+    # literal block puts a real newline into the string being built, and $GITHUB_OUTPUT is
+    # line-oriented — so the key would arrive truncated and every lookup would miss.
+    #
+    # ⚠️ And no expression delimiters appear in these comments, deliberately. That is not caution
+    # about YAML: `tools/workflow_expr_check.py` refuses them ANYWHERE in the file, because the
+    # position where they genuinely are a syntax error — a `#` line inside a `run:` block, which is a
+    # comment to the shell and not to GitHub — is indistinguishable from this one without tracking
+    # block scalars, and a gate that has to be argued with is one people stop reading. It caught this
+    # very comment when it was first written the other way.
+    - name: Name the cache entry
+      id: key
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "key=star-catalogue-g${{ inputs.magnitude }}-${{ hashFiles('tools/sky/build_catalogue.py', 'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/StarCatalogFormat.kt', 'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyGrid.kt') }}-dr3-v1" >> "$GITHUB_OUTPUT"
+
+    # ⚠️ **`restore` plus an explicit `save`, NOT the combined `actions/cache`, and the difference is
+    # about fifty minutes of somebody else's telescope archive.** The combined action saves in a post
+    # step declared `post-if: success()`, so a job that fails or is cancelled ANYWHERE after this
+    # point — a Kotlin error, a failed APK gate, or a later push cancelling the run under
+    # `concurrency: cancel-in-progress` — throws away a cold crawl that has already completed and
+    # leaves the next run to fetch 3.5 GB from the ESA archive all over again. That is the discourtesy
+    # `sky-catalogue.yml` exists to prevent, arriving by the back door.
+    #
+    # The food database beside it was moved off the combined action for exactly this reason and the
+    # catalogue never was. It is the more expensive of the two by an order of magnitude.
     - name: Restore the star catalogue
       id: cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: core/sky/src/main/assets/sky/stars.skycat
-        # ⚠️ The magnitude is IN THE KEY. The food database's own comment records what happens
-        # without that: a change to *what* is fetched that does not move the builder's hash restores
-        # the stale artefact and the change does nothing at all, silently. Here the stale artefact
-        # would be a shallower sky that looks entirely correct.
-        #
-        # ⚠️ The two Kotlin files are in the hash because the builder READS them — the record
-        # layout out of `StarCatalogFormat.kt` and the tiling out of `SkyGrid.kt`. That is what
-        # stops the builder and the reader drifting; with only the builder hashed, a change to the
-        # magnitude scale or the number of bands would restore a catalogue laid out to the old rules
-        # and every star would decode into slightly the wrong place.
-        #
-        # The trailing salt is a manual rebuild switch, exactly as the food database's is. Gaia DR3
-        # is a frozen release so its contents cannot move underneath us; bump the salt only to force
-        # a rebuild for some other reason.
-        key: >-
-          star-catalogue-g${{ inputs.magnitude }}-${{ hashFiles('tools/sky/build_catalogue.py',
-          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/StarCatalogFormat.kt',
-          'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SkyGrid.kt')
-          }}-dr3-v1
+        key: ${{ steps.key.outputs.key }}
 
     - name: Build the star catalogue
       shell: bash
@@ -149,6 +178,33 @@ runs:
           --catalogue core/sky/src/main/assets/sky/stars.skycat \
           --magnitude ${{ inputs.magnitude }} \
           --github-output "$GITHUB_OUTPUT"
+
+    # ⚠️ **Banked the moment the catalogue is known good, rather than at the end of the job.** See
+    # the restore step for why: everything after this point can fail, and a crawl that has already
+    # succeeded must not be thrown away with it.
+    #
+    # ⚠️ Gated on the CHECK having passed, not on `always()` alone. A job cancelled mid-crawl never
+    # reaches the check, so nothing is banked — which is the point: caching a half-written 295 MB
+    # file under the right key would be permanent, silent, and would ship a sky that simply stops.
+    # `always()` is still needed on top of that, because a cancellation skips every step whose `if`
+    # does not say otherwise, and a cancellation arriving AFTER a good build is the main case this
+    # exists for.
+    #
+    # ⚠️ **Deliberately a stronger gate than the food database's beside it**, which asks only whether
+    # the file is non-empty. That is right there — a partial SQLite file is caught downstream and the
+    # feature degrades honestly. It is not right here: this asset has no degraded state, the depth is
+    # not visible from the size, and the entry would be permanent. The header check is the only thing
+    # that distinguishes a finished crawl from an interrupted one, so it is what the save waits for.
+    #
+    # ⚠️ Skipped on a cache hit. Saving an entry whose key already exists is not an error — the
+    # action logs it and moves on — but it would put a misleading "failed to save" line in every warm
+    # build's log, which is how people learn to skim logs.
+    - name: Bank the star catalogue
+      if: always() && steps.check.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: core/sky/src/main/assets/sky/stars.skycat
+        key: ${{ steps.key.outputs.key }}
 
     # ⚠️ **The raster lives here rather than in each build workflow for the reason this file's
     # header gives about the cache key: the two build workflows and the warmer all want it, and a

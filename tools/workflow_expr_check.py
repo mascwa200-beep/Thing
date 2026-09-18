@@ -104,7 +104,15 @@ def check(path: Path) -> list[str]:
 def main(argv: list[str]) -> int:
     paths = [Path(a) for a in argv[1:]]
     if not paths:
+        # ⚠️ COMPOSITE ACTIONS TOO, and they were missed for as long as this gate existed. They
+        # evaluate `${{ }}` by exactly the same rules as a workflow, they carry `run:` blocks with
+        # the same comments in them, and this repository keeps its most expensive step — the star
+        # catalogue, an hour of a research archive's time — in one. A gate that reports "clean"
+        # while never having opened the file is the shape this project has corrected repeatedly:
+        # not a missed finding but a silent absence of looking.
         paths = sorted(Path(".github/workflows").glob("*.yml"))
+        paths += sorted(Path(".github/actions").glob("*/action.yml"))
+        paths += sorted(Path(".github/actions").glob("*/action.yaml"))
     if not paths:
         print("workflow_expr_check: no workflow files given or found", file=sys.stderr)
         return 2
