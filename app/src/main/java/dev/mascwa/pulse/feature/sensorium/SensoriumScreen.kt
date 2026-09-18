@@ -175,7 +175,13 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                             modifier = Modifier.padding(top = 6.dp, start = 2.dp),
                         )
                     }
-                    items(holdHistory, key = { "${it.atMs}:${it.text}" }) { line -> HoldLineRow(line, nowMs) }
+                    // ⚠️ The literal prefix is what `LazyKeyTest` turns on, and it is load-bearing
+                    // here rather than a formality: this list and the sensed events below share one
+                    // key namespace, and both are keyed off a wall-clock instant stamped on the same
+                    // heartbeat. Today they cannot collide — an event key opens with a letter
+                    // ("sound.smoke_alarm") and this one with a digit — but nothing enforces that,
+                    // and "safe by construction" is not a property anything checks.
+                    items(holdHistory, key = { "did:${it.atMs}:${it.text}" }) { line -> HoldLineRow(line, nowMs) }
                 }
                 item {
                     Text(
@@ -194,7 +200,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                         )
                     }
                 } else {
-                    items(events, key = { "${it.key}:${it.atMs}" }) { e -> EventRow(e) }
+                    items(events, key = { "sensed:${it.key}:${it.atMs}" }) { e -> EventRow(e) }
                 }
             }
         }
