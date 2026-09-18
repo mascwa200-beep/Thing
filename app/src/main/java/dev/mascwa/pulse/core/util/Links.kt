@@ -128,13 +128,55 @@ fun setTimer(context: Context, seconds: Int, message: String): Boolean {
 fun openCamera(context: Context): Boolean =
     launch(context, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
 
+/**
+ * Where the camera writes a photograph this app asked for.
+ *
+ * One definition, because two things now depend on it: [createCameraImageUri] names a file inside it
+ * and [pruneCameraCaptures] empties it. A second spelling of the same path is how a sweep quietly
+ * stops sweeping the directory that is actually filling up.
+ */
+fun cameraCaptureDir(context: Context): File = File(context.cacheDir, "camera")
+
 /** A FileProvider content URI the camera can write a captured photo into (cacheDir/camera/). Pass it to
  *  the `TakePicture` contract, then read it back as the captured image. Null if the file can't be made. */
 fun createCameraImageUri(context: Context): Uri? = runCatching {
-    val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+    val dir = cameraCaptureDir(context).apply { mkdirs() }
     val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
     FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }.getOrNull()
+
+/**
+ * Give back the disk that photographs already read borrowed.
+ *
+ * ⚠️ **Nothing deleted these, ever.** Both callers of [createCameraImageUri] — the meal photograph on
+ * the health tab and the console's Take photo — hand the file to the camera, read it once, and
+ * abandon it. A full-resolution JPEG is several megabytes, so somebody who photographs their meals
+ * accumulates that indefinitely, on a phone whose whole design brief here is that it might be a cheap
+ * one. `ProgressPhotoStore` says in writing that the cache is "correct for a photo that is read once
+ * and discarded" — right about the intent, and the discarding was never written.
+ *
+ * ⚠️ A **cancelled** capture is the case a per-call-site delete could never cover: some camera apps
+ * create the file and then abandon it, so it belongs to no code path at all. Only a sweep collects it.
+ *
+ * ⚠️ [STALE_CAPTURE_MS] is an hour, and it has to be well clear of one particular race rather than
+ * merely small. `Application.onCreate` runs BEFORE an Activity is recreated and before a pending
+ * `TakePicture` result is delivered, so if our process was killed while the camera app was in the
+ * foreground this sweep runs first. The file's timestamp is when the camera wrote it, which is at
+ * most minutes before the user comes back — an hour is enormous headroom, and the alternative
+ * (deleting a photograph a fraction of a second before it is read) is silent and unreproducible.
+ *
+ * Shaped after `UpdateRepository.pruneCache`, deliberately: same problem, same launch-time answer.
+ */
+fun pruneCameraCaptures(context: Context, nowMs: Long = System.currentTimeMillis()) {
+    runCatching {
+        cameraCaptureDir(context).listFiles()?.forEach { f ->
+            if (f.isFile && nowMs - f.lastModified() > STALE_CAPTURE_MS) runCatching { f.delete() }
+        }
+    }
+}
+
+/** How long a captured photograph may sit before it is assumed read. See [pruneCameraCaptures]. */
+const val STALE_CAPTURE_MS = 60L * 60 * 1000
 
 /** Opens the contacts app. */
 fun openContacts(context: Context): Boolean =
@@ -171,12 +213,16 @@ fun requestInstallPermission(context: Context) {
  * showing the old dialog where it does not. Both the automatic and the manual UPDATE control come
  * through here on purpose, so the two can never drift into behaving differently.
  *
+ * ⚠️ [expectPackage] names the package the APK declares when it is NOT this app's own — the
+ * companion nutrition app is installed through this same path. The platform checks it against the
+ * APK and refuses a mismatch, so it is stated when the caller knows it rather than guessed.
+ *
  * The permission is checked *after* an attempt rather than before it: a device owner does not need
  * `REQUEST_INSTALL_PACKAGES` to install through a session, and asking first would send such a device
  * to a settings screen it has no reason to visit.
  */
-fun installApk(context: Context, file: File): Boolean {
-    if (dev.mascwa.pulse.data.update.ApkInstaller.install(context, file)) return true
+fun installApk(context: Context, file: File, expectPackage: String? = null): Boolean {
+    if (dev.mascwa.pulse.data.update.ApkInstaller.install(context, file, expectPackage)) return true
     if (!canInstallApks(context)) requestInstallPermission(context)
     return false
 }

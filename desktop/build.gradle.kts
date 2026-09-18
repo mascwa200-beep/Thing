@@ -77,6 +77,21 @@ tasks.processResources {
     // the phone and the companion cannot end up on different versions of the same face, and the
     // OFL notice that ships in the survival assets already covers them.
     from(rootProject.file("app/src/main/res/font")) { into("font") }
+    // The 8,404 naked-eye stars, borrowed the same way. A quarter of a megabyte of tab-separated
+    // text, one copy in the repository, so the phone's chart and the companion's can never disagree
+    // about where a star is. Its NOTICE.txt travels with it — the catalogue is CDS-licensed and the
+    // attribution is a condition rather than a courtesy.
+    //
+    // ⚠️ **The packed Gaia catalogue is EXCLUDED, and this comment used to be quietly wrong.** It
+    // said "a quarter of a megabyte" of a directory copy that took everything in the directory,
+    // which by then also held `stars.skycat` — so the jar has been carrying 24.7 MB of packed
+    // binary that nothing on this side can read. `StarCatalogSource` opens exactly one resource,
+    // `/sky/stars.tsv`, and there is no desktop deep-tier reader at all. At G<15 the same
+    // oversight would have put 295 MB into every MSI, silently.
+    from(rootProject.file("core/sky/src/main/assets/sky")) {
+        into("sky")
+        exclude("stars.skycat")
+    }
     from(writeBuildInfo)
 }
 

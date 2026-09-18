@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The icon on API 26 and above. Below it the launcher asks for `@mipmap/ic_launcher` and finds the
+  rendered PNG in the density buckets beside this folder — ⚠️ which is not a nicety: this file lives
+  in a `-v26` directory, so an older device does not see it AT ALL, and before the fallback existed
+  the manifest named a resource that had no value for a third of the range this app now installs on.
+  `tools/sky/build_legacy_icon.py` draws the PNGs from the same mark; run it if this changes.
+-->
+
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

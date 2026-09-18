@@ -5,7 +5,6 @@ import android.net.Uri
 import android.text.format.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.settings.SettingsBackup
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -28,9 +27,11 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     private val repo: SettingsRepository,
     private val scheduler: NotificationScheduler,
-    private val diskCache: DiskCache,
+    private val caches: dev.mascwa.pulse.data.cache.AppCaches,
     private val notifier: Notifier,
     private val updates: UpdateRepository,
+    /** The same checker pointed at the standalone nutrition app's own release. */
+    private val companionUpdates: UpdateRepository,
     private val selfCoder: SelfCoder,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
@@ -41,6 +42,7 @@ class SettingsViewModel(
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
     private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
+    private val mailNotices: dev.mascwa.pulse.data.comms.MailNoticeStore,
     private val study: dev.mascwa.pulse.data.study.StudyStore,
     private val python: dev.mascwa.pulse.data.python.PythonRuntime,
 ) : ViewModel() {
@@ -128,17 +130,23 @@ class SettingsViewModel(
         _auditLedger.value = "Verifying…"
         viewModelScope.launch {
             _auditLedger.value = runCatching {
-                val v = auditLedger.verify()
-                val signed = auditLedger.headSignatureValid()
-                val anchorMs = auditLedger.anchorTimeMs()
-                buildList {
-                    add(if (v.valid) "Intact" else "BROKEN at #${v.brokenAtSeq}")
-                    when (signed) {
+                val h = auditLedger.health()
+                // ⚠️ **The unreadable case leads, and it used to be invisible.** `verify()` runs over
+                // whatever chain is in memory, and when the stored blob cannot be decoded that is an
+                // empty replacement — trivially intact. So this row said "Intact" at precisely the
+                // moment the record had become unreachable and nothing new was reaching disk.
+                if (h.unreadable) {
+                    "STORED RECORD UNREADABLE — nothing is being written" +
+                        (if (h.unwritten > 0) "; ${h.unwritten} event(s) held in memory only" else "") +
+                        ". Clear the ledger to start a new chain."
+                } else buildList {
+                    add(if (h.verification.valid) "Intact" else "BROKEN at #${h.verification.brokenAtSeq}")
+                    when (h.signatureValid) {
                         true -> add("signed")
                         false -> add("bad signature")
                         null -> {}
                     }
-                    if (anchorMs != null) add("anchored ${DateUtils.getRelativeTimeSpanString(anchorMs)}")
+                    h.anchorMs?.let { add("anchored ${DateUtils.getRelativeTimeSpanString(it)}") }
                 }.joinToString(" · ")
             }.getOrDefault("Couldn't verify")
         }
@@ -258,8 +266,100 @@ class SettingsViewModel(
         }
     }
 
+    // ------------------------------------------------------------------- the companion nutrition app
+
+    private val _companion = MutableStateFlow<UpdateUi>(UpdateUi.Idle)
+
+    /**
+     * The standalone nutrition app's own release, so it can be put on this phone at all.
+     *
+     * ⚠️ **This is how that app is obtained.** It has no store listing and its releases sit in a
+     * private repository, so without this the only route is a desktop, a browser signed in to
+     * GitHub and a cable. This app already holds the token that can read those releases, which is
+     * the whole reason the download belongs here rather than there.
+     *
+     * ⚠️ It reuses [UpdateUi] rather than growing a parallel vocabulary, so the same screen code
+     * renders both — and the states mean exactly what they mean above, including [UpdateUi.Pending]
+     * for a build still going through CI.
+     */
+    val companionState: StateFlow<UpdateUi> = _companion
+
+    /**
+     * Fetch the nutrition app: ask GitHub what the newest build is and, if there is one, start
+     * downloading it. One action.
+     *
+     * ⚠️ **This used to be a bare "check", and that is precisely why somebody hunting for a way to
+     * get the app did not find one.** A person looking for a download expects a button that says
+     * download; a button that says *check* reads as diagnostics, and the actual Download control
+     * only appeared after that first tap succeeded. Three taps, the first two looking like
+     * different things. The check still happens — it has to, because the release URL is only known
+     * afterwards — it simply is not a separate decision any more.
+     *
+     * ⚠️ **Never [UpdateUi.UpToDate].** That repository is pointed at with `currentVersionCode = 0`
+     * — this app cannot read the version of a package it does not own — so every published build is
+     * newer than nothing and the answer is always either "here it is" or "it is not built yet".
+     * Saying "up to date" would be a claim about a package this app has not looked at.
+     *
+     * ⚠️ It starts a download of roughly 180 MB without asking a second time, which is deliberate
+     * and is why the button has to name the size. The alternative — a confirmation between the
+     * check and the fetch — is the very step that made this unfindable.
+     */
+    fun getCompanion() {
+        if (_companion.value is UpdateUi.Checking || _companion.value is UpdateUi.Downloading) return
+        _companion.value = UpdateUi.Checking
+        viewModelScope.launch {
+            val resolved = runCatching { companionUpdates.check() }.fold(
+                onSuccess = { result ->
+                    val info = result.available
+                    when {
+                        info != null -> UpdateUi.Available(info)
+                        else -> UpdateUi.Pending(result.latestVersionName)
+                    }
+                },
+                onFailure = { e ->
+                    val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
+                    UpdateUi.Error(
+                        when {
+                            companionUpdates.token() == null ->
+                                "The nutrition app's releases are in the same private repo — add a " +
+                                    "GitHub token (repo scope) in Computer Setup."
+                            code == 404 ->
+                                "No nutrition release yet (404), or the token cannot see this repo."
+                            code == 401 || code == 403 ->
+                                "GitHub refused the token ($code) — check it has repo scope."
+                            else -> "Couldn't reach GitHub${code?.let { " ($it)" } ?: ""}."
+                        },
+                    )
+                },
+            )
+            _companion.value = resolved
+            // The whole point: having found a build, go and get it rather than waiting for a
+            // second tap on a control that was not visible until this moment.
+            if (resolved is UpdateUi.Available) downloadCompanion()
+        }
+    }
+
+    /** Fetch the nutrition APK; the screen installs the file this leaves in [companionState]. */
+    fun downloadCompanion() {
+        val info = (_companion.value as? UpdateUi.Available)?.info
+            ?: (_companion.value as? UpdateUi.ReadyToInstall)?.info ?: return
+        _companion.value = UpdateUi.Downloading(0)
+        viewModelScope.launch {
+            val file = runCatching {
+                companionUpdates.download(info) { pct -> _companion.value = UpdateUi.Downloading(pct) }
+            }.getOrNull()
+            _companion.value =
+                if (file != null) UpdateUi.ReadyToInstall(info, file)
+                else UpdateUi.Error("Download failed — try again.")
+        }
+    }
+
     private val _cacheSize = MutableStateFlow(0L)
     val cacheSize: StateFlow<Long> = _cacheSize
+
+    /** How much the last clear actually gave back. Null until one has run. See [clearCache]. */
+    private val _cacheFreed = MutableStateFlow<Long?>(null)
+    val cacheFreed: StateFlow<Long?> = _cacheFreed
 
     init {
         refreshCacheSize()
@@ -317,12 +417,21 @@ class SettingsViewModel(
     }
 
     fun refreshCacheSize() {
-        viewModelScope.launch { _cacheSize.value = diskCache.sizeBytes() }
+        viewModelScope.launch { _cacheSize.value = caches.bytes() }
     }
 
+    /**
+     * Free what can be freed and say how much that was.
+     *
+     * ⚠️ The freed figure is reported rather than left implied, because [AppCaches.clear] cannot
+     * empty the directory: a download in progress and whatever the platform keeps there on its own
+     * account are deliberately left alone. Without the number, a reading that fell from 300 MB to
+     * 40 MB would read as the button half-working.
+     */
     fun clearCache() {
         viewModelScope.launch {
-            diskCache.clear()
+            val freed = caches.clear()
+            _cacheFreed.value = freed
             refreshCacheSize()
         }
     }
@@ -350,6 +459,17 @@ class SettingsViewModel(
     /** Forget which advisories the user acts on — every Oracle rule back to equal footing. */
     fun clearOracleLearning() {
         viewModelScope.launch { oracleLearning.clear() }
+    }
+
+    /**
+     * Forget the mail counts and which apps have been seen to notify.
+     *
+     * ⚠️ The count itself is rebuilt from the shade the next time the listener connects, so the
+     * part worth clearing is the SEEN list — a record of which of your apps have notified you,
+     * which is the only thing here that a person might not want kept.
+     */
+    fun clearMailNotices() {
+        viewModelScope.launch { mailNotices.clear() }
     }
 
     /** Forget the episodic memory stream (timestamped observations & reflections). */

@@ -12,7 +12,20 @@
         <!-- "Wipe after N failed unlocks" anti-theft control (setMaximumFailedPasswordsForWipe). -->
         <watch-login />
         <wipe-data />
-        <!-- Lock the screen on demand (lockNow) — used by the user-armed commitment lock. -->
+        <!--
+          Lock the screen on demand (lockNow).
+
+          ⚠️ NOTHING CALLS IT TODAY. This said "used by the user-armed commitment lock", and that
+          feature was deleted along with the life-sim game it belonged to — so the comment described
+          a caller that no longer exists, which is the kind of note that makes the next reader believe
+          a capability is load-bearing when it is inert.
+
+          It is kept rather than removed, deliberately. Whether an ALREADY-PROVISIONED device owner
+          picks up a policy that is removed and later re-declared is not something a build machine can
+          settle, and on this phone re-provisioning costs a factory reset. Declaring a policy grants
+          nothing on its own — the platform throws only when a matching call is made — so the cost of
+          keeping it is a line of XML and the cost of guessing wrong is the whole device.
+        -->
         <force-lock />
     </uses-policies>
 </device-admin>

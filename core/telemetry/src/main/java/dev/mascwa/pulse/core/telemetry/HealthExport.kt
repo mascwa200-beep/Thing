@@ -102,6 +102,10 @@ object HealthExport {
                 // header cannot come to disagree with the column order below, which reads the same
                 // `entries`. `calcium_mg`, `vitamin_d_ug`, and so on.
                 *MICRO_COLUMNS.toTypedArray(),
+                // ⚠️ And the twenty-nine further nutrients, on the same terms: derived from the
+                // declaration so a thirtieth reaches the export by existing, and an unrecorded one
+                // is an empty cell rather than a zero.
+                *EXTRA_COLUMNS.toTypedArray(),
                 *arrayOf("source", "day_epoch_ms", "logged_epoch_ms", "entry_id"),
             ),
         )
@@ -132,6 +136,8 @@ object HealthExport {
                         // nothing would report a deficiency nobody measured. This is why
                         // `Micronutrients.Amounts` is a map rather than eight more doubles.
                         e.micros[m]?.let { num(it, decimals = microDecimals(m)) } ?: ""
+                    } + NutrientSet.Nutrient.entries.map { x ->
+                        e.extras[x]?.let { num(it, decimals = extraDecimals(x)) } ?: ""
                     } + listOf(
                         field(e.source.label),
                         e.dayStartMs.toString(),
@@ -169,6 +175,38 @@ object HealthExport {
     }
 
     /**
+     * `added_sugars_g`, `vitamin_b12_ug`, … — one column per further nutrient, carrying its unit.
+     *
+     * ⚠️ Same derivation and same reasoning as [MICRO_COLUMNS], including the ASCII `ug`: a header
+     * a script has to guess the encoding of is a header somebody's parser gets wrong.
+     */
+    val EXTRA_COLUMNS: List<String> = NutrientSet.Nutrient.entries.map(::extraColumn)
+
+    /** The column name for one further nutrient. Asked for BY NUTRIENT, never by position. */
+    fun extraColumn(n: NutrientSet.Nutrient): String {
+        val unit = if (n.unit.symbol == "µg") "ug" else n.unit.symbol
+        return n.name.lowercase() + "_" + unit
+    }
+
+    /**
+     * How many decimals a further nutrient's figure is worth.
+     *
+     * ⚠️ **Derived from the measured typical value rather than hand-listed**, unlike
+     * [microDecimals] above — and that is the better shape of the same rule. Each nutrient carries
+     * the non-zero median of what the corpus actually records, so the bands below give roughly one
+     * per cent of it in every case: galactose's median is 0.0104 g and prints as `0.0104`, where a
+     * single decimal would print `0.0` and lose the reading entirely. A thirtieth nutrient gets the
+     * right precision without anybody adding it to a list.
+     */
+    private fun extraDecimals(n: NutrientSet.Nutrient): Int = when {
+        n.typicalPer100g >= 100.0 -> 0
+        n.typicalPer100g >= 10.0 -> 1
+        n.typicalPer100g >= 1.0 -> 2
+        n.typicalPer100g >= 0.1 -> 3
+        else -> 4
+    }
+
+    /**
      * How many decimals a micronutrient's figure is worth.
      *
      * ⚠️ Iron and vitamin C are fractions of a milligram in most foods and vitamin D is a fraction of
@@ -194,7 +232,7 @@ object HealthExport {
      *
      * ⚠️ **The micronutrients are deliberately NOT summed here**, though the entry sheet carries them.
      * A day's calcium total is only as complete as the foods that happened to record it, and a single
-     * cell cannot say "310 mg, from two of your six foods" — the distinction `Micronutrients.Tally`
+     * cell cannot say "310 mg, from two of your six foods" — the distinction `NutrientTally`
      * exists to keep. Carrying eight totals plus eight coverage columns would double this sheet's
      * width for a figure anybody can pivot out of the entry sheet themselves, correctly, with the
      * blanks visible. A pre-summed total whose completeness is unstated is the worse of the two.

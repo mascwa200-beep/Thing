@@ -69,16 +69,8 @@
     <!-- Let J.A.R.V.I.S. set alarms/timers in the clock app (normal permission). -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
-    <!-- Self-update: install a newer APK the app downloaded (the user still confirms in the system
-         installer, and must grant "install unknown apps" once). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!--
-      Lets an update complete with no confirmation, but ONLY for the installer of record of the
-      package being updated. This app is not that yet — every install so far came through the system
-      installer UI — so the permission arms itself one update after the first session ApkInstaller
-      commits. It is the fallback route; the primary is device-owner status, which needs nothing here.
-    -->
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Self-update: REQUEST_INSTALL_PACKAGES and UPDATE_PACKAGES_WITHOUT_USER_ACTION are
+         declared by `:core:update` and merged in, so both applications carry the same pair. -->
 
     <!-- Active-Matrix: keep J.A.R.V.I.S. resident as a foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -115,6 +107,18 @@
     <!-- Optional: read calendar events with a location to show them as NAV objectives (opt-in). -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!--
+      Optional: count unread texts for the widget's comms line. Nothing is read but the number of
+      rows in the inbox with read = 0 — no addresses, no bodies, and nothing leaves the device.
+
+      ⚠️ Holding READ_SMS bars an app from Google Play outside a few declared categories, none of
+      which this is. That costs nothing here — the app is sideloaded and private and always has
+      been — but it is a decision taken deliberately rather than an oversight, and worth naming so
+      a later session does not discover it as a surprise. Asked for at the point the feature is
+      switched on; without it the count is simply absent, never a zero.
+    -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -139,6 +143,21 @@
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+    <!--
+      `android:largeHeap="true"` below is load-bearing, and NOT for the reason long assumed. There is
+      no Filament renderer in this tree (zero references, checked) — what needs the room is the
+      native engine set the interrogator carries: whisper.cpp holds its acoustic model in memory,
+      llama.cpp's adjudicator is a ~1 GB quantised model, and QuickJS runs beside them. The
+      standalone nutrition app declares none of this and correctly does not set the flag.
+
+      Two consequences worth knowing rather than rediscovering:
+      - The platform IGNORES it on a device where `isLowRamDevice` is true, so it is not a way to
+        make a weak phone behave like a strong one.
+      - It changes which number `ActivityManager` should be asked for. `getMemoryClass()` is what an
+        ordinary app gets; a large-heap app gets `getLargeMemoryClass()`, routinely two to three
+        times larger on the same hardware. `DeviceProbeReader.heapCeilingMb` reads FLAG_LARGE_HEAP
+        and picks accordingly — reading the standard class here classed a capable phone as MODEST.
+    -->
     <application
         android:name=".PulseApplication"
         android:allowBackup="true"
@@ -236,17 +255,10 @@
 
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <!--
-          The install session's own result. Not exported: the PendingIntent that reaches it is
-          package-scoped, and an exported receiver here would let any app fake an install outcome.
+          ⚠️ The install-result receiver and the two install permissions are declared by
+          `:core:update`'s own manifest and merged in from there, so the standalone nutrition app
+          gets exactly the same ones from exactly one declaration.
         -->
-        <receiver
-            android:name=".data.update.ApkInstaller$ResultReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="dev.mascwa.pulse.INSTALL_RESULT" />
-            </intent-filter>
-        </receiver>
 
         <receiver
             android:name=".notifications.BootReceiver"
@@ -342,6 +354,31 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="acoustic_interrogation" />
+        </service>
+
+        <!--
+            Counts waiting mail by reading what the phone's own mail apps have notified about — the
+            whole of linking email without a password. No network, no credential, no account.
+
+            ⚠️ **exported="true" here is REQUIRED and is the opposite of every other service in this
+            file, and getting it wrong fails silently.** The system binds this component; with
+            exported="false" the binder simply cannot reach it, and there is no error, no log and no
+            crash — just a feature that never counts anything, which reads as a bug in the counting
+            rather than in this declaration. What protects it is the permission below:
+            BIND_NOTIFICATION_LISTENER_SERVICE is held by the system and by nothing else, so no other
+            app on the device can bind to it.
+
+            There is no runtime permission dialog for any of this and no way to request one. The
+            only route is the user switching the app on in the system's notification-access page.
+        -->
+        <service
+            android:name=".data.comms.MailNotificationListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
 
         <!--

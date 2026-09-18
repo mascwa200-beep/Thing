@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.Collections
@@ -53,7 +54,7 @@ class NewsAnalysisStore(
     private val failed: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
     private suspend fun ensureLoaded(): MutableMap<String, NewsAnalysis> = mutex.withLock {
-        byUrl ?: run {
+        byUrl ?: withContext(Dispatchers.IO) {
             val raw = context.newsAnalysisDataStore.data.first()[prefsKey]
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
@@ -102,8 +103,10 @@ class NewsAnalysisStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock { byUrl?.let { Stored(it.toMap()) } } ?: return
-        runCatching {
-            context.newsAnalysisDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+        withContext(Dispatchers.IO) {
+            runCatching {
+                context.newsAnalysisDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
+            }
         }
     }
 

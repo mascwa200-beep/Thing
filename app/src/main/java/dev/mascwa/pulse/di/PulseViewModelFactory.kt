@@ -43,7 +43,26 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
                 SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
-                OrbitalViewModel(c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository)
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository,
+                    c.starCatalog,
+                    c.cometRepository,
+                )
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sky.SkyMapViewModel::class.java) ->
+                dev.mascwa.pulse.feature.sky.SkyMapViewModel(
+                    c.starCatalog, c.deepStarCatalog, c.constellationCatalog,
+                    c.deepSkyCatalog, c.milkyWayCatalog,
+                    dev.mascwa.pulse.feature.sky.SkyDevice(
+                        c.locationProvider,
+                        // ⚠️ Camera-upright, and UNFILTERED: the sky map blends the two directions
+                        // rather than the three angles — see CompassController's note on the zenith.
+                        c.newCompassController(cameraUpright = true, smoothed = false),
+                    ),
+                    dev.mascwa.pulse.feature.sky.SkyPrefs(c.settingsRepository),
+                    // ⚠️ `tier()`, not `budgetCached().` — the sky budget wants how much
+                    // machine this is, which does not change, rather than how warm it is
+                    // right now. See SkyBudget.forTier for why pressure is left out.
+                    dev.mascwa.pulse.core.telemetry.SkyBudget.forTier(c.deviceProbe.tier()),
+                )
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)
             modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
@@ -99,7 +118,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest, c.oracleLearningStore, c.studyStore, c.pythonRuntime)
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.appCaches, c.notifier, c.updateRepository, c.nutritionUpdateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest, c.oracleLearningStore, c.mailNoticeStore, c.studyStore, c.pythonRuntime)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(
                     c.crashReporter, c.debugUploader, c.mediaExtractor,
@@ -126,7 +145,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.study.StudyViewModel(c)
 
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.health.HealthViewModel::class.java) ->
-                dev.mascwa.pulse.feature.health.HealthViewModel(c)
+                dev.mascwa.pulse.feature.health.HealthViewModel(c.healthDeps)
 
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.packs.PacksViewModel::class.java) ->
                 dev.mascwa.pulse.feature.packs.PacksViewModel(c)

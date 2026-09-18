@@ -25,10 +25,21 @@ class CalendarRepository(private val context: Context) {
      * Upcoming instances in `[nowMs, nowMs + horizonMs]` via the Instances table (which expands recurring
      * events), soonest first, capped at [max]. Empty if READ_CALENDAR isn't granted or anything fails.
      */
+    /**
+     * Whether the calendar may be read at all.
+     *
+     * ⚠️ Public because [upcoming] cannot answer it. That returns an empty list for *three*
+     * different situations — permission refused, provider unavailable, and a genuinely clear diary —
+     * and a caller that renders all three the same way tells someone their week is free when the app
+     * was never allowed to look. Ask this first when the difference matters, rather than restating
+     * the permission check at the call site and having two copies of one rule.
+     */
+    fun canRead(): Boolean =
+        context.checkSelfPermission(android.Manifest.permission.READ_CALENDAR) ==
+            PackageManager.PERMISSION_GRANTED
+
     fun upcoming(nowMs: Long, horizonMs: Long = 48L * 3_600_000L, max: Int = 20): List<CalEvent> {
-        if (context.checkSelfPermission(android.Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
-            return emptyList()
-        }
+        if (!canRead()) return emptyList()
         val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
         ContentUris.appendId(builder, nowMs)
         ContentUris.appendId(builder, nowMs + horizonMs)

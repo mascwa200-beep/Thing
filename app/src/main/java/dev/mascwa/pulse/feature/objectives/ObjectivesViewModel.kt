@@ -109,8 +109,23 @@ class ObjectivesViewModel(
         if (loc == null) this
         else copy(distanceMeters = Geo.distanceMeters(loc.latitude, loc.longitude, latitude, longitude))
 
-    /** Identity for de-dup: title + coordinates rounded to ~11 m, so a calendar event and the waypoint
-     *  it was tracked into collapse to one entry. */
+    /**
+     * Identity for de-dup: title + coordinates rounded to ~11 m, so a calendar event and the
+     * waypoint it was tracked into collapse to one entry.
+     *
+     * ⚠️ `Locale.US`, not the device's. `"%.4f".format(v)` renders a comma decimal separator on
+     * most of Europe — harmless while every key on screen was written under the same locale, and
+     * wrong the moment somebody changes the phone's language: every existing waypoint's key
+     * respells itself, nothing matches, and the next tap on a tracked objective drops a duplicate
+     * pin instead of re-activating the one already there. That duplicate-pin bug is exactly what
+     * this function was written to fix.
+     *
+     * The `lowercase()` beside it needs no such argument: Kotlin's no-argument overload folds under
+     * `Locale.ROOT`, not the device's, so it is already stable. (The deprecated `toLowerCase()` was
+     * the one that took the default locale and turned an I into a dotless ı in Turkish.)
+     */
     private fun coordKey(title: String, lat: Double, lon: Double): String =
-        "${title.trim().lowercase()}@${"%.4f".format(lat)},${"%.4f".format(lon)}"
+        "${title.trim().lowercase()}@" +
+            "${String.format(java.util.Locale.US, "%.4f", lat)}," +
+            String.format(java.util.Locale.US, "%.4f", lon)
 }

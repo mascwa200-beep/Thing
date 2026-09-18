@@ -1,0 +1,48 @@
+# Baseline profile — profile-guided AOT for the standalone nutrition app.
+#
+# ⚠️ This module had none, and :app has had one for months. That is exactly backwards: :app runs on
+# one flagship Pixel, and THIS is the application built to run on a cheap phone — the owner's real
+# second device is a Samsung Galaxy A16. A baseline profile is the largest startup win available to
+# a Compose application and it costs nothing at runtime; ART pre-compiles these methods instead of
+# interpreting them cold on first use, which is the difference a slow CPU feels most.
+#
+# ⚠️ androidx.profileinstaller is what makes this work AT ALL here. On Play, profiles are delivered
+# by the store; this APK is sideloaded from a GitHub release, so that path does not exist and the
+# library's startup initializer is the only thing that writes the profile for ART to read. It is
+# declared in build.gradle.kts on the same commit as this file, and one without the other is inert.
+#
+# ⚠️ The release build must stay non-debuggable for any of this to apply. It is (buildTypes.release
+# sets no isDebuggable), and the debug applicationIdSuffix does not change that.
+#
+# Lines that match nothing are warned-and-skipped by AGP, never fatal — the same property :app's
+# starter profile relies on.
+
+# --- Startup entry points: compile every method (HSPL = hot / startup / post-startup) ------------
+HSPLdev/mascwa/nutrition/MainActivity;->**(**)**
+HSPLdev/mascwa/nutrition/NutritionApplication;->**(**)**
+
+# --- Everything drawn on the way to the first frame, and the container behind it -----------------
+HSPLdev/mascwa/nutrition/ui/**->**(**)**
+HSPLdev/mascwa/nutrition/data/**->**(**)**
+
+# --- The shared view model, which runs its whole init before anything is drawn -------------------
+# One HealthViewModel backs both applications; its construction reads six stores and recomputes the
+# day, so it is startup work by definition rather than by guess.
+HSPLdev/mascwa/pulse/feature/health/**->**(**)**
+HSPLdev/mascwa/pulse/data/health/**->**(**)**
+
+# --- Class presence only for the shared cores, and that is deliberate ----------------------------
+#
+# ⚠️ Measured before deciding: the nutrition path imports 34 types out of :core:telemetry's 144
+# files. AOT-compiling that whole module would pre-compile an SGP4 propagator, a solar-system
+# ephemeris, a live-TV channel table and a Star Trek stardate — none of which this app can reach —
+# and pay for it in install time and disk on the very device this profile exists to help. The
+# class-presence rule loads and verifies ahead of time without compiling every method, which is the
+# right trade for code that is used but not hot.
+Ldev/mascwa/pulse/core/telemetry/**
+Ldev/mascwa/pulse/core/network/**
+Ldev/mascwa/pulse/core/cache/**
+Ldev/mascwa/pulse/core/util/**
+Ldev/mascwa/pulse/crash/**
+Ldev/mascwa/pulse/data/food/**
+Ldev/mascwa/nutrition/**

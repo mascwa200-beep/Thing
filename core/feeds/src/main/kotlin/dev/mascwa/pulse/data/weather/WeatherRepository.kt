@@ -62,7 +62,15 @@ class WeatherRepository(
         // ⚠️ The day count is part of the cache key. Without it a deep sixteen-day answer and an
         // ordinary seven-day one share a slot, so whichever ran first is served to both — and the
         // deep switch would appear to do nothing at all.
-        val key = "weather_${"%.3f".format(latitude)}_${"%.3f".format(longitude)}" +
+        // ⚠️ Locale.US on the coordinates, like every other cache key in this package. A bare
+        // `"%.3f".format(v)` takes the DEVICE locale, so the same place spells itself differently
+        // depending on the phone's language. Nothing breaks loudly — the key is hashed to a
+        // filename and stays stable while the locale does — but it stops being stable the moment
+        // somebody changes the language, and every entry written before then is orphaned rather
+        // than superseded. The URL below interpolates the raw Double, which Kotlin always renders
+        // with a point, so the request itself was never affected.
+        val key = "weather_${String.format(java.util.Locale.US, "%.3f", latitude)}" +
+            "_${String.format(java.util.Locale.US, "%.3f", longitude)}" +
             "_${s.temperatureUnit.apiValue}_${s.windUnit.apiValue}_${s.precipUnit.apiValue}_d$days"
         if (!force) {
             cache.read(key, ttl, WeatherData.serializer())?.let {

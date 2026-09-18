@@ -19,9 +19,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.TimeZone
 
 /**
  * Citizen-style "Nearby Safety" feed aggregated from free, keyless public
@@ -277,17 +281,43 @@ class SafetyRepository(
         }.sortedBy { it.distanceMeters }.take(25)
     }
 
-    private val monthFmt = SimpleDateFormat("yyyy-MM", Locale.US)
+    /**
+     * ⚠️ **`SimpleDateFormat` is not thread-safe, and these ran on four coroutines at once.**
+     * [incidents] fans out to `usgs`, `gdacs`, `nws` and `ukCrime` with `async`, and two of those —
+     * `gdacs` for its `fromdate`, `nws` for `effective` and `expires` — went through one shared
+     * formatter. A `SimpleDateFormat` keeps a mutable `Calendar` inside it, so concurrent `parse`
+     * calls do not merely throw: they can hand back a time assembled from two different strings.
+     *
+     * ⚠️ **The consequence is not cosmetic.** `nws` reads `expires` and drops an alert that has
+     * already lapsed, so a corrupted parse can carry an EXPIRED weather warning onto the screen as a
+     * current one — in the feature whose entire job is telling you what is dangerous right now.
+     *
+     * `java.time`'s formatters are immutable and thread-safe, which is the fix rather than a lock.
+     * ⚠️ Verified rather than assumed: **143 real timestamps** taken live from both feeds (NWS
+     * `2026-08-24T13:34:00-07:00`, offset form; GDACS `2026-08-18T12:00:00`, no offset, hence the
+     * UTC fallback) parse to the identical epoch under both implementations. The one deliberate
+     * difference is that a nonsense month no longer becomes a plausible date: `SimpleDateFormat` is
+     * lenient and rolled `2026-13` into January 2027, where this refuses and answers 0.
+     *
+     * `java.time` is API 26 and `minSdkWide` is 26, so this is at the floor rather than over it —
+     * and both shared modules already use it in a dozen places.
+     */
     private fun parseMonth(s: String?): Long {
         if (s.isNullOrBlank()) return 0L
-        return runCatching { monthFmt.parse(s)?.time }.getOrNull() ?: 0L
+        // ⚠️ The device's own zone, not UTC, because that is what the formatter it replaces used —
+        // it never had a `timeZone` set, so it took the default. UK crime months are month-grained
+        // and used for ordering, but a silent shift is still a silent shift.
+        return runCatching {
+            YearMonth.parse(s).atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }.getOrNull() ?: 0L
     }
 
-    private val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-    private val isoZ = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
     private fun parseIso(s: String?): Long {
         if (s.isNullOrBlank()) return 0L
-        return runCatching { iso.parse(s)?.time }.getOrNull()
-            ?: runCatching { isoZ.parse(s.take(19))?.time }.getOrNull() ?: 0L
+        return runCatching {
+            OffsetDateTime.parse(s, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant().toEpochMilli()
+        }.getOrNull() ?: runCatching {
+            LocalDateTime.parse(s.take(19)).toInstant(ZoneOffset.UTC).toEpochMilli()
+        }.getOrNull() ?: 0L
     }
 }

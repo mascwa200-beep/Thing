@@ -1,0 +1,320 @@
+stars.tsv — where it comes from and what was done to it
+========================================================
+
+SOURCE
+    Bright Star Catalogue, 5th Revised Edition (Preliminary Version)
+    Hoffleit D., Warren Jr W.H., 1991
+    Astronomical Data Center, NSSDC/ADC
+    Bibcodes: 1964BS....C......0H, 1991bsc..book.....H
+
+    Obtained as catalogue V/50 from the Centre de Données astronomiques de
+    Strasbourg (CDS): https://cdsarc.cds.unistra.fr/ftp/V/50/
+
+    This research has made use of the VizieR catalogue access tool and the SIMBAD
+    database, CDS, Strasbourg, France. The original description of the VizieR
+    service was published in A&AS 143, 23.
+
+WHAT WAS DONE TO IT
+    The catalogue is a fixed-width text file of 9,110 records carrying more than
+    thirty fields each. tools/sky/build_star_catalog.py reads it and writes out
+    seven of them, for the 8,404 stars brighter than visual magnitude 6.5:
+
+        right ascension and declination   converted from sexagesimal to degrees
+                                          (J2000, unchanged otherwise)
+        visual magnitude                  unchanged
+        B-V colour                        unchanged
+        Bayer letter                      three-letter abbreviation expanded to
+                                          the Greek character, with the component
+                                          index as a superscript
+        Flamsteed number                  unchanged
+        constellation                     unchanged, IAU three-letter form
+
+    Rows are ordered brightest first. No position, magnitude or colour has been
+    altered, interpolated or filled in. Nothing has been added that was not in
+    the source.
+
+    Everything else the catalogue holds — the Durchmusterung, HD, SAO and FK5
+    cross-references, B1900 positions, galactic coordinates, U-B and R-I colours,
+    spectral types, proper motions, parallaxes, radial and rotational velocities,
+    and the multiple-star details — is dropped. The builder explains why for the
+    one field where dropping it has a visible consequence.
+
+    The builder re-derives Sirius from its own output on every run and refuses to
+    finish if the position, magnitude or designation does not match. That is the
+    guard against a column offset, which in a fixed-width format produces a file
+    that parses perfectly and describes the wrong sky.
+
+TO REBUILD
+    curl -o bsc5.gz https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz
+    python3 tools/sky/build_star_catalog.py bsc5.gz core/sky/src/main/assets/sky/stars.tsv
+
+STAR NAMES
+    The proper names shown for the brightest stars are not from this file. They
+    are the IAU Working Group on Star Names' approved designations, together with
+    the IAU's 88 constellation names and their genitive forms, and live in
+    core/telemetry/.../StarNames.kt. StarCatalogAssetTest checks every one of them
+    against this catalogue.
+
+
+================================================================================
+
+
+stars.skycat — where it comes from and what was done to it
+==========================================================
+
+SOURCE
+    Gaia Data Release 3 (Gaia Collaboration et al. 2023, A&A 674, A1)
+    European Space Agency, Gaia mission
+    Obtained from the Gaia Archive: https://gea.esac.esa.int/archive/
+
+    This work has made use of data from the European Space Agency (ESA) mission
+    Gaia (https://www.cosmos.esa.int/gaia), processed by the Gaia Data
+    Processing and Analysis Consortium (DPAC,
+    https://www.cosmos.esa.int/web/gaia/dpac/consortium). Funding for the DPAC
+    has been provided by national institutions, in particular the institutions
+    participating in the Gaia Multilateral Agreement.
+
+    The Gaia data are released under the Creative Commons Attribution-ShareAlike
+    3.0 IGO licence (CC BY-SA 3.0 IGO).
+
+WHAT WAS DONE TO IT
+    tools/sky/build_catalogue.py queries the archive for every source brighter
+    than G = 12 — 3,087,821 of them — and packs them into a binary the app can
+    read a few thousand of at a time without loading the rest.
+
+    Each star keeps five things and nothing else: right ascension, declination,
+    G magnitude, the BP-RP colour, and proper motion in both axes. Everything
+    else Gaia measures — parallax, radial velocity, the error estimates, the
+    astrometric quality flags, the epoch photometry, the source identifier — is
+    dropped, because none of it is used to draw a star.
+
+    Positions are stored relative to the tile they fall in rather than absolutely,
+    which is what makes the record eight bytes instead of twenty-four. That gives
+    about a twentieth of an arcsecond of resolution, uniformly across the sky.
+    Magnitude is stored in fourteenths and colour in steps of about a fortieth,
+    both far finer than a pixel can show. Proper motion is stored on a square law
+    so that the small motions almost every star has keep their precision while
+    the rare fast ones still fit in a byte.
+
+    No position, magnitude, colour or motion has been altered, interpolated or
+    filled in. Where Gaia measured no colour — about one source in three hundred
+    — the file records that fact rather than substituting a value.
+
+    The epoch is 2016.0, Gaia's own. The app carries each star forward by its
+    measured proper motion to whatever date it is drawing.
+
+⚠️ WHAT THIS FILE IS NOT
+    It is not the whole sky, and it must never be treated as a replacement for
+    stars.tsv.
+
+    Gaia saturates on bright stars. Measured against the Bright Star Catalogue
+    bundled beside it, of the fifteen stars brighter than magnitude 1 — Sirius,
+    Canopus, Arcturus, Vega, Capella, Rigel, Procyon, Betelgeuse, Achernar,
+    Altair, Aldebaran, Antares, Spica, Pollux and Fomalhaut — this file contains
+    NONE. At magnitude 1 to 2 it holds 12% of them; at 2 to 3, 71%; at 3 to 4,
+    90%; and it only reaches 96% below fifth magnitude. The brightest source in
+    the whole file is G = 1.71.
+
+    So the two catalogues are complementary, not alternatives. stars.tsv is the
+    bright half of the sky and carries the names; stars.skycat is the faint half
+    and carries the depth. SkyCatalogBundleTest asserts this rather than leaving
+    it as a remark, because a build that quietly dropped stars.tsv would still
+    draw three million stars and would still look like a sky.
+
+TO REBUILD
+    python3 tools/sky/build_catalogue.py core/sky/src/main/assets/sky/stars.skycat
+
+    It fetches from the Gaia archive in tiles, splitting any query that comes
+    back at the archive's undocumented 50,000-row ceiling, and verifies its own
+    output by reading it back before it finishes. Expect it to take some hours.
+
+
+================================================================================
+
+
+constellations.json — where it comes from and what was done to it
+=================================================================
+
+SOURCE — THE FIGURES, ASTERISMS AND BOUNDARY EDGES
+    Stellarium's "modern" sky culture
+    https://github.com/Stellarium/stellarium/blob/master/skycultures/modern/index.json
+
+    ⚠️ LICENCE: Creative Commons Attribution-ShareAlike 4.0 International
+    (CC BY-SA 4.0), stated in that sky culture's own description.md under
+    "License: Text and data: CC BY-SA 4.0". Only the text and data are used
+    here — none of the illustrations, which carry a different licence.
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+    The boundary edges in that file are themselves attributed by Stellarium to
+    Pierre Barbier's transcription of the IAU boundaries, which descend from
+    Delporte (1930): https://pbarbier.com/constellations/edges_18.txt
+
+SOURCE — THE STAR POSITIONS
+    Hipparcos, the New Reduction of the Raw Data
+    van Leeuwen F., 2007, A&A 474, 653
+    Catalogue I/311 from the Centre de Données astronomiques de Strasbourg:
+    https://cdsarc.cds.unistra.fr/ftp/I/311/
+
+WHAT WAS DONE TO IT
+    tools/sky/build_constellations.py joins the three and writes one file:
+
+        88 constellation figures    695 segments over 914 polyline points
+        76 asterisms                11 "ray helper" entries excluded, being
+                                    scaffolding for pointer lines rather than
+                                    shapes anybody names
+        912 star positions          every figure and asterism vertex, stored
+                                    once and referenced by index
+        781 boundary edges          B1875, each naming both adjacent
+                                    constellations
+
+    ⚠️ THE FIGURES NAME THEIR VERTICES BY HIPPARCOS NUMBER, AND NEITHER BUNDLED
+    CATALOGUE CARRIES ONE. stars.tsv drops the cross-references (see above) and
+    stars.skycat is positions only. So each of the 912 is resolved against
+    Hipparcos here, at build time, and the app needs no cross-identification
+    index at all.
+
+    Hipparcos positions are at epoch J1991.25 and everything else this app draws
+    is J2000, so each is carried forward 8.75 years by its own proper motion.
+    That is not a formality: measured over these 912 the median shift is 0.49
+    arcseconds and the worst is 32.46 (Alpha Centauri A), which at the narrowest
+    field the map allows is thirty-nine screen pixels — a figure line visibly
+    missing the star it is drawn to. `pmRA` in that file is mu_alpha*, already
+    including cos(declination), which was settled against Polaris rather than
+    assumed.
+
+    ⚠️ THE BOUNDARIES ARE KEPT IN B1875 ON PURPOSE, NOT CONVERTED. The IAU
+    boundaries were defined in 1930 as straight lines of right ascension and
+    declination in the B1875 frame, so in any later frame they are curves. The
+    J2000 file at CDS (VI/49 bound_20.dat) approximates those curves with 11,415
+    added "shape points" — the same information as 781 straight edges, at
+    fifteen times the size and fixed to one epoch. Storing the edge lets the map
+    generate the curve for whatever date it is drawing.
+
+    Nothing else in that sky culture is used: not the illustrations, not the
+    references, not the 660 traditional star names.
+
+TO REBUILD
+    curl -o /tmp/index.json https://raw.githubusercontent.com/Stellarium/stellarium/master/skycultures/modern/index.json
+    curl -o /tmp/hip2.dat.gz https://cdsarc.cds.unistra.fr/ftp/I/311/hip2.dat.gz
+    python3 tools/sky/build_constellations.py /tmp/index.json /tmp/hip2.dat.gz \
+        core/sky/src/main/assets/sky/constellations.json
+
+    ⚠️ CDS lists logical file names in its ReadMe and stores them gzipped, so a
+    request for the name the ReadMe prints returns a 404 page — and curl saves
+    it and exits successfully. Check the first two bytes are 1f 8b.
+
+    The builder re-derives Alpha Centauri A from its own output and refuses to
+    finish if it has moved more than an arcsecond from its published J2000
+    position, which is the guard against a dropped epoch correction or a shifted
+    column. It also refuses if fewer than all 781 edge rows parsed, if the
+    boundary right ascensions do not span the sky, or if a boundary names a
+    constellation the figures do not know.
+
+
+================================================================================
+
+
+deepsky.tsv — where it comes from and what was done to it
+=========================================================
+
+SOURCE
+    OpenNGC — "a license friendly NGC/IC objects database"
+    Mattia Verga
+    https://github.com/mattiaverga/OpenNGC
+
+    Files used: database_files/NGC.csv and database_files/addendum.csv. The
+    addendum carries objects outside the NGC and IC catalogues, including the
+    two Messier objects (M40 and M45) that have no NGC or IC designation.
+
+LICENCE, AND EXACTLY WHAT THE EVIDENCE FOR IT IS
+    The project's README says, in its own words:
+
+        "Unlike other similar databases which are released with license
+         limitations, OpenNGC is released under CC-BY-SA-4.0 license, which
+         allows the use for a wider range of cases."
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+    ⚠️ THAT SENTENCE IS THE WHOLE OF THE LICENCE STATEMENT. The repository
+    contains no licence file: LICENSE, LICENSE.md, LICENSE.txt, COPYING,
+    LICENCE and license.txt all return 404 at master, and NGC_guide.txt is
+    silent on the question. This notice states that plainly rather than
+    implying a formal grant that is not there. What CC-BY-SA-4.0 asks for is
+    attribution and share-alike, and both are honoured here: the database is
+    credited above, this file travels with the app, and nothing about the
+    data has been relicensed.
+
+UPSTREAM SOURCES, ACKNOWLEDGED AS THEY ASK TO BE
+    OpenNGC is itself a merge, and its README carries the wording each of
+    these databases requests. Reproduced:
+
+    This research has made use of the NASA/IPAC Extragalactic Database (NED)
+    which is operated by the Jet Propulsion Laboratory, California Institute
+    of Technology, under contract with the National Aeronautics and Space
+    Administration.
+
+    We acknowledge the usage of the HyperLeda database
+    (http://leda.univ-lyon1.fr).
+
+    This research has made use of the SIMBAD database, operated at CDS,
+    Strasbourg, France.
+
+    Several tables from the HEASARC High Energy Astrophysics Science Archive
+    Research Center (http://heasarc.gsfc.nasa.gov/) are used by OpenNGC:
+    messier, mwsc, lbn, plnebulae, lmcextobj and smcclustrs.
+
+    Positions and notes also draw on Harold Corwin's NGC/IC work,
+    http://haroldcorwin.net/ngcic/index.html
+
+WHAT WAS DONE TO IT
+    tools/sky/build_deepsky.py reads the two files — 14,034 rows carrying
+    thirty-two fields each — and writes ten of them for the 12,579 rows that
+    are an object worth drawing:
+
+        identifier            unchanged
+        type                  unchanged, OpenNGC's own string
+        right ascension       converted from sexagesimal hours to degrees
+        declination           converted from sexagesimal to degrees
+        magnitude and band    V where measured, B otherwise, band recorded
+        major and minor axis  unchanged, arcminutes
+        position angle        unchanged, degrees
+        label                 the first common name, else the Messier number
+
+    1,455 rows are dropped: 652 duplicate entries, 546 single stars and 244
+    double stars (which the star catalogue already draws), 10 objects later
+    shown not to exist, and 3 transients.
+
+    ⚠️ THE MAGNITUDE IS NOT ALL IN ONE BAND, WHICH IS WHY THE BAND IS STORED.
+    11,303 rows carry a B magnitude and only 4,218 carry V, with 161 having V
+    and no B — so preferring V and falling back to B is the difference between
+    4,218 objects with a brightness and 11,464. B and V are different
+    photometric bands and for these mostly-red populations B is the fainter
+    number, so mixing them silently would put a systematic bias into any cut
+    the app applies. No conversion is done here: it would need a colour this
+    catalogue does not measure for these objects.
+
+    ⚠️ SOME ANGULAR SIZES ARE INFRARED, NOT VISUAL. OpenNGC's own notes say
+    that where LEDA has no major or minor axis for a galaxy the value comes
+    from SIMBAD, usually a 2MASS measurement. An infrared extent is not the
+    extent an eye or a camera sees, and the difference is not recorded per
+    row, so a drawn ellipse is the best size available rather than a promise.
+
+    Nothing else in that repository is used: not the nebula outlines, not the
+    Hubble classifications, not the radial velocities, not the notes.
+
+TO REBUILD
+    curl -o /tmp/NGC.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv
+    curl -o /tmp/addendum.csv https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv
+    python3 tools/sky/build_deepsky.py /tmp/NGC.csv /tmp/addendum.csv \
+        core/sky/src/main/assets/sky/deepsky.tsv
+
+    The builder re-derives M31 from its own output and refuses to finish if it
+    has moved more than five arcseconds from its published J2000 position,
+    which is the guard against a shifted column or a lost hours-to-degrees
+    conversion. It also refuses if any row was silently dropped, if a type
+    appears that it has never seen, if a minor axis is longer than its major,
+    if the objects do not span the sky, or if any of eight famous objects —
+    Andromeda, Orion, the Pleiades, the Ring, the Sombrero, the Whirlpool, the
+    Hercules cluster and the Small Magellanic Cloud — is missing or has no
+    magnitude.

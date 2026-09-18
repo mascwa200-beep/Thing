@@ -61,13 +61,71 @@ class AppContainer(private val appContext: Context) {
     val appForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     val json: Json by lazy { HttpClient.defaultJson() }
-    val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
+    /**
+     * The one HTTP client every feed shares.
+     *
+     * ⚠️ The fan-out is scaled to the phone. Sixty-four concurrent calls on a 2 GB device is
+     * sixty-four threads, sockets and read buffers — a low-memory kill, not a slow screen — so a
+     * MINIMAL phone gets twenty-one. `durableBudget()` rather than the live one because a
+     * `Dispatcher` is built once with the client and nothing here could re-tune it as the phone
+     * cooled; see the reasoning at the call it makes.
+     */
+    val http: HttpClient by lazy {
+        HttpClient.create(json, appContext.cacheDir, parallelism = deviceProbe.durableBudget().parallelism)
+    }
     // ⚠️ `filesDir`, not the `Context` itself. The cache is shared with the desktop companion now,
     // and reading a directory was the only thing it ever wanted a `Context` for.
     val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
+
+    /**
+     * Every rebuildable cache, so Settings can report and clear all of them rather than one.
+     *
+     * ⚠️ The image loader and the HTTP client are passed as lambdas, not instances. Building this
+     * eagerly forces both, and [imageLoader] in particular has no business existing in a process
+     * that never draws a picture — a background worker among them.
+     */
+    val appCaches: dev.mascwa.pulse.data.cache.AppCaches by lazy {
+        dev.mascwa.pulse.data.cache.AppCaches(appContext, diskCache, { imageLoader }, { http })
+    }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
-        dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
+        dev.mascwa.pulse.data.update.UpdateRepository(
+            appContext,
+            http,
+            tag = dev.mascwa.pulse.data.update.UpdateRepository.LCARS_TAG,
+            workflow = dev.mascwa.pulse.data.update.UpdateRepository.LCARS_WORKFLOW,
+            currentVersionCode = dev.mascwa.pulse.BuildConfig.VERSION_CODE,
+            currentVersionName = dev.mascwa.pulse.BuildConfig.VERSION_NAME,
+            token = { settingsRepository.current().jarvis.githubToken },
+        )
+    }
+
+    /**
+     * The same checker pointed at the standalone nutrition app's own release, so this app can put
+     * the companion on the phone in the first place — there is otherwise no way to obtain it.
+     *
+     * ⚠️ **`currentVersionCode = 0` is a statement, not a placeholder**: it treats every published
+     * build as newer than nothing and offers the newest, which is what the manual control wants —
+     * somebody who taps GET THE NUTRITION APP is asking for the app, and installing over an equal
+     * or older build is harmless because the platform refuses a downgrade itself.
+     *
+     * ⚠️ **It is NOT because the version cannot be read, which this note used to claim.** This app
+     * holds `QUERY_ALL_PACKAGES`, so `getPackageInfo` answers for the companion perfectly well —
+     * and that wrong sentence is exactly what made keeping the companion updated automatically look
+     * impossible. `RefreshWorker.updateCompanion` reads the installed version and compares against
+     * it there, which is why this instance can stay deliberately permissive without that pass ever
+     * re-installing a build the phone already has.
+     */
+    val nutritionUpdateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
+        dev.mascwa.pulse.data.update.UpdateRepository(
+            appContext,
+            http,
+            tag = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_TAG,
+            workflow = dev.mascwa.pulse.data.update.UpdateRepository.NUTRITION_WORKFLOW,
+            currentVersionCode = 0,
+            currentVersionName = "",
+            token = { settingsRepository.current().jarvis.githubToken },
+        )
     }
     /** GitHub write client + self-coding brain (opt-in): J.A.R.V.I.S. drafts a change and opens a PR. */
     val gitHubRepo: dev.mascwa.pulse.data.selfcode.GitHubRepo by lazy {
@@ -84,6 +142,21 @@ class AppContainer(private val appContext: Context) {
     }
 
     /**
+     * What this phone can actually be asked to do — RAM, heap class, cores, thermal state.
+     *
+     * ⚠️ Held here rather than constructed per call site, and that is not tidiness. The reader keeps
+     * a high-water mark of the core count, because `availableProcessors()` reports cores that are
+     * ONLINE and a big.LITTLE governor parks them when idle: a fresh instance takes one reading and
+     * can class an eight-core flagship as a two-core phone. One instance per process accumulates.
+     *
+     * Placed above [imageLoader] deliberately — the cache sizes below become tier-scaled, and a
+     * `by lazy` that referenced a member declared later would be an initialisation-order trap.
+     */
+    val deviceProbe: dev.mascwa.pulse.device.DeviceProbeReader by lazy {
+        dev.mascwa.pulse.device.DeviceProbeReader(appContext)
+    }
+
+    /**
      * Bounded Coil image loader so thumbnail-heavy screens (news/markets/images/social) can't grow
      * the heap without limit — a key part of stopping the OS low-memory kills. Installed as the app's
      * singleton loader via [PulseApplication.newImageLoader], so every `AsyncImage` uses it.
@@ -91,8 +164,27 @@ class AppContainer(private val appContext: Context) {
     val imageLoader: coil.ImageLoader by lazy {
         coil.ImageLoader.Builder(appContext)
             // Decode bundled .svg survival diagrams (crisp at any size) alongside the default raster fetchers.
-            .components { add(coil.decode.SvgDecoder.Factory()) }
-            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.06).build() }
+            .components {
+                add(coil.decode.SvgDecoder.Factory())
+                // Bound every decode to what this phone can afford, re-read per request through the
+                // cached accessor so a phone that gets hot decodes smaller from the next image on.
+                // See DecodeCapInterceptor: the case it exists for is a dimension the layout left
+                // open, which Coil's own size resolver cannot bound.
+                add(dev.mascwa.pulse.device.DecodeCapInterceptor { deviceProbe.budgetCached().imageDecodePx })
+            }
+            // ⚠️ The share is the DURABLE budget — hardware only, thermal excluded. The cache is
+            // sized once and kept for the life of the process, so folding a momentary reading into
+            // it would leave a phone that happened to be warm at launch holding a small cache all
+            // day. Pressure arriving later is already covered: onTrimMemory clears this.
+            //
+            // 0.06 was measured, and it is what this returns at every tier down to MODEST; a LEAN
+            // phone gets 0.04 and a MINIMAL one 0.03, which on a 2 GB phone is the difference
+            // between a thumbnail cache and a low-memory kill.
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(appContext)
+                    .maxSizePercent(deviceProbe.durableBudget().imageCacheShare)
+                    .build()
+            }
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(java.io.File(appContext.cacheDir, "image_cache"))
@@ -216,7 +308,83 @@ class AppContainer(private val appContext: Context) {
     }
     val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
     val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
+    val cometRepository: dev.mascwa.pulse.data.orbital.CometRepository by lazy {
+        dev.mascwa.pulse.data.orbital.CometRepository(http, diskCache)
+    }
+    /**
+     * The water where you are — tides on a coast, lake level on the Great Lakes.
+     *
+     * ⚠️ Takes the context because the station list is a bundled asset, which is also why it lives
+     * in `:app` rather than beside the other keyless feeds in `:core:feeds`.
+     */
+    val waterRepository: dev.mascwa.pulse.data.water.WaterRepository by lazy {
+        dev.mascwa.pulse.data.water.WaterRepository(appContext, http, diskCache)
+    }
+    /**
+     * Mobile data used since the allowance last reset. Local, no network, no coordinate.
+     *
+     * ⚠️ Needs Usage Access, which the user grants in Settings rather than at a runtime prompt —
+     * the same special access the Security Audit's per-app breakdown already asks for.
+     */
+    val mobileData: dev.mascwa.pulse.core.device.MobileData by lazy {
+        dev.mascwa.pulse.core.device.MobileData(appContext)
+    }
+    /**
+     * Unread texts and unread mail.
+     *
+     * ⚠️ The mail half is one TLS round trip per account and must never sit in the widget's
+     * four-second budget: `RefreshWorker` calls `refresh` and the widget reads `cached`.
+     */
+    /**
+     * The last count of waiting mail worked out from the notification shade.
+     *
+     * ⚠️ Lazy, so a phone that never grants notification access never has this DataStore on disk at
+     * all: nothing constructs it until something asks, and the only asker is the read path below.
+     */
+    val mailNoticeStore: dev.mascwa.pulse.data.comms.MailNoticeStore by lazy {
+        dev.mascwa.pulse.data.comms.MailNoticeStore(appContext, json)
+    }
+    val commsRepository: dev.mascwa.pulse.data.comms.CommsRepository by lazy {
+        // The narrow thing rather than the store, so CommsRepository keeps compiling against
+        // nothing but the platform — see the parameter's own note.
+        dev.mascwa.pulse.data.comms.CommsRepository(appContext, diskCache) { mailNoticeStore.read()?.total }
+    }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
+
+    /**
+     * The bundled star catalogue.
+     *
+     * ⚠️ Lazy, and it matters more here than usual: the parse is a quarter of a megabyte and 8,404
+     * objects, so a phone that never opens the sky map never pays for it at all.
+     */
+    val starCatalog: dev.mascwa.pulse.data.sky.StarCatalog by lazy {
+        dev.mascwa.pulse.data.sky.StarCatalog(appContext)
+    }
+
+    /**
+     * The deep catalogue — three million stars, memory-mapped rather than read.
+     *
+     * ⚠️ Lazy for a different reason from [starCatalog]: opening this costs almost nothing (a
+     * mapping, not a parse), but it holds a file descriptor for the life of the process, and a phone
+     * that never opens the sky map should not hold one.
+     */
+    val deepStarCatalog: dev.mascwa.pulse.data.sky.DeepStarCatalog by lazy {
+        dev.mascwa.pulse.data.sky.DeepStarCatalog(appContext)
+    }
+
+    /** The constellation figures, asterisms and IAU borders. Lazy for [starCatalog]'s reason. */
+    val constellationCatalog: dev.mascwa.pulse.data.sky.ConstellationCatalog by lazy {
+        dev.mascwa.pulse.data.sky.ConstellationCatalog(appContext)
+    }
+
+    /** The galaxies, clusters and nebulae. Lazy for [starCatalog]'s reason. */
+    val deepSkyCatalog: dev.mascwa.pulse.data.sky.DeepSkyCatalog by lazy {
+        dev.mascwa.pulse.data.sky.DeepSkyCatalog(appContext)
+    }
+
+    val milkyWayCatalog: dev.mascwa.pulse.data.sky.MilkyWayCatalog by lazy {
+        dev.mascwa.pulse.data.sky.MilkyWayCatalog(appContext)
+    }
 
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
         dev.mascwa.pulse.core.connectivity.ConnectivityObserver(appContext)
@@ -314,7 +482,7 @@ class AppContainer(private val appContext: Context) {
      */
     val payloadProvisioner: dev.mascwa.pulse.data.provision.PayloadProvisioner by lazy {
         dev.mascwa.pulse.data.provision.PayloadProvisioner(
-            appContext, packRepository, llamaEngine, usageRepository,
+            appContext, packRepository, llamaEngine, usageRepository, deviceProbe,
         )
     }
 
@@ -383,6 +551,16 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.health.RecipeStore(appContext, json)
     }
 
+    /** A meal being assembled, kept on disk so a telephone call cannot lose it. */
+    val plateStore: dev.mascwa.pulse.data.health.PlateStore by lazy {
+        dev.mascwa.pulse.data.health.PlateStore(appContext, json)
+    }
+
+    /** What was lifted, and the personal bests that outlive the sessions they were set in. */
+    val trainingStore: dev.mascwa.pulse.data.health.TrainingStore by lazy {
+        dev.mascwa.pulse.data.health.TrainingStore(appContext, json)
+    }
+
     /** Packaged food by barcode or name, from the keyless Open Food Facts community database. */
     val openFoodFacts: dev.mascwa.pulse.data.food.OpenFoodFactsRepository by lazy {
         dev.mascwa.pulse.data.food.OpenFoodFactsRepository(http, diskCache)
@@ -400,8 +578,35 @@ class AppContainer(private val appContext: Context) {
      * so a local developer build genuinely has none — see `FoodDatabase.open`.
      */
     val offlineFoodStore: dev.mascwa.pulse.data.health.OfflineFoodStore? by lazy {
-        dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
-            ?.let { dev.mascwa.pulse.data.health.OfflineFoodStore(it) }
+        val opened = dev.mascwa.pulse.data.food.db.FoodDatabase.open(appContext)
+        if (opened == null) {
+            // ⚠️ Null used to mean one thing — the asset never arrived — and now means two. A phone
+            // that refused to unpack for want of room is a different situation entirely, and this
+            // report is the only place either becomes visible.
+            crashReporter.reportNonFatal(
+                "food.db.open",
+                note = "The bundled barcode database did not open — every scan falls back to the " +
+                    "network. Reason: " +
+                    (dev.mascwa.pulse.data.food.db.FoodDatabase.lastOpenNote ?: "not stated"),
+            )
+        }
+        opened
+            ?.let {
+                dev.mascwa.pulse.data.health.OfflineFoodStore(it) { op, t ->
+                    // ⚠️ A query that THREW is not a query that found nothing, and until now both
+                    // arrived on screen as "not in the database". The unpack above is where this
+                    // fails in practice — a phone with no room left throws on the first query and
+                    // every one after it — so without this the offline half is dead for good with
+                    // the network path quietly covering for it.
+                    crashReporter.reportNonFatal(
+                        "food.db.$op",
+                        t,
+                        note = "The bundled barcode database could not answer a '$op' query. Every " +
+                            "scan and offline search falls back to the network until this is fixed; " +
+                            "the usual cause is no room left to unpack the database.",
+                    )
+                }
+            }
     }
 
     /**
@@ -411,7 +616,10 @@ class AppContainer(private val appContext: Context) {
      */
     val foodRepository: dev.mascwa.pulse.data.health.FoodRepository by lazy {
         dev.mascwa.pulse.data.health.FoodRepository(
-            appContext, openFoodFacts, customFoodStore, offlineFoodStore,
+            // ⚠️ A supplier because the standalone nutrition application downloads its corpus while
+            // running; this one bundles it, so the answer never changes and `by lazy` behind the
+            // lambda means it is still opened exactly once.
+            appContext, openFoodFacts, customFoodStore, { offlineFoodStore },
         )
     }
 
@@ -430,6 +638,40 @@ class AppContainer(private val appContext: Context) {
      * Foods somebody typed in themselves. Searched ahead of both databases, because a short list you
      * named yourself is more likely to be what you meant than one of thirteen thousand generic rows.
      */
+    /**
+     * The health view model's whole world, assembled from the members above.
+     *
+     * ⚠️ **This is the seam that lets one view model serve two applications.** Everything it names
+     * lives in `:core:health` except the last three, which are exactly the things the two
+     * applications do differently: this one keeps its health preferences as one section of a much
+     * larger settings blob, watches connectivity through its own observer, and has a vision model to
+     * read a photograph with. The standalone nutrition app has its own answers to the first two and
+     * passes null for the third.
+     */
+    val healthDeps: dev.mascwa.pulse.data.health.HealthDeps by lazy {
+        dev.mascwa.pulse.data.health.HealthDeps(
+            foodLogStore = foodLogStore,
+            bodyStore = bodyStore,
+            progressPhotoStore = progressPhotoStore,
+            healthConnect = healthConnect,
+            customFoodStore = customFoodStore,
+            recipeStore = recipeStore,
+            plateStore = plateStore,
+            trainingStore = trainingStore,
+            foodRepository = foodRepository,
+            healthExporter = healthExporter,
+            healthImporter = healthImporter,
+            readerRepository = readerRepository,
+            healthSettings = settingsRepository.settings.map { it.health },
+            // ⚠️ A read-modify-write, not a setter: `health` is one field of forty on AppSettings and
+            // the other thirty-nine have to survive the write.
+            updateHealth = { block -> settingsRepository.update { it.copy(health = block(it.health)) } },
+            isOnline = { connectivityObserver.isOnline.value },
+            mealPhotoReader = mealPhotoReader,
+            crumb = dev.mascwa.pulse.crash.Breadcrumbs::drop,
+        )
+    }
+
     val customFoodStore: dev.mascwa.pulse.data.health.CustomFoodStore by lazy {
         dev.mascwa.pulse.data.health.CustomFoodStore(appContext, json)
     }
@@ -588,7 +830,12 @@ class AppContainer(private val appContext: Context) {
             http,
             micBusy = {
                 voskSpeech.consoleActive.value ||
-                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking)
+                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking) ||
+                    // ⚠️ The interrogator takes the microphone OUTRIGHT — see [MicFloor], which says
+                    // so in as many words and which nothing here was consulting. A sip attempted
+                    // underneath it is a second AudioRecord on a device that may or may not permit
+                    // one, to produce labels from audio another subsystem is already holding.
+                    dev.mascwa.pulse.feature.media.MicFloor.interrogating.value
             },
         )
     }
@@ -649,23 +896,143 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sensing.SensoriumStore(appContext, json)
     }
 
+    /**
+     * What the phone knows about itself — screen, lock, power, thermal, audio, Do Not Disturb.
+     *
+     * ⚠️ It BORROWS [deviceProbe] and [deviceContextProvider] rather than reading the thermal status
+     * and the battery intent a second time. Two mappings of the same system service is the
+     * duplicated-definition drift this project has corrected seven times, and the cost of borrowing
+     * is two extra sets of binder calls on a thirty-second heartbeat.
+     */
+    val senseContextReader: dev.mascwa.pulse.data.sensing.SenseContextReader by lazy {
+        dev.mascwa.pulse.data.sensing.SenseContextReader(appContext, deviceProbe, deviceContextProvider)
+    }
+
     /** The Sensorium's conductor: fuses sampler output each heartbeat, learns the baseline, extracts
      *  events, dispatches alerts/memories. Driven by [dev.mascwa.pulse.data.sensing.SensoriumService]. */
     val sensoriumEngine: dev.mascwa.pulse.data.sensing.SensoriumEngine by lazy {
         dev.mascwa.pulse.data.sensing.SensoriumEngine(
             sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
-            memoryStream, notifier, settingsRepository,
+            memoryStream, notifier, settingsRepository, locationProvider,
+            senseContextReader, wifiPolicyController, calendarRepository,
+            // ⚠️ A lambda so that [textToSpeech] is READ only when an alarm is actually being
+            // spoken. Reading it binds a TTS service — see the note on `voicePreference` below —
+            // and passing it eagerly here would bind one on every phone the moment sensing starts,
+            // for a line most people will never hear.
+            speakAloud = { line -> runCatching { textToSpeech.speak(line) } },
         )
     }
+    /**
+     * The PHONE tier's two effects — the ringer and the torch.
+     *
+     * ⚠️ It borrows [survivalTools] for the torch rather than finding the flash-bearing camera a
+     * second time. That lookup already exists, is already lazy, and a second copy is the
+     * duplicated-definition drift this project has converged seven times.
+     */
+    val phoneHolds: dev.mascwa.pulse.data.sensing.PhoneHolds by lazy {
+        dev.mascwa.pulse.data.sensing.PhoneHolds(appContext, survivalTools)
+    }
+
+    /**
+     * The OWNER tier's one effect — pausing the apps that are not a way back out.
+     *
+     * ⚠️ It builds its own [dev.mascwa.pulse.security.DevicePolicyController] rather than sharing
+     * one, and that costs nothing worth sharing: the class holds a system-service handle and a
+     * `ComponentName`, owns no state and reads nothing at construction. Settings already makes its
+     * own for the same reason. What must not be duplicated is the DECISION about which packages may
+     * be paused, and that lives once in `AppSuspension`, in a module with no Android in it.
+     */
+    val ownerHolds: dev.mascwa.pulse.data.sensing.OwnerHolds by lazy {
+        dev.mascwa.pulse.data.sensing.OwnerHolds(
+            appContext,
+            dev.mascwa.pulse.security.DevicePolicyController(appContext),
+        )
+    }
+
+    /**
+     * The acting layer: what the ambient rules want, made to happen and undone again.
+     *
+     * ⚠️ **A phone that never switches sensing on never has a holds file on disk** — the same
+     * property as the mail-notice store, though for a different reason than the laziness here. The
+     * file is created by the first read inside a suspend method, and every one of those is called by
+     * [dev.mascwa.pulse.data.sensing.SensoriumService], which is opt-in; merely constructing this
+     * allocates an object and touches nothing. The `by lazy` saves the allocation, not the file, and
+     * saying otherwise would be claiming more than it does.
+     *
+     * ⚠️ The effect lambda is deliberately the only coupling to anything playing. Exactly one
+     * APP-tier action needs a side effect rather than set membership — pausing is a thing that has
+     * to be DONE — and both controllers read
+     * [dev.mascwa.pulse.data.sensing.AmbientHolds] themselves to stay paused, which is what makes it
+     * a hold rather than a one-off. Nothing is resumed on release: video somebody stopped, or drove
+     * away from, must not start playing by itself.
+     */
+    val ambientActuator: dev.mascwa.pulse.data.sensing.AmbientActuator by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientActuator(appContext, json) { action, asserting ->
+            if (action == dev.mascwa.pulse.core.telemetry.AmbientAction.PAUSE_VIDEO && asserting) {
+                runCatching { dev.mascwa.pulse.feature.theater.OnDemandController.pause() }
+                // ⚠️ Stopped rather than paused, and that is forced rather than chosen: a live
+                // stream has no position to hold, which is why its own status vocabulary has no
+                // PAUSED in it. Leaving it connected and muted would spend the data anyway.
+                runCatching { dev.mascwa.pulse.feature.live.LiveVideoController.stop(appContext) }
+            }
+            // ⚠️ Handed every action rather than filtered here. Whether a PHONE- or OWNER-tier hold
+            // is allowed at all is `AmbientRules.permit`'s decision, made once against the user's
+            // own switches — a second gate at the call site is a second place for the two to
+            // disagree about what is switched on. Each tier ignores what is not its own.
+            runCatching { phoneHolds.run(action, asserting) }
+            // ⚠️ And the OWNER tier is reached the same way, which is what makes the release work
+            // after a crash: `reconcileFromDisk` replays every held action through this one lambda,
+            // so a process that did not assert the hold still lets it go. A tier wired anywhere else
+            // would be a tier nothing releases.
+            runCatching { ownerHolds.run(action, asserting) }
+            // ⚠️ **Safety rule 6 for the one tier that earns it, and the actuator's own KDoc names
+            // this as where it belongs.** That file explains at length why APP-tier transitions go
+            // to its own history instead: "stopped speaking aloud because you are in a meeting" is
+            // not a security event, and a routine app behaviour landing several times a day in a
+            // hash-chained append-only log would drown the four things in it that matter. A
+            // device-owner power used with no human in the loop is the opposite case — it is the
+            // same class of event as the `devicepolicy.*` entries Settings already writes when
+            // somebody flips the USB or camera toggle by hand, and arguably more worth recording
+            // for having been automatic.
+            //
+            // ⚠️ Here rather than inside `OwnerHolds`, so a hold that this handset could not carry
+            // out is not recorded as though it had been. `minusWhatThisHandsetCannotDo` has already
+            // moved those into `refused`, so nothing that reaches this lambda was refused — and
+            // `OwnerHolds.run` swallowing a `SecurityException` internally would be invisible from
+            // in there anyway.
+            if (action.tier == dev.mascwa.pulse.core.telemetry.ActionTier.OWNER) {
+                runCatching {
+                    auditLedgerStore.record(
+                        dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
+                        "ambient.${if (asserting) "hold" else "release"}",
+                        action.name,
+                    )
+                }
+            }
+        }
+    }
+
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
      *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
     val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {
         dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer(appContext)
     }
 
-    /** App-wide crash reporter backing the global handler + the SYS crash console. */
+    /**
+     * App-wide crash reporter backing the global handler + the SYS crash console.
+     *
+     * ⚠️ The build identity is passed in rather than read inside: the reporter is shared with the
+     * standalone nutrition application now, and each one has to name its own `BuildConfig`. Which
+     * build a fault came from is the most load-bearing line in a report, so there is no default to
+     * fall through to.
+     */
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
-        dev.mascwa.pulse.crash.CrashReporter(appContext)
+        dev.mascwa.pulse.crash.CrashReporter(
+            appContext,
+            appLabel = "LCARS",
+            versionName = dev.mascwa.pulse.BuildConfig.VERSION_NAME,
+            versionCode = dev.mascwa.pulse.BuildConfig.VERSION_CODE,
+        )
     }
     /** Uploads scrubbed crash/debug reports to the repo's `debug-reports` branch (opt-in) for remote
      *  reading. Reuses the repo-scoped GitHub token; never touches main/dev or opens a PR. */
@@ -919,16 +1286,26 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.reflection.ReflectionEngine(memoryStream, inferenceEngine, settingsRepository)
     }
 
-    /** Compass is stateful per-screen, so hand out a fresh controller each time. [cameraUpright] = AR mode. */
-    fun newCompassController(cameraUpright: Boolean = false): CompassController =
-        CompassController(appContext, cameraUpright)
+    /**
+     * Compass is stateful per-screen, so hand out a fresh controller each time.
+     *
+     * [cameraUpright] = AR mode, which is also the only mode where pitch and roll mean anything.
+     * [smoothed] = false hands over the sensor's angles unfiltered, which the sky map needs so it
+     * can blend the two DIRECTIONS instead — see `CompassController`'s own note on the zenith.
+     */
+    fun newCompassController(
+        cameraUpright: Boolean = false,
+        smoothed: Boolean = true,
+    ): CompassController = CompassController(appContext, cameraUpright, smoothed)
 
     /** Telemetry is stateful per-screen (sensor lifecycle), so hand out fresh. */
     fun newTelemetryController(): dev.mascwa.pulse.data.sensors.TelemetryController =
         dev.mascwa.pulse.data.sensors.TelemetryController(appContext)
 
     val notifier: Notifier by lazy { Notifier(appContext) }
-    val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
+    val notificationScheduler: NotificationScheduler by lazy {
+        NotificationScheduler(appContext, deviceProbe)
+    }
 
     // --- On-device security auditor (read-only, local-only defender's tool) ---
     val securityAuditor: dev.mascwa.pulse.data.security.SecurityAuditor by lazy {

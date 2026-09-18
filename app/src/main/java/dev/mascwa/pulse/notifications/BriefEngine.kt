@@ -3,6 +3,7 @@ package dev.mascwa.pulse.notifications
 import android.content.Context
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import dev.mascwa.pulse.core.telemetry.AmbientAction
 import dev.mascwa.pulse.core.telemetry.BriefSignals
 import dev.mascwa.pulse.core.telemetry.EmergencyAlert
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
@@ -15,6 +16,7 @@ import dev.mascwa.pulse.core.telemetry.UnifiedBriefComposer
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
+import dev.mascwa.pulse.data.sensing.AmbientHolds
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.study.localDayIndex
 import dev.mascwa.pulse.data.weather.WeatherCode
@@ -128,7 +130,7 @@ object BriefEngine {
                 severe = WeatherCode.isSevere(d.weatherCode)
             }
         }
-        val kp = runCatching { container.spaceWeatherRepository.fetch(false).data.kp }.getOrNull()
+        val kp = runCatching { container.spaceWeatherRepository.fetch(false, heavy = false).data.kp }.getOrNull()
 
         // --- Agenda: next calendar event + open tasks + how many reminders are queued. ---
         // upcoming() is a blocking ContentResolver query, not suspend — keep it off the caller's dispatcher.
@@ -243,8 +245,24 @@ object BriefEngine {
 
         // Local val: urgencyKey is a public property from another module, so it can't smart-cast directly.
         val urgentKey = brief.urgencyKey
+
+        // ⚠️ The Sensorium can hold the buzz back, and the two carve-outs are the whole design.
+        //
+        // A RED board is never held: an alarm sounding while somebody is driving is precisely when
+        // interrupting them is right, and "non-urgent" in this file's own vocabulary means the yellow
+        // tier — a routine refresh is already silent and needs nobody's permission to stay that way.
+        //
+        // ⚠️ And this stops the BUZZ, never the board. `notifyBrief` is still called either way and
+        // `alertNew` only picks the channel, so everything is still there to be read; a hold that
+        // hid information would be a different and much worse thing than one that stops a noise.
+        val heldBack = AmbientHolds.isHeld(AmbientAction.HOLD_NON_URGENT) &&
+            brief.urgency != dev.mascwa.pulse.core.telemetry.BriefUrgency.RED
+
         val alertNew = when {
             reminderNow != null -> true // the user asked to be interrupted at exactly this moment
+            // ⚠️ Below the reminder on purpose. Somebody who set an alarm for this minute has asked
+            // to be interrupted more recently and more explicitly than any rule inferred anything.
+            heldBack -> false
             urgentKey != null && urgentKey != state.lastUrgentKey && prefs.urgentAlertsEnabled -> true
             else -> false
         }

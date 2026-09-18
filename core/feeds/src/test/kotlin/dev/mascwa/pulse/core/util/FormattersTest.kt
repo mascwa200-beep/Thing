@@ -41,6 +41,52 @@ class FormattersTest {
         assertEquals("4d ago", Formatters.relativeTime(now - 4L * 86_400_000L, now))
     }
 
+    /**
+     * The defect this pins: "yesterday" is a claim about which day it was, and it was being decided
+     * by how much time had passed.
+     *
+     * `now` here is noon on Sunday 16 August. A story filed at 13:00 on **Friday** is 47 hours old,
+     * which is one whole elapsed day — so the old `days < 2` branch called it yesterday, on a story
+     * from the day before yesterday. Anything published in the afternoon reads as a day fresher than
+     * it is for the whole of the following day, and a news feed is the one place that matters.
+     */
+    @Test
+    fun theDayBeforeYesterdayIsNotYesterday() {
+        val fridayAfternoon = localNoon(2026, 8, 14) + 3_600_000L      // 47h before noon Sunday
+        assertEquals("2d ago", Formatters.relativeTime(fridayAfternoon, now))
+
+        // …and the boundary either side of it still reads as it should.
+        assertEquals("yesterday", Formatters.relativeTime(localNoon(2026, 8, 15), now))
+        assertEquals("3d ago", Formatters.relativeTime(localNoon(2026, 8, 13), now))
+    }
+
+    /**
+     * ⚠️ Where the clocks go back a local day runs twenty-five hours, so more than a day of elapsed
+     * time can still be the same date — and "yesterday" would then be a statement about today.
+     *
+     * Pinned in a zone that genuinely observes it rather than the machine's own, because a runner in
+     * UTC would never reach the branch and the guard would sit here proving nothing. 26 October 2025
+     * is the European autumn transition: 00:30 to 23:30 that day is 24.5 hours inside one date.
+     */
+    @Test
+    fun aTwentyFiveHourDayStillReadsInHours() {
+        val previous = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/London"))
+            val cal = Calendar.getInstance()
+            cal.clear(); cal.set(2025, 9, 26, 0, 30, 0)
+            val earlyThatDay = cal.timeInMillis
+            cal.clear(); cal.set(2025, 9, 26, 23, 30, 0)
+            val lateThatDay = cal.timeInMillis
+
+            val elapsedHours = (lateThatDay - earlyThatDay) / 3_600_000L
+            assertTrue("the fixture must actually span a long day: ${elapsedHours}h", elapsedHours >= 24)
+            assertEquals("${elapsedHours}h ago", Formatters.relativeTime(earlyThatDay, lateThatDay))
+        } finally {
+            TimeZone.setDefault(previous)
+        }
+    }
+
     /** A date inside the current year needs no year — the reader supplies it. */
     @Test
     fun aDateThisYearOmitsTheYear() {

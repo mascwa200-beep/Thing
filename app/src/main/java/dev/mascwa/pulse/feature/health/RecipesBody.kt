@@ -3,7 +3,6 @@ package dev.mascwa.pulse.feature.health
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,8 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Decimals
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.NutritionDay
+import dev.mascwa.pulse.core.telemetry.RecipeImport
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.data.food.Food
 import dev.mascwa.pulse.feature.common.LcarsButton
@@ -35,7 +36,6 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.roundToInt
 
-private val Pad = PaddingValues(13.dp)
 
 /**
  * The dishes you make more than once, and the groups of foods you eat together.
@@ -82,6 +82,7 @@ fun RecipesBody(vm: HealthViewModel) {
                 )
             }
         }
+        item { ImportFromLink(vm) }
         if (saved.isEmpty()) {
             item {
                 NotYet(
@@ -94,12 +95,133 @@ fun RecipesBody(vm: HealthViewModel) {
         }
         if (dishes.isNotEmpty()) {
             item { SectionLabel("RECIPES") }
-            items(dishes, key = { it.id }) { r -> SavedRecipe(vm, r) }
+            items(dishes, key = { "dish:${it.id}" }) { r -> SavedRecipe(vm, r) }
         }
         if (meals.isNotEmpty()) {
             item { SectionLabel("SAVED MEALS") }
-            items(meals, key = { it.id }) { r -> SavedRecipe(vm, r) }
+            items(meals, key = { "meal:${it.id}" }) { r -> SavedRecipe(vm, r) }
         }
+    }
+}
+
+// ------------------------------------------------------------------------------ from a web page
+
+/**
+ * Read a recipe page and start a draft from it.
+ *
+ * ⚠️ **Offered on the list and deliberately not inside the builder.** An import carries a name and a
+ * portion count, and it always opens a fresh draft — folding one into an open builder would overwrite
+ * both and throw away whatever was half-built.
+ *
+ * ⚠️ **A page supplies names and amounts. It supplies no nutrition, and nothing here invents any.**
+ * Every figure in this tab comes from a real food record, so an imported line is a saved keystroke
+ * and not an ingredient — it counts for nothing until it is matched against the database below.
+ */
+@Composable
+private fun ImportFromLink(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val state by vm.recipeImport.collectAsStateWithLifecycle()
+    var url by remember { mutableStateOf("") }
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "FROM A LINK",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            LcarsField(
+                url,
+                { url = it.take(300) },
+                placeholder = "Address of a recipe page",
+                onImeAction = { vm.importRecipe(url) },
+            )
+            LcarsButton(
+                text = if (state.busy) "READING…" else "READ IT",
+                enabled = !state.busy && url.isNotBlank(),
+                onClick = { vm.importRecipe(url) },
+            )
+            if (state.note.isNotBlank()) {
+                Text(state.note, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, lineHeight = 14.sp)
+            }
+            Text(
+                "The page gives the names and the amounts. Every calorie still comes from a food " +
+                    "record, so each line is matched against the database before it counts.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+            )
+        }
+    }
+}
+
+/** The lines an import found that nobody has dealt with yet. */
+@Composable
+private fun FromThePage(vm: HealthViewModel) {
+    val c = Pulse.colors
+    val state by vm.recipeImport.collectAsStateWithLifecycle()
+    if (state.lines.isEmpty()) return
+
+    LcarsFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "FROM THE PAGE",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent,
+            )
+            if (state.summary.isNotBlank()) {
+                Text(
+                    state.summary,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                )
+            }
+            state.lines.forEachIndexed { i, line ->
+                val matching = state.matching == i
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            RecipeImport.describe(line),
+                            fontFamily = ChakraPetch, fontSize = 13.sp,
+                            color = if (matching) c.accent else c.ink,
+                        )
+                        Text(
+                            lineWeight(line),
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, lineHeight = 13.sp,
+                        )
+                    }
+                    Text(
+                        if (matching) "STOP" else "FIND",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                        modifier = Modifier
+                            .clickable { if (matching) vm.cancelImportedMatch() else vm.matchImported(i) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    )
+                    Text(
+                        "✕",
+                        fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted,
+                        modifier = Modifier
+                            .clickable { vm.dropImported(i) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ⚠️ **Four situations, said as four different things, and collapsing them is the easy mistake.** A
+ * volume, a count and a line the page gave no amount for every one come back with a null weight —
+ * but "needs a weight" about a line that never had an amount sends somebody hunting a number that
+ * was never there, and calling "2 onions" a volume is simply untrue.
+ */
+private fun lineWeight(line: RecipeImport.Ingredient): String {
+    val grams = line.grams
+    return when {
+        grams != null -> "${grams.roundToInt()} g"
+        line.quantity == null -> "the page gave no amount — weigh it yourself"
+        line.measure == RecipeImport.Measure.PIECE -> "counted, not weighed — say what it comes to"
+        else -> "a ${line.measure.label} is a volume, not a weight — say what it comes to"
     }
 }
 
@@ -181,7 +303,7 @@ private fun LogAHelping(vm: HealthViewModel, r: Recipes.Recipe) {
     var byServings by remember(r.id) { mutableStateOf(true) }
     var amount by remember(r.id) { mutableStateOf("1") }
     var meal by remember(r.id) { mutableStateOf(NutritionDay.Meal.DINNER) }
-    val n = amount.trim().toDoubleOrNull()
+    val n = Decimals.parse(amount)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -307,6 +429,7 @@ private fun RecipeBuilder(vm: HealthViewModel, d: Recipes.Recipe) {
                 }
             }
         }
+        item { FromThePage(vm) }
         item { FindAnIngredient(vm, meal) }
         if (d.components.isNotEmpty()) {
             item {
@@ -401,7 +524,7 @@ private fun YieldField(d: Recipes.Recipe, vm: HealthViewModel) {
             text,
             {
                 text = it
-                vm.draftYield(it.trim().toDoubleOrNull())
+                vm.draftYield(Decimals.parse(it))
             },
             placeholder = "Cooked weight in grams — leave blank if you did not weigh it",
         )
@@ -437,6 +560,7 @@ private fun FindAnIngredient(vm: HealthViewModel, meal: Boolean) {
     val search by vm.search.collectAsStateWithLifecycle()
     val picked by vm.picked.collectAsStateWithLifecycle()
     val target by vm.pickFor.collectAsStateWithLifecycle()
+    val imported by vm.recipeImport.collectAsStateWithLifecycle()
 
     LcarsFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -467,7 +591,10 @@ private fun FindAnIngredient(vm: HealthViewModel, meal: Boolean) {
                     }
                 }
             } else {
-                HowMuchWentIn(chosen, vm, meal)
+                // ⚠️ The weight the page gave, when it gave one this app can use. Null for a cup, a
+                // spoon or a count — `RecipeImport.Ingredient.grams` refuses rather than guessing a
+                // density it has no way to know, and the field then asks.
+                HowMuchWentIn(chosen, vm, meal, seedGrams = imported.current?.grams)
             }
         }
     }
@@ -475,12 +602,25 @@ private fun FindAnIngredient(vm: HealthViewModel, meal: Boolean) {
 
 /** The weight that went in, in whatever unit the food can actually express. */
 @Composable
-private fun HowMuchWentIn(food: Food, vm: HealthViewModel, meal: Boolean) {
+private fun HowMuchWentIn(food: Food, vm: HealthViewModel, meal: Boolean, seedGrams: Double? = null) {
     val c = Pulse.colors
     val units = remember(food.id) { FoodPortion.unitsFor(food.sizes) }
-    var unit by remember(food.id) { mutableStateOf(units.first()) }
-    var amount by remember(food.id) { mutableStateOf(if (unit == FoodPortion.Unit.GRAM) "100" else "1") }
-    val n = amount.trim().toDoubleOrNull()
+    // ⚠️ Keyed on the seed as well as the food, so picking the same ingredient again for a different
+    // imported line re-seeds rather than keeping the weight the previous line put there. A seeded
+    // weight is in grams by definition — it came off a mass unit on the page.
+    var unit by remember(food.id, seedGrams) {
+        mutableStateOf(if (seedGrams != null) FoodPortion.Unit.GRAM else units.first())
+    }
+    var amount by remember(food.id, seedGrams) {
+        mutableStateOf(
+            when {
+                seedGrams != null -> seedGrams.roundToInt().toString()
+                unit == FoodPortion.Unit.GRAM -> "100"
+                else -> "1"
+            },
+        )
+    }
+    val n = Decimals.parse(amount)
     val grams = n?.let { FoodPortion.gramsFor(FoodPortion.Portion(it, unit), food.sizes) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

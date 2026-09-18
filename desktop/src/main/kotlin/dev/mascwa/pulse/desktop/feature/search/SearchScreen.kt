@@ -135,7 +135,7 @@ fun SearchScreen(
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }
-                items(results, key = { it.id + it.kind.name }) { r -> ResultRow(r, onOpenGuide) }
+                items(results, key = { "res:" + it.id + it.kind.name }) { r -> ResultRow(r, onOpenGuide) }
             }
         }
     }

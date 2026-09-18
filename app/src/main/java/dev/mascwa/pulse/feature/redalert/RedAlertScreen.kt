@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +63,12 @@ fun RedAlertScreen(
     receivedAt: String,
     onAcknowledge: () -> Unit,
 ) {
-    val pulse by rememberInfiniteTransition(label = "alert").animateFloat(
+    // ⚠️ **No `by`, and the value is read in the DRAW lambda below.** A delegated read here puts the
+    // snapshot read in this composable's scope, so the whole screen — a scrolling column of a dozen
+    // Texts — recomposed on every frame of the pulse, for as long as the alert stood. That is the
+    // opposite of what an emergency takeover should do to a phone that is already struggling.
+    // `drawBehind` re-draws the bar without recomposing anything.
+    val pulse = rememberInfiniteTransition(label = "alert").animateFloat(
         initialValue = 0.30f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
@@ -81,7 +87,7 @@ fun RedAlertScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(RED.copy(alpha = pulse))
+                    .drawBehind { drawRect(RED.copy(alpha = pulse.value)) }
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -112,6 +112,33 @@ class OracleTest {
         assertNull(Oracle.divine(s.copy(movement = 0.5f)).byId("focus_task"))
     }
 
+    @Test fun `a focus moment says what it saw when the Sensorium is running`() {
+        // ⚠️ The expected sentence is built by the shipped fuser rather than typed out here, so this
+        // cannot drift into asserting a wording `describe()` no longer produces.
+        val read = EnvReading(
+            setting = EnvSetting.INDOOR, motion = MotionState.STILL,
+            noise = NoiseProfile.QUIET, light = LightState.LIT, social = SocialDensity.ALONE,
+        ).describe()
+        val s = base(hour = 14).copy(
+            pendingTasks = listOf("File the report"), movement = 0.0f, envDescription = read,
+        )
+        val ins = Oracle.divine(s).byId("focus_task")
+        assertNotNull(ins)
+        assertTrue("the ambient read is the evidence and must be shown", ins!!.detail.contains(read))
+    }
+
+    @Test fun `a focus moment reads exactly as it did when nothing is sensing`() {
+        // Sensing is a switch somebody may never turn on, so null is the ordinary case rather than a
+        // fault — and the rule has to be unchanged for them.
+        val s = base(hour = 14).copy(pendingTasks = listOf("File the report"), movement = 0.0f)
+        val ins = Oracle.divine(s).byId("focus_task")
+        assertNotNull(ins)
+        assertEquals(
+            "You're settled and clear for a bit — a solid window to get it done.",
+            ins!!.detail,
+        )
+    }
+
     @Test fun divineRanksByUrgencyThenScore() {
         val s = base(hour = 9).copy(
             emergencyHeadline = "Breaking crisis",

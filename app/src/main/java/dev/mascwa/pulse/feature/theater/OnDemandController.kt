@@ -17,7 +17,9 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.AmbientAction
 import dev.mascwa.pulse.core.telemetry.MediaFloor
+import dev.mascwa.pulse.data.sensing.AmbientHolds
 import dev.mascwa.pulse.core.telemetry.MediaItem
 import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
@@ -58,6 +60,15 @@ import kotlinx.coroutines.launch
 object OnDemandController {
 
     enum class Status { IDLE, CONNECTING, PLAYING, PAUSED, ERROR }
+
+    /**
+     * What the screen says while the Sensorium is holding video back.
+     *
+     * ⚠️ One string, read by both the refusal to start and the refusal to resume, so the two cannot
+     * come to say different things about the same hold. Its undo lives on the action itself
+     * ([AmbientAction.PAUSE_VIDEO].undo), which is what the scanner's RELEASE button renders.
+     */
+    private const val HELD_BACK = "video is on hold — the scanner will say why, and can let it go"
 
     data class OnDemandState(
         val item: MediaItem? = null,
@@ -133,6 +144,16 @@ object OnDemandController {
             _state.value = OnDemandState(item, Status.ERROR, "nothing playable in that item")
             return
         }
+        // ⚠️ Video only. The Sensorium's driving rule deliberately leaves AUDIO alone — somebody at
+        // the wheel is listening to something, and cutting it off is an actively dangerous
+        // distraction — so the hold is about pictures wanting eyes and nothing else.
+        //
+        // IDLE with a sentence rather than ERROR: nothing failed, and dressing a deliberate refusal
+        // in red would have somebody hunting a fault that is not there.
+        if (!audioOnly && AmbientHolds.isHeld(AmbientAction.PAUSE_VIDEO)) {
+            _state.value = OnDemandState(item, Status.IDLE, HELD_BACK)
+            return
+        }
         val app = context.applicationContext
         // Ask for the speaker BEFORE building anything — this is what stops the radio or live TV.
         AudioFloor.claim(app, MediaFloor.Owner.ONDEMAND)
@@ -158,9 +179,16 @@ object OnDemandController {
 
     fun resume() = runOnMain {
         val exo = player ?: return@runOnMain
-        exo.playWhenReady = true
         val s = _state.value
-        if (s.status == Status.PAUSED) _state.value = s.copy(status = Status.PLAYING)
+        // ⚠️ Blocking resume is what makes this a HOLD rather than a one-off pause. Without it the
+        // rule would pause the video and the very next tap would start it again, which is a control
+        // that fights the person rather than one that holds a situation.
+        if (!s.audioOnly && AmbientHolds.isHeld(AmbientAction.PAUSE_VIDEO)) {
+            _state.value = s.copy(detail = HELD_BACK)
+            return@runOnMain
+        }
+        exo.playWhenReady = true
+        if (s.status == Status.PAUSED) _state.value = s.copy(status = Status.PLAYING, detail = null)
     }
 
     /**

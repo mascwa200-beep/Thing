@@ -4,6 +4,7 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.FoodPortion
 import dev.mascwa.pulse.core.telemetry.Micronutrients
+import dev.mascwa.pulse.core.telemetry.NutrientSet
 import dev.mascwa.pulse.core.telemetry.NutritionDay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -113,8 +114,15 @@ class OpenFoodFactsRepository(
             throw e
         }
 
+        // ⚠️ **An unreadable answer is not "no such food".** This returned an empty page, which the
+        // screen renders as "nothing matched" — so a server sending nonsense looked exactly like a
+        // successful search for something that does not exist, and the reader would go on to type
+        // the name in three more ways. `byBarcode`, fifty lines up in this same file, already tells
+        // those two apart (`FoodLookup.Unreachable("…sent something unreadable")`); this did not.
+        // Thrown rather than returned, matching the network `catch` above, which serves the cache
+        // and then rethrows — so every caller already handles a failure from here.
         val root = runCatching { http.json.parseToJsonElement(body).jsonObject }.getOrNull()
-            ?: return FoodSearchPage(q, emptyList())
+            ?: throw IllegalStateException("Open Food Facts sent something unreadable")
         val hits = (root["hits"] as? kotlinx.serialization.json.JsonArray).orEmpty()
 
         val foods = hits.mapNotNull { hit ->
@@ -215,6 +223,7 @@ internal fun parseOffProduct(id: String, p: JsonObject): Food? {
         source = NutritionDay.Source.OPEN_FOOD_FACTS,
         imageUrl = p.str("image_small_url"),
         micros = offMicros(n),
+        extras = offExtras(n),
     )
 }
 
@@ -237,6 +246,26 @@ internal fun parseOffProduct(id: String, p: JsonObject): Food? {
  * publish nothing at all. "Contains none" and "nobody measured" are different things to sum into a
  * day's total.
  */
+/**
+ * The further nutrients this record carries.
+ *
+ * ⚠️ **The field list is not written down here — it comes from the declaration.** Each nutrient
+ * knows its own Open Food Facts column, and the offline database's builder reads that same
+ * declaration, so the network path and the bundled path cannot end up looking at different columns.
+ * That divergence is exactly the defect this project corrected when the network lookup was found to
+ * be dropping micronutrients the offline one kept.
+ *
+ * ⚠️ Open Food Facts publishes every one of these in GRAMS, as it does the micronutrients above;
+ * [NutrientSet.fromGrams] is the one conversion into the unit each is stored in.
+ */
+private fun offExtras(n: JsonObject): NutrientSet.Amounts {
+    val m = LinkedHashMap<NutrientSet.Nutrient, Double>()
+    for (nutrient in NutrientSet.Nutrient.entries) {
+        NutrientSet.fromGrams(nutrient, n.num("${nutrient.offField}_100g"))?.let { m[nutrient] = it }
+    }
+    return NutrientSet.Amounts(m)
+}
+
 private fun offMicros(n: JsonObject): Micronutrients.Amounts {
     val m = LinkedHashMap<Micronutrients.Micro, Double>(8)
     fun put(k: Micronutrients.Micro, field: String) {

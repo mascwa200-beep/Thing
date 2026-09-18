@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -81,7 +82,25 @@ class AuditLedgerStore(
     private val mutex = Mutex()
     private var chain: HashChain? = null
 
-    /** A stored blob existed but couldn't be read — refuse to flush so we never clobber the evidence. */
+    /**
+     * A stored blob existed but couldn't be read — refuse to flush so we never clobber the evidence.
+     *
+     * ⚠️ **Refusing to write is right; saying nothing about it was the defect.** This flag made the
+     * store silently unwritable for the life of the install, while [verify] ran over the *empty
+     * replacement* chain and answered "intact" — so both surfaces reported the record was fine at
+     * exactly the moment every prior entry had become invisible and every new one was going nowhere.
+     * It is surfaced by [health] now, and the two readouts lead with it.
+     *
+     * ⚠️ **And it is retried rather than latched.** `SecretCrypto` can fail transiently — a secure
+     * element not yet ready at early boot looks identical to a key that has genuinely changed — and
+     * latching turned a moment's failure into a permanent one. [flush] re-attempts the decode, and on
+     * success re-appends whatever was recorded meanwhile onto the recovered chain, which relinks
+     * cleanly because [HashChain.append] computes the link from the head it is given.
+     *
+     * ⚠️ Deliberately NOT quarantined-and-resumed. Moving the unreadable blob aside and starting a new
+     * chain would restore writing at the cost of forking the record on a failure that may be transient,
+     * which is the worse trade for a log whose whole value is that it is one unbroken chain.
+     */
     private var corrupt = false
 
     // The head signature as it was last persisted — checked by [headSignatureValid] (proof the on-disk
@@ -111,30 +130,74 @@ class AuditLedgerStore(
         hash = hash,
     )
 
+    /** Decode a stored blob, or null if it is present and unreadable. Callers hold [mutex]. */
+    private fun decode(raw: String): Stored? {
+        val plain = if (SecretCrypto.isEncrypted(raw)) SecretCrypto.decrypt(raw) else raw
+        return plain?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
+    }
+
+    /** Adopt a decoded blob's chain and its seals. Callers hold [mutex]. */
+    private fun adopt(parsed: Stored): HashChain =
+        HashChain(parsed.entries.map { it.domain() }).also { c ->
+            loadedHeadHash = c.headHash
+            loadedHeadSig = parsed.headSig?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
+            loadedSpki = parsed.publicKeySpki?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
+            anchorTokenB64 = parsed.anchorTokenB64
+            anchorGenTimeMs = parsed.anchorGenTimeMs
+            anchorHeadHash = parsed.anchorHeadHash
+        }
+
     private suspend fun ensureLoaded(): HashChain = mutex.withLock {
-        chain ?: run {
+        chain ?: withContext(Dispatchers.IO) {
             val raw = context.blackboxDataStore.data.first()[prefsKey]
             val loaded = if (raw == null) {
                 HashChain() // no prior ledger — start fresh
             } else {
-                val plain = if (SecretCrypto.isEncrypted(raw)) SecretCrypto.decrypt(raw) else raw
-                val parsed = plain?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
+                val parsed = decode(raw)
                 if (parsed == null) {
                     corrupt = true // blob present but unreadable → preserve, don't overwrite
                     HashChain()
                 } else {
-                    HashChain(parsed.entries.map { it.domain() }).also { c ->
-                        loadedHeadHash = c.headHash
-                        loadedHeadSig = parsed.headSig?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
-                        loadedSpki = parsed.publicKeySpki?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
-                        anchorTokenB64 = parsed.anchorTokenB64
-                        anchorGenTimeMs = parsed.anchorGenTimeMs
-                        anchorHeadHash = parsed.anchorHeadHash
-                    }
+                    adopt(parsed)
                 }
             }
             loaded.also { chain = it; _entriesFlow.value = it.entries() }
         }
+    }
+
+    /**
+     * What the ledger can honestly say about itself.
+     *
+     * ⚠️ **One answer, because there were two composers of it and they had already drifted** — the
+     * Settings row said "Intact" where the Memory screen said "chain intact", and neither of them
+     * could say anything at all about [unreadable], which is the one state that matters most. The two
+     * surfaces still word it for themselves; what they no longer do is each decide what the facts are.
+     */
+    data class Health(
+        /** The stored record is present and could not be read; nothing new is being written. */
+        val unreadable: Boolean,
+        /** Entries recorded since, which are in memory only while [unreadable] holds. */
+        val unwritten: Int,
+        val verification: VerificationResult,
+        val signatureValid: Boolean?,
+        val anchorMs: Long?,
+    )
+
+    /** The whole readout in one pass, so a surface cannot report half of it. */
+    suspend fun health(): Health {
+        val chain = ensureLoaded()
+        // ⚠️ One lock for the facts that have to agree with each other: taken per field it could
+        // report the record as readable and its entries as unwritten, or the reverse. An empty
+        // ledger that could not be read is still unreadable, which is why the flag is carried
+        // rather than inferred from a count.
+        val snap = mutex.withLock { Triple(corrupt, chain.size, chain.verify()) }
+        return Health(
+            unreadable = snap.first,
+            unwritten = if (snap.first) snap.second else 0,
+            verification = snap.third,
+            signatureValid = headSignatureValid(),
+            anchorMs = anchorTimeMs(),
+        )
     }
 
     /**
@@ -193,7 +256,10 @@ class AuditLedgerStore(
             anchorGenTimeMs = token.genTimeMs
             anchorHeadHash = head
         }
-        flushNow() // persist the anchor immediately
+        // ⚠️ Caught, because this function's own contract two paragraphs up is that it is fully
+        // defensive and answers with a boolean. [flushNow] now rethrows a failed write so app-stop
+        // can report one; letting that escape here would break a promise a periodic worker relies on.
+        runCatching { flushNow() } // persist the anchor immediately
         return true
     }
 
@@ -227,9 +293,27 @@ class AuditLedgerStore(
     }
 
     /** Force buffered changes to disk now (e.g. on app stop). */
+    /**
+     * The outcome of the most recent write, so an explicit [flushNow] can report a failure it would
+     * otherwise swallow.
+     *
+     * ⚠️ **Both callers of [flushNow] already wrap it in a reporter that could never fire.** Every
+     * store of this shape catches its own DataStore edit and discards the `Result`, so the "the
+     * store could not be written to disk; anything recorded since is lost" report in `MainActivity`
+     * and `NutritionContainer` was structurally unreachable — a claim in a KDoc that nothing could
+     * make true. The debounced background flush still swallows, deliberately: an exception thrown
+     * there escapes into a launched coroutine and takes the process with it.
+     */
+    @Volatile
+    private var lastWrite: Result<*>? = null
+
     suspend fun flushNow() {
         flushJobCancel()
+        // ⚠️ Cleared first: [flush] returns early when nothing is owed, and a stale failure
+        // from an earlier write would then be reported against a write no longer outstanding.
+        lastWrite = null
         flush()
+        lastWrite?.getOrThrow()
     }
 
     private var flushJob: Job? = null
@@ -255,8 +339,39 @@ class AuditLedgerStore(
         val anchorHeadHash: String?,
     )
 
+    /**
+     * One more attempt at a blob that would not decode, before refusing to write over it.
+     *
+     * ⚠️ **A latched failure is a permanent one, and a decrypt failure need not be permanent.**
+     * `SecretCrypto` reaches a secure element; one not yet ready looks exactly like a key that has
+     * genuinely changed, and the difference only shows on a second attempt. Anything recorded
+     * meanwhile is re-appended onto the recovered chain — which relinks correctly because
+     * [HashChain.append] takes its `prevHash` from the head it is given, so the result is one
+     * unbroken chain in time order rather than two.
+     *
+     * Returns true when the store is writable. Callers hold no lock.
+     */
+    private suspend fun recoverIfPossible(): Boolean = mutex.withLock {
+        if (!corrupt) return@withLock true
+        val raw = withContext(Dispatchers.IO) { context.blackboxDataStore.data.first()[prefsKey] } ?: run {
+            // The blob is gone (cleared elsewhere): there is nothing left to protect.
+            corrupt = false
+            return@withLock true
+        }
+        val parsed = withContext(Dispatchers.IO) { decode(raw) } ?: return@withLock false
+        val pending = chain?.entries().orEmpty()
+        val recovered = adopt(parsed)
+        for (e in pending) recovered.append(e.timeMs, e.type, e.label, e.detail)
+        chain = recovered
+        corrupt = false
+        _entriesFlow.value = recovered.entries()
+        true
+    }
+
     private suspend fun flush() {
-        if (corrupt) return // never overwrite an undecodable blob
+        // ⚠️ Never overwrite an undecodable blob — but try to read it once more first, or a moment's
+        // failure becomes a ledger that never writes again for the life of the install.
+        if (!recoverIfPossible()) return
         // Snapshot head + entries + anchor under the lock; sign outside it (Keystore I/O is comparatively slow).
         val snap = mutex.withLock {
             chain?.let { c ->
@@ -264,7 +379,9 @@ class AuditLedgerStore(
             }
         } ?: return
         val head = snap.head
-        val sig = signer?.sign(LedgerSignature.headBytes(head))
+        // ⚠️ On IO because it is a secure-element round trip, which is what the comment above the
+        // snapshot already says about it — it was simply never on a thread that suited it.
+        val sig = withContext(Dispatchers.IO) { signer?.sign(LedgerSignature.headBytes(head)) }
         val spki = sig?.let { signer?.publicKeySpki() } // only emit a key when we actually produced a signature
         val snapshot = Stored(
             entries = snap.entries,
@@ -274,14 +391,16 @@ class AuditLedgerStore(
             anchorGenTimeMs = snap.anchorGenTimeMs,
             anchorHeadHash = snap.anchorHeadHash,
         )
-        runCatching {
-            val plain = json.encodeToString(Stored.serializer(), snapshot)
-            val blob = SecretCrypto.encrypt(plain) ?: plain // plaintext fallback if no secure element
-            context.blackboxDataStore.edit { it[prefsKey] = blob }
-            // Track what's now sealed on disk so headSignatureValid() reflects the latest flush this session.
-            loadedHeadHash = head
-            loadedHeadSig = sig
-            loadedSpki = spki
+        lastWrite = withContext(Dispatchers.IO) {
+            runCatching {
+                val plain = json.encodeToString(Stored.serializer(), snapshot)
+                val blob = SecretCrypto.encrypt(plain) ?: plain // plaintext fallback if no secure element
+                context.blackboxDataStore.edit { it[prefsKey] = blob }
+                // Track what's now sealed on disk so headSignatureValid() reflects the latest flush this session.
+                loadedHeadHash = head
+                loadedHeadSig = sig
+                loadedSpki = spki
+            }
         }
     }
 

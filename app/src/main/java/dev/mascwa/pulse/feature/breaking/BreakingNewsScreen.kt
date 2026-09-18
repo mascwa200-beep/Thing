@@ -6,6 +6,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -94,7 +96,9 @@ fun BreakingNewsScreen(
 
     // Pulsing LIVE dot + a ticking clock for the "instant/live" feel.
     val inf = rememberInfiniteTransition(label = "live")
-    val pulse by inf.animateFloat(
+    // ⚠️ Read in the draw and layer phases below, never here — see `RedAlertScreen` for the same
+    // note. This is the other full-screen takeover, and it has the same reason to stay cheap.
+    val pulse = inf.animateFloat(
         0.25f, 1f, infiniteRepeatable(tween(650), RepeatMode.Reverse), label = "pulse",
     )
     var nowMs by remember { mutableStateOf(0L) }
@@ -116,7 +120,7 @@ fun BreakingNewsScreen(
             Modifier.fillMaxWidth().background(RED).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White.copy(alpha = pulse)))
+            Box(Modifier.size(9.dp).drawBehind { drawCircle(Color.White.copy(alpha = pulse.value)) })
             Spacer(Modifier.width(8.dp))
             Text(
                 "BREAKING NEWS",
@@ -124,8 +128,10 @@ fun BreakingNewsScreen(
                 letterSpacing = 2.sp, color = Color.White,
             )
             Spacer(Modifier.weight(1f))
+            // `graphicsLayer`'s lambda form defers the read to the layer phase, and alpha on a layer of
+            // white text is the same picture as white text at that alpha.
             Text("● LIVE", fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = pulse))
+                color = Color.White, modifier = Modifier.graphicsLayer { alpha = pulse.value })
             Spacer(Modifier.width(10.dp))
             Text(
                 "✕",
@@ -224,8 +230,10 @@ private fun LiveTakeover() {
     }
 }
 
-private fun isTrusted(source: String): Boolean =
-    BreakingCoverageRepository.TRUSTED.any { source.lowercase().contains(it) }
+// ⚠️ This file used to restate the trust rule itself — `TRUSTED.any { source.lowercase()... }` —
+// alongside an identical copy in the repository. Two statements of one rule is how they drift, so
+// the judgement now lives once, on the companion, and this is a delegation rather than a copy.
+private fun isTrusted(source: String): Boolean = BreakingCoverageRepository.isTrusted(source)
 
 @Composable
 private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {

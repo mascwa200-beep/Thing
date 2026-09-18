@@ -102,6 +102,15 @@ class HealthTool(
         return buildString {
             append(BodyTrend.trendSentence(latest, unit))
             append("\n").append(BodyTrend.rateSentence(latest, unit, estimated.hasRate))
+            // ⚠️ Only when a goal is set, and off `state.goalProjection` rather than divided out
+            // here. "When will I reach my goal" is the question somebody is most likely to ask out
+            // loud rather than go and look for, so the assistant answering it matters — but the
+            // arithmetic has cases that must not be performed (a rate whose interval spans zero has
+            // no bounded arrival), and a second copy of that judgement here is exactly the drift the
+            // note above records happening to the rate line.
+            if (state.profile.goalKg > 0.0) {
+                append("\n").append(state.goalProjection.sentence)
+            }
             append("\n").append(expenditureLine(state))
         }
     }

@@ -9,9 +9,11 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.TimeZone
 
 /**
  * Live government emergency alerts for one point, fetched fresh every time.
@@ -33,10 +35,6 @@ import java.util.TimeZone
  */
 class EmergencyAlertRepository(private val http: HttpClient) {
 
-    private val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-    private val isoZ = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
-    }
 
     /**
      * Every active official alert covering this point, newest first.
@@ -76,9 +74,32 @@ class EmergencyAlertRepository(private val http: HttpClient) {
         }.sortedByDescending { it.effectiveMs }
     }.getOrDefault(emptyList())
 
+    /**
+     * A CAP timestamp to epoch millis, or 0 when it cannot be read.
+     *
+     * ⚠️ **`java.time`, not `SimpleDateFormat`, and this is the same defect `SafetyRepository`
+     * already carried.** A `SimpleDateFormat` keeps a mutable `Calendar` inside it, so a shared one
+     * is not thread-safe — and this repository is a singleton with two independent callers on
+     * different schedules and different threads: `BriefEngine.publish`, which runs from the
+     * background worker, and `EmergencyWatchService.sweep`, which polls on its own IO scope every
+     * sixty seconds. Concurrent `parse` on one instance does not merely throw; it can return a time
+     * assembled from two different strings. On this path that is an expired warning shown as
+     * current, or a live one dropped. `DateTimeFormatter` is immutable and safe to share.
+     *
+     * ⚠️ It also removes a wrong-by-hours fallback. The old pattern rejected fractional seconds, so
+     * `2026-08-28T14:30:00.000-05:00` fell through to the offset-less branch, which reads the first
+     * nineteen characters AS UTC — five hours out, silently. `ISO_OFFSET_DATE_TIME` accepts the
+     * fractional form, so that branch is now reached only by a string that genuinely states no zone,
+     * which is the one case where reading it as UTC is the documented intent rather than an accident.
+     */
     private fun parseIso(s: String?): Long {
         if (s.isNullOrBlank()) return 0L
-        return runCatching { iso.parse(s)?.time }.getOrNull()
-            ?: runCatching { isoZ.parse(s.take(19))?.time }.getOrNull() ?: 0L
+        runCatching { OffsetDateTime.parse(s, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant().toEpochMilli() }
+            .getOrNull()?.let { return it }
+        // No zone stated: read it as UTC, as the previous implementation did.
+        return runCatching {
+            LocalDateTime.parse(s.take(19), DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .toInstant(ZoneOffset.UTC).toEpochMilli()
+        }.getOrDefault(0L)
     }
 }

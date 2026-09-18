@@ -13,7 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,49 +62,56 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
         title = ""; body = ""; mood = ""; editingId = null
     }
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        // ---- NEW ENTRY ----
-        LcarsHeaderBar(if (editingId == null) "New Entry" else "Edit Entry")
-        LcarsFrame(Modifier.fillMaxWidth()) {
-            Column {
-                DiaryField(title, { title = it }, "Title (optional)", c)
-                Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    DiaryField(body, { body = it }, "How did it go? What's on your mind…", c, single = false)
-                }
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    vm.moods.forEach { m ->
-                        MoodChip(if (m.isBlank()) "—" else m, selected = m == mood, c = c) { mood = m }
+    // ⚠️ Lazy for the same reason `NotesBody` is: `DiaryStore` deliberately has no cap, so the
+    // journal is as long as the person has been keeping one, and a scrolling `Column` composes every
+    // entry of it before the first frame. The composer is the first item so the scroll behaves
+    // exactly as it did; its text lives in this function's `remember`s and `DiaryField` is stateless,
+    // so scrolling it out of the viewport loses nothing.
+    LazyColumn(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        item(key = "diary:composer") {
+            // ---- NEW ENTRY ----
+            LcarsHeaderBar(if (editingId == null) "New Entry" else "Edit Entry")
+            LcarsFrame(Modifier.fillMaxWidth()) {
+                Column {
+                    DiaryField(title, { title = it }, "Title (optional)", c)
+                    Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        DiaryField(body, { body = it }, "How did it go? What's on your mind…", c, single = false)
                     }
-                }
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier
-                            .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-                            .clickable {
-                                if (title.isNotBlank() || body.isNotBlank()) {
-                                    val id = editingId
-                                    if (id == null) vm.add(title, body, mood)
-                                    else vm.update(id, title, body, mood)
-                                    clearComposer()
-                                }
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            if (editingId == null) "▸ SAVE ENTRY" else "▸ SAVE CHANGES",
-                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                            letterSpacing = 1.5.sp, color = c.accent,
-                        )
+                        vm.moods.forEach { m ->
+                            MoodChip(if (m.isBlank()) "—" else m, selected = m == mood, c = c) { mood = m }
+                        }
                     }
-                    if (editingId != null) {
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(
-                            Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                            Modifier
+                                .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                                .clickable {
+                                    if (title.isNotBlank() || body.isNotBlank()) {
+                                        val id = editingId
+                                        if (id == null) vm.add(title, body, mood)
+                                        else vm.update(id, title, body, mood)
+                                        clearComposer()
+                                    }
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                         ) {
-                            Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
+                            Text(
+                                if (editingId == null) "▸ SAVE ENTRY" else "▸ SAVE CHANGES",
+                                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                                letterSpacing = 1.5.sp, color = c.accent,
+                            )
+                        }
+                        if (editingId != null) {
+                            Box(
+                                Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) {
+                                Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
+                            }
                         }
                     }
                 }
@@ -112,15 +120,17 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
 
         // ---- JOURNAL (newest first) ----
         if (entries.isEmpty()) {
-            Text(
-                "No entries yet — write one above, or ask the computer to journal for you. Everything " +
-                    "stays on this device.",
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
-            )
+            item(key = "diary:empty") {
+                Text(
+                    "No entries yet — write one above, or ask the computer to journal for you. " +
+                        "Everything stays on this device.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+                )
+            }
         } else {
-            LcarsHeaderBar("Journal", trailing = entries.size.toString())
-            entries.forEach { entry ->
+            item(key = "diary:head") { LcarsHeaderBar("Journal", trailing = entries.size.toString()) }
+            items(entries, key = { "diary:row:" + it.id }) { entry ->
                 EntryRow(
                     entry, c,
                     editing = entry.id == editingId,
@@ -136,13 +146,15 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
                     },
                 )
             }
-            Box(
-                Modifier.padding(top = 14.dp, bottom = 28.dp)
-                    .border(1.dp, c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-                    .clickable { vm.clear() }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-            ) {
-                Text("CLEAR DIARY", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted)
+            item(key = "diary:clear") {
+                Box(
+                    Modifier.padding(top = 14.dp, bottom = 28.dp)
+                        .border(1.dp, c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                        .clickable { vm.clear() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text("CLEAR DIARY", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted)
+                }
             }
         }
     }

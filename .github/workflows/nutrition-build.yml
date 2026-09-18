@@ -1,0 +1,526 @@
+name: Nutrition Build
+
+# ⚠️ **The run TITLE carries the instruction, because it is the one surface no client hides.**
+# A step summary is written by this workflow and by `setup-gradle`, and a phone screenshot showed
+# NEITHER of them rendering — the run page went jobs-graph → Annotations → Artifacts with no summary
+# anywhere. Two independent summaries missing is the tell that the client does not display them at
+# all, so nothing written into one can be relied on to arrive. The run name shows on the run page, in
+# the runs list and in the mobile app.
+#
+# ⚠️ `run-name` may only reference `github`, `inputs` and `vars` — not secrets, not job outputs — so
+# this is a static string plus the run number, which is all it needs to be.
+run-name: "Nutrition #${{ github.run_number }} — install from Releases ▸ nutrition-latest"
+
+# The standalone nutrition app: the health half of the LCARS application with none of its novelty,
+# its device gate or its native code.
+#
+# ⚠️ **A PATH ALLOWLIST, not "every push".** The LCARS workflow builds on everything because that is
+# the application under continuous work; this one produces a ~150 MB artifact from a much smaller
+# surface, and running it on a news-screen commit would publish an identical APK for nothing. The
+# list is what this module actually reads: itself, the two shared modules, the food-database builder
+# and the declarations it parses, and the build wiring.
+on:
+  push:
+    branches:
+      - "**"
+      - "!debug-reports"
+    paths:
+      - "nutrition/**"
+      - "core/telemetry/**"
+      - "core/feeds/**"
+      - "core/health/**"
+      - "core/database/**"
+      # ⚠️ Added when the self-update path moved here. A change to the green gate or the
+      # installer ladder that did not rebuild this app would leave the two disagreeing about
+      # when a build is safe to install, which is the exact thing sharing the module prevents.
+      - "core/update/**"
+      # ⚠️ The camera and both barcode decoders. A change to the decode path that did not rebuild
+      # this app would leave the scanner it belongs to on the previous one.
+      - "core/scan/**"
+      - "tools/food/**"
+      - "gradle/libs.versions.toml"
+      - "settings.gradle.kts"
+      - "build.gradle.kts"
+      # ⚠️ Missed when this list was written, and it cost a verification: the heap ceiling that
+      # this module's `compressReleaseAssets` ran out of lives in `gradle.properties`, so raising
+      # it would not have rebuilt the app whose failure it was fixing. Everything in that file —
+      # the daemon's memory, parallelism, the build cache, AndroidX — applies to every module in
+      # the tree, and the wrapper decides which Gradle runs at all. Same shape as the desktop
+      # workflow's filter not naming a directory it genuinely reads.
+      - "gradle.properties"
+      - "gradle/wrapper/**"
+      - ".github/workflows/nutrition-build.yml"
+
+  # ⚠️ **Without this the corpus only grows when somebody happens to push in a new month.** The cache
+  # key expires monthly (see "Stamp the source window"), but an expired key rebuilds nothing until a
+  # run starts — so on a quiet month the newest barcodes would simply never be fetched. This is what
+  # makes "keep adding barcodes" a property of the calendar rather than of the commit log.
+  #
+  # ⚠️ The 4th rather than the 1st, and a minute that is not zero: the Open Food Facts export is
+  # rebuilt daily and a job starting the instant a month turns over is a job racing whatever is
+  # regenerating it. A scheduled run fires on the DEFAULT branch only, which is where a published
+  # pack should come from anyway.
+  schedule:
+    - cron: "17 5 4 * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ⚠️ Its own group. Sharing the LCARS workflow's would make each cancel the other's in-flight run on
+# a commit that touches both, and the two produce different artifacts.
+concurrency:
+  group: nutrition-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Stamp the source window
+        id: sources
+        # ⚠️ **This is what makes new barcodes actually arrive, and without it nothing ever changes.**
+        # The Open Food Facts export at that URL is rebuilt daily, but the cache key hashed only the
+        # BUILDER — so once a database was cached it was restored for ever and the corpus was frozen
+        # at whatever day it was first built. "Keep adding barcodes" was structurally impossible.
+        #
+        # A calendar month in the key is what expires it. ⚠️ Monthly rather than weekly, deliberately
+        # and only for now: until the publisher emits deltas, every rebuild that changes the content
+        # means a fresh ~160 MB download offered to the phone, and a card asking for that every week
+        # is a card people learn to dismiss. Weekly becomes the right answer the day deltas land.
+        #
+        # ⚠️ **The whole cache key is emitted here, so the restore and the save cannot drift.** They
+        # have to be two separate steps — see the save step below — and two copies of a three-file
+        # `hashFiles` plus a salt is a key that will one day differ by a character, at which point
+        # every run rebuilds from 1.7 GB and reports success while doing it.
+        run: |
+          w=$(date -u +%Y-%m)
+          echo "window=$w" >> "$GITHUB_OUTPUT"
+          # ⚠️ ONE line, and it has to be. This is a literal block scalar, so a newline inside an
+          # expression would be a real newline in the value written to $GITHUB_OUTPUT — which is a
+          # line-oriented file, so the key would arrive truncated and every run would miss the cache.
+          #
+          # ⚠️ **And this comment may not SHOW an empty expression either, which cost two runs.** A
+          # `#` line inside a `run:` block is a comment to the SHELL and not to GitHub: expressions
+          # are substituted before the script exists, so an empty one here is a syntax error in the
+          # workflow itself. Both runs that carried it produced zero jobs — no log, no failing step,
+          # nothing to read but "failure" — which is what an invalid workflow looks like.
+          echo "key=food-db-${{ hashFiles('tools/food/build_food_db.py', 'tools/food/nutrient_set.py', 'core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NutrientSet.kt') }}-$w-usda20260430" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the food database
+        id: fooddb
+        # ⚠️ **`cache/restore` rather than `cache`, and the save is a separate step below.** The
+        # composite action declares `post-if: success()` — read out of its own `action.yml`, not
+        # recalled — so a job that fails ANY later step never saves. Run 134 built the database in
+        # eight minutes after a quarter of an hour of downloading, published the pack from it, and
+        # then threw the file away because a one-line Kotlin error failed the APK four minutes later.
+        # The next run started again from nothing. Splitting the two banks the artefact the moment it
+        # exists, which is the only moment its correctness has anything to do with the rest of the job.
+        uses: actions/cache/restore@v4
+        with:
+          # ⚠️ **`app/…`, NOT `nutrition/…`, even though this workflow packages the nutrition APK,
+          # and getting this wrong ships a broken artifact greenly.** A cache archive records the
+          # paths it was saved FROM, so a key saved by the LCARS workflow restores to
+          # `app/src/main/assets/food/food.db` wherever it is restored. Declaring a different path
+          # here reports a cache HIT and leaves nothing at that path — and a build step gated on
+          # `cache-hit` would then skip, and the APK would ship with no database at all. The copy
+          # step below is what puts it where this module packages it.
+          path: app/src/main/assets/food/food.db
+          # ⚠️ **Deliberately the SAME key the LCARS workflow uses**, so the two share one cached
+          # database rather than each spending a quarter of an hour downloading 1.7 GB to build a
+          # byte-identical file. Caches are repository-scoped, so whichever workflow builds it first
+          # saves it for the other. The key is about the CONTENT, and the content is the same.
+          #
+          # ⚠️ Every file the builder reads is hashed, including `NutrientSet.kt` — see the same
+          # comment in android-build.yml for why the builder alone was not enough. The expression
+          # itself is in the stamp step above, so this and the save below read one value.
+          key: ${{ steps.sources.outputs.key }}
+
+      - name: Build the food database
+        # ⚠️ Gated on the FILE existing, not on `steps.fooddb.outputs.cache-hit`. A restore that
+        # reports a hit and produces no file at the path we asked about is exactly the failure the
+        # note above describes, and asking about the artefact rather than the cache's opinion of
+        # itself is immune to the whole class.
+        if: hashFiles('app/src/main/assets/food/food.db') == ''
+        # Not a hard gate, for the same reason as the LCARS workflow: this reaches two servers
+        # neither of us controls. Without the bundle `FoodDatabase.open` returns null, the app says
+        # so on its own first screen, and everything else still works.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # ⚠️ **Printed because the run before this one died in this step with no log and no
+          # failing command.** `continue-on-error` is set, so a builder that crashed would have been
+          # swallowed and the job would have carried on to the APK — it did not, which means the
+          # runner itself went away rather than the script failing. That is what running out of a
+          # system resource looks like, and nothing recorded which one. These three lines make the
+          # next occurrence say so instead of leaving it to inference.
+          echo "--- before ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
+          work=/tmp/fooddb
+          mkdir -p "$work" app/src/main/assets/food
+
+          OFF=https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+          # ⚠️ _csv_, NOT _json_ — the builder parses branded_food.csv, and the json archive holds
+          # one enormous JSON member instead. Getting that wrong once shipped a database missing the
+          # entire USDA merge, and still reported success.
+          USDA=https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2026-04-30.zip
+
+          for pair in "OFF:$OFF:off.csv.gz" "USDA:$USDA:usda_branded.zip"; do
+            label=${pair%%:*}; rest=${pair#*:}; url=${rest%:*}; name=${rest##*:}
+            echo "fetching $label…"
+            # ⚠️ Moved into place only on success. A half-downloaded source is worse than a missing
+            # one: the builder reads it, hits a truncated stream part way through, and produces a
+            # database that looks complete and silently stops.
+            if curl -fSL --retry 3 --retry-delay 10 --max-time 1800 -o "$work/$name.part" "$url"; then
+              mv "$work/$name.part" "$work/$name"
+              echo "  $label: $(du -h "$work/$name" | cut -f1)"
+            else
+              rm -f "$work/$name.part"
+              echo "::warning::could not fetch $label — the database will be built without it"
+            fi
+          done
+
+          # ⚠️ `/usr/bin/time -v` reports PEAK resident memory, which is the number that
+          # matters here: the USDA merge holds every branded item in one dict while it makes
+          # three passes over the archive, so this builder's footprint is dominated by one
+          # structure and that structure grows with every column added to it.
+          # ⚠️ Guarded, because a DIAGNOSTIC that can break the build is worse than none:
+          # `/usr/bin/time` is a package rather than the shell builtin, and if a future
+          # runner image drops it an unguarded invocation would fail the whole step.
+          TIMER=""; [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
+          if $TIMER python3 tools/food/build_food_db.py --work "$work" --out app/src/main/assets/food/food.db 2> >(tee /tmp/fooddb-time.log >&2); then
+            echo "food.db: $(du -h app/src/main/assets/food/food.db | cut -f1)"
+          else
+            echo "::warning::the food database did not build — this APK ships without offline barcodes"
+            rm -f app/src/main/assets/food/food.db
+          fi
+          rm -rf "$work"
+          echo "--- after ---"; df -h / /mnt 2>/dev/null | sed "s/^/    /"; free -m | sed "s/^/    /"
+          grep -E "Maximum resident set size|Elapsed .wall clock" /tmp/fooddb-time.log 2>/dev/null | sed "s/^/    /" || true
+
+      - name: Bank the food database
+        # ⚠️ **Immediately after it is built, not at the end of the job.** See the restore step for
+        # what the composite action's `post-if: success()` costs; this is the half that fixes it.
+        #
+        # ⚠️ Gated on the FILE, like the build step, rather than on the cache action's opinion of
+        # itself — and `always()` so a save still happens if something between here and the end
+        # fails, which is the entire point. A save on a key that already exists logs a warning and
+        # carries on, so a restored-then-re-saved database is noisy rather than broken.
+        if: always() && hashFiles('app/src/main/assets/food/food.db') != '' && steps.fooddb.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: app/src/main/assets/food/food.db
+          key: ${{ steps.sources.outputs.key }}
+
+      # ⚠️ **The step that used to sit here copied the 425 MB database into this module's assets, and
+      # deleting it is the point of the change.** The APK was 189,972,281 bytes and almost all of it
+      # was that one file — and the in-app updater downloads the WHOLE APK on every published build,
+      # so adding barcodes meant re-downloading the entire corpus every time a line of interface code
+      # changed. It is published as a separate pack below and fetched once by the app.
+      #
+      # ⚠️ The LCARS application still bundles it, deliberately: the cache path IS its asset directory
+      # and nothing here touches that. Moving both at once would be a behaviour change on a daily
+      # driver that nobody asked for. `FoodDatabase.open` handles either.
+
+      - name: Prepare the food-database pack
+        id: pack
+        if: hashFiles('app/src/main/assets/food/food.db') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          db=app/src/main/assets/food/food.db
+          api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+
+          # ⚠️ **Gated on the CONTENT, not on the run number.** The database is rebuilt only when the
+          # builder or a source date changes — every other run restores a byte-identical file from the
+          # cache — so publishing per run would upload 160 MB and mint a new version for a corpus that
+          # had not moved, and every phone would then download it again for nothing.
+          sha=$(sha256sum "$db" | cut -d" " -f1)
+          short=${sha:0:16}
+          published=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$api/releases/tags/food-db-latest" 2>/dev/null | jq -r ".name // \"\"" 2>/dev/null || true)
+          echo "database content: $short"
+          echo "published:        ${published:-(nothing yet)}"
+          if printf "%s" "$published" | grep -q "content $short"; then
+            echo "the published pack already holds this database — nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ⚠️ Read out of the Kotlin source rather than written here, so the number the app checks
+          # and the number the pack declares cannot drift. A pack whose schema does not match is
+          # refused by `FoodPack.plan`, which is exactly the silent-mismatch this prevents.
+          schema=$(grep -oP "const val SCHEMA: Int = \K[0-9]+" \
+            core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/FoodPack.kt)
+          if [ -z "$schema" ]; then
+            echo "::error::could not read FoodPack.SCHEMA — refusing to publish a pack with a guessed one"
+            exit 1
+          fi
+
+          # ⚠️ **python3, not `sqlite3`, and the count is a HARD requirement.** Running this step
+          # against a throwaway database found that `sqlite3` is not installed everywhere and the
+          # `|| echo 0` that used to be here swallowed it — producing a manifest that said "0
+          # products" for a corpus of four and a half million, which the app renders as the sentence
+          # asking somebody to allow a 160 MB download. python3 carries the sqlite3 module and is
+          # already what builds this database, so the count is now testable off the runner too.
+          rows=$(python3 -c "
+          import sqlite3, sys
+          print(sqlite3.connect(sys.argv[1]).execute('SELECT COUNT(*) FROM food').fetchone()[0])
+          " "$db" 2>/dev/null || echo 0)
+          if [ "${rows:-0}" -le 0 ]; then
+            echo "::error::could not count the products in $db — refusing to publish a pack that " \
+                 "would tell people it holds none"
+            exit 1
+          fi
+          mkdir -p /tmp/pack
+          # ⚠️ A STABLE asset name, so each publish replaces the last rather than leaving a release
+          # holding every 160 MB pack ever built. The version lives in the manifest, which is what the
+          # app reads. Deltas, when they exist, will be versioned — they are additive by nature.
+          gzip -c "$db" > /tmp/pack/food.db.gz
+          gzbytes=$(stat -c%s /tmp/pack/food.db.gz)
+          gzsha=$(sha256sum /tmp/pack/food.db.gz | cut -d" " -f1)
+          dbbytes=$(stat -c%s "$db")
+          v=${{ github.run_number }}
+
+          jq -n \
+            --argjson schema "$schema" --argjson version "$v" \
+            --arg builtAt "$(date -u +%Y-%m-%d)" --argjson rows "$rows" \
+            --argjson bytes "$gzbytes" --arg sha "$gzsha" --argjson unpacked "$dbbytes" \
+            '{schema:$schema, version:$version, builtAt:$builtAt, rows:$rows,
+              full:{name:"food.db.gz", bytes:$bytes, sha256:$sha, unpackedBytes:$unpacked,
+                    from:0, to:$version, rows:$rows},
+              deltas:[]}' > /tmp/pack/food-pack.json
+          cat /tmp/pack/food-pack.json
+
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "name=Food database — pack #$v · $rows products · content $short" >> "$GITHUB_OUTPUT"
+          echo "pack: $(numfmt --to=iec "$gzbytes") compressed, $(numfmt --to=iec "$dbbytes") unpacked"
+
+      - name: Publish the food-database pack
+        if: steps.pack.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ **Its OWN tag.** This action rewrites a release's NAME on every publish, and the name is
+          # where each updater reads its identity — so sharing `nutrition-latest` would have each
+          # publish overwrite the other's. The desktop companion has `desktop-latest` for exactly this.
+          tag_name: food-db-latest
+          name: ${{ steps.pack.outputs.name }}
+          body: |
+            The offline barcode database, downloaded by the nutrition app on first run.
+
+            This is not an application. `food-pack.json` describes it; `food.db.gz` is the database.
+          prerelease: true
+          files: |
+            /tmp/pack/food.db.gz
+            /tmp/pack/food-pack.json
+
+      - name: Build the release APK
+        run: |
+          set -o pipefail
+          ./gradlew :nutrition:assembleRelease \
+            -PNUTRITION_VERSION_CODE=${{ github.run_number }} \
+            --stacktrace --no-daemon 2>&1 | tee /tmp/nutrition-build.log
+
+      - name: Say what actually went wrong
+        # ⚠️ Gradle's "What went wrong" says only "Compilation error. See log for more details", and
+        # the `e:` lines naming the file and symbol sit hundreds of stack frames earlier where no
+        # tail of the log will ever reach them. Re-printing them LAST is what makes a failure
+        # diagnosable in one round instead of two.
+        if: failure()
+        run: |
+          f=/tmp/nutrition-build.log
+          [ -f "$f" ] || exit 0
+          echo "----- compiler errors -----"
+          grep -E "^(e|w): .*: error:|^e: " "$f" | head -40 || true
+          echo "----- gradle's summary -----"
+          awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
+
+      - name: Check what actually shipped
+        # ⚠️ **The "runs on any phone" claim, CHECKED rather than asserted.** The whole reason this
+        # module exists is that the LCARS application packages arm64 native libraries and refuses to
+        # start except on one device. If a `lib/` directory ever appears in this APK, something has
+        # pulled in a native dependency and the universal-APK property is gone — silently, because
+        # the build would still be green and the phone it was tested on would still work.
+        run: |
+          apk=$(ls nutrition/build/outputs/apk/release/*.apk | head -1)
+          bytes=$(stat -c%s "$apk")
+          echo "APK: $apk"
+          echo "size: $bytes bytes ($(numfmt --to=iec "$bytes"))"
+
+          # ⚠️ **The rule is "every architecture", not "no native code", and the first version of
+          # this check had it wrong — it failed on the presence of any `lib/` directory at all.**
+          # That reasoning does not hold: Compose UI depends transitively on
+          # `androidx.graphics:graphics-path`, which ships a small `.so`, and it ships one for all
+          # four architectures, so the APK still runs everywhere. What would genuinely take the
+          # property away is a library present for SOME architectures and not others, or an
+          # `abiFilters` narrowing the build — so the check is per-library now.
+          abis="arm64-v8a armeabi-v7a x86 x86_64"
+          # ⚠️ `.+` after the ABI, so a DIRECTORY entry (`lib/`, `lib/arm64-v8a/`) is not mistaken
+          # for a library. AGP's own APKs carry no directory entries, but a check that fails on a
+          # zip written by any other tool is a check nobody will trust — found by running this
+          # against a synthetic APK with all four architectures present, which it rejected.
+          libs=$(unzip -l "$apk" | awk '$4 ~ /^lib\/[^\/]+\/.+/ {print $4}')
+          if [ -z "$libs" ]; then
+            echo "no native libraries at all: one APK covers $abis"
+          else
+            missing=""
+            for so in $(echo "$libs" | sed 's|^lib/[^/]*/||' | sort -u); do
+              for abi in $abis; do
+                echo "$libs" | grep -qx "lib/$abi/$so" || missing="$missing lib/$abi/$so"
+              done
+            done
+            if [ -n "$missing" ]; then
+              echo "::error::this APK is not architecture-independent — absent:$missing"
+              echo "$libs" | sed 's/^/    /'
+              exit 1
+            fi
+            echo "every native library is present for all four architectures:"
+            echo "$libs" | sed 's/^/    /'
+          fi
+
+          # ⚠️ **The check INVERTED, and the inversion is the change.** It used to insist the 425 MB
+          # database was inside the APK; it now insists it is NOT. The corpus is published as a pack
+          # and fetched once, and an asset that crept back in would silently put the APK from roughly
+          # forty megabytes back to two hundred — green, installable, and re-downloaded in full by the
+          # in-app updater on every published build, which is the whole thing this change was for.
+          #
+          # A stale `nutrition/src/main/assets/food/` left on a developer machine is exactly how that
+          # happens, so this is an ERROR rather than a warning.
+          if unzip -l "$apk" | grep -q "assets/food/food.db"; then
+            unzip -l "$apk" | grep "assets/food/food.db"
+            echo "::error::the food database is INSIDE this APK — it is meant to be a downloaded pack"
+            exit 1
+          else
+            echo "no bundled food database, as intended — the app fetches the pack on first run"
+          fi
+
+          # ⚠️ And the generic-food seed, which is a HARD failure rather than a warning. The database
+          # above is built and cached, so a run that legitimately skipped it should still publish;
+          # the seed is a small committed file inside :core:health, so its absence can only mean the
+          # library asset merge stopped working. This app shipped without it for its whole life —
+          # searching "chicken breast" found nothing generic, describing a meal matched nothing, and
+          # every one of those was swallowed and rendered as "no such food".
+          if unzip -l "$apk" | grep -q "assets/food/seed.tsv"; then
+            unzip -l "$apk" | grep "assets/food/seed.tsv"
+          else
+            echo "::error::no generic-food seed in this APK — no food can be found by name"
+            unzip -l "$apk" | grep "assets/food/" || echo "(no food assets at all)"
+            exit 1
+          fi
+          if unzip -l "$apk" | grep -q "assets/food/this-seed-must-not-exist.tsv"; then
+            echo "::error::the sentinel matched — this check cannot tell present from absent"
+            exit 1
+          fi
+
+      # ⚠️ **Without this there is nothing to download on the run's own page, and that is exactly
+      # how somebody looking for the app fails to find it.** The release under `nutrition-latest` is
+      # a different page entirely — you have to know it exists and go to Releases — whereas the
+      # workflow run is where anyone naturally looks after watching a build go green. The LCARS
+      # workflow has carried this step since it was written; this one was missing it, so its run
+      # page showed a green tick and no artifact.
+      #
+      # `if-no-files-found: error` because a silent empty upload would restore the same dead end.
+      #
+      # ⚠️ **But an artifact is NOT the answer on a phone, and the step below is.** GitHub zips every
+      # artifact and offers no way not to, so this is a `.zip` Android cannot install; the GitHub
+      # mobile app lists no artifacts at all; and the drawer lives on the run SUMMARY page rather
+      # than the job log most people land on after tapping a tick. This upload is for a computer.
+      #
+      # ⚠️ `retention-days` because the release under `nutrition-latest` is the durable copy and is
+      # always the newest build, so an artifact older than a few days has no consumer — while each
+      # one is ~187 MB and this branch pushes many times a day. The honest cost is that an OLD run's
+      # page stops offering a download after a week; the newest build is always on the release.
+      - name: Upload the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: nutrition-release-apk
+          path: nutrition/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ **Its own tag, never `latest`.** `action-gh-release` rewrites the release NAME on every
+          # publish, and the name is where each app's updater reads its build number — the desktop
+          # companion already learned this. Three publishers sharing one tag would have each
+          # overwrite the others' name, and every updater would then read somebody else's build.
+          tag_name: nutrition-latest
+          name: "Nutrition — build #${{ github.run_number }}"
+          prerelease: true
+          # ⚠️ **The direct link is spelled out because this is the half that reaches the GitHub
+          # mobile app**, which shows releases and their assets but no workflow artifacts at all.
+          # The asset name is stable (`nutrition-release.apk`, from the module name), so the URL
+          # never changes and always serves the newest build.
+          body: |
+            Standalone nutrition app, build #${{ github.run_number }}, from ${{ github.sha }}.
+
+            **[▸ Download and install it](${{ github.server_url }}/${{ github.repository }}/releases/download/nutrition-latest/nutrition-release.apk)**
+
+            One APK for every architecture, Android 8.0 and later, no device gate. Installs
+            alongside the LCARS app rather than over it — different package name — so both can be
+            on one phone at once. Sideload it and allow "install unknown apps".
+
+            This repository is private, so following that link needs a signed-in GitHub session in
+            whatever browser opens it. Already have the LCARS app? **Settings → System → GET THE
+            NUTRITION APP** does the whole thing in one tap with the token already stored there.
+          files: nutrition/build/outputs/apk/release/*.apk
+
+      # ⚠️ **This is what a run page can carry that is genuinely installable**, and it is the fix for
+      # "there is no download arrow": `$GITHUB_STEP_SUMMARY` renders at the TOP of the run summary,
+      # above the artifacts drawer, and it links to the bare `.apk` on the rolling release rather
+      # than to a zip. Nothing else in this repository writes a step summary, so this is a new
+      # surface rather than a tweak to one.
+      #
+      # ⚠️ `always()` so it still appears when the publish itself failed — the previous build's
+      # release is then still the newest thing there is to install, and a run that says nothing is
+      # exactly the dead end being removed. Gated on the APK existing, so a failed compile writes
+      # no misleading link.
+      - name: Say where to get it
+        if: always() && hashFiles('nutrition/build/outputs/apk/release/*.apk') != ''
+        run: |
+          apk=$(ls nutrition/build/outputs/apk/release/*.apk | head -1)
+          size=$(numfmt --to=iec "$(stat -c%s "$apk")")
+          base="${{ github.server_url }}/${{ github.repository }}"
+          {
+            echo "## Nutrition app — build #${{ github.run_number }}"
+            echo
+            echo "### [▸ Download and install it]($base/releases/download/nutrition-latest/nutrition-release.apk)"
+            echo
+            echo "$size · one APK for every architecture · Android 8.0 and later · installs"
+            echo "alongside the LCARS app, not over it."
+            echo
+            echo "That link is a bare \`.apk\` the phone's installer opens directly. You must be"
+            echo "**signed in to GitHub in that browser** — this repository is private."
+            echo
+            echo "The artifact below is a **zip**, because GitHub zips every artifact; Android"
+            echo "cannot install one. It is there for a computer."
+            echo
+            echo "Already have the LCARS app? **Settings → System → GET THE NUTRITION APP** does all"
+            echo "of this in one tap using the token stored in Computer Setup, with no browser."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ⚠️ **The same link as an ANNOTATION, because a phone screenshot proved this block renders
+          # where the summary above does not** — and renders URLs as tappable links, which is how the
+          # Node-20 deprecation notice appears there in blue.
+          #
+          # ⚠️ Deliberately `notice` and NOT `warning`. A warning would be guaranteed to render on
+          # every client, and it would also be a lie about severity — the block beside this one is
+          # where genuine build warnings live, and dressing a download up as one teaches a reader to
+          # skim past all of them. If a client turns out to show only warnings and errors, the run
+          # NAME above is the half that still arrives.
+          echo "::notice title=Download the nutrition app ($size)::$base/releases/download/nutrition-latest/nutrition-release.apk"

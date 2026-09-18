@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.news
 
 import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.core.network.FeedDate
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.network.RssItem
 import dev.mascwa.pulse.core.network.RssParser
@@ -14,9 +15,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.net.URLEncoder
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 class NewsRepository(
     private val http: HttpClient,
@@ -310,16 +308,11 @@ class NewsRepository(
         )
     }
 
-    private val isoFormats = listOf("yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssXXX")
-    private fun parseIso(s: String?): Long {
-        if (s.isNullOrBlank()) return 0L
-        for (p in isoFormats) {
-            runCatching {
-                val f = SimpleDateFormat(p, Locale.ENGLISH)
-                if (p.endsWith("'Z'")) f.timeZone = TimeZone.getTimeZone("UTC")
-                return f.parse(s)!!.time
-            }
-        }
-        return 0L
-    }
+    /**
+     * ⚠️ The third copy of "read a date off a feed", now the same [FeedDate] the two RSS parsers use.
+     * This one accepted exactly two spellings, so an ISO stamp carrying fractional seconds — which
+     * RFC 3339 permits and which is what the old RSS copy got catastrophically wrong — was refused
+     * outright here and the article sorted to the bottom of the list with a published time of zero.
+     */
+    private fun parseIso(s: String?): Long = if (s.isNullOrBlank()) 0L else FeedDate.parse(s)
 }

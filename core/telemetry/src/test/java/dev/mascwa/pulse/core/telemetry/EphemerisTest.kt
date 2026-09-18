@@ -14,10 +14,26 @@ import kotlin.math.abs
  * planetary data professional astronomy uses — at four sites spanning the equator, both
  * hemispheres and the near-Arctic, at four instants across the year.
  *
- * Measured agreement: **Sun within 0.007 deg, Moon within 0.05 deg, sunrise/sunset within two
+ * Measured agreement: **Sun within 0.008 deg, Moon within 0.021 deg, sunrise/sunset within two
  * seconds, illuminated fraction within 0.0001.** For scale, the code this replaces claimed about
  * a degree for the Sun and "a couple of degrees" for the Moon, and could not produce an altitude
  * or a rise time at all.
+ *
+ * ⚠️ **The Moon figure was 0.05 deg and is now 0.021, and the tolerances below were tightened to
+ * match rather than left loose.** A tolerance far above what the code achieves is not a guard: it
+ * would let the Moon drift back by a factor of two without a single test going red. GEOCENTRICALLY
+ * the improvement is larger still — **167 arcsec to 7.4** — and it is the parallax approximation in
+ * [Ephemeris.moonPosition], which corrects altitude and leaves azimuth alone, that now sets the
+ * topocentric floor. That is the next thing to fix if anyone wants better.
+ *
+ * ⚠️ **Three separate faults were found by measuring rather than by reading, and each was in a
+ * different place.** The tables were truncated at 25 of 60 terms; they were being handed UTC where
+ * they want Terrestrial Time; and the Moon's longitude carried no nutation while the Sun's did, so
+ * the two bodies sat in frames seventeen arcseconds apart. Geocentric Moon: 167 arcsec, then 14,
+ * then 7.4. Then the SUN turned out to be the worse body at 11.2 and its perturbation terms took
+ * it to 3.8. None of that is visible topocentrically, which is why
+ * [geocentricMoonMatchesJplToBetterThanAHundredthOfADegree] and
+ * [geocentricSunMatchesJplToBetterThanTenArcseconds] both exist.
  *
  * Distances are compared **geocentric to geocentric**. Skyfield's `altaz()` distance is
  * topocentric — measured from the observer, not the Earth's centre — and the two differ by up to
@@ -91,8 +107,9 @@ class EphemerisTest {
             val p = Ephemeris.moonPosition(r.lat, r.lon, r.ms)
             worst = maxOf(worst, abs(p.altitudeDeg - r.moonAlt), angleDiff(p.azimuthDeg, r.moonAz))
         }
-        // The Moon is the harder body — a truncated series, plus the observer-offset correction.
-        assertTrue("worst Moon error was $worst deg", worst < 0.1)
+        // ⚠️ 0.021 measured, so the bar sits just above it. It was 0.1 against a code that
+        // achieved 0.046 — twice the slack it needed, which is how a regression hides.
+        assertTrue("worst Moon error was $worst deg", worst < 0.03)
     }
 
     @Test fun moonDistanceIsGeocentricAndAccurateToAboutFiftyKilometres() {
@@ -101,7 +118,8 @@ class EphemerisTest {
             val d = Ephemeris.moonEquatorial(r.ms).distanceKm
             worst = maxOf(worst, abs(d - r.moonDistKm))
         }
-        assertTrue("worst Moon distance error was $worst km", worst < 200.0)
+        // 25 km measured, down from 45 before the full table landed.
+        assertTrue("worst Moon distance error was $worst km", worst < 50.0)
         // And it stays inside the real perigee-apogee envelope.
         for (r in positions) {
             val d = Ephemeris.moonEquatorial(r.ms).distanceKm
@@ -122,6 +140,124 @@ class EphemerisTest {
             )
         }
         assertTrue("worst rise/set error was $worst s", worst < 60)
+    }
+
+    /**
+     * The Moon where it really is, before any observer is involved.
+     *
+     * ⚠️ **This is the test that would have caught the timescale bug, and none existed.** Every
+     * other Moon check here is topocentric, where the parallax approximation adds its own error and
+     * masks the underlying one. Geocentrically there is nowhere for a fault to hide: these are
+     * Skyfield/DE421 apparent positions for the equinox of date, and the shipped series was out by
+     * up to 167 arcseconds against them — nearly a tenth of the Moon's diameter, five minutes of
+     * its motion — because Meeus's tables were truncated at 25 of 60 terms AND were being handed
+     * UTC where they want Terrestrial Time.
+     */
+    @Test fun geocentricMoonMatchesJplToBetterThanAHundredthOfADegree() {
+        // (epochMs, apparent RA, apparent Dec) from Skyfield reading DE421.
+        val refs = listOf(
+            Triple(1767225600000L, 63.9203, 26.4037),    // 2026-01-01 00:00 UTC
+            Triple(1782777600000L, 279.2909, -27.2263),  // 2026-06-30 00:00 UTC
+            Triple(1798329600000L, 139.1957, 16.2721),   // 2026-12-27 00:00 UTC
+            Triple(1755000000000L, 0.3353, 1.3668),      // 2025-08-12 12:00 UTC
+        )
+        var worst = 0.0
+        for ((ms, ra, dec) in refs) {
+            val m = Ephemeris.moonEquatorial(ms)
+            worst = maxOf(worst, Ephemeris.angularSeparationDeg(m.rightAscensionDeg, m.declinationDeg, ra, dec))
+        }
+        // 0.0021 deg measured (7.4 arcsec). It was 13.8 until the nutation was added: Meeus ch. 47
+        // gives a GEOMETRIC longitude and the Sun's apparent one already carried the nutation, so
+        // the two bodies sat in frames seventeen arcseconds apart.
+        //
+        // ⚠️ **The bar is 0.002 because 0.004 and then 0.003 both failed to guard it.** Removing
+        // the nutation in longitude ALONE costs 0.0021 at these four instants and removing both it
+        // and the nutation in obliquity costs 0.0038, so anything looser than 0.002 lets the
+        // half-measure through — and a half-measure is exactly what a later edit would produce.
+        // Measured with both: 0.00103.
+        assertTrue("worst geocentric Moon error was $worst deg", worst < 0.002)
+    }
+
+    /**
+     * The Sun, geocentrically — and it exists because the Sun turned out to be the WORST body here,
+     * which was not the expectation.
+     *
+     * ⚠️ Every other check in this file is topocentric, where the parallax approximation in
+     * [Ephemeris.moonPosition] contributes its own error and hides what the underlying theories are
+     * doing. Measured geocentrically against DE421 at the eighteen eclipse epochs of 2025 through
+     * 2028, with only the equation of centre, the Moon was out by a mean of 2.9 arcseconds and the
+     * Sun by 11.2 — four times worse. That matters far beyond the Sun's own position: an eclipse is
+     * a Sun-to-Moon separation, so the Sun's error was setting the accuracy of the entire
+     * [Eclipses] feature while all the attention was on the lunar tables.
+     *
+     * ⚠️ **Without this test, deleting [Ephemeris]'s solar perturbation terms would fail nothing.**
+     * They are five lines carrying the pull of Venus, Jupiter and the Moon on the Earth's orbit,
+     * they took the Sun from 11.2 arcseconds to 3.8, and every other assertion in this file would
+     * stay green without them.
+     */
+    @Test fun geocentricSunMatchesJplToBetterThanTenArcseconds() {
+        // (epochMs, apparent RA, apparent Dec) from Skyfield reading DE421, equinox of date —
+        // the same four instants the Moon is checked at.
+        val refs = listOf(
+            // The four the Moon is checked at, so the two bodies are compared at the same instants.
+            Triple(1767225600000L, 281.494713, -23.017248),  // 2026-01-01 00:00 UTC
+            Triple(1782777600000L, 98.979832, 23.181026),    // 2026-06-30 00:00 UTC
+            Triple(1798329600000L, 275.692632, -23.334374),  // 2026-12-27 00:00 UTC
+            Triple(1755000000000L, 142.446750, 14.801528),   // 2025-08-12 12:00 UTC
+            // ⚠️ And four chosen BECAUSE the perturbation terms matter most there. A periodic
+            // correction is near zero for much of its cycle, so four arbitrary instants can miss it
+            // almost entirely: at the first four above, deleting the terms costs only 15.6
+            // arcseconds and would slip under any bar loose enough not to fail on a good build.
+            // These were found by running the comparison with the terms removed and taking the
+            // worst offenders — 21.7 to 24.5 arcseconds, which nothing can mistake for noise.
+            Triple(1743245245000L, 8.262908, 3.565273),      // 2025-03-29 10:47 UTC
+            Triple(1772537622000L, 344.233516, -6.718436),   // 2026-03-03 11:33 UTC
+            Triple(1846520386000L, 106.486203, 22.571245),   // 2028-07-06 18:19 UTC
+            Triple(1847847329000L, 122.015976, 20.181379),   // 2028-07-22 02:55 UTC
+        )
+        var worst = 0.0
+        for ((ms, ra, dec) in refs) {
+            val s = Ephemeris.sunEquatorial(ms)
+            worst = maxOf(worst, Ephemeris.angularSeparationDeg(s.rightAscensionDeg, s.declinationDeg, ra, dec))
+        }
+        // Measured: 0.0031 deg (11.2 arcsec) worst across these eight. Without the perturbation
+        // terms the BEST of the last four is 0.0060 (21.7 arcsec), so the bar sits in the gap —
+        // comfortably above what the code achieves and comfortably below what its absence costs.
+        assertTrue("worst geocentric Sun error was $worst deg", worst < 0.0045)
+    }
+
+    /**
+     * ⚠️ **Sidereal time must stay on UT, and this is the guard that says so.**
+     *
+     * The fix above moved three theory call sites onto Terrestrial Time. [Ephemeris.gmstDeg]
+     * deliberately did NOT move: it answers how far the Earth has turned, which is a question about
+     * the rotating Earth and not about dynamics. Feeding it TT would shift every hour angle by 69
+     * seconds of rotation — about 0.29 degrees, or a thousand arcseconds, which is twenty times
+     * worse than the bug being fixed and would show up as everything in the sky being in the wrong
+     * place rather than the Moon being slightly off.
+     */
+    @Test fun siderealTimeStaysOnUniversalTimeAndIsNotOffsetByDeltaT() {
+        // Greenwich mean sidereal time in degrees, from Skyfield.
+        val refs = listOf(
+            1767225600000L to 100.6612,
+            1782777600000L to 278.0776,
+        )
+        for ((ms, expected) in refs) {
+            val got = Ephemeris.gmstDeg(Ephemeris.julianDate(ms))
+            assertEquals("GMST at $ms", expected, got, 0.01)
+        }
+        // And the TT date is genuinely ahead, by exactly the constant and no more.
+        //
+        // ⚠️ The tolerance is a millisecond, not a microsecond, and that is a fact about Double
+        // rather than about the code. A Julian date is around 2.46 million, where one unit in the
+        // last place is 4.7e-10 days — about fourteen microseconds. A tighter bar than that asks
+        // the representation for digits it does not have; my first attempt used 1e-6 s and failed
+        // on 69.18401420116425, which is the correct answer rendered as closely as a Double can.
+        // A millisecond of clock is 0.0006 arcseconds of Moon, so this is still far below anything
+        // that could matter.
+        val ms = 1767225600000L
+        val gap = (Ephemeris.julianDateTT(ms) - Ephemeris.julianDate(ms)) * 86_400.0
+        assertEquals(Ephemeris.DELTA_T_SECONDS, gap, 1e-3)
     }
 
     @Test fun illuminatedFractionMatchesJpl() {
@@ -207,5 +343,337 @@ class EphemerisTest {
             if (sep < 20) assertTrue("sep $sep should be near-new", p.illuminatedFraction < 0.10)
             if (sep > 160) assertTrue("sep $sep should be near-full", p.illuminatedFraction > 0.95)
         }
+    }
+
+    // ---- precession -------------------------------------------------------------------------
+
+    private data class Prec(
+        val ms: Long,
+        val raJ2000: Double,
+        val decJ2000: Double,
+        val ra: Double,
+        val dec: Double,
+    )
+
+    /**
+     * Five stars at three epochs, against DE421 read through Skyfield.
+     *
+     * ⚠️ **The expected values are the TRUE equinox of date — precession AND nutation** — because
+     * that is the frame [Ephemeris.sunEquatorial] and [Ephemeris.moonEquatorial] are in, and the
+     * only reason to precess a star here is to compare it with the Moon. Skyfield's
+     * `radec(epoch='date')` gives exactly that. Precession alone leaves about 15 arcseconds, which
+     * is what the first version of this measured before the nutation was added; the bar below is
+     * set at 2 because the measured worst is 1.6 and a tolerance ten times what the code achieves
+     * would let it drift back by a factor of six without going red.
+     *
+     * The five are the four stars bright enough and close enough to the ecliptic for the Moon to
+     * occult visibly, plus Alcyone in the Pleiades. That is not decoration: they are the positions
+     * an occultation is actually computed against.
+     */
+    private val precessions = listOf(
+        // 2026-06-15T00:00:00Z
+        Prec(1781481600000L, 68.98016279, 16.50930235, 69.361792, 16.563893),      // Aldebaran
+        Prec(1781481600000L, 152.09296244, 11.96720878, 152.448633, 11.837125),    // Regulus
+        Prec(1781481600000L, 201.29824736, -11.16131949, 201.649387, -11.299859),  // Spica
+        Prec(1781481600000L, 247.35191542, -26.43200261, 247.760394, -26.490450),  // Antares
+        Prec(1781481600000L, 56.87116533, 24.10516667, 57.267129, 24.187400),      // Alcyone
+        // 2035-01-01T00:00:00Z
+        Prec(2051222400000L, 68.98016279, 16.50930235, 69.482113, 16.575776),
+        Prec(2051222400000L, 152.09296244, 11.96720878, 152.559129, 11.793746),
+        Prec(2051222400000L, 201.29824736, -11.16131949, 201.760597, -11.341249),
+        Prec(2051222400000L, 247.35191542, -26.43200261, 247.889612, -26.503587),
+        Prec(2051222400000L, 56.87116533, 24.10516667, 57.392735, 24.208475),
+        // 2044-08-09T05:00:00Z
+        Prec(2354331600000L, 68.98016279, 16.50930235, 69.622334, 16.599595),
+        Prec(2354331600000L, 152.09296244, 11.96720878, 152.690827, 11.747668),
+        Prec(2354331600000L, 201.29824736, -11.16131949, 201.889255, -11.393759),
+        Prec(2354331600000L, 247.35191542, -26.43200261, 248.039409, -26.528763),
+        Prec(2354331600000L, 56.87116533, 24.10516667, 57.537718, 24.242092),
+    )
+
+    @Test fun precessedStarsMatchJplToBetterThanTwoArcseconds() {
+        var worst = 0.0
+        for (p in precessions) {
+            val got = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val off = Ephemeris.angularSeparationDeg(
+                got.rightAscensionDeg, got.declinationDeg, p.ra, p.dec,
+            )
+            worst = maxOf(worst, off)
+        }
+        assertTrue("worst precessed position is ${worst * 3600} arcsec from DE421", worst < 2.0 / 3600.0)
+    }
+
+    /**
+     * ⚠️ The whole reason this function exists: a J2000 catalogue position is a third of the Moon's
+     * radius away from where the star is now, so an occultation computed without it answers the
+     * wrong question. The bar is a quarter of a degree because in 2026 the drift is 22 arcminutes —
+     * measured, not assumed, and it grows by 50 arcseconds a year.
+     */
+    @Test fun ignoringPrecessionWouldBeWorthMostOfTheMoonsRadius() {
+        for (p in precessions.take(5)) {
+            // How far the function MOVES the catalogue position, not how far the fixture is from
+            // it -- otherwise this asserts something about the fixtures and nothing about the code.
+            val moved = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val drift = Ephemeris.angularSeparationDeg(
+                p.raJ2000, p.decJ2000, moved.rightAscensionDeg, moved.declinationDeg,
+            )
+            assertTrue("2026 drift of ${drift * 60} arcmin", drift > 0.25 && drift < 0.45)
+        }
+    }
+
+    // ---- the topocentric transform ----------------------------------------------------------
+
+    /**
+     * ⚠️ A star has no distance, so it must come back untouched.
+     *
+     * The transform subtracts the observer's position vector in Earth radii; for a body at
+     * infinity that subtraction is meaningless, and a [Ephemeris.Equatorial] with the default
+     * distance of zero would otherwise divide by it. Returning the input unchanged is what lets a
+     * caller put every target through one code path instead of branching on what kind of thing it
+     * is — which is how the two branches come to disagree.
+     */
+    @Test fun aBodyWithNoDistanceIsNotMovedByParallax() {
+        val star = Ephemeris.Equatorial(68.98, 16.5, distanceKm = 0.0)
+        val seen = Ephemeris.topocentric(star, 51.5, -0.13, 1781481600000L)
+        assertEquals(star.rightAscensionDeg, seen.rightAscensionDeg, 0.0)
+        assertEquals(star.declinationDeg, seen.declinationDeg, 0.0)
+    }
+
+    /**
+     * The Moon moves by roughly a degree, which is four times its own width — the fact the whole
+     * of [Eclipses] turns on, and the reason this transform is shared rather than copied. The Sun
+     * barely moves at all.
+     */
+    @Test fun parallaxMovesTheMoonFourTimesItsOwnWidthAndTheSunNotAtAll() {
+        for (r in positions) {
+            val moon = Ephemeris.moonEquatorial(r.ms)
+            val moonHere = Ephemeris.topocentric(moon, r.lat, r.lon, r.ms)
+            val moonShift = Ephemeris.angularSeparationDeg(
+                moon.rightAscensionDeg, moon.declinationDeg,
+                moonHere.rightAscensionDeg, moonHere.declinationDeg,
+            )
+            assertTrue("the Moon shifted $moonShift deg, which is not a lunar parallax", moonShift < 1.05)
+
+            val sun = Ephemeris.sunEquatorial(r.ms)
+            val sunHere = Ephemeris.topocentric(sun, r.lat, r.lon, r.ms)
+            val sunShift = Ephemeris.angularSeparationDeg(
+                sun.rightAscensionDeg, sun.declinationDeg,
+                sunHere.rightAscensionDeg, sunHere.declinationDeg,
+            )
+            assertTrue("the Sun shifted ${sunShift * 3600} arcsec", sunShift < 10.0 / 3600.0)
+        }
+        // And somewhere in the set the Moon really does move most of a degree, or the bound above
+        // would be passing on a transform that does nothing at all.
+        val biggest = positions.maxOf { r ->
+            val m = Ephemeris.moonEquatorial(r.ms)
+            val h = Ephemeris.topocentric(m, r.lat, r.lon, r.ms)
+            Ephemeris.angularSeparationDeg(
+                m.rightAscensionDeg, m.declinationDeg, h.rightAscensionDeg, h.declinationDeg,
+            )
+        }
+        assertTrue("the largest lunar parallax in the set was only $biggest deg", biggest > 0.5)
+    }
+
+    // ---- the mean-equinox rotation the star map is built on ----------------------------------
+
+    /**
+     * ⚠️ **Measured in degrees, NOT through [Ephemeris.angularSeparationDeg], and that is the whole
+     * reason this reads the way it does.** That function ends in `acos`, which loses half its
+     * significant figures at a separation near zero: the same grid measured through it reports this
+     * pair as 4e-3 arcseconds apart when the direct measurement says 4e-10. A bound set from the
+     * lossy instrument would sit ten million times above what the code achieves, and the wrong
+     * inverse below (0.56 arcseconds) would sail under it.
+     */
+    private fun worstRoundTripDeg(): Double {
+        var worst = 0.0
+        for (ms in longArrayOf(1781481600000L, 2051222400000L, 2354331600000L)) {
+            var ra = 0
+            while (ra < 360) {
+                var dec = -85
+                while (dec <= 85) {
+                    val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
+                    val back = Ephemeris.j2000ToMeanOfDate(j[0], j[1], ms)
+                    var dRa = abs(back[0] - ra)
+                    if (dRa > 180.0) dRa = 360.0 - dRa
+                    worst = maxOf(worst, maxOf(dRa, abs(back[1] - dec)))
+                    dec += 5
+                }
+                ra += 5
+            }
+        }
+        return worst
+    }
+
+    /**
+     * The pair is an exact inverse, which is what a tap on a star map rests on: the touched
+     * direction goes into the catalogue's frame to find the star, and the star comes back out to
+     * say how high it is. Measured worst over 72 x 35 positions at three epochs: **4e-10
+     * arcseconds** — floating point and nothing else, since the two rotations are algebraically
+     * transposes. The bar is a microarcsecond, which is 2,400 times the measured value and still
+     * half a million times tighter than the wrong inverse below.
+     */
+    @Test fun theMeanEquinoxRotationsAreAnExactInversePair() {
+        val worst = worstRoundTripDeg() * 3600.0
+        assertTrue("worst round trip was $worst arcsec", worst < 1e-6)
+    }
+
+    /**
+     * ⚠️ **Negating the epoch looks like the inverse and is not.** It is the obvious shortcut —
+     * precession angles are odd in time to first order — and it comes back within 0.56 arcseconds,
+     * small enough that a test with any ordinary tolerance would pass. This pins the gap: the real
+     * inverse is a billion times better, so the two can never be confused by accident again.
+     */
+    @Test fun negatingTheEpochIsNotTheInverseAndIsFarWorse() {
+        var worst = 0.0
+        for (p in precessions) {
+            val j = Ephemeris.meanOfDateToJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val t = (Ephemeris.julianDateTT(p.ms) - 2451545.0) / 36525.0
+            val back = Ephemeris.precessToJ2000(j[0], j[1], -t)
+            worst = maxOf(
+                worst,
+                Ephemeris.angularSeparationDeg(p.raJ2000, p.decJ2000, back[0], back[1]),
+            )
+        }
+        assertTrue(
+            "the negated rotation came back within ${worst * 3600} arcsec, so this test proves nothing",
+            worst * 3600.0 > 0.1,
+        )
+        assertTrue("but it should still be under an arcsecond", worst * 3600.0 < 2.0)
+        assertTrue("the real inverse is far better", worstRoundTripDeg() * 3600.0 < 1e-6)
+    }
+
+    /**
+     * ⚠️ **The two directions are twice the drift apart, which is what makes a swap catchable.**
+     * Calling one where the other is meant does not fail, crash or look wrong: it produces a
+     * perfectly plausible sky at double the offset. In 2026 each direction moves 22 arcminutes and
+     * the two answers land 0.74 degrees from each other — measured, and asserted as a RATIO so it
+     * holds at every epoch rather than only at the one it was written against.
+     */
+    @Test fun theTwoDirectionsLandTwiceTheDriftApart() {
+        for (p in precessions) {
+            val toJ2000 = Ephemeris.meanOfDateToJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val toDate = Ephemeris.j2000ToMeanOfDate(p.raJ2000, p.decJ2000, p.ms)
+            val drift = Ephemeris.angularSeparationDeg(
+                p.raJ2000, p.decJ2000, toDate[0], toDate[1],
+            )
+            val gap = Ephemeris.angularSeparationDeg(toJ2000[0], toJ2000[1], toDate[0], toDate[1])
+            assertTrue("2026-2044 drift was ${drift * 60} arcmin", drift > 0.3 && drift < 0.7)
+            assertTrue("the two directions were only ${gap / drift} drifts apart", gap > 1.95 * drift)
+        }
+    }
+
+    /**
+     * ⚠️ **The MEAN equinox, not the true one — this is the half that pairs with GMST.**
+     * [Ephemeris.precessFromJ2000] carries the nutation and belongs with the Sun and the Moon;
+     * [Ephemeris.j2000ToMeanOfDate] deliberately does not, because [Ephemeris.toHorizontal] runs on
+     * Greenwich MEAN sidereal time and pairing an apparent position with a mean sidereal time is
+     * the wrong combination rather than a better one. Measured, the two differ by **4.9 to 11.1
+     * arcseconds** — present, so this cannot be passing on a function that quietly became the
+     * apparent one, and small, so it cannot be passing on something unrelated.
+     */
+    @Test fun theMeanRotationIsNotTheApparentOne() {
+        for (p in precessions) {
+            val mean = Ephemeris.j2000ToMeanOfDate(p.raJ2000, p.decJ2000, p.ms)
+            val apparent = Ephemeris.precessFromJ2000(p.raJ2000, p.decJ2000, p.ms)
+            val arcsec = Ephemeris.angularSeparationDeg(
+                mean[0], mean[1], apparent.rightAscensionDeg, apparent.declinationDeg,
+            ) * 3600.0
+            assertTrue("nutation moved it $arcsec arcsec", arcsec > 2.0 && arcsec < 25.0)
+        }
+    }
+
+    /**
+     * The vector form is the degree form, so a star map that holds directions as unit vectors
+     * cannot end up with a second implementation of Meeus chapter 21. Measured worst component
+     * disagreement 1.8e-15, worst departure from unit length 4.4e-16.
+     */
+    @Test fun theVectorFormAgreesWithTheDegreeFormAndStaysAUnitVector() {
+        val ms = 1781481600000L
+        var worstComponent = 0.0
+        var worstLength = 0.0
+        var ra = 0
+        while (ra < 360) {
+            var dec = -85
+            while (dec <= 85) {
+                val v = SkyProjection.equatorialVector(ra.toDouble(), dec.toDouble())
+                Ephemeris.precessVectorToJ2000(v, ms)
+                val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
+                val w = SkyProjection.equatorialVector(j[0], j[1])
+                for (i in 0..2) worstComponent = maxOf(worstComponent, abs(v[i] - w[i]))
+                worstLength =
+                    maxOf(worstLength, abs(v[0] * v[0] + v[1] * v[1] + v[2] * v[2] - 1.0))
+                dec += 5
+            }
+            ra += 5
+        }
+        assertTrue("worst component disagreement $worstComponent", worstComponent < 1e-12)
+        assertTrue("worst |v|^2 - 1 was $worstLength", worstLength < 1e-12)
+    }
+
+    /**
+     * ⚠️ **The celestial pole, where the right ascension the vector form recovers is arbitrary.**
+     * A star map is pointed there whenever somebody lies on their back, so it is worth knowing
+     * rather than assuming: at a declination of ±90 the rotation's arithmetic drops the right
+     * ascension, because every term carrying it is multiplied by `cos(dec)`.
+     *
+     * ⚠️ **Not bit-identical, and the first version of this test asserted that it was.** `cos(90°)`
+     * in binary floating point is 6.1e-17 rather than zero, so the terms shrink by that factor
+     * instead of vanishing: three unrelated right ascensions agree to **1.3e-12 degrees**, which is
+     * five nanoarcseconds. The probe that suggested otherwise was printing six decimal places —
+     * print precision is not equality.
+     */
+    @Test fun thePoleIsSafeBecauseTheRightAscensionDropsOut() {
+        val ms = 1781481600000L
+        for (sign in doubleArrayOf(1.0, -1.0)) {
+            val first = Ephemeris.meanOfDateToJ2000(0.0, 90.0 * sign, ms)
+            for (anyRa in doubleArrayOf(90.0, 217.0, 359.9)) {
+                val other = Ephemeris.meanOfDateToJ2000(anyRa, 90.0 * sign, ms)
+                assertEquals(first[0], other[0], 1e-9)
+                assertEquals(first[1], other[1], 1e-9)
+            }
+            // The vector form takes the same path and must agree with it.
+            val v = doubleArrayOf(0.0, 0.0, sign)
+            Ephemeris.precessVectorToJ2000(v, ms)
+            val w = SkyProjection.equatorialVector(first[0], first[1])
+            for (i in 0..2) assertEquals(w[i], v[i], 1e-12)
+            // And a component rounded a hair outside [-1, 1] is clamped rather than made a NaN.
+            val over = doubleArrayOf(0.0, 0.0, sign * (1.0 + 1e-15))
+            Ephemeris.precessVectorToJ2000(over, ms)
+            for (i in 0..2) assertTrue("component $i was ${over[i]}", over[i].isFinite())
+        }
+    }
+
+    /**
+     * ⚠️ **What the star map's frame is actually worth: twenty-two arcminutes, today.**
+     * The map holds its catalogue in J2000 and every direction the observer supplies arrives in the
+     * equinox of date, so without this rotation the whole star field is turned against the horizon
+     * and against the planets — which are drawn through the horizon path and never touch the frame.
+     * Measured over the full sky from London in 2026 the worst is 22.2 arcminutes; the bar is a
+     * band rather than a floor, because doubling it (the swap above) or applying it twice would
+     * sail past a floor alone.
+     */
+    @Test fun theStarMapsFrameWouldBeTwentyTwoArcminutesOutWithoutThis() {
+        val ms = 1781481600000L
+        var worst = 0.0
+        var az = 0
+        while (az < 360) {
+            for (alt in intArrayOf(0, 30, 60, 90)) {
+                val eq = Ephemeris.toEquatorial(
+                    Ephemeris.Horizontal(alt.toDouble(), az.toDouble(), 0.0),
+                    51.5074, -0.1278, ms,
+                )
+                val j = Ephemeris.meanOfDateToJ2000(
+                    eq.rightAscensionDeg, eq.declinationDeg, ms,
+                )
+                worst = maxOf(
+                    worst,
+                    Ephemeris.angularSeparationDeg(
+                        eq.rightAscensionDeg, eq.declinationDeg, j[0], j[1],
+                    ),
+                )
+            }
+            az += 15
+        }
+        assertTrue("the frame moved ${worst * 60} arcmin", worst * 60.0 > 20.0 && worst * 60.0 < 26.0)
     }
 }

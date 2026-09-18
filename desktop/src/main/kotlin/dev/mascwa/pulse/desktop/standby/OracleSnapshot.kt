@@ -87,7 +87,7 @@ suspend fun gatherOracleSignals(
         }
     }.getOrDefault(emptyList())
 
-    val kp = runCatching { space.fetch(force = false).data.kp }.getOrNull()
+    val kp = runCatching { space.fetch(force = false, heavy = false).data.kp }.getOrNull()
 
     val emergency = runCatching {
         news.headlines(NewsCategory.TOP, force = false).getOrNull()?.data

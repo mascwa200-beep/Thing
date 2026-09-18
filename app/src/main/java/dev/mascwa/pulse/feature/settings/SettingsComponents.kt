@@ -38,8 +38,12 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun PrefSection(title: String, initiallyExpanded: Boolean = true, content: @Composable () -> Unit) {
-    // All sections start COLLAPSED by default (declutter); pass initiallyExpanded = true to open one
-    // (e.g. Software update). State is saved per section title so manual toggles stick.
+    // ⚠️ Sections start OPEN. This comment used to say the opposite — "all sections start COLLAPSED
+    // by default" — which the default argument one line up contradicts, and the mistake was not
+    // harmless: it let a collapsed section read as the house style, and the one section that had
+    // been given `initiallyExpanded = false` was the whole of "link your mail", which the owner
+    // then could not find. Pass false to start one closed; no caller does today.
+    // State is saved per section title so manual toggles stick.
     var collapsed by androidx.compose.runtime.saveable.rememberSaveable(title) { androidx.compose.runtime.mutableStateOf(!initiallyExpanded) }
     Column(Modifier.fillMaxWidth()) {
         dev.mascwa.pulse.feature.common.CyberHeader(
@@ -208,4 +212,21 @@ fun <T> PrefRadioGroup(
             }
         }
     }
+}
+
+/**
+ * Body copy inside a dialog — the app's own monospace, not Material's body style.
+ *
+ * `internal` so a dialog defined in a sibling file styles its prose identically. Two copies of this
+ * is how one screen's dialogs come to look like a different application from the next's.
+ */
+@Composable
+internal fun DialogBody(text: String) {
+    Text(
+        text,
+        fontFamily = JetBrainsMono,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        color = Pulse.colors.ink2,
+    )
 }

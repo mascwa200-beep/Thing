@@ -1,6 +1,8 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -206,4 +208,439 @@ class SensoriumTest {
         assertTrue(!conserve.cameraOnTrigger) // ALERT ramps allowed down to SETTLED, not CONSERVE
         assertTrue(standdown.fusionHeartbeatSec > conserve.fusionHeartbeatSec)
     }
+    // ---- the device tier folds into the ONE ladder ---------------------------------------------
+
+    private fun lvl(
+        tier: DeviceClass.Tier = DeviceClass.Tier.FULL,
+        pressure: DeviceClass.Pressure = DeviceClass.Pressure.NONE,
+        battery: Int = 90,
+        charging: Boolean = false,
+        powerSave: Boolean = false,
+        screenOffMin: Int = 0,
+        movement: Float = 0.5f,
+        previous: Sensorium.SenseLevel = Sensorium.SenseLevel.NOMINAL,
+    ) = Sensorium.level(
+        previous = previous, batteryPct = battery, charging = charging, powerSave = powerSave,
+        screenOffMinutes = screenOffMin, movement = movement, tier = tier, pressure = pressure,
+    )
+
+    @Test
+    fun `a flagship at rest is byte-for-byte what it was before the tier existed`() {
+        assertEquals(Sensorium.SenseLevel.NOMINAL, lvl())
+        // And the defaults are what an un-migrated call site gets.
+        assertEquals(
+            lvl(),
+            Sensorium.level(
+                previous = Sensorium.SenseLevel.NOMINAL, batteryPct = 90, charging = false,
+                powerSave = false, screenOffMinutes = 0, movement = 0.5f,
+            ),
+        )
+    }
+
+    @Test
+    fun `a weak phone is throttled on a full battery, because battery was never the only cost`() {
+        assertEquals(Sensorium.SenseLevel.SETTLED, lvl(tier = DeviceClass.Tier.LEAN, battery = 100, charging = true))
+        assertEquals(Sensorium.SenseLevel.CONSERVE, lvl(tier = DeviceClass.Tier.MINIMAL, battery = 100, charging = true))
+    }
+
+    @Test
+    fun `a phone with room to spare is left alone`() {
+        assertEquals(Sensorium.SenseLevel.NOMINAL, lvl(tier = DeviceClass.Tier.MODEST))
+        assertEquals(Sensorium.SenseLevel.NOMINAL, lvl(pressure = DeviceClass.Pressure.WARM))
+    }
+
+    @Test
+    fun `heat throttles and extreme heat stops`() {
+        assertEquals(Sensorium.SenseLevel.CONSERVE, lvl(pressure = DeviceClass.Pressure.HOT))
+        assertEquals(Sensorium.SenseLevel.STANDDOWN, lvl(pressure = DeviceClass.Pressure.CRITICAL))
+    }
+
+    @Test
+    fun `the ceiling can never promote a device the battery has already throttled`() {
+        // Every combination: a flat battery must stay STANDDOWN whatever the hardware is.
+        for (tier in DeviceClass.Tier.entries) {
+            for (pressure in DeviceClass.Pressure.entries) {
+                assertEquals(
+                    "$tier/$pressure",
+                    Sensorium.SenseLevel.STANDDOWN,
+                    lvl(tier = tier, pressure = pressure, battery = 5),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `no combination of tier and pressure is ever less throttled than the battery alone`() {
+        // ⚠️ The floors are LITERAL, not another call to `lvl`. The first version of this test
+        // compared the function against itself, so replacing the aggregation with `minBy` broke both
+        // sides identically and the test passed against a ladder that promoted every device to
+        // NOMINAL — the assertion was too weak to see the damage it was written to catch.
+        val batteryAlone = mapOf(
+            5 to Sensorium.SenseLevel.STANDDOWN,   // at or below the stand-down threshold
+            20 to Sensorium.SenseLevel.CONSERVE,   // at or below the conserve threshold
+            27 to Sensorium.SenseLevel.NOMINAL,    // above conserve, and not already throttled
+            50 to Sensorium.SenseLevel.NOMINAL,
+            100 to Sensorium.SenseLevel.NOMINAL,
+        )
+        for ((battery, floor) in batteryAlone) {
+            assertEquals("the floor itself, at $battery%", floor, lvl(battery = battery))
+            for (tier in DeviceClass.Tier.entries) {
+                for (pressure in DeviceClass.Pressure.entries) {
+                    assertTrue(
+                        "$battery%/$tier/$pressure",
+                        lvl(tier = tier, pressure = pressure, battery = battery).ordinal >= floor.ordinal,
+                    )
+                }
+            }
+        }
+    }
+
+    // ---- one battery answer, not two -----------------------------------------------------------
+
+    @Test
+    fun `conserving has hysteresis and a charger always ends it`() {
+        assertTrue(Sensorium.conserveBattery(5, charging = false, previouslyConserving = false))
+        assertFalse(Sensorium.conserveBattery(5, charging = true, previouslyConserving = true))
+        // Recovering: still conserving through the band, released above it.
+        assertTrue(Sensorium.conserveBattery(20, charging = false, previouslyConserving = true))
+        assertFalse(Sensorium.conserveBattery(20, charging = false, previouslyConserving = false))
+        assertFalse(Sensorium.conserveBattery(40, charging = false, previouslyConserving = true))
+    }
+
+    @Test
+    fun `the user's own stand-down percentage is honoured and cannot be set absurdly`() {
+        assertEquals(
+            Sensorium.SenseLevel.STANDDOWN,
+            Sensorium.level(
+                previous = Sensorium.SenseLevel.NOMINAL, batteryPct = 18, charging = false,
+                powerSave = false, screenOffMinutes = 0, movement = 0.5f, standDownPct = 20,
+            ),
+        )
+        // A setting of zero would mean "never stand down", which is not a choice this offers.
+        assertTrue(Sensorium.conserveBattery(1, charging = false, previouslyConserving = false, standDownPct = 0))
+    }
+
+    // ---- the notification says why -------------------------------------------------------------
+
+    @Test
+    fun `every throttled level can account for itself`() {
+        // The whole point: "Conserving battery" used to be said whatever the cause.
+        assertEquals(
+            "the phone is warm",
+            Sensorium.reasonFor(
+                Sensorium.SenseLevel.CONSERVE, DeviceClass.Tier.FULL, DeviceClass.Pressure.HOT,
+                batteryPct = 90, charging = false, powerSave = false,
+            ),
+        )
+        assertEquals(
+            "battery is at 12%",
+            Sensorium.reasonFor(
+                Sensorium.SenseLevel.CONSERVE, DeviceClass.Tier.FULL, DeviceClass.Pressure.NONE,
+                batteryPct = 12, charging = false, powerSave = false,
+            ),
+        )
+        assertEquals(
+            "this phone has little to spare",
+            Sensorium.reasonFor(
+                Sensorium.SenseLevel.CONSERVE, DeviceClass.Tier.MINIMAL, DeviceClass.Pressure.NONE,
+                batteryPct = 90, charging = true, powerSave = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `nothing throttled is ever left without an explanation`() {
+        // ⚠️ Driven THROUGH the ladder rather than over every (level, battery) pair. My first
+        // version asserted the universal and failed on "CONSERVE at 30%" — a state the ladder cannot
+        // produce, because 30 is the recovery threshold and a healthy phone there is NOMINAL. The
+        // property worth holding is that every state the ladder REALLY reaches can account for
+        // itself, which is both true and stronger than the version that was wrong.
+        for (battery in listOf(-1) + (1..100).toList()) {
+            for (charging in listOf(false, true)) {
+                for (powerSave in listOf(false, true)) {
+                    for (tier in DeviceClass.Tier.entries) {
+                        for (pressure in DeviceClass.Pressure.entries) {
+                            for (screenOff in listOf(0, 60)) {
+                                for (previous in Sensorium.SenseLevel.entries) {
+                                    val level = Sensorium.level(
+                                        previous = previous, batteryPct = battery, charging = charging,
+                                        powerSave = powerSave, screenOffMinutes = screenOff,
+                                        movement = 0.0f, tier = tier, pressure = pressure,
+                                    )
+                                    if (level == Sensorium.SenseLevel.NOMINAL) continue
+                                    val why = Sensorium.reasonFor(
+                                        level, tier, pressure, battery, charging, powerSave,
+                                    )
+                                    assertTrue(
+                                        "$level from $battery% charging=$charging saver=$powerSave " +
+                                            "$tier/$pressure screenOff=$screenOff prev=$previous",
+                                        why != null && why.isNotBlank(),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `an unreadable battery does not stand the whole stack down for ever`() {
+        // ⚠️ A live defect before this: `DeviceContext.batteryPct` is -1 when the gauge cannot be
+        // read, and the ladder compared it straight against the stand-down threshold — so a phone
+        // with a broken gauge sampled nothing, permanently, and said the battery was flat.
+        assertEquals(
+            Sensorium.SenseLevel.NOMINAL,
+            Sensorium.level(
+                previous = Sensorium.SenseLevel.NOMINAL, batteryPct = -1, charging = false,
+                powerSave = false, screenOffMinutes = 0, movement = 0.5f,
+            ),
+        )
+        // It also asserts nothing in the other direction: a phone already conserving stays there,
+        // because "unknown" is not evidence that the battery has recovered either.
+        assertEquals(
+            Sensorium.SenseLevel.CONSERVE,
+            Sensorium.level(
+                previous = Sensorium.SenseLevel.CONSERVE, batteryPct = -1, charging = false,
+                powerSave = false, screenOffMinutes = 0, movement = 0.5f,
+            ),
+        )
+        assertFalse(Sensorium.conserveBattery(-1, charging = false, previouslyConserving = false))
+        assertTrue(Sensorium.conserveBattery(-1, charging = false, previouslyConserving = true))
+    }
+
+    @Test
+    fun `a healthy phone at full sampling has nothing to explain`() {
+        assertEquals(
+            null,
+            Sensorium.reasonFor(
+                Sensorium.SenseLevel.NOMINAL, DeviceClass.Tier.FULL, DeviceClass.Pressure.NONE,
+                batteryPct = 90, charging = false, powerSave = false,
+            ),
+        )
+    }
+
+    // --- a phone with no ambient-light sensor -------------------------------------------------
+    //
+    // ⚠️ Many phones ship without one, and this used to be reported as DIM: a fabricated reading
+    // that reached the scanner, the Computer's per-turn environment line and ORACLE's rules.
+
+    @Test
+    fun noLightReadingIsUnknownAndNotDim() {
+        assertEquals(LightState.UNKNOWN, Sensorium.distill(SenseFrame()).light)
+    }
+
+    @Test
+    fun anUnknownBrightnessIsLeftOutOfTheSpokenLineEntirely() {
+        val line = Sensorium.distill(SenseFrame(movement = 0.01f)).describe()
+        // Not "dim" (the old lie), not "unknown" (reads as a fault) — simply absent.
+        assertFalse(line.contains("dim"))
+        assertFalse(line.lowercase().contains("unknown"))
+        // The facets that WERE measured still speak.
+        assertTrue(line.contains("still"))
+        assertTrue(line.contains("alone"))
+    }
+
+    @Test
+    fun aRealLuxReadingStillNamesEveryBand() {
+        // The bands either side of each threshold, so UNKNOWN cannot have displaced one of them.
+        assertEquals(LightState.DARK, Sensorium.distill(SenseFrame(lightLux = 0.5f)).light)
+        assertEquals(LightState.DIM, Sensorium.distill(SenseFrame(lightLux = 20f)).light)
+        assertEquals(LightState.LIT, Sensorium.distill(SenseFrame(lightLux = 120f)).light)
+        assertEquals(LightState.BRIGHT, Sensorium.distill(SenseFrame(lightLux = 2000f)).light)
+        assertEquals(LightState.SUNLIGHT, Sensorium.distill(SenseFrame(lightLux = 20000f)).light)
+    }
+
+    @Test
+    fun aDefaultReadingClaimsNoBrightnessItNeverMeasured() {
+        assertEquals(LightState.UNKNOWN, EnvReading().light)
+    }
+
+    // --- a covered phone ------------------------------------------------------------------------
+    //
+    // ⚠️ The proximity sensor was sampled, carried into the frame and read by nothing, so a phone in
+    // a pocket reported a pitch-dark ROOM. Same class of fabrication as the missing light sensor,
+    // one step further on, and the fix is the same: fold it into LightState rather than expecting
+    // every consumer to remember to check.
+
+    @Test
+    fun aCoveredSensorReportsNoBrightnessRatherThanADarkRoom() {
+        val pocket = Sensorium.distill(SenseFrame(lightLux = 1f, proximityNear = true))
+        assertEquals(LightState.UNKNOWN, pocket.light)
+        assertTrue(pocket.covered)
+        // The same lux with nothing against the glass is a genuine reading and must still be made.
+        assertEquals(LightState.DARK, Sensorium.distill(SenseFrame(lightLux = 1f)).light)
+    }
+
+    @Test
+    fun theSpokenLineSaysCoveredAndDropsTheBrightnessWord() {
+        val line = Sensorium.distill(
+            SenseFrame(lightLux = 1f, proximityNear = true, movement = 0.01f),
+        ).describe()
+        assertTrue(line.contains("covered"))
+        assertFalse(line.contains("dark"))
+        // Not "pocketed": all the sensor knows is that something is against the glass, and
+        // face-down on a table reads identically.
+        assertFalse(line.contains("pocket"))
+    }
+
+    @Test
+    fun proximityFarIsNotCovered() {
+        assertFalse(Sensorium.distill(SenseFrame(proximityNear = false)).covered)
+        assertFalse(Sensorium.distill(SenseFrame()).covered)
+    }
+
+    @Test
+    fun aCoveredPhoneCannotBeReadAsOutdoorsFromItsLightSensor() {
+        // Unreachable in practice — an occluded sensor never sees 20,000 lux — but the guard is what
+        // keeps the intent true if the threshold is ever lowered.
+        assertEquals(
+            EnvSetting.UNKNOWN,
+            Sensorium.distill(SenseFrame(lightLux = 20000f, proximityNear = true)).setting,
+        )
+    }
+
+    // --- access points count buildings, not people ----------------------------------------------
+
+    @Test
+    fun aDenseAccessPointCountIsAWeakIndoorPriorAndNothingMore() {
+        val r = Sensorium.distill(SenseFrame(wifiApCount = 40))
+        assertEquals(EnvSetting.INDOOR, r.setting)
+        // ⚠️ The killer case, and the reason this is not wired to `social`: forty access points is
+        // an ordinary apartment building, and the person in it is alone in a room.
+        assertEquals(SocialDensity.ALONE, r.social)
+    }
+
+    @Test
+    fun aSparseAccessPointCountAssertsNothing() {
+        assertEquals(EnvSetting.UNKNOWN, Sensorium.distill(SenseFrame(wifiApCount = 6)).setting)
+        assertEquals(EnvSetting.UNKNOWN, Sensorium.distill(SenseFrame(wifiApCount = 0)).setting)
+    }
+
+    @Test
+    fun realEvidenceAlwaysBeatsTheAccessPointCount() {
+        // Standing in a city street with forty APs in range: the camera saw sky and trees, and that
+        // must win. The prior sits at the bottom of the list precisely so it can only ever fill a
+        // gap, never contradict something measured.
+        assertEquals(
+            EnvSetting.OUTDOOR,
+            Sensorium.distill(
+                SenseFrame(sceneLabels = labels("sky", "tree"), wifiApCount = 40),
+            ).setting,
+        )
+        assertEquals(
+            EnvSetting.VEHICLE,
+            Sensorium.distill(
+                SenseFrame(soundLabels = labels("engine"), movement = 0.2f, wifiApCount = 40),
+            ).setting,
+        )
+    }
+
+    // --- the soundscape stops being keyword-only ------------------------------------------------
+
+    @Test
+    fun everyLevelBandHasAWord() {
+        // Either side of each threshold (-60 / -45 / -33 / -22).
+        assertEquals(NoiseProfile.SILENT, Sensorium.levelProfile(-70f))
+        assertEquals(NoiseProfile.QUIET, Sensorium.levelProfile(-50f))
+        assertEquals(NoiseProfile.CALM, Sensorium.levelProfile(-40f))
+        assertEquals(NoiseProfile.LIVELY, Sensorium.levelProfile(-28f))
+        assertEquals(NoiseProfile.LOUD, Sensorium.levelProfile(-10f))
+        assertEquals(null, Sensorium.levelProfile(null))
+    }
+
+    @Test
+    fun aLoudRoomTheClassifierHasNoWordForIsNoLongerQuiet() {
+        // The reported defect: nothing recognised, so the reading assumed silence.
+        assertEquals(NoiseProfile.QUIET, Sensorium.distill(SenseFrame()).noise)
+        assertEquals(NoiseProfile.LOUD, Sensorium.distill(SenseFrame(soundDbfs = -15f)).noise)
+    }
+
+    @Test
+    fun aMeasuredLevelNeverQuietensAReadingTheClassifierNamed() {
+        // music + shouting + traffic is loudHits 3 → LOUD by keyword. A quiet meter must not
+        // demote it: a named sound carries meaning a number does not.
+        val named = labels("music", "shouting", "traffic")
+        assertEquals(NoiseProfile.LOUD, Sensorium.distill(SenseFrame(soundLabels = named)).noise)
+        assertEquals(
+            NoiseProfile.LOUD,
+            Sensorium.distill(SenseFrame(soundLabels = named, soundDbfs = -70f)).noise,
+        )
+    }
+
+    @Test
+    fun aMeasuredLevelMayRaiseAReadingTheClassifierUnderstated() {
+        // birdsong alone is calmHits 1 → CALM, at ordinal 2.
+        assertEquals(NoiseProfile.CALM, Sensorium.distill(SenseFrame(soundLabels = labels("bird"))).noise)
+        assertEquals(
+            NoiseProfile.LOUD,
+            Sensorium.distill(SenseFrame(soundLabels = labels("bird"), soundDbfs = -12f)).noise,
+        )
+    }
+
+    @Test
+    fun anAbsentLevelLeavesEveryReadingExactlyWhereItWas() {
+        // The property that makes this safe to ship without a calibrated microphone: a null level
+        // is byte-for-byte the old behaviour on every shape of input.
+        val shapes = listOf(
+            SenseFrame(),
+            SenseFrame(soundLabels = labels("silence")),
+            SenseFrame(soundLabels = labels("bird", "wind")),
+            SenseFrame(soundLabels = labels("speech")),
+            SenseFrame(soundLabels = labels("music", "shouting", "traffic")),
+        )
+        val expected = listOf(
+            NoiseProfile.QUIET, NoiseProfile.SILENT, NoiseProfile.CALM,
+            NoiseProfile.CALM, NoiseProfile.LOUD,
+        )
+        shapes.zip(expected).forEach { (f, want) -> assertEquals(want, Sensorium.distill(f).noise) }
+    }
+
+    @Test
+    fun aSilentRoomReadsSilentRatherThanMerelyQuiet() {
+        // Nothing recognised, so the level is the only evidence there is and it decides outright.
+        // Taking the louder of the two here would floor every unrecognised sip at QUIET and the
+        // quiet end of the scale would be unreachable without the classifier naming "silence".
+        assertEquals(NoiseProfile.SILENT, Sensorium.distill(SenseFrame(soundDbfs = -75f)).noise)
+    }
+
+    @Test
+    fun aSipThatOnlyMeasuredALevelStillCountsAsHavingHeard() {
+        assertFalse(Sensorium.distill(SenseFrame()).heard)
+        assertTrue(Sensorium.distill(SenseFrame(soundDbfs = -50f)).heard)
+        assertTrue(Sensorium.distill(SenseFrame(soundLabels = labels("speech"))).heard)
+    }
+    /**
+     * ⚠️ The rule [AmbientAction.LOWER_SENSE_RATE]'s own documentation calls the convenient mistake:
+     * a step too far reaches STANDDOWN, where `cadenceFor` sets `micIntervalSec = 0` — OFF — and the
+     * microphone is how this app hears a smoke alarm. The floor is what makes that unreachable
+     * rather than merely warned about.
+     */
+    @Test
+    fun `lowering the sense rate can never switch the ears off`() {
+        for (l in Sensorium.SenseLevel.entries) {
+            val out = Sensorium.slowed(l)
+            // Never faster: the battery's claim on the ladder outranks any rule's.
+            assertTrue("$l sped up to $out", out.ordinal >= l.ordinal)
+            // And never OFF, unless the battery had already put it there.
+            if (l != Sensorium.SenseLevel.STANDDOWN) {
+                assertNotEquals("$l was lowered all the way to standdown", Sensorium.SenseLevel.STANDDOWN, out)
+                assertTrue("$l stopped sipping", Sensorium.cadenceFor(out).micIntervalSec > 0)
+            }
+        }
+    }
+
+    @Test
+    fun `lowering the sense rate moves exactly one rung, and stops`() {
+        assertEquals(Sensorium.SenseLevel.SETTLED, Sensorium.slowed(Sensorium.SenseLevel.NOMINAL))
+        assertEquals(Sensorium.SenseLevel.CONSERVE, Sensorium.slowed(Sensorium.SenseLevel.SETTLED))
+        assertEquals(Sensorium.SenseLevel.CONSERVE, Sensorium.slowed(Sensorium.SenseLevel.CONSERVE))
+        assertEquals(Sensorium.SenseLevel.STANDDOWN, Sensorium.slowed(Sensorium.SenseLevel.STANDDOWN))
+        // Applying it repeatedly must settle rather than walk off the end.
+        var l = Sensorium.SenseLevel.NOMINAL
+        repeat(8) { l = Sensorium.slowed(l) }
+        assertEquals(Sensorium.SenseLevel.CONSERVE, l)
+    }
+
 }

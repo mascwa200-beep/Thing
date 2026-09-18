@@ -28,13 +28,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Astrology
+import dev.mascwa.pulse.core.telemetry.Eclipses
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
+import dev.mascwa.pulse.core.telemetry.MeteorShowers
+import dev.mascwa.pulse.core.telemetry.Occultations
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.LcarsIcons
@@ -65,6 +70,11 @@ import kotlin.math.roundToInt
 private enum class SkyTab(val label: String) {
     TONIGHT("TONIGHT"),
     SATELLITES("SATELLITES"),
+    SHOWERS("SHOWERS"),
+    ECLIPSES("ECLIPSES"),
+    OCCULTATIONS("OCCULTATIONS"),
+    COMETS("COMETS"),
+    ZODIAC("ZODIAC"),
     CHART("SKY CHART"),
     SUN_MOON("SUN & MOON"),
     ASTEROIDS("ASTEROIDS"),
@@ -72,7 +82,17 @@ private enum class SkyTab(val label: String) {
 }
 
 @Composable
-fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
+fun OrbitalScreen(
+    vm: OrbitalViewModel,
+    onBack: (() -> Unit)? = null,
+    /**
+     * Opens the full-screen chart.
+     *
+     * ⚠️ Additive and defaulted, so the one existing call site and the embedded [OrbitalBody]
+     * hosts are untouched. Null hides the control rather than showing one that does nothing.
+     */
+    onOpenSkyMap: (() -> Unit)? = null,
+) {
     PulseScaffold(
         title = "Observatory",
         onBack = onBack,
@@ -80,19 +100,29 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
             IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },
     ) { innerPadding ->
-        OrbitalBody(vm, Modifier.padding(innerPadding))
+        OrbitalBody(vm, Modifier.padding(innerPadding), onOpenSkyMap)
     }
 }
 
 /** The observatory body, scaffold-free so it can also be hosted inside another screen. */
 @Composable
-fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
+fun OrbitalBody(
+    vm: OrbitalViewModel,
+    modifier: Modifier = Modifier,
+    onOpenSkyMap: (() -> Unit)? = null,
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val tonight by vm.tonight.collectAsStateWithLifecycle()
     val passes by vm.passes.collectAsStateWithLifecycle()
     val passesLoading by vm.passesLoading.collectAsStateWithLifecycle()
     val tracked by vm.trackedCount.collectAsStateWithLifecycle()
     val launches by vm.launches.collectAsStateWithLifecycle()
+    val showers by vm.showers.collectAsStateWithLifecycle()
+    val eclipses by vm.eclipses.collectAsStateWithLifecycle()
+    val occultations by vm.occultations.collectAsStateWithLifecycle()
+    val comets by vm.comets.collectAsStateWithLifecycle()
+    val cometsLoading by vm.cometsLoading.collectAsStateWithLifecycle()
+    val zodiac by vm.zodiac.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val c = Pulse.colors
     var tab by remember { mutableStateOf(SkyTab.TONIGHT) }
@@ -127,7 +157,12 @@ fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
                         SkyTab.TONIGHT -> tonightTab(tonight, passes, passesLoading, site != null, c)
                         SkyTab.SATELLITES ->
                             satellitesTab(passes, passesLoading, tracked, site != null, c)
-                        SkyTab.CHART -> chartTab(d, tonight, c)
+                        SkyTab.SHOWERS -> showersTab(showers, site != null, c)
+                        SkyTab.ECLIPSES -> eclipsesTab(eclipses, site != null, c)
+                        SkyTab.OCCULTATIONS -> occultationsTab(occultations, site != null, c)
+                        SkyTab.COMETS -> cometsTab(comets, cometsLoading, c)
+                        SkyTab.ZODIAC -> zodiacTab(zodiac, site != null, c)
+                        SkyTab.CHART -> chartTab(d, tonight, c, onOpenSkyMap)
                         SkyTab.SUN_MOON -> sunMoonTab(tonight, site != null, c)
                         SkyTab.ASTEROIDS -> asteroidsTab(d, c)
                         SkyTab.LAUNCHES -> launchesTab(launches, c)
@@ -287,12 +322,644 @@ private fun PassCard(pass: SatellitePasses.Pass, c: NightwirePalette) {
     }
 }
 
+// ---- SHOWERS -----------------------------------------------------------------------------------
+
+/**
+ * What is falling, and whether it is worth going outside.
+ *
+ * ⚠️ **Ordered by how close the peak is, not by how impressive the shower is.** The Geminids are the
+ * best of the year and in April they are eight months away; sorting by rate would put them at the
+ * top of a page whose whole question is "tonight?".
+ */
+private fun LazyListScope.showersTab(
+    showers: List<OrbitalViewModel.ShowerNight>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    val active = showers.filter { it.occurrence.active }
+    item { LcarsHeaderBar("On now", trailing = "${active.size}") }
+    if (active.isEmpty()) {
+        item {
+            Hint(
+                "No shower is inside its activity window today. The next one is below — a few " +
+                    "sporadic meteors an hour is the background rate all year round.",
+                c,
+            )
+        }
+    } else {
+        items(active, key = { "active-${it.occurrence.shower.id}" }) { ShowerCard(it, c) }
+    }
+
+    val ahead = showers.filterNot { it.occurrence.active }
+    if (ahead.isNotEmpty()) {
+        item { LcarsHeaderBar("Coming up", trailing = "${ahead.size}") }
+        items(ahead, key = { "ahead-${it.occurrence.shower.id}" }) { ShowerCard(it, c) }
+    }
+}
+
+@Composable
+private fun ShowerCard(night: OrbitalViewModel.ShowerNight, c: NightwirePalette) {
+    val s = night.occurrence.shower
+    val v = night.viewing
+    // ⚠️ Colour follows whether it is watchable NOW rather than how good the shower is, so a glance
+    // down the page answers the question the page is for.
+    val accent = when {
+        v.hindrance != MeteorShowers.Hindrance.NONE -> c.muted
+        night.occurrence.active -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    s.name,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(peakPhrase(night.occurrence), fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent)
+            }
+            Text(
+                night.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                // The ZHR is quoted as what it is — an idealisation — rather than as an expectation,
+                // because the count above already carries the real answer for here and now.
+                "Up to ${s.zhr}/hr in ideal conditions · ${s.speedKmS} km/s, ${s.pace} · from ${s.parent}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            if (s.caveat.isNotBlank()) {
+                Text(
+                    s.caveat,
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.amber,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/** "Peaks tonight" / "Peaks in 9 days" / "Peaked 3 days ago", never a bare signed number. */
+private fun peakPhrase(o: MeteorShowers.Occurrence): String = when {
+    o.daysFromPeak == 0 -> "PEAKS TONIGHT"
+    o.daysFromPeak < 0 -> "PEAKS IN ${-o.daysFromPeak}D"
+    else -> "PEAKED ${o.daysFromPeak}D AGO"
+}
+
+// ---- ECLIPSES ----------------------------------------------------------------------------------
+
+/**
+ * Eclipses, split by whether you would actually see anything.
+ *
+ * ⚠️ **The split is the point.** Most eclipses happen on the other side of the world, so a plain
+ * chronological list is mostly disappointment with the occasional real event buried in it. Sorting
+ * by "can I see this" answers the question somebody opens the page to ask — and the ones that are
+ * elsewhere are still listed rather than hidden, because an eclipse you cannot see is a fact about
+ * where you are standing and not an absence of news.
+ */
+private fun LazyListScope.eclipsesTab(
+    eclipses: List<OrbitalViewModel.EclipseNight>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (eclipses.isEmpty()) {
+        item {
+            Hint(
+                "No eclipse falls in the next two years, which would be remarkable — there are " +
+                    "usually four to seven a year. If this stays empty, suspect the clock.",
+                c,
+            )
+        }
+        return
+    }
+    val here = eclipses.filter { it.local.visible }
+    item { LcarsHeaderBar("Visible from here", trailing = "${here.size}") }
+    if (here.isEmpty()) {
+        item {
+            Hint(
+                "None of the next two years' eclipses is above your horizon while it happens. That " +
+                    "is ordinary rather than unlucky: the Moon's shadow is small and the Earth is " +
+                    "large.",
+                c,
+            )
+        }
+    } else {
+        items(here, key = { "here-${it.eclipse.greatestEpochMs}" }) { EclipseCard(it, c) }
+    }
+
+    val elsewhere = eclipses.filterNot { it.local.visible }
+    if (elsewhere.isNotEmpty()) {
+        item { LcarsHeaderBar("Elsewhere in the world", trailing = "${elsewhere.size}") }
+        items(elsewhere, key = { "away-${it.eclipse.greatestEpochMs}" }) { EclipseCard(it, c) }
+    }
+}
+
+@Composable
+private fun EclipseCard(night: OrbitalViewModel.EclipseNight, c: NightwirePalette) {
+    val e = night.eclipse
+    val l = night.local
+    // ⚠️ Colour says how much of it YOU get, not how impressive the event is somewhere else — the
+    // same rule the shower cards follow, so one glance down the page answers one question. Amber is
+    // reserved for "this file cannot tell", which is a different thing from a poor view.
+    val accent = when {
+        !l.visible -> c.muted
+        l.borderline -> c.amber
+        l.totalHere || l.annularHere -> c.violet
+        else -> c.accent
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    Eclipses.describe(e),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    countdown(e.greatestEpochMs),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent,
+                )
+            }
+            Text(
+                night.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                eclipseFigures(night),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under the sentence — and it omits a figure rather than printing a misleading one.
+ *
+ * ⚠️ A solar eclipse's GEOCENTRIC magnitude is routinely zero for a real and even a total eclipse,
+ * because the centre of the Earth is not where the eclipse is. Printing that beside the words
+ * "Total solar eclipse" reads as a contradiction, so the solar line quotes what THIS place gets and
+ * the lunar line quotes the eclipse's own depth, which really is the same for everybody.
+ */
+private fun eclipseFigures(night: OrbitalViewModel.EclipseNight): String {
+    val e = night.eclipse
+    val l = night.local
+    val at = "${dateOrDash(e.greatestEpochMs)} ${clockOrDash(e.greatestEpochMs)}"
+    return if (e.isSolar) {
+        if (l.visible) {
+            "$at · ${(l.obscuration * 100).roundToInt()}% of the Sun hidden here · " +
+                "Sun ${l.altitudeDeg.roundToInt()}° up"
+        } else {
+            "$at · greatest eclipse, wherever the shadow falls"
+        }
+    } else {
+        val depth = "${(e.magnitude * 100).roundToInt()}% of the Moon in the true shadow"
+        if (l.visible) "$at · $depth · Moon ${l.altitudeDeg.roundToInt()}° up" else "$at · $depth"
+    }
+}
+
+/**
+ * "IN 43 DAYS", "TOMORROW", "TONIGHT" — a countdown, never a bare date.
+ *
+ * ⚠️ **[Formatters.relativeTime] cannot be reused here and it is worth saying why**: it returns
+ * "just now" for any epoch in the future, by design, because it exists to age news. Reaching for it
+ * would have put "just now" on an eclipse two years away, on every card, and looked deliberate.
+ *
+ * Counted in CALENDAR days rather than elapsed milliseconds, for the reason that same function's
+ * KDoc gives at length: an eclipse 30 hours away is tomorrow, not "in one day", and where the
+ * clocks change a local day is not 24 hours.
+ */
+private fun countdown(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+    val zone = java.time.ZoneId.systemDefault()
+    val then = java.time.Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
+    val today = java.time.Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+    val days = java.time.temporal.ChronoUnit.DAYS.between(today, then)
+    return when {
+        days < 0L -> "PASSED"
+        days == 0L -> "TODAY"
+        days == 1L -> "TOMORROW"
+        days < 60L -> "IN ${days}D"
+        else -> "IN ${days / 30}MO"
+    }
+}
+
+// ---- OCCULTATIONS ------------------------------------------------------------------------------
+
+/**
+ * When the Moon covers something, and whether it does so over your head.
+ *
+ * ⚠️ **Split by whether it happens HERE, not by how good the event is somewhere else**, because the
+ * two are barely related: the Moon's parallax is four times its own diameter, so a conjunction that
+ * looks like a direct hit from the centre of the Earth routinely misses a given place by half a
+ * degree, and one that looks like a wide miss can be a clean occultation. A list ordered by
+ * geocentric closeness would put the events you cannot see at the top.
+ */
+private fun LazyListScope.occultationsTab(
+    hidings: List<OrbitalViewModel.Hiding>,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (hidings.isEmpty()) {
+        item {
+            Hint(
+                "Nothing in the next six months. That is unusual rather than impossible — the Moon " +
+                    "passes something bright every few weeks — so if this stays empty, suspect the " +
+                    "clock or a missing star catalogue.",
+                c,
+            )
+        }
+        return
+    }
+
+    val here = hidings.filter { it.local.occulted || it.local.grazing }
+    item { LcarsHeaderBar("Covered from here", trailing = "${here.size}") }
+    if (here.isEmpty()) {
+        item {
+            Hint(
+                "None of these passes in front of anything from where you are standing. That is " +
+                    "ordinary: the Moon's parallax is about a degree, four times its own width, so " +
+                    "which places see an occultation and which see a near miss changes with every " +
+                    "event.",
+                c,
+            )
+        }
+    } else {
+        items(here, key = { "occ-${it.event.target.name}-${it.event.greatestEpochMs}" }) {
+            OccultationCard(it, c)
+        }
+    }
+
+    val misses = hidings.filterNot { it.local.occulted || it.local.grazing }
+    if (misses.isNotEmpty()) {
+        item { LcarsHeaderBar("Close passes and elsewhere", trailing = "${misses.size}") }
+        items(misses, key = { "miss-${it.event.target.name}-${it.event.greatestEpochMs}" }) {
+            OccultationCard(it, c)
+        }
+    }
+
+    item {
+        LcarsFrame(Modifier.fillMaxWidth(), accent = c.muted) {
+            Column {
+                Text(
+                    "Why the same event is different two hundred miles away",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    "The Moon is close enough that where it appears against the stars depends on " +
+                        "where you are standing — by up to a degree, which is four times its own " +
+                        "width. So an occultation is a strip across the Earth rather than an event " +
+                        "everyone shares, and near the edge of that strip the star winks in and out " +
+                        "behind lunar mountains. Those edges are marked as undecided here rather " +
+                        "than guessed at.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The comets worth looking for, brightest first.
+ *
+ * ⚠️ **Location is not required and that is deliberate**, unlike every other tab here. Where a comet
+ * IS depends on the date alone; only whether it is above your horizon needs a site. So the list is
+ * shown either way, and the altitude line simply goes missing without one — rather than the tab
+ * refusing to say anything, which would be withholding most of the answer over a detail.
+ */
+private fun LazyListScope.cometsTab(
+    comets: List<OrbitalViewModel.Comet>,
+    loading: Boolean,
+    c: NightwirePalette,
+) {
+    if (comets.isEmpty()) {
+        item {
+            Hint(
+                if (loading) {
+                    "Reading the Minor Planet Center's catalogue."
+                } else {
+                    "Nothing bright enough is far enough from the Sun to look at. That is the " +
+                        "ordinary state of affairs — a comet worth seeing without a telescope " +
+                        "turns up every year or two, not every week."
+                },
+                c,
+            )
+        }
+        return
+    }
+
+    val up = comets.filter { it.up }
+    item { LcarsHeaderBar("Up now", trailing = "${up.size}") }
+    if (up.isEmpty()) {
+        item { Hint("None of these is above the horizon at the moment. They will be, at some point tonight or in the coming weeks.", c) }
+    } else {
+        items(up, key = { "comet-up-${it.sighting.designation}" }) { CometCard(it, c) }
+    }
+
+    val below = comets.filterNot { it.up }
+    if (below.isNotEmpty()) {
+        item { LcarsHeaderBar("Below the horizon", trailing = "${below.size}") }
+        items(below, key = { "comet-down-${it.sighting.designation}" }) { CometCard(it, c) }
+    }
+
+    item {
+        Hint(
+            "⚠️ The magnitudes are predictions, not measurements. A comet's brightness is fitted " +
+                "from how it behaved last time, and comets are famously bad at repeating " +
+                "themselves — being two magnitudes out either way is completely ordinary. Treat " +
+                "these as a rough expectation of what is worth going outside for.",
+            c,
+        )
+    }
+}
+
+/** One comet: how bright it should be, where it is, and what it is doing. */
+@Composable
+private fun CometCard(comet: OrbitalViewModel.Comet, c: NightwirePalette) {
+    val s = comet.sighting
+    val m = s.magnitude
+    // Colour says what you would need to see it, which is the only question that matters here.
+    val accent = when {
+        m == null -> c.muted
+        m <= 6.0 -> c.violet      // naked eye, under a dark sky
+        m <= 10.0 -> c.accent     // binoculars
+        else -> c.muted           // a telescope, and patience
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    s.designation,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    m?.let { "mag ${"%.1f".format(java.util.Locale.US, it)}" } ?: "brightness unknown",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = accent,
+                )
+            }
+            Text(
+                comet.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                cometFigures(comet),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under a comet card.
+ *
+ * ⚠️ Locale.US throughout: these are data, and a comma decimal in a figure somebody might copy into
+ * a star atlas is the recurring mistake this project has corrected across coordinates, cache keys
+ * and exported files.
+ */
+private fun cometFigures(comet: OrbitalViewModel.Comet): String {
+    val s = comet.sighting
+    val us = java.util.Locale.US
+    val parts = mutableListOf(
+        "%.2f AU from Earth".format(us, s.geocentricAu),
+        "%.2f from the Sun".format(us, s.heliocentricAu),
+        "%.0f° from the Sun in the sky".format(us, s.elongationDeg),
+    )
+    // Altitude is the one figure that needs a site, so it is the one that can be missing.
+    if (comet.horizontal.altitudeDeg != 0.0 || comet.horizontal.azimuthDeg != 0.0) {
+        parts += "alt %.0f° az %.0f°".format(us, comet.horizontal.altitudeDeg, comet.horizontal.azimuthDeg)
+    }
+    return parts.joinToString("  ·  ")
+}
+
+@Composable
+private fun OccultationCard(hiding: OrbitalViewModel.Hiding, c: NightwirePalette) {
+    val e = hiding.event
+    val l = hiding.local
+    // Same rule as the eclipse cards: colour says what YOU get. Amber is "cannot tell", which is a
+    // different thing from a poor view.
+    val accent = when {
+        l.grazing -> c.amber
+        l.occulted && l.visible -> c.violet
+        l.occulted -> c.accent
+        else -> c.muted
+    }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    Occultations.describe(e),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = c.ink,
+                )
+                Text(
+                    countdown(e.greatestEpochMs),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = accent,
+                )
+            }
+            Text(
+                hiding.advice,
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                occultationFigures(hiding),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The numbers under the sentence.
+ *
+ * ⚠️ **Contact times are printed only when there ARE contacts**, and a miss quotes how far the
+ * Moon's edge passed instead. Printing a disappearance time for an event that does not happen here
+ * would be the single most misleading thing this card could do — somebody would set an alarm.
+ */
+private fun occultationFigures(hiding: OrbitalViewModel.Hiding): String {
+    val e = hiding.event
+    val l = hiding.local
+    val lit = "${(e.moonIlluminatedFraction * 100).roundToInt()}% lit"
+    if (!l.minSeparationDeg.isFinite()) return "${dateOrDash(e.greatestEpochMs)} · $lit"
+    return if (l.occulted && l.disappearsEpochMs != null && l.reappearsEpochMs != null) {
+        val mins = ((l.reappearsEpochMs!! - l.disappearsEpochMs!!) / 60_000L)
+        "${dateOrDash(l.bestEpochMs)} · hidden ${clockOrDash(l.disappearsEpochMs)}–" +
+            "${clockOrDash(l.reappearsEpochMs)} (${mins}m) · Moon ${l.moonAltitudeDeg.roundToInt()}° up · $lit"
+    } else {
+        val gap = ((l.minSeparationDeg - l.moonSemiDeg) * 60).roundToInt()
+        "${dateOrDash(l.bestEpochMs)} ${clockOrDash(l.bestEpochMs)} · edge passes $gap′ away · " +
+            "Moon ${l.moonAltitudeDeg.roundToInt()}° up · $lit"
+    }
+}
+
+// ---- ZODIAC ------------------------------------------------------------------------------------
+
+/**
+ * Where the classical bodies sit along the ecliptic, in both zodiacs.
+ *
+ * ⚠️ **The disclaimer is the first thing on the page and it is not negotiable.** Every position
+ * here is measured and checkable; every meaning attached to it is tradition that has been tested
+ * and does not predict. Saying so once, plainly, is what makes it defensible to compute the rest
+ * properly — and it is said without sneering, because doing the tradition well and being honest
+ * about its standing are not in tension.
+ */
+private fun LazyListScope.zodiacTab(
+    zodiac: OrbitalViewModel.Zodiac?,
+    hasSite: Boolean,
+    c: NightwirePalette,
+) {
+    if (!hasSite) {
+        item { NeedsLocation(c) }
+        return
+    }
+    if (zodiac == null) {
+        item { Hint("Working out where everything is.", c) }
+        return
+    }
+    item {
+        Hint(
+            "The positions below are real: the same ephemeris the rest of this app uses, good to a " +
+                "few arcseconds against JPL. What the signs are said to MEAN is a system of " +
+                "correspondences about three thousand years old, which has been tested and does not " +
+                "predict anything. Both are worth knowing; they are not the same kind of thing.",
+            c,
+        )
+    }
+
+    item { LcarsHeaderBar("Where they are", trailing = "${zodiac.bodies.size}") }
+    items(zodiac.bodies, key = { "z-${it.name}" }) { ZodiacRow(it, c) }
+
+    item {
+        LcarsHeaderBar("The angles", trailing = if (zodiac.ascendantDeg == null) "—" else "2")
+    }
+    item {
+        LcarsFrame(Modifier.fillMaxWidth()) {
+            Column {
+                Text(
+                    zodiac.ascendantDeg?.let { "Rising  ${Astrology.format(it)}" }
+                        ?: "Rising  — undefined at this latitude, where the ecliptic never crosses " +
+                            "the horizon in the ordinary way",
+                    fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                )
+                Text(
+                    "Midheaven  ${Astrology.format(zodiac.midheavenDeg)}",
+                    fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "The rising degree is the point of the ecliptic on your eastern horizon right " +
+                        "now, and the midheaven the point crossing your meridian. Both are ordinary " +
+                        "astronomy and both move about a degree every four minutes.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+
+    if (zodiac.aspects.isNotEmpty()) {
+        item { LcarsHeaderBar("Angles between them", trailing = "${zodiac.aspects.size}") }
+        items(zodiac.aspects, key = { "a-${it.a}-${it.b}-${it.kind}" }) { AspectRow(it, c) }
+    }
+
+    item {
+        LcarsFrame(Modifier.fillMaxWidth(), accent = c.muted) {
+            Column {
+                Text(
+                    "Why two columns",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    "Western signs are measured from the March equinox, which drifts against the " +
+                        "stars by about fifty arcseconds a year. Two thousand years on, the two " +
+                        "systems are ${fmt("%.1f", zodiac.ayanamsaDeg)}° apart — most of a whole " +
+                        "sign. So a Sun \"in Aries\" is usually standing in front of Pisces. The " +
+                        "second column is the constellation-anchored answer Indian astrology uses.",
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZodiacRow(body: OrbitalViewModel.ZodiacBody, c: NightwirePalette) {
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (body.retrograde) c.amber else c.accent) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    body.name,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                    color = c.ink,
+                )
+                Text(
+                    // ⚠️ Real, and the one piece of astrological vocabulary that names something a
+                    // telescope can see: the Earth overtaking an outer planet on the inside.
+                    if (body.retrograde) "℞ RETROGRADE" else "",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                )
+            }
+            Text(
+                "${body.tropical.symbol}  ${Astrology.format(body.longitudeDeg)}",
+                fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                "${body.tropical.element.label} · ${body.tropical.mode.label}  ·  " +
+                    "against the stars: ${body.sidereal.label}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AspectRow(aspect: Astrology.Aspect, c: NightwirePalette) {
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (aspect.exact) c.violet else c.muted) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "${aspect.a} ${aspect.kind.symbol} ${aspect.b}",
+                fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+            )
+            Text(
+                "${aspect.kind.label} · ${fmt("%.1f", aspect.orbDeg)}° off",
+                fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = if (aspect.exact) c.violet else c.muted,
+            )
+        }
+    }
+}
+
 // ---- SKY CHART ---------------------------------------------------------------------------------
 
 private fun LazyListScope.chartTab(
     d: OrbitalData?,
     tonight: OrbitalViewModel.Tonight?,
     c: NightwirePalette,
+    onOpenSkyMap: (() -> Unit)?,
 ) {
     item { LcarsHeaderBar("Looking up", trailing = "zenith at centre") }
     item {
@@ -331,6 +998,18 @@ private fun LazyListScope.chartTab(
             }
         }
         LcarsSkyPlot(points, Modifier.fillMaxWidth().height(320.dp))
+    }
+    if (onOpenSkyMap != null) {
+        item {
+            // This plot holds the Sun, the Moon and five planets in a fixed 320dp square. The map
+            // holds 8,404 stars as well and you can move around in it, which is what somebody
+            // standing outside actually wants.
+            LcarsButton(
+                "OPEN THE FULL SKY MAP",
+                onClick = onOpenSkyMap,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
     item {
         Hint(
@@ -632,6 +1311,27 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
             "Passes propagated on-device (SGP4) from Celestrak element sets."
         SkyTab.CHART, SkyTab.SUN_MOON ->
             "Sun and Moon computed on-device — no network needed."
+        SkyTab.ZODIAC ->
+            "Positions computed on-device from the same ephemeris as every other tab. The zodiac " +
+                "labels are a three-thousand-year-old system of correspondences, not a measurement " +
+                "— see the note at the top of the tab."
+        SkyTab.ECLIPSES ->
+            "Computed on-device from the shipped ephemeris — no network needed. Checked against " +
+                "JPL DE421: every eclipse of 2025-2028 agrees in kind, greatest eclipse within 30 " +
+                "seconds and magnitude within 0.004."
+        SkyTab.OCCULTATIONS ->
+            "Computed on-device from the shipped ephemeris and the bundled star catalogue — no " +
+                "network needed. Checked against JPL DE421 at five sites: whether it happens agrees " +
+                "everywhere, and disappearance and reappearance land within a minute."
+        SkyTab.SHOWERS ->
+            "Peaks solved from the Sun's own position on-device, from a bundled table of radiants " +
+                "— no network needed. Rates are an ideal-conditions figure scaled for the radiant's " +
+                "height and the Moon; light pollution is not modelled."
+        SkyTab.COMETS ->
+            "Orbital elements from the Minor Planet Center; the positions are solved on the " +
+                "device. Checked against JPL DE421 over all 957 comets in a real catalogue: half " +
+                "are within 0.6 arcseconds and the worst is 17, which is the Earth's own position " +
+                "rather than the orbit. The magnitudes are a fitted prediction and are not."
         SkyTab.ASTEROIDS -> "Source: NASA NeoWs."
         SkyTab.LAUNCHES -> "Source: The Space Devs Launch Library (keyless)."
     }

@@ -21,7 +21,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,13 +36,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.AmbientAction
+import dev.mascwa.pulse.core.telemetry.AmbientIntent
+import dev.mascwa.pulse.core.telemetry.AudioRoute
+import dev.mascwa.pulse.data.sensing.AmbientActuator
+import dev.mascwa.pulse.core.telemetry.DndFilter
+import dev.mascwa.pulse.core.telemetry.ElapsedPhrase
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
+import dev.mascwa.pulse.core.telemetry.LightState
+import dev.mascwa.pulse.core.telemetry.Posture
 import dev.mascwa.pulse.core.telemetry.PressureTrend
+import dev.mascwa.pulse.core.telemetry.SenseContext
 import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.core.telemetry.Situation
+import dev.mascwa.pulse.core.telemetry.SituationRead
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.sensing.FusionSnapshot
+import dev.mascwa.pulse.data.sensing.SensorsPresent
 import dev.mascwa.pulse.data.sensing.SensoriumStore
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -46,6 +64,7 @@ import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlinx.coroutines.delay
 
 /**
  * The SENSORIUM scanner — the live environmental sweep: what the ship's senses read right now (fused
@@ -66,10 +85,36 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val level by vm.level.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val fusion by vm.fusion.collectAsStateWithLifecycle()
+    val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
+    val lookNote by vm.lookNote.collectAsStateWithLifecycle()
+    val phone by vm.phone.collectAsStateWithLifecycle()
+    val situation by vm.situation.collectAsStateWithLifecycle()
+    val holds by vm.holds.collectAsStateWithLifecycle()
+    val refusedHolds by vm.refusedHolds.collectAsStateWithLifecycle()
+    val quietBecause by vm.quietBecause.collectAsStateWithLifecycle()
+    val holdHistory by vm.holdHistory.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { vm.rearm(ctx) }
+
+    // See refreshModelBytes: the classifiers usually land while this screen is open, so a figure
+    // read once at construction would report zero for the rest of the session.
+    LaunchedEffect(Unit) { vm.refreshModelBytes() }
+
+    // ⚠️ A ticking clock, because reading the wall clock during composition would freeze.
+    // `situation` is a StateFlow of a data class, so it only emits when a FIELD changes — and a
+    // situation that is holding steady is exactly the case where nothing changes. Left to
+    // recomposition the card would have said "started 2 minutes ago" for the whole eight hours
+    // somebody was asleep. The tick is coarse because ElapsedPhrase is coarse, and it runs only
+    // while this screen is composed.
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(SITUATION_TICK_MS)
+            nowMs = System.currentTimeMillis()
+        }
+    }
 
     PulseScaffold(
         title = "Sensorium",
@@ -83,6 +128,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 item {
                     HeaderCard(
                         reading = reading, level = level, micArmed = micArmed, camArmed = camArmed,
+                        lookNote = lookNote,
                         onArm = {
                             val missing = buildList {
                                 if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) !=
@@ -98,9 +144,45 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                         onLook = { vm.lookNow() },
                     )
                 }
-                item { FacetsCard(reading) }
+                // ⚠️ Above the facets on purpose: the fused reading is the raw material and this is
+                // the conclusion, and a person opening this screen wants the conclusion first.
+                item { SituationCard(situation, nowMs) }
+                // ⚠️ Directly under the situation, because it is the answer to the question
+                // the situation raises — "and what did you do about it?" — and a person who
+                // opens this screen because their phone went quiet should not have to scroll.
+                item {
+                    HoldingNowCard(
+                        holds = holds, refused = refusedHolds, quietBecause = quietBecause,
+                        nowMs = nowMs,
+                        onRelease = { vm.releaseHold(it) }, onReleaseAll = { vm.releaseAllHolds() },
+                    )
+                }
+                item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
-                item { InstrumentsCard(fusion) }
+                item { InstrumentsCard(fusion, reading) }
+                item { PhoneCard(phone) }
+                item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
+                // ⚠️ Its own section rather than interleaved with the sensed events below. Those
+                // answer "what happened in the room"; this answers "what did the phone do about it",
+                // and a single merged list would make it hard to tell a cause from an effect. It is
+                // omitted entirely until there is something in it.
+                if (holdHistory.isNotEmpty()) {
+                    item {
+                        Text(
+                            "WHAT IT HAS DONE",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold, color = c.accent,
+                            modifier = Modifier.padding(top = 6.dp, start = 2.dp),
+                        )
+                    }
+                    // ⚠️ The literal prefix is what `LazyKeyTest` turns on, and it is load-bearing
+                    // here rather than a formality: this list and the sensed events below share one
+                    // key namespace, and both are keyed off a wall-clock instant stamped on the same
+                    // heartbeat. Today they cannot collide — an event key opens with a letter
+                    // ("sound.smoke_alarm") and this one with a digit — but nothing enforces that,
+                    // and "safe by construction" is not a property anything checks.
+                    items(holdHistory, key = { "did:${it.atMs}:${it.text}" }) { line -> HoldLineRow(line, nowMs) }
+                }
                 item {
                     Text(
                         "SENSED EVENTS · LAST 48H",
@@ -118,7 +200,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                         )
                     }
                 } else {
-                    items(events, key = { "${it.key}:${it.atMs}" }) { e -> EventRow(e) }
+                    items(events, key = { "sensed:${it.key}:${it.atMs}" }) { e -> EventRow(e) }
                 }
             }
         }
@@ -131,6 +213,7 @@ private fun HeaderCard(
     level: Sensorium.SenseLevel,
     micArmed: Boolean,
     camArmed: Boolean,
+    lookNote: String?,
     onArm: () -> Unit,
     onLook: () -> Unit,
 ) {
@@ -169,6 +252,16 @@ private fun HeaderCard(
                 ActionChip("▸ LOOK NOW", onLook)
             }
         }
+        // ⚠️ The button used to set a flag and say nothing at all, and at CONSERVE or STANDDOWN that
+        // flag could never be honoured — so on a phone low on battery it did precisely nothing, with
+        // no way to tell that from a camera that had looked and seen nothing worth naming.
+        if (lookNote != null) {
+            Text(
+                "◉ $lookNote",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
     }
 }
 
@@ -198,7 +291,7 @@ private fun ActionChip(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FacetsCard(reading: EnvReading) {
+private fun FacetsCard(reading: EnvReading, present: SensorsPresent?) {
     val c = Pulse.colors
     Column(
         Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
@@ -206,13 +299,44 @@ private fun FacetsCard(reading: EnvReading) {
     ) {
         FacetRow("SETTING", reading.setting.name, if (reading.seen) "seen" else "inferred")
         FacetRow("MOTION", reading.motion.name, null)
-        FacetRow("SOUNDSCAPE", reading.noise.name, if (reading.heard) reading.soundTags.joinToString(", ") else "mic idle")
-        FacetRow("LIGHT", reading.light.name, null)
-        FacetRow("COMPANY", reading.social.name, null)
-        reading.pressureTrend?.let {
+        FacetRow(
+            "SOUNDSCAPE", reading.noise.name,
+            when {
+                reading.soundTags.isNotEmpty() -> reading.soundTags.joinToString(", ")
+                // Heard, and nothing it had a word for. That is a real reading of a real room and
+                // it used to be indistinguishable from a microphone nobody had opened.
+                reading.heard -> "nothing recognisable — read by level"
+                else -> "mic idle"
+            },
+        )
+        // ⚠️ FOUR different silences now, and they used to render as one word. An unknown brightness
+        // says which it is: no such sensor, a sensor that has not reported yet, the whole watch stood
+        // down — or the front of the phone is against something, which is the one where the sensor
+        // is working perfectly and its reading is simply not about the room.
+        if (reading.light == LightState.UNKNOWN) {
             FacetRow(
-                "PRESSURE", it.name,
-                if (it == PressureTrend.PLUNGING || it == PressureTrend.FALLING) "weather may be turning" else null,
+                "LIGHT", "—",
+                if (reading.covered) "covered — that reading is not the room"
+                else whySilent(present?.light, "ambient-light sensor"),
+            )
+        } else {
+            FacetRow("LIGHT", reading.light.name, null)
+        }
+        FacetRow("COMPANY", reading.social.name, null)
+        // Same rule for the barometer, which plenty of phones also lack. The row used to simply not
+        // exist, so "no barometer" and "the ring has not filled yet" were both a blank space.
+        val trend = reading.pressureTrend
+        if (trend != null) {
+            FacetRow(
+                "PRESSURE", trend.name,
+                if (trend == PressureTrend.PLUNGING || trend == PressureTrend.FALLING) "weather may be turning" else null,
+            )
+        } else {
+            FacetRow(
+                "PRESSURE", "—",
+                // The barometer's own extra case: present and reporting, but the 3 h ring is short.
+                if (present?.pressure == true) "needs about an hour of history"
+                else whySilent(present?.pressure, "barometer"),
             )
         }
         if (reading.sceneTags.isNotEmpty()) {
@@ -223,6 +347,21 @@ private fun FacetsCard(reading: EnvReading) {
             )
         }
     }
+}
+
+/**
+ * Why a sense has nothing to show — **three answers, never one blank**.
+ *
+ * ⚠️ `null` is "nobody has asked the hardware yet" (the sensing service is stood down), `false` is
+ * "this phone does not have it", `true` is "it is there and has not reported". Before this, all
+ * three rendered as a missing row, so a person on a phone with no barometer could not tell that
+ * from a feature that was simply switched off. [what] names the instrument when there is room for
+ * it; the compact instrument strip passes null and lets the row label carry that.
+ */
+private fun whySilent(has: Boolean?, what: String?): String = when (has) {
+    null -> "sensing is not running"
+    true -> "waiting for a reading"
+    false -> if (what != null) "no $what on this phone" else "not on this phone"
 }
 
 @Composable
@@ -240,6 +379,42 @@ private fun FacetRow(label: String, value: String, note: String?) {
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * What the two classifiers are holding on disk, and a way to hand it back.
+ *
+ * ⚠️ **Silent when nothing is held, which is the ordinary state before the watch has ever run.** A
+ * row reading "0 MB" beside a button that would free nothing is worse than no row: it invites the
+ * tap and then appears broken. Once the models are down it says so, because until now they arrived
+ * with nothing asked and nothing said, and 8 MB you cannot account for is more irritating than
+ * 8 MB you can.
+ */
+@Composable
+private fun StorageCard(modelBytes: Long, onDiscard: () -> Unit) {
+    if (modelBytes <= 0L) return
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Text(
+            "ON THIS DEVICE",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.accent,
+        )
+        Text(
+            "Sound and scene classifiers: ${Formatters.megabytes(modelBytes)}. Fetched once, the " +
+                "first time the watch ran, and kept so it works with no network.",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        LcarsButton(
+            text = "STAND DOWN AND FREE ${Formatters.megabytes(modelBytes)}",
+            onClick = onDiscard,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
@@ -280,7 +455,7 @@ private fun AnomalyCard(anomalies: List<EnvAnomaly>, normalLine: String?) {
 }
 
 @Composable
-private fun InstrumentsCard(f: FusionSnapshot) {
+private fun InstrumentsCard(f: FusionSnapshot, reading: EnvReading) {
     val c = Pulse.colors
     Column(
         Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
@@ -290,15 +465,330 @@ private fun InstrumentsCard(f: FusionSnapshot) {
             "INSTRUMENTS", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
             fontWeight = FontWeight.Bold, color = c.accent,
         )
+        // ⚠️ **Every sense gets a row, always.** These used to be dropped when the value was null,
+        // so a phone with no barometer and a phone whose barometer had not reported yet and a phone
+        // where the whole controller was never started all rendered identically: a missing line. A
+        // row that says "no sensor" is a measurement of the hardware; a blank is an absence of one.
+        val p = f.present
+        fun silent(has: Boolean?) = whySilent(has, null)
         val rows = buildList {
-            add("MOTION" to "%.3f".format(f.movement))
-            f.lightLux?.let { add("LIGHT" to "${it.toInt()} lx") }
-            f.pressureHpa?.let {
-                val delta = f.pressureDeltaHpa?.let { d -> " (${if (d >= 0) "+" else ""}%.1f/3h)".format(d) } ?: ""
-                add("PRESSURE" to "%.1f hPa%s".format(it, delta))
+            // ⚠️ MOTION reads the ACCELEROMETER flag rather than the value: `movement` defaults to
+            // 0f, and 0f is also what a phone at rest genuinely measures, so the number alone can
+            // never say whether anything is watching.
+            add("MOTION" to if (p?.accelerometer == true) "%.3f".format(f.movement) else silent(p?.accelerometer))
+            add("LIGHT" to (f.lightLux?.let { "${it.toInt()} lx" } ?: silent(p?.light)))
+            add(
+                "PRESSURE" to (
+                    f.pressureHpa?.let {
+                        val delta = f.pressureDeltaHpa
+                            ?.let { d -> " (${if (d >= 0) "+" else ""}%.1f/3h)".format(d) } ?: ""
+                        "%.1f hPa%s".format(it, delta)
+                    } ?: silent(p?.pressure)
+                    ),
+            )
+            add("MAG FIELD" to (f.magneticUt?.let { "${it.toInt()} µT" } ?: silent(p?.magnetometer)))
+            add(
+                "PROXIMITY" to (
+                    f.proximityNear?.let { if (it) "covered" else "clear" } ?: silent(p?.proximity)
+                    ),
+            )
+            // The measured loudness behind the SOUNDSCAPE word, which was computed from the capture
+            // buffer and then thrown away. Not from the sensor snapshot: this one comes from the mic
+            // sampler, so its silence means "no sip has landed", never "no such hardware".
+            add(
+                "SOUND LEVEL" to (
+                    reading.soundDbfs?.let { "%.0f dBFS".format(java.util.Locale.US, it) }
+                        ?: "waiting for a sip"
+                    ),
+            )
+        }
+        rows.forEach { (label, value) ->
+            Row(Modifier.padding(top = 4.dp)) {
+                Text(
+                    label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp,
+                    color = c.muted, modifier = Modifier.padding(end = 10.dp),
+                )
+                Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
             }
-            f.magneticUt?.let { add("MAG FIELD" to "${it.toInt()} µT") }
-            f.proximityNear?.let { add("PROXIMITY" to if (it) "covered" else "clear") }
+        }
+    }
+}
+
+/**
+ * What all of it adds up to — the read the acting layer will hang off.
+ *
+ * ⚠️ **The evidence is on screen because it has to be.** Everything downstream of this can change
+ * what the phone does, and a person has to be able to see WHY it did. "Driving" on its own is
+ * unarguable-with; "Driving · moving at vehicle speed, audio over Bluetooth" can be recognised as
+ * wrong by the person it is wrong about, which is the only debugging this feature will ever get.
+ */
+@Composable
+private fun SituationCard(s: SituationRead, nowMs: Long) {
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "SITUATION", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = c.accent,
+            )
+            Spacer(Modifier.weight(1f))
+            // ⚠️ A count of points rather than a percentage. Confidence here is a scale and not a
+            // probability — see AmbientSituation.CONFIDENT — and dressing it up as "83%" would claim
+            // a precision the scoring does not have.
+            if (s.situation != Situation.UNKNOWN) {
+                Text(
+                    "◼".repeat((s.confidence * 5f).toInt().coerceIn(1, 5)),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent,
+                )
+            }
+        }
+        Text(
+            // ⚠️ Read from the core rather than spelled here. This was a byte-identical copy of the
+            // ten-branch `when` in SituationRead.describe, so the same situation could have been
+            // called two different things depending on which surface you were looking at.
+            s.situation.label,
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Black, fontSize = 20.sp,
+            color = if (s.situation == Situation.UNKNOWN) c.muted else c.ink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (s.situation == Situation.UNKNOWN) {
+            // ⚠️ Said out loud rather than left as a blank card. Not knowing is the commonest correct
+            // answer here and it is not a fault, but a screen that goes quiet about it looks broken.
+            Text(
+                "Nothing has reached the bar. That is usually right — most of what a phone can sense " +
+                    "is consistent with several different lives.",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            return@Column
+        }
+        Text(
+            s.evidence.joinToString(" · "),
+            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (s.sinceMs > 0L && nowMs > s.sinceMs) {
+            Text(
+                "started ${ElapsedPhrase.describe(nowMs - s.sinceMs)}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (s.contenders.isNotEmpty()) {
+            Text(
+                "or possibly ${s.contenders.joinToString(", ") { it.name.lowercase().replace('_', ' ') }}",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/**
+ * What the phone knows about ITSELF, beside what the instruments know about the room.
+ *
+ * ⚠️ **Every row says something, and the ways of saying nothing are kept apart.** This is the same
+ * rule the INSTRUMENTS card was rebuilt around: "not read" (the system service never answered),
+ * "moving — cannot tell" (the accelerometer answered and refused) and a real value are three
+ * different facts, and rendering the first two as a blank row makes them indistinguishable from each
+ * other and from a sense that is working fine.
+ */
+/**
+ * What the acting layer is doing to this phone right now, and how to stop it.
+ *
+ * ⚠️ **This card is safety rule 6, and it is why the invasive tiers come after it rather than
+ * before.** A layer that quietly changes what a phone does, with no way to see what it changed or
+ * take it back, is indistinguishable from a fault — and the deleted `PhonePenaltyController` is the
+ * cautionary instance already recorded in CLAUDE.md. Every row names what was done, why, how long it
+ * has been on, and carries its own undo in the words of the thing it will undo.
+ *
+ * ⚠️ It draws nothing at all when nothing is held or refused. A permanently visible panel reading
+ * "nothing" teaches people to skip the part of the screen that matters on the day it says something.
+ */
+@Composable
+private fun HoldingNowCard(
+    holds: List<AmbientIntent>,
+    refused: List<String>,
+    quietBecause: String?,
+    nowMs: Long,
+    onRelease: (AmbientAction) -> Unit,
+    onReleaseAll: () -> Unit,
+) {
+    val c = Pulse.colors
+    // ⚠️ Nothing held, nothing refused and nothing to say about why: draw no card at all. That is
+    // the state before the watch has ever run, and a panel reading "nothing" would be the first
+    // thing somebody learns to scroll past — on the card that matters most when it says something.
+    if (holds.isEmpty() && refused.isEmpty() && quietBecause == null) return
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                // ⚠️ The heading says which of the two things this card is. A panel headed
+                // "HOLDING NOW" above an explanation of why nothing is held would be claiming the
+                // opposite of what it goes on to say.
+                if (holds.isEmpty()) "NOT ACTING, BECAUSE" else "HOLDING NOW",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = c.accent,
+            )
+            Spacer(Modifier.weight(1f))
+            if (holds.size > 1) ActionChip("RELEASE ALL", onReleaseAll)
+        }
+        if (holds.isEmpty() && quietBecause != null) {
+            Text(
+                quietBecause,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        for (h in holds) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(
+                    h.action.label,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    // ⚠️ The reason, verbatim from the rule that asked. It is mandatory on an intent
+                    // for exactly this line: "Pulse silenced your ringer" with no because reads as a
+                    // fault rather than a decision.
+                    h.reason,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Text(
+                        // ⚠️ How long it has been on AND when it will lift by itself. The second half
+                        // is what stops this reading as something the phone has decided to do for
+                        // ever — every hold has a ceiling it cannot outlive.
+                        "since ${ElapsedPhrase.describe(nowMs - h.fromMs)} · lifts by itself " +
+                            "in ${ElapsedPhrase.describe((h.untilMs - nowMs).coerceAtLeast(0L))}",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    // The undo is phrased as what pressing it will DO, not as "release".
+                    ActionChip(h.action.undo.uppercase(), { onRelease(h.action) })
+                }
+            }
+        }
+        if (refused.isNotEmpty()) {
+            // ⚠️ Shown rather than dropped. A rule that wanted something and could not have it is the
+            // difference between a tier being switched off and the layer being broken, and only this
+            // line can tell somebody which they are looking at.
+            Text(
+                "ASKED FOR, NOT ALLOWED", fontFamily = JetBrainsMono, fontSize = 9.sp,
+                letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = c.muted,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            for (r in refused) {
+                Text(
+                    r, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+/** One line of what the acting layer has done, newest first. */
+@Composable
+private fun HoldLineRow(line: AmbientActuator.Line, nowMs: Long) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            ElapsedPhrase.describe(nowMs - line.atMs),
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(line.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+    }
+}
+
+@Composable
+private fun PhoneCard(p: SenseContext) {
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Text(
+            "THIS PHONE", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.accent,
+        )
+        Text(
+            p.describe(), fontFamily = ChakraPetch, fontSize = 15.sp, color = c.ink,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        val unread = "not read"
+        val rows = buildList {
+            add(
+                "SCREEN" to when (p.screenOn) {
+                    null -> unread
+                    true -> if (p.locked == true) "on, locked" else if (p.locked == false) "on, unlocked" else "on"
+                    false -> "off"
+                },
+            )
+            add(
+                "LAST UNLOCK" to (
+                    // ⚠️ Null here is "none seen since the watch started", not "never" — the service
+                    // can begin while the phone is already in somebody's hand. Saying so beats a
+                    // dash, which would read as "this phone has not been unlocked".
+                    p.msSinceUnlock?.let { "${it / 1000L}s ago" } ?: "none seen since the watch started"
+                    ),
+            )
+            add(
+                "POSTURE" to when (p.posture) {
+                    null -> unread
+                    Posture.UNKNOWN -> "moving — cannot tell"
+                    Posture.FACE_DOWN -> "face-down"
+                    Posture.FACE_UP -> "face-up"
+                    Posture.UPRIGHT -> "upright or held"
+                },
+            )
+            add(
+                "POWER" to when (p.charging) {
+                    null -> unread
+                    true -> "charging · ${p.power?.name?.lowercase() ?: "source unknown"}"
+                    false -> "on battery"
+                },
+            )
+            add(
+                // Null below API 29, where the phone genuinely cannot say — see DeviceProbeReader.
+                "THERMAL" to (p.thermal?.name?.lowercase() ?: "$unread (needs Android 10)"),
+            )
+            add(
+                "AUDIO" to buildList {
+                    if (p.onCall == true) add("on a call")
+                    if (p.musicPlaying == true) add("playing")
+                    p.route?.takeIf { it != AudioRoute.UNKNOWN }?.let { add(it.name.lowercase()) }
+                }.joinToString(" · ").ifEmpty { if (p.route == null) unread else "idle" },
+            )
+            add("RINGER" to (p.ringer?.name?.lowercase() ?: unread))
+            add(
+                "DO NOT DISTURB" to when (p.dnd) {
+                    null, DndFilter.UNKNOWN -> "the phone will not say"
+                    DndFilter.OFF -> "off"
+                    DndFilter.PRIORITY -> "priority only"
+                    DndFilter.ALARMS_ONLY -> "alarms only"
+                    DndFilter.TOTAL_SILENCE -> "total silence"
+                },
+            )
+            add(
+                "HOME NETWORK" to when (p.awayFromHome) {
+                    // ⚠️ Null covers two situations and neither is "away": no home network is
+                    // configured, or the SSID cannot be read — which needs location permission and is
+                    // the ordinary case on GrapheneOS.
+                    null -> "no home Wi-Fi set, or the name cannot be read"
+                    true -> "away"
+                    false -> "at home"
+                },
+            )
         }
         rows.forEach { (label, value) ->
             Row(Modifier.padding(top = 4.dp)) {
@@ -335,6 +825,15 @@ private fun EventRow(e: SensoriumStore.StoredEvent) {
         Text(relative(e.atMs), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
     }
 }
+
+/**
+ * How often the "started … ago" line is refreshed while the scanner is open.
+ *
+ * ⚠️ Deliberately coarse. [ElapsedPhrase] speaks in minutes and hours, so a faster tick would
+ * recompose the card for a string that cannot have changed; slower and the first minute of a new
+ * situation would read "now" for too long to believe.
+ */
+private const val SITUATION_TICK_MS = 20_000L
 
 private fun relative(atMs: Long): String {
     val mins = (System.currentTimeMillis() - atMs) / 60_000L

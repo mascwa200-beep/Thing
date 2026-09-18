@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.provision
 import android.content.Context
 import dev.mascwa.pulse.core.telemetry.ContentPack
 import dev.mascwa.pulse.data.interrogator.LlamaEngine
+import dev.mascwa.pulse.device.DeviceProbeReader
 import dev.mascwa.pulse.data.survival.PackRepository
 import dev.mascwa.pulse.data.usage.UsageRepository
 import kotlinx.coroutines.sync.Mutex
@@ -43,6 +44,8 @@ class PayloadProvisioner(
     private val packs: PackRepository,
     private val llama: LlamaEngine,
     private val usage: UsageRepository,
+    /** Null means today's behaviour exactly — an absent measurement must never demote. */
+    private val deviceProbe: DeviceProbeReader? = null,
 ) {
 
     /** ⚠️ One pass at a time across the whole process — the worker and a future caller cannot race. */
@@ -99,6 +102,22 @@ class PayloadProvisioner(
     private suspend fun fetchAdjudicator(interrogatorOn: Boolean): Fetched? {
         if (!interrogatorOn) return null
         if (llama.modelPresent()) return null
+        // ⚠️ **Storage was the only thing this asked about, and it is not the binding constraint.**
+        // A phone can have room for a gigabyte of weights and no hope of running them: the model
+        // wants its context and KV cache resident, which is the one thing a MINIMAL device has least
+        // of. Spending somebody's data and a gigabyte of their storage to find that out is worse
+        // than not trying, so the same question the rest of the app asks — can this phone afford a
+        // heavy engine — is asked here, before the download rather than after it.
+        //
+        // ⚠️ The LIVE budget, unlike the durable one the caches use: this is a decision taken fresh
+        // on every pass, so a phone that is merely hot right now should wait rather than be written
+        // off, and one that has cooled by the next pass gets its model.
+        //
+        // A person tapping the download button is deliberately NOT gated by this — see
+        // `DeviceClass.Budget.heavyEngines`. This is the pass that decides on its own.
+        if (deviceProbe?.budgetCached()?.heavyEngines == false) {
+            return record("adjudicator", false, "this phone has too little to spare to run a local model")
+        }
         if (!hasRoomFor(MODEL_BYTES)) {
             return record("adjudicator", false, "not enough free storage for a ${MODEL_BYTES / 1_000_000_000} GB model")
         }

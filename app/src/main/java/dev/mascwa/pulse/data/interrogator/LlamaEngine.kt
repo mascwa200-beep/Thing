@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.interrogator
 
 import android.content.Context
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.model.ModelFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -95,6 +96,22 @@ class LlamaEngine(
                     ?.takeIf { it.isNotEmpty() }
             }
         }
+
+
+    /** How much of the disk this model is holding — see [ModelFile], including a half-fetched one. */
+    fun bytesOnDisk(): Long = ModelFile.bytes(context, MODEL_FILE)
+
+    /**
+     * Free the native handle and delete the weights.
+     *
+     * ⚠️ Releases FIRST, for the reason given on [WhisperEngine.discardModel]: the weights are
+     * mapped while a handle is open. This one matters more — it is a gigabyte, and it is the single
+     * largest thing this app can put on a phone.
+     */
+    suspend fun discardModel(): Boolean {
+        release()
+        return withContext(Dispatchers.IO) { ModelFile.discard(context, MODEL_FILE) }
+    }
 
     suspend fun release() = lock.withLock {
         val h = handle

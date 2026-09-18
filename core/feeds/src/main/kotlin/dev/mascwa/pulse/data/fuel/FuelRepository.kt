@@ -53,27 +53,53 @@ class FuelRepository(
             }
         }
         return try {
-            val data = coroutineScope {
-                val benchmarksD = async { runCatching { markets.quotesFor(energySymbols) }.getOrDefault(emptyList()) }
+            // ⚠️ **A failure is kept as a failure here, not flattened to an empty list.** Both
+            // fetches used `getOrDefault(emptyList())`, which made "it went wrong" and "there is
+            // genuinely nothing" the same answer — and the result was then written over a good
+            // cached copy and reported as a clean fresh fetch. Yahoo throttling a burst is a
+            // documented, recurring thing in this app, so the realistic outcome was a blank FUEL
+            // page held for the whole TTL with nothing on screen to say why.
+            val (benchmarks, usRetail) = coroutineScope {
+                val benchmarksD = async { runCatching { markets.quotesFor(energySymbols) } }
                 val eiaD = async {
-                    if (s.hasEia && country.equals("US", true)) {
-                        runCatching { fetchEiaUsRetail(s.eiaKey) }.getOrDefault(emptyList())
-                    } else emptyList()
+                    // ⚠️ `null` means NOT ASKED, which is different from asked-and-failed: with no
+                    // key, or outside the United States, an empty list is the correct answer and
+                    // carrying an older one forward would show figures we are no longer entitled to.
+                    if (s.hasEia && country.equals("US", true)) runCatching { fetchEiaUsRetail(s.eiaKey) }
+                    else null
                 }
-
-                FuelData(
-                    countryCode = country,
-                    countryName = country,
-                    benchmarks = benchmarksD.await(),
-                    // The World Bank pump-price indicators (EP.PMP.SGAS.CD / EP.PMP.DESL.CD)
-                    // were archived/removed upstream, so national averages are only
-                    // available via the optional EIA key (US) for now.
-                    nationalPrices = emptyList(),
-                    usRetail = eiaD.await(),
-                )
+                benchmarksD.await() to eiaD.await()
             }
+
+            val previous = cache.readAny(key, FuelData.serializer())?.value
+            // ⚠️ Carried over only where this fetch actually failed. Same rule as
+            // `MarketsRepository.mergeWithCache`: a partial fetch never shrinks what is on screen.
+            val benchmarkRows = benchmarks.getOrNull() ?: previous?.benchmarks.orEmpty()
+            val retailRows = when {
+                usRetail == null -> emptyList()          // not asked: an empty list IS the answer
+                usRetail.isSuccess -> usRetail.getOrDefault(emptyList())
+                else -> previous?.usRetail.orEmpty()     // asked and failed: keep what we had
+            }
+
+            val carried = benchmarks.isFailure || usRetail?.isFailure == true
+            // Nothing to show and nothing carried over is a failure, not an empty page.
+            if (benchmarkRows.isEmpty() && retailRows.isEmpty() && carried) {
+                throw IllegalStateException("no fuel benchmarks or retail prices could be fetched")
+            }
+
+            val data = FuelData(
+                countryCode = country,
+                countryName = country,
+                benchmarks = benchmarkRows,
+                // The World Bank pump-price indicators (EP.PMP.SGAS.CD / EP.PMP.DESL.CD)
+                // were archived/removed upstream, so national averages are only
+                // available via the optional EIA key (US) for now.
+                nationalPrices = emptyList(),
+                usRetail = retailRows,
+            )
             cache.write(key, data, FuelData.serializer())
-            Fetched(data, false)
+            // Stale when any of this came from the last fetch rather than this one.
+            Fetched(data, carried)
         } catch (e: Exception) {
             cache.readAny(key, FuelData.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)

@@ -67,6 +67,20 @@ object Recipes {
          * [totalMicros] adds a union rather than refusing on a partial dish.
          */
         val micros: Micronutrients.Amounts = Micronutrients.Amounts(),
+
+        /**
+         * The ingredient's TWENTY-NINE further nutrients per 100 g, where its source recorded any.
+         *
+         * ⚠️ **Added because a recipe was silently throwing them away.** A component carried its
+         * eight micronutrients and nothing else, so a dish built entirely out of foods that record
+         * magnesium logged no magnesium — the figure existed on the ingredient and was dropped at
+         * the component, which is the same defect the micronutrient path already had and had fixed.
+         *
+         * ⚠️ Defaulted, so every recipe already saved decodes unchanged — the store persists this
+         * type, and an added field without a default makes the whole list undecodable. Empty is also
+         * the honest state for every recipe built before this existed.
+         */
+        val extras: NutrientSet.Amounts = NutrientSet.Amounts(),
     )
 
     data class Recipe(
@@ -189,6 +203,40 @@ object Recipes {
     fun eatenServingsMicros(r: Recipe, servings: Double): Micronutrients.Amounts? =
         perServingMicros(r)?.scaled(servings.coerceAtLeast(0.0))
 
+    // ⚠️ **The same five functions again for the further nutrients, and deliberately not one
+    // generic pass over both.** `Micronutrients.Amounts` and `NutrientSet.Amounts` are separate
+    // types on purpose — the eight have a published reference intake to compare against and the
+    // twenty-nine have none — so a shared implementation would mean either erasing them to a map of
+    // strings or inventing a common supertype for two things that answer different questions. The
+    // duplication is five one-line bodies; the alternative is a type nobody wants.
+
+    /** Everything in the pot, for the further nutrients its ingredients recorded. */
+    fun totalExtras(r: Recipe): NutrientSet.Amounts =
+        r.components.fold(NutrientSet.Amounts()) { acc, cc ->
+            acc + FoodPortion.eatenExtras(cc.extras, cc.grams)
+        }
+
+    /** The dish's own density, or null when there is nothing to divide by. */
+    fun per100gExtras(r: Recipe): NutrientSet.Amounts? {
+        val y = yieldGrams(r)
+        if (y <= 0.0 || r.components.isEmpty()) return null
+        return totalExtras(r).scaled(FoodPortion.PER / y)
+    }
+
+    /** One portion, or null when the recipe cannot say what a portion is. */
+    fun perServingExtras(r: Recipe): NutrientSet.Amounts? {
+        if (r.components.isEmpty()) return null
+        return totalExtras(r).scaled(1.0 / r.servings.coerceAtLeast(1))
+    }
+
+    /** A weighed helping. */
+    fun eatenGramsExtras(r: Recipe, grams: Double): NutrientSet.Amounts? =
+        per100gExtras(r)?.let { FoodPortion.eatenExtras(it, grams) }
+
+    /** A counted helping. */
+    fun eatenServingsExtras(r: Recipe, servings: Double): NutrientSet.Amounts? =
+        perServingExtras(r)?.scaled(servings.coerceAtLeast(0.0))
+
     // ---------------------------------------------------------------------------- a meal, logged
     //
     // A [Kind.MEAL] does not become one entry. It becomes one per food, so INTAKE still shows what
@@ -201,6 +249,8 @@ object Recipes {
         val grams: Double,
         val nutrients: NutritionDay.Nutrients,
         val micros: Micronutrients.Amounts,
+        /** Defaulted for the same reason [Component.extras] is: meals saved before this decode. */
+        val extras: NutrientSet.Amounts = NutrientSet.Amounts(),
     )
 
     /**
@@ -235,6 +285,7 @@ object Recipes {
                 grams = grams,
                 nutrients = FoodPortion.eaten(cc.per100g, grams),
                 micros = FoodPortion.eatenMicros(cc.micros, grams),
+                extras = FoodPortion.eatenExtras(cc.extras, grams),
             )
         }
     }

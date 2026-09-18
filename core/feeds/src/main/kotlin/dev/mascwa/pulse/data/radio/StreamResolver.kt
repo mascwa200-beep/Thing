@@ -72,6 +72,34 @@ object StreamResolver {
      * a few kilobytes rather than being read as a string. The `Content-Type` is consulted first
      * because it is the authoritative answer when the server bothers to give one.
      */
+    /** A playlist is a few hundred bytes; nothing legitimate here is close to this. */
+    private const val MAX_PLAYLIST_CHARS = 64_000
+
+    /**
+     * Read at most [MAX_PLAYLIST_CHARS], and STOP.
+     *
+     * ⚠️ **`readText().take(64_000)` reads the whole body first and then throws away all but the
+     * first 64 kB**, which is the opposite of a cap. The comment it replaces claimed it stopped a
+     * mislabelled binary stream being "slurped whole" — it is exactly what it did not do. A station
+     * that serves continuous audio under a playlist content type has no end, so the read ran until
+     * the 12-second timeout, buffering everything that arrived in the meantime. On the phone this
+     * app is meant to run well on, that is megabytes allocated to be discarded a moment later.
+     */
+    private fun readCapped(conn: HttpURLConnection): String {
+        val out = StringBuilder()
+        val buf = CharArray(4096)
+        conn.inputStream.bufferedReader().use { r ->
+            while (out.length < MAX_PLAYLIST_CHARS) {
+                // ⚠️ Bounded by what is LEFT in the budget, not by the buffer, or the last read
+                // could overshoot the cap by up to a buffer's worth.
+                val n = r.read(buf, 0, minOf(buf.size, MAX_PLAYLIST_CHARS - out.length))
+                if (n <= 0) break
+                out.appendRange(buf, 0, n) // endIndex is exclusive
+            }
+        }
+        return out.toString()
+    }
+
     private fun fetchAndSniff(url: String): String? {
         var conn: HttpURLConnection? = null
         return try {
@@ -88,7 +116,7 @@ object StreamResolver {
             val looksLikeAudio = type.startsWith("audio/") &&
                 PLAYLIST_TYPES.none { type.contains(it) }
             if (looksLikeAudio) return null
-            val body = conn.inputStream.bufferedReader().use { it.readText().take(64_000) }
+            val body = readCapped(conn)
             // Order matters only in that each parser is cheap and returns null on a non-match.
             parsePls(body) ?: parseM3u(body) ?: parseAsx(body)
         } catch (_: Exception) {
@@ -111,8 +139,7 @@ object StreamResolver {
                 instanceFollowRedirects = true
             }
             conn.connect()
-            // Playlists are tiny; cap the read so a mislabelled binary stream can't be slurped whole.
-            val body = conn.inputStream.bufferedReader().use { it.readText().take(64_000) }
+            val body = readCapped(conn)
             when (kind) {
                 Kind.PLS -> parsePls(body)
                 Kind.M3U -> parseM3u(body)

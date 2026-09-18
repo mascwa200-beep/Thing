@@ -43,6 +43,10 @@ object WidgetDiagnostics {
         STUDY("study"),
         SPACE("space wx"),
         SKY("sky"),
+        WATER("water"),
+        CALENDAR("calendar"),
+        DATA("data used"),
+        COMMS("texts & mail"),
         FUEL("fuel"),
         ECONOMY("economy"),
         SAFETY("safety"),
@@ -141,6 +145,38 @@ object WidgetDiagnostics {
         val named = bad.take(3).joinToString(", ") { it.label }
         val more = if (bad.size > 3) " +${bad.size - 3}" else ""
         return "⚠ no answer from $named$more — tap for why"
+    }
+
+    /**
+     * The rows a widget with [cap] slots should actually draw, with [notice] — the [degradedLine]
+     * row — guaranteed one of them.
+     *
+     * ⚠️ **This exists because the row form silently dropped its own failure report.** The renderer
+     * ended in a bare `rows.take(limit)`, and the degraded line was appended to the end of the list
+     * with a comment saying it went last *"so it never pushes real content off a small widget"* —
+     * but going last is precisely what made it the FIRST row dropped. Counted at the time: twenty-one
+     * `rows +=` sites against twenty slots, plus this one, so a healthy-looking busy widget shed the
+     * very line whose only job is to say a feed had died. Silent truncation, and the casualty was
+     * the diagnostic.
+     *
+     * So the notice is placed *above* the cut rather than below it, and a real row is shed to make
+     * room. That is the deliberate trade: one row of content is worth knowing that another row is
+     * missing for a reason. Rows are shed from the TAIL because the caller appends them in
+     * descending consequence — the advisory first, the system footnote last.
+     *
+     * ⚠️ [cap] of zero returns nothing at all, notice included. `List.take` throws on a negative
+     * count, so without that guard a widget with no slots would crash rather than draw nothing —
+     * and a crash here is the condition that makes the launcher print *"Can't load widget"*, which
+     * is the one string this file exists to prevent.
+     *
+     * Generic over the row type so the rule can be exercised on the JVM: the renderer's own `Row` is
+     * private to it and carries Android colours, and what is worth testing is the decision, not the
+     * struct it is made of.
+     */
+    fun <T> fit(rows: List<T>, cap: Int, notice: T?): List<T> {
+        if (cap <= 0) return emptyList()
+        if (notice == null) return rows.take(cap)
+        return rows.take(cap - 1) + notice
     }
 
     /** The compact form written to the activity log, and thence to a debug report. */

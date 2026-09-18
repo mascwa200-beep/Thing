@@ -37,8 +37,15 @@ import kotlin.math.roundToInt
  *
  * ## And a day says how much of itself it actually measured
  *
- * [Tally] carries `reported` alongside `total`, so the surface can say "310 mg, from 2 of your 6
- * foods" instead of implying the day is fully accounted for. [Day.coverage] is that fraction.
+ * [NutrientTally] carries `reported` alongside `total`, so the surface can say "310 mg, from 2 of
+ * your 6 foods" instead of implying the day is fully accounted for. [Day.coverage] is that fraction.
+ *
+ * ## The rules live in [SparseNutrition] now
+ *
+ * They were worked out here and they are argued here, but [NutrientSet] needs every one of them
+ * again for twenty-nine further nutrients — so scaling, the union add, and the tally fold moved to
+ * one generic place and both callers are thin. Nothing about the behaviour changed; what changed is
+ * that there is no longer a second copy of it to drift.
  */
 object Micronutrients {
 
@@ -112,10 +119,7 @@ object Micronutrients {
         val isEmpty: Boolean get() = values.isEmpty()
 
         /** Scale a per-100-gram record to the portion eaten. Absences stay absent. */
-        fun scaled(factor: Double): Amounts {
-            if (!factor.isFinite() || factor < 0.0) return Amounts()
-            return Amounts(values.mapValues { it.value * factor })
-        }
+        fun scaled(factor: Double): Amounts = Amounts(SparseNutrition.scale(values, factor))
 
         /**
          * Two records added — an ingredient onto a running total.
@@ -126,22 +130,9 @@ object Micronutrients {
          * silent ingredient as zero would understate the total; refusing to add at all would report
          * nothing for a dish that partly knows.
          */
-        operator fun plus(other: Amounts): Amounts {
-            if (values.isEmpty()) return other
-            if (other.values.isEmpty()) return this
-            val out = LinkedHashMap(values)
-            for ((k, v) in other.values) out[k] = (out[k] ?: 0.0) + v
-            return Amounts(out)
-        }
+        operator fun plus(other: Amounts): Amounts =
+            Amounts(SparseNutrition.merge(values, other.values))
     }
-
-    /**
-     * One micronutrient across a day: how much, and out of how many foods it could be counted.
-     *
-     * ⚠️ [reported] is the point of the type. Without it, `total` is a number the reader will take
-     * as their day's intake, and it is only the intake of the foods that happened to say.
-     */
-    data class Tally(val total: Double, val reported: Int)
 
     /**
      * A day's micronutrients, and how much of the day they were drawn from.
@@ -149,9 +140,9 @@ object Micronutrients {
      * [entries] counts every logged food, whether or not it reported anything — that is the
      * denominator the coverage fraction needs.
      */
-    data class Day(val tallies: Map<Micro, Tally> = emptyMap(), val entries: Int = 0) {
+    data class Day(val tallies: Map<Micro, NutrientTally> = emptyMap(), val entries: Int = 0) {
 
-        operator fun get(m: Micro): Tally? = tallies[m]
+        operator fun get(m: Micro): NutrientTally? = tallies[m]
 
         /**
          * The share of today's foods that recorded [m], 0.0..1.0, or null if nothing was logged.
@@ -189,15 +180,8 @@ object Micronutrients {
      * reported no micronutrients is still a food that was eaten, and leaving it out of the
      * denominator would report perfect coverage for a day mostly made of records that say nothing.
      */
-    fun add(day: Day, amounts: Amounts): Day {
-        val merged = day.tallies.toMutableMap()
-        for ((m, v) in amounts.values) {
-            if (!v.isFinite() || v < 0.0) continue
-            val prior = merged[m]
-            merged[m] = Tally((prior?.total ?: 0.0) + v, (prior?.reported ?: 0) + 1)
-        }
-        return Day(merged, day.entries + 1)
-    }
+    fun add(day: Day, amounts: Amounts): Day =
+        Day(SparseNutrition.tally(day.tallies, amounts.values), day.entries + 1)
 
     /** A whole day from its portions, in one call. */
     fun of(portions: List<Amounts>): Day = portions.fold(Day()) { d, a -> add(d, a) }

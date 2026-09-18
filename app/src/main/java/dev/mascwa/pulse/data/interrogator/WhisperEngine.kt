@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.interrogator
 
 import android.content.Context
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.model.ModelFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -92,6 +93,27 @@ class WhisperEngine(
         if (!NativeBridge.available) null else runCatching { WhisperNative.nativeBackends() }.getOrNull()
 
     /** Release the model. Safe to call twice, and safe when nothing ever loaded. */
+
+    /** How much of the disk this model is holding — see [ModelFile], including a half-fetched one. */
+    fun bytesOnDisk(): Long = ModelFile.bytes(context, MODEL_FILE)
+
+    /**
+     * Free the native handle and delete the weights.
+     *
+     * ⚠️ Releases FIRST. The model is mapped by native code while a handle is open, and deleting a
+     * file out from under a live mapping is the kind of thing that works on one filesystem and
+     * crashes on another. Ordering it here rather than at the call site means no caller can get it
+     * wrong.
+     *
+     * ⚠️ The caller is responsible for the feature being off. Discarding while the service is
+     * transcribing would leave it holding a handle to a model that is no longer on disk, and the
+     * next `prepare` would silently re-download the whole thing.
+     */
+    suspend fun discardModel(): Boolean {
+        release()
+        return withContext(Dispatchers.IO) { ModelFile.discard(context, MODEL_FILE) }
+    }
+
     suspend fun release() = lock.withLock {
         val h = handle
         handle = 0

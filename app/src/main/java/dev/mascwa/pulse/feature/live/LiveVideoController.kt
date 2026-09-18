@@ -15,9 +15,11 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import dev.mascwa.pulse.core.telemetry.AmbientAction
 import dev.mascwa.pulse.core.telemetry.LiveChannels
 import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import dev.mascwa.pulse.core.telemetry.MediaFloor
+import dev.mascwa.pulse.data.sensing.AmbientHolds
 import dev.mascwa.pulse.feature.media.AudioFloor
 import dev.mascwa.pulse.feature.media.MediaHttp
 import kotlinx.coroutines.CoroutineScope
@@ -106,6 +108,13 @@ object LiveVideoController {
         // guard for anything that arrives later from the opt-in catalogue.
         if (!LiveChannels.isHls(channel.url)) {
             _state.value = LiveState(channel, Status.ERROR, "not a playable stream")
+            return
+        }
+        // ⚠️ Live TV has no audio-only mode, so unlike the on-demand controller there is nothing to
+        // exempt: a held video hold blocks it outright. IDLE with a sentence rather than ERROR —
+        // nothing failed, and dressing a deliberate refusal in red sends somebody hunting a fault.
+        if (AmbientHolds.isHeld(AmbientAction.PAUSE_VIDEO)) {
+            _state.value = LiveState(channel, Status.IDLE, "video is on hold — the scanner will say why, and can let it go")
             return
         }
         // Ask for the speaker BEFORE building anything — this is what stops the radio.

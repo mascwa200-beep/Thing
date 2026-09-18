@@ -10,7 +10,9 @@ import in a new Compose file therefore reaches CI untouched by either.
 
 Three checks, and each later one exists because an earlier one was not enough:
 
-  1. every capitalised symbol used is imported, declared in the same package, or a builtin;
+  1. every capitalised symbol used — plus the lowercase `dp`/`sp` extension properties, which are
+     reachable only by import and appear in nearly every Compose file — is imported, declared in the
+     same package, or a builtin;
   2. every own-package import actually RESOLVES to a declaration at that path;
   3. no class declares two `companion object`s — a compile error no other local gate can see;
   4. no file declares two same-named functions that both take a lambda, which makes `it` at a
@@ -52,7 +54,7 @@ the package you touched. Across every package it still reports about a dozen, an
 shapes it cannot model without being a compiler, both benign:
 
   - **nested declarations** — `private data class ApiAlbum` inside an object, an AIDL-generated
-    `IInferenceService`, a Room `Callback`. Only top-level names are collected;
+    `IInferenceService`, a Room `Callback`;
   - **unqualified enum entries in a `when`** — Kotlin 2.0 resolves `AIR ->` from the subject's type
     without an import, and knowing the subject's type requires type inference.
 
@@ -60,6 +62,25 @@ Both are reported as "used but not imported". Neither is worth chasing: the fix 
 checker, and the compiler already is one. What this catches — a name that resolves nowhere, and an
 import pointing at the wrong package — is the part the compiler only tells you about after a CI
 round.
+
+⚠️ **A NESTED DECLARATION ALSO CAUSES A FALSE NEGATIVE, which is far worse than the noise above, and
+an earlier version of this note got it exactly backwards by claiming "only top-level names are
+collected".** `declarations()` is anchored with `^\\s*`, so it collects an INDENTED `data class Plate`
+inside a `sealed interface` just as readily as a top-level one — measured, not assumed. Everything
+that file's package declares is then treated as same-package and needing no import, ACROSS MODULES,
+because a package here can span `:app` and `:core:health`.
+
+The consequence, found by writing code that hit it: `HealthViewModel.MealShot.Plate` is nested in
+`dev.mascwa.pulse.feature.health`, and a sibling file in that package using the unrelated top-level
+`dev.mascwa.pulse.core.telemetry.Plate` with **no import at all** was reported clean. Confirmed both
+ways — import removed, gate says clean; import restored, gate says clean.
+
+Not fixed here, deliberately. Telling a nested declaration from a top-level one needs brace-depth
+tracking, and the note above says nested declarations are ALSO the main source of this gate's
+false positives — so tightening it would trade a rare silent miss for a flood of noise, and a gate
+that floods is one people stop reading. The practical defence is the one that found it: **if a new
+type's simple name already exists anywhere in the package you are editing, rename it.** A third
+`Plate` in scope was a readability problem before it was a tooling one.
 """
 
 import re
@@ -78,6 +99,13 @@ SRC_ROOTS = sorted(
     for d in pathlib.Path(".").glob(pattern)
     if d.is_dir() and d.name in ("java", "kotlin")
 )
+
+# ⚠️ Discovered, not listed — the same reasoning as SRC_ROOTS, which was wrong once for exactly this
+# kind of hardcoding. `build` is excluded because AGP copies generated sources back under it, and a
+# stale copy there would keep declaring a name after its `.aidl` was deleted.
+# Measured at 0.05s over this whole repository, so it is not worth scoping to the source-root
+# patterns — and an unscoped walk keeps working wherever AGP is pointed.
+AIDL_FILES = [p for p in pathlib.Path(".").rglob("*.aidl") if "build" not in p.parts]
 
 # ⚠️ Written by the build, never present in source. Reporting them is the documented false positive
 # `android_resolve_check.sh` also carries; naming them here is cheaper than re-diagnosing it.
@@ -100,7 +128,8 @@ BUILTINS = set(
     Class Integer Character ProcessBuilder ProcessHandle Object Void Boolean
     System Math Locale UUID Runtime Thread Error Runnable LinkageError
     UnsatisfiedLinkError NoClassDefFoundError StackOverflowError OutOfMemoryError
-    AssertionError CloneNotSupportedException InterruptedException""".split()
+    AssertionError CloneNotSupportedException InterruptedException
+    StackTraceElement StringBuffer ThreadLocal Iterable""".split()
 )
 
 
@@ -148,13 +177,67 @@ def strip(t: str) -> str:
             continue
         if t[i:i + 3] == '"""':
             i += 3
-            while i < n and t[i:i + 3] != '"""':
+            while i < n:
                 if t[i:i + 2] == "${":
                     out.append(" ")
                     i = interpolations(t, i, n, out)
-                else:
-                    i += 1
-            i += 3
+                    continue
+                if t[i] == '"':
+                    # ⚠️ **A RAW STRING ENDS AT THE LAST QUOTE OF THE RUN, NOT THE FIRST.** Kotlin
+                    # closes `"""` on a run of three or more quotes and gives the leading extras to
+                    # the content, so `Regex("""...\"([^\"$]+)"""")` — four quotes — is one quote of
+                    # content and then the terminator. Stopping at the first `"""` closed the string
+                    # a character early, left a stray `"` that opened a REGULAR string, and the scan
+                    # ran on inside-out from there: prose in later literals became "code" and real
+                    # code became "string", so every symbol after it went INVISIBLE to this gate.
+                    # That is the same desync the char-literal and escaped-identifier branches below
+                    # were written for, on a third shape. Found via a standing false positive in
+                    # `LazyKeyTest.kt`, which reported `Destinations` — a word from inside an
+                    # assertion message.
+                    run = 0
+                    while i + run < n and t[i + run] == '"':
+                        run += 1
+                    if run >= 3:
+                        i += run
+                        break
+                    i += run
+                    continue
+                i += 1
+            out.append(" ")
+            continue
+        # ⚠️ **A CHARACTER LITERAL, and leaving this out silently inverted whole files.** Kotlin's
+        # `'` has no other use in code position, so a bare one always opens a char literal — and one
+        # containing a double quote, `'\"'`, is ordinary (`trim('`', '\"')` appears in this
+        # repository). Without this branch that `\"` opened a STRING, which then ran to the opening
+        # quote of some later real string, and from there the file was read inside-out: prose inside
+        # string literals became "code" and real code became "string". That is not one stray false
+        # positive — every symbol used after such a literal became INVISIBLE to this gate, which is
+        # precisely the miss it exists to catch. Found in `CiTool.kt`; 19 files carry the shape.
+        if t[i] == "'":
+            i += 1
+            while i < n and t[i] != "'":
+                i += 2 if t[i] == "\\" else 1
+            i += 1
+            out.append(" ")
+            continue
+        # ⚠️ **AN ESCAPED IDENTIFIER, and it is the char-literal bug over again on a much larger
+        # population.** In code position a backtick always opens one — `fun \`a name\`()`,
+        # ``obj.\`is\`()`` — and this repository writes every test name as an English sentence
+        # inside them. Measured across the tree: 2,893 escaped identifiers, of which **56 contain a
+        # double quote and 26 an apostrophe** (`NavScreen.kt` has one with both, `\`179°59'60.0"\``).
+        # Each of those desyncs the scan exactly as `trim('`', '"')` did, so every symbol used after
+        # it goes INVISIBLE to this gate — the miss it exists to catch. The visible half was cheaper
+        # to notice: `HealthDaysTest.kt` was reporting `NOT`, a word out of the middle of a test name.
+        #
+        # Bounded to the line as well as to the closing backtick. The grammar forbids a newline
+        # inside an escaped identifier, so an unpaired one can only be a typo, and stopping at the
+        # newline keeps the damage to that line instead of eating the rest of the file.
+        if t[i] == "`":
+            i += 1
+            while i < n and t[i] != "`" and t[i] != "\n":
+                i += 1
+            if i < n and t[i] == "`":
+                i += 1
             out.append(" ")
             continue
         if t[i] == '"':
@@ -185,10 +268,21 @@ def declarations(text: str) -> set:
         r'^\s*(?:internal |private |public |abstract |open |sealed |expect |actual |suspend |'
         r'inline |operator |infix |tailrec |external |override |final |value )*'
         r'(?:fun|val|var|const val|class|object|enum class|interface|data class|'
-        r'annotation class|typealias) (?:<[^>]*> )?([A-Za-z_]\w*)', body, re.M))
+        # ⚠️ The optional dotted group is the EXTENSION RECEIVER, and without it this captured the
+        # receiver as the declared name: `fun BoxScope.CornerTag(` declared `BoxScope`, never
+        # `CornerTag`. It rarely showed, because extension function names are usually lowercase and
+        # this gate only judges capitalised symbols — but a private composable extension is exactly
+        # the case that is both capitalised and same-file, so it reported as unimported.
+        r'annotation class|typealias) (?:<[^>]*> )?(?:[A-Za-z_][\w.]*\.)?([A-Za-z_]\w*)', body, re.M))
     # ⚠️ `[(,;]` alone misses the LAST entry of an enum, which carries no trailing comma — and
     # Kotlin 2.0 resolves unqualified entries in a `when`, so those reads look unimported.
     names |= set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\s*(?:[(,;}]|$)', body, re.M))
+    # ⚠️ The line-anchored pattern above sees only the FIRST constant on a line, so a compact
+    # `A("a"), B("b"), C("c")` declared every entry but `A` as a call to something unimported.
+    # The enum bodies are already parsed properly for the constant checker, so read them from there
+    # rather than teaching the regex to count commas.
+    for members in enum_constants(text).values():
+        names |= set(members)
     return names
 
 
@@ -218,8 +312,33 @@ def _package_symbols(directory: pathlib.Path) -> set:
         extensions |= set(re.findall(
             r'^\s*(?:internal |private |public )*(?:val|var)\b[^=\n]*?\.([A-Za-z_]\w*)\s*(?::|\bget\b)',
             body, re.M))
+    names |= _aidl_interfaces(directory)
     _PKG_CACHE[key] = names | extensions
     return _PKG_CACHE[key]
+
+
+def _aidl_interfaces(directory: pathlib.Path) -> set:
+    """Interfaces declared by `.aidl` files whose package matches this directory's."""
+    pkg = _package_of(directory)
+    if not pkg:
+        return set()
+    out = set()
+    for aidl in AIDL_FILES:
+        text = aidl.read_text(errors="ignore")
+        declared = re.search(r'^\s*package\s+([\w.]+)\s*;', text, re.M)
+        if declared and declared.group(1) == pkg:
+            out |= set(re.findall(r'^\s*(?:oneway\s+)?interface\s+(\w+)', text, re.M))
+            out |= set(re.findall(r'^\s*parcelable\s+(\w+)', text, re.M))
+    return out
+
+
+def _package_of(directory: pathlib.Path) -> str:
+    """The Kotlin package a source directory holds, read from a file rather than from its path."""
+    for kt in directory.glob("*.kt"):
+        m = re.search(r'^package\s+([\w.]+)', kt.read_text(errors="ignore"), re.M)
+        if m:
+            return m.group(1)
+    return ""
 
 
 def declares(directory: pathlib.Path, symbol: str) -> bool:
@@ -445,6 +564,16 @@ def main(pkgdir: pathlib.Path) -> int:
     for text in texts.values():
         same_pkg |= declarations(text)
 
+    # ⚠️ **An AIDL interface is a same-package declaration with no Kotlin source, and it IS
+    # textually knowable — the `.aidl` file is right there.** `IInferenceService` is generated into
+    # `dev.mascwa.pulse.jarvis.inference` at build time, so both files using it read as an
+    # unimported symbol for as long as this gate has existed. Matched by the PACKAGE the aidl
+    # declares rather than by directory shape, because AGP keeps aidl under
+    # `src/main/aidl/<package path>` while Kotlin sits under `src/main/java` or `src/main/kotlin` —
+    # and hardcoding that relationship is exactly the assumption this file was already wrong about
+    # once, when a listed set of source roots made `:core:feeds` invisible.
+    same_pkg |= _aidl_interfaces(pkgdir)
+
     # ⚠️ A package can span modules. `dev.mascwa.pulse.data.settings` exists in BOTH :app and
     # :core:feeds — deliberately, so the shared repositories kept their import paths when they moved —
     # so a type declared in the other half is same-package and needs no import, while a scan of one
@@ -482,10 +611,28 @@ def main(pkgdir: pathlib.Path) -> int:
     # declarations with identical members are safe to judge against whichever one the file means,
     # which readmits every deliberately-duplicated kit type. Genuine collisions between unrelated
     # types differ in their members, and those are still skipped rather than guessed at.
+    #
+    # ⚠️ **The third collision family, and it is not a disagreement between two enums — it is an enum
+    # losing a name to something that is not an enum at all.** `core:telemetry` holds a top-level
+    # `object Body` (a person: mass, height, BMR) and, nested inside `PlanetDisc`, an
+    # `enum class Body` (the Sun, the Moon, the planets). Only the enum reaches the map above, since
+    # an `object` has no constants to collect — so every `Body.MIN_KG` in that package was judged
+    # against SATURN and MERCURY and reported, twenty-odd times, all false. Kotlin's own scoping is
+    # the answer: a bare `Body.` there means the TOP-LEVEL object, and the nested enum is only ever
+    # reachable as `PlanetDisc.Body`. So a simple name also declared as a non-enum type is ambiguous
+    # by construction and this check must say nothing about it.
+    non_enum = set()
     seen = {}
     for root in SRC_ROOTS:
         for kt in root.rglob("*.kt"):
             raw = kt.read_text(errors="replace")
+            # Top-level only — `^` with no leading indent — because a NESTED type does not shadow
+            # anything at package scope, which is the whole point of the rule above.
+            non_enum |= {
+                m.group(2) for m in
+                re.finditer(r'^(?!\s)(?:\w+\s+)*?(object|class|interface)\s+(\w+)', raw, re.M)
+                if not re.match(r'^enum\s', m.group(0))
+            }
             found = enum_constants(raw)
             if not found:
                 continue
@@ -497,7 +644,7 @@ def main(pkgdir: pathlib.Path) -> int:
                 pkgs.add(pkg)
     enums = {
         n: (set(next(iter(agree))), pkgs)
-        for n, (agree, pkgs) in seen.items() if len(agree) == 1
+        for n, (agree, pkgs) in seen.items() if len(agree) == 1 and n not in non_enum
     }
 
     bad = False
@@ -517,6 +664,56 @@ def main(pkgdir: pathlib.Path) -> int:
         # word at the start of a line follow the colon that ended the line before it, which turned
         # every `when` branch of an enum into a false alarm. Measured: 11 noisy packages became 23.
         used |= set(re.findall(r'(?::[ \t]*|\bis[ \t]+|\bas[ \t]+)([A-Z]\w*)', body))
+        # ⚠️ **The extension properties every Compose file lives on, and they are LOWERCASE**, so
+        # the capitalised-symbol patterns above cannot see one. `Arrangement.spacedBy(8.dp)` with no
+        # `import androidx.compose.ui.unit.dp` passed this gate cleanly and failed CI — twice on one
+        # screen. Two names, not a general lowercase rule: a bare lowercase identifier is almost
+        # always a local, and reporting those would drown the real findings. `dp` and `sp` are
+        # different because they are only ever reachable by import and appear in nearly every file.
+        #
+        # ⚠️ Matched only after a NUMBER (`8.dp`, `0.5f.dp`), which is what makes it unambiguous. A
+        # property named `dp` on somebody's own type would otherwise be reported for ever.
+        used |= {m for m in re.findall(r'\d(?:f|F)?\.(dp|sp)\b', body)}
+
+        # ⚠️ Same blind spot, same remedy, one more name: `collectAsStateWithLifecycle` is a
+        # lowercase extension function and so was invisible here, which is how a file using it with
+        # no import reached CI. Measured before adding rather than assumed: 49 files in this repo
+        # use it and exactly ONE lacked the import -- the one that failed -- so watching it is a
+        # real catch at no cost in noise. Named specifically, as `dp` is, because a blanket
+        # lowercase rule would report every local variable in the repository.
+        used |= {m for m in re.findall(r'\b(collectAsStateWithLifecycle)\s*\(', body)}
+
+        # ⚠️ Two more, and the second is a different shape entirely. `mutableStateOf` is an ordinary
+        # lowercase call; `getValue`/`setValue` are never CALLED at all — they are the operator
+        # functions a `by` delegate resolves to, so a file can need them while never naming them,
+        # and the compiler's message points at the delegation rather than at a missing import.
+        # `var open by remember { mutableStateOf(false) }` needs all three and mentions one.
+        #
+        # ⚠️ Restricted to Compose delegates (`by remember`, `by ...collectAsState...`) rather than
+        # every `by`, because `by lazy` and `by viewModels()` need neither and a blanket rule would
+        # report most of the repository. And a qualified use — `androidx.compose.runtime.mutableStateOf`
+        # — needs no import, which is how two files in this repo legitimately lack it.
+        #
+        # Measured before adding, as with `dp`: 69 files use mutableStateOf, 104 delegate a value and
+        # 69 delegate a var, and NONE of them lacks the import. So all three are a real catch at no
+        # cost in noise — and the failure that prompted them lacked two of the three.
+        used |= {m for m in re.findall(r'(?<![\w.])(mutableStateOf)\s*[(<]', body)}
+        for kw, expr in re.findall(r'\b(val|var)\s+\w+\s+by\s+([^\n]*)', body):
+            if 'remember' in expr or 'collectAsState' in expr:
+                used.add('getValue')
+                if kw == 'var':
+                    used.add('setValue')
+        # ⚠️ **A class literal or a callable reference, which the first pattern cannot see**: it
+        # requires the name be followed by `.`, `(` or `<`, and `SensorManager::class.java` is
+        # followed by a colon. That hole let a genuinely missing `import android.hardware.SensorManager`
+        # through a gate that reported the same file's `Sensor` correctly — so the run looked like a
+        # single finding rather than two, and fixing what it named would still have failed CI.
+        #
+        # ⚠️ `::` is unambiguous in a way a bare capitalised word is not: the left side of one is
+        # always a type or an expression, and a capitalised expression is a type or an object. There
+        # is no widening judgement to make here, unlike the type-position rule above.
+        used |= set(re.findall(r'(?<![\w.])([A-Z]\w*)::', body))
+
         # A generic parameter is declared, not imported. `fun <T> load(): T` must not report T.
         # ⚠️ The optional NAME matters: `fun <T> load()` puts the list straight after the keyword,
         # `class Async<T>` puts the class name in between. A pattern that only handles the first
@@ -524,8 +721,20 @@ def main(pkgdir: pathlib.Path) -> int:
         used -= {n for decl in re.findall(
                      r'\b(?:fun|class|interface|object)\s*(?:\w+\s*)?<([^>]*)>', body)
                  for n in re.findall(r'\b([A-Z]\w*)\b', decl)}
+        # ⚠️ `GENERATED` is excused HERE as well as in `unresolvable_imports`, and the gap between
+        # the two was a standing false positive. A module whose `namespace` equals a file's package
+        # gets `BuildConfig` and `R` written into that package by the build — so the file needs no
+        # import, and no source anywhere declares them. `:sky`'s container hit exactly that. A
+        # sub-package file (`dev.mascwa.nutrition.data`) imports it instead, and that import is
+        # still validated above.
+        #
+        # ⚠️ What this gives up, said rather than glossed: a file using ANOTHER module's
+        # `BuildConfig` without importing it now goes unreported here. That is a compile error CI
+        # catches in three minutes, and it is not a shape anybody writes — while standing noise is
+        # what makes a whole gate get ignored, which is the more expensive failure.
         missing = sorted(u for u in used
-                         if u not in imported and u not in same_pkg and u not in BUILTINS)
+                         if u not in imported and u not in same_pkg
+                         and u not in BUILTINS and u not in GENERATED)
         if missing:
             bad = True
             print(f"  {f.name}: used but not imported: {missing}")

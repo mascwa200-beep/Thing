@@ -366,4 +366,59 @@ class FoodPortionTest {
         )!!
         assertNull(FoodPortion.densityLooksWrong(fine))
     }
+
+    /**
+     * The other direction for the sparse layers, which is what a hand-typed label needs.
+     *
+     * ⚠️ Expected values worked out from the rule before the assertion: 120 mg of calcium in 50 g is
+     * 120 × 100/50 = **240 mg per hundred grams**, and 41.2 mg of magnesium in 50 g is **82.4**.
+     * Both were then confirmed by running the shipped function over exactly this input.
+     */
+    @Test
+    fun theSparseLayersConvertToADensityTheSameWay() {
+        val eatenM = Micronutrients.Amounts(mapOf(Micronutrients.Micro.CALCIUM to 120.0))
+        val eatenE = NutrientSet.Amounts(mapOf(NutrientSet.Nutrient.MAGNESIUM to 41.2))
+
+        assertEquals(240.0, FoodPortion.per100gMicrosFrom(eatenM, 50.0)[Micronutrients.Micro.CALCIUM]!!, 1e-9)
+        assertEquals(82.4, FoodPortion.per100gExtrasFrom(eatenE, 50.0)[NutrientSet.Nutrient.MAGNESIUM]!!, 1e-9)
+
+        // And it round-trips through the portion conversion, which is the property that matters:
+        // what goes into a saved food, scaled back to the portion, is what was eaten.
+        val backM = FoodPortion.eatenMicros(FoodPortion.per100gMicrosFrom(eatenM, 50.0), 50.0)
+        assertEquals(120.0, backM[Micronutrients.Micro.CALCIUM]!!, 1e-9)
+    }
+
+    /**
+     * ⚠️ **Empty, not null, and not the input.**
+     *
+     * `per100gFrom` returns null without a weight because a food with no density is not a food, and
+     * that refusal gates the whole save. These ride along on the same weight, so a second refusal
+     * would only be a second spelling of it. What must never happen is the eaten figures being
+     * passed through unchanged — that would record a 30 g biscuit's magnesium as if it were a
+     * hundred grams of it, while the macros beside them converted properly.
+     */
+    @Test
+    fun noWeightYieldsNothingRatherThanTheEatenFiguresUnchanged() {
+        val eatenM = Micronutrients.Amounts(mapOf(Micronutrients.Micro.CALCIUM to 120.0))
+        val eatenE = NutrientSet.Amounts(mapOf(NutrientSet.Nutrient.MAGNESIUM to 41.2))
+        for (bad in listOf(0.0, -5.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertTrue("weight $bad", FoodPortion.per100gMicrosFrom(eatenM, bad).isEmpty)
+            assertTrue("weight $bad", FoodPortion.per100gExtrasFrom(eatenE, bad).isEmpty)
+        }
+    }
+
+    /**
+     * A nutrient nobody typed does not acquire a zero density on the way through.
+     *
+     * ⚠️ This is the whole discipline of the sparse layer restated at the conversion: absence is the
+     * absence of a key, and a conversion that mapped over the enum instead of over the keys present
+     * would quietly turn "nobody measured the iron" into "this food contains no iron".
+     */
+    @Test
+    fun absentStaysAbsentThroughTheConversion() {
+        val only = Micronutrients.Amounts(mapOf(Micronutrients.Micro.CALCIUM to 120.0))
+        val density = FoodPortion.per100gMicrosFrom(only, 50.0)
+        assertEquals(1, density.values.size)
+        assertNull(density[Micronutrients.Micro.IRON])
+    }
 }

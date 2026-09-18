@@ -1,9 +1,7 @@
 package dev.mascwa.pulse.desktop.network
 
+import dev.mascwa.pulse.core.network.FeedDate
 import java.io.StringReader
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 import javax.xml.stream.XMLInputFactory
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamReader
@@ -158,29 +156,13 @@ object RssParser {
         return sb.toString()
     }
 
-    private val DATE_PATTERNS = listOf(
-        "EEE, dd MMM yyyy HH:mm:ss zzz",
-        "EEE, dd MMM yyyy HH:mm:ss Z",
-        "EEE, dd MMM yyyy HH:mm zzz",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        "yyyy-MM-dd'T'HH:mm:ss'Z'",
-        "yyyy-MM-dd'T'HH:mm:ssZ",
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        "yyyy-MM-dd",
-    )
-
-    private fun parseDate(raw: String): Long {
-        val s = raw.trim()
-        if (s.isEmpty()) return 0L
-        for (p in DATE_PATTERNS) {
-            try {
-                val fmt = SimpleDateFormat(p, Locale.ENGLISH)
-                if (p.endsWith("'Z'") || p == "yyyy-MM-dd") fmt.timeZone = TimeZone.getTimeZone("UTC")
-                return fmt.parse(s)?.time ?: continue
-            } catch (_: Exception) { /* try next */ }
-        }
-        return 0L
-    }
+    /**
+     * ⚠️ Shared with the Android parser rather than copied beside it. The XML pulling genuinely
+     * differs by platform — that one uses `android.util.Xml`, this one `XMLStreamReader` — and that
+     * is why these two files exist at all. Reading a date out of a string is not platform work, and
+     * the copy this replaced read six fractional digits as whole milliseconds.
+     */
+    private fun parseDate(raw: String): Long = FeedDate.parse(raw)
 
     private fun looksLikeImage(url: String): Boolean {
         val u = url.lowercase()

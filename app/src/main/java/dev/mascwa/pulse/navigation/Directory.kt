@@ -74,6 +74,9 @@ val GROUPS = listOf(
             listOf("aurora", "northern lights", "kp", "sun", "flare", "geomagnetic")),
         MenuEntry("Satellites & Asteroids", "The ISS, the Moon and close asteroid passes", Routes.ORBITAL,
             listOf("iss", "space station", "orbit", "sky tonight", "launches", "planets")),
+        MenuEntry("Sky Map", "Point it at the sky — 8,404 stars, offline", Routes.SKYMAP,
+            listOf("stars", "star chart", "constellation", "planetarium", "astronomy", "night sky",
+                "meteor", "shower")),
     )),
     MenuGroup("SOUND", { it.amber }, listOf(
         MenuEntry("Radio", "Local and internet stations, plays in the background", Routes.RADIO,
@@ -104,8 +107,15 @@ val GROUPS = listOf(
             listOf("forums", "posts", "trending", "hn")),
     )),
     MenuGroup("SYSTEM", { it.muted }, listOf(
+        // ⚠️ The mail words earn their place here rather than in a second entry. These terms reach
+        // three consumers, and every one of them identifies a single destination rather than
+        // filtering a list, so widening them cannot bury anything: the MENU's own search,
+        // DeviceSearchIndex's FEATURE record for this route, and the Computer's `open` tool.
         MenuEntry("Settings", "Every switch and preference", Routes.SETTINGS,
-            listOf("preferences", "options", "config", "toggles", "setup")),
+            listOf(
+                "preferences", "options", "config", "toggles", "setup",
+                "email", "mail", "texts", "sms", "inbox", "notifications",
+            )),
         MenuEntry("Device Health", "Battery, sensors, memory and position", Routes.TELEMETRY,
             listOf("telemetry", "diagnostics", "status", "storage")),
         MenuEntry("Security Check", "A local scan of apps and permissions", Routes.SECURITY_AUDIT,

@@ -1,0 +1,185 @@
+package dev.mascwa.pulse.ui
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * The gate against a number field that cannot read the keyboard it is given.
+ *
+ * ⚠️ **`String.toDoubleOrNull()` is `java.lang.Double.parseDouble`: locale-independent, and it
+ * accepts a full stop and nothing else.** Measured rather than recalled — `"2,5".toDoubleOrNull()`
+ * is `null`. Most of Europe and most of South America write that, and Android's numeric keyboard
+ * offers whichever separator the device locale uses, so on those phones a fractional weight, a
+ * portion, a macro figure or a training load could not be entered **anywhere in either
+ * application**. Sixty input sites, all returning null: the SAVE button stayed disabled, or the
+ * field committed as zero, with nothing on screen to say why.
+ *
+ * ⚠️ One site was worse than refusing. `TrainingCard`'s field pre-filtered to
+ * `isDigit() || it == '.'`, which DELETES a comma and closes the gap — so `2,5` became the string
+ * `25`, and two and a half kilograms went into the record as twenty-five. A refusal is visible; a
+ * number ten times too large looks like it worked.
+ *
+ * `Decimals.parse` is the one reader now. This stops a new field from going back, in both
+ * directions: no raw parse, and no hand-rolled separator swap. ⚠️ A third of the previous fix had
+ * already been hand-rolled at exactly ONE of those sixty sites — `amount.replace(',', '.')` — which
+ * is the shape this repository keeps correcting: one place knows, fifty-nine do not, and the one
+ * that knows still gets `1.234,56` wrong.
+ *
+ * ⚠️ **Scoped to the two health user interfaces on purpose.** Elsewhere a `toDoubleOrNull` is
+ * parsing MACHINE text — a JavaScript bridge result, a CSV this app wrote itself, a JSON field —
+ * and those must stay strict, because accepting a comma there would mean accepting a file we did
+ * not write. `EmbeddedPlayer` is the live example and it is deliberately outside these roots.
+ *
+ * The scanner is a pure function over text, exercised against synthetic fixtures before it is run
+ * over the real tree, for the reason `LazyKeyTest` gives: a gate whose rules are only ever
+ * exercised by the code they pass on is a gate nobody can trust.
+ */
+class TypedNumberInputTest {
+
+    /**
+     * The user interfaces that read numbers a person typed.
+     *
+     * ⚠️ Both applications, from the `:app` test source set, the way `LazyKeyTest` reaches the
+     * standalone module. `:nutrition` has no unit-test source set of its own, and adding one to run
+     * a text scan would be a build change for no gain.
+     */
+    private val roots = listOf(
+        File("src/main/java/dev/mascwa/pulse/feature/health"),
+        File("../nutrition/src/main/java/dev/mascwa/nutrition/ui"),
+    )
+
+    @Test
+    fun `every typed number goes through the one parser`() {
+        val found = roots.flatMap { root ->
+            assertTrue("root is missing: ${root.absolutePath}", root.isDirectory)
+            root.walkTopDown().filter { it.extension == "kt" }.flatMap { f ->
+                TypedNumberScan.offences(f.readText()).map { "${f.name}:${it.line}  ${it.what}" }
+            }
+        }
+        assertEquals(
+            "a number a person typed must be read by Decimals.parse — see this file's header:\n" +
+                found.joinToString("\n"),
+            emptyList<String>(),
+            found,
+        )
+    }
+
+    // ------------------------------------------------------------------ the rules, proven to fire
+
+    @Test
+    fun `a raw parse of typed text is an offence`() {
+        val hits = TypedNumberScan.offences("val n = amount.toDoubleOrNull()")
+        assertEquals(1, hits.size)
+        assertTrue(hits.single().what.contains("toDoubleOrNull"))
+    }
+
+    @Test
+    fun `a hand-rolled separator swap is an offence`() {
+        val hits = TypedNumberScan.offences("val v = amount.replace(',', '.').toDoubleOrNull()")
+        // Both rules see it; one report is enough to fail the build, and naming both is more useful
+        // than picking one.
+        assertTrue(hits.isNotEmpty())
+        assertTrue(hits.any { it.what.contains("replace") })
+    }
+
+    @Test
+    fun `stripping everything but digits and a full stop is an offence`() {
+        val hits = TypedNumberScan.offences("val cleaned = text.filter { it.isDigit() || it == '.' }")
+        assertEquals(1, hits.size)
+        assertTrue(hits.single().what.contains("filter"))
+    }
+
+    @Test
+    fun `the parser itself is not an offence`() {
+        assertEquals(emptyList<TypedNumberScan.Offence>(), TypedNumberScan.offences("val n = Decimals.parse(amount)"))
+    }
+
+    @Test
+    fun `a comment about the old shape is not an offence`() {
+        // ⚠️ This is load-bearing rather than tidiness. The fix commit explains itself at the call
+        // sites, so `TrainingCard` now carries the words `isDigit() || it == '.'` inside a comment
+        // — and a scanner that could not tell a comment from code would fail on the file that
+        // documents the very defect it is guarding.
+        assertEquals(
+            emptyList<TypedNumberScan.Offence>(),
+            TypedNumberScan.offences(
+                """
+                // the pre-filter here used to be isDigit() || it == '.', which deleted a comma
+                /* and amount.replace(',', '.').toDoubleOrNull() was the half-fix */
+                val n = Decimals.parse(text)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `the line number reported is the offending one`() {
+        val hits = TypedNumberScan.offences("val a = 1\nval b = 2\nval n = grams.toDoubleOrNull()\n")
+        assertEquals(3, hits.single().line)
+    }
+}
+
+/** A pure scan over Kotlin source text. Public only so its rules can be tested directly. */
+internal object TypedNumberScan {
+
+    data class Offence(val line: Int, val what: String)
+
+    private val RULES = listOf(
+        "toDoubleOrNull" to Regex("""\btoDoubleOrNull\s*\(""") ,
+        "toFloatOrNull" to Regex("""\btoFloatOrNull\s*\("""),
+        "replace(',', '.')" to Regex("""replace\s*\(\s*','\s*,\s*'\.'\s*\)"""),
+        "filter { isDigit() || '.' }" to Regex("""isDigit\s*\(\s*\)\s*\|\|[^\n]*'\.'"""),
+    )
+
+    fun offences(source: String): List<Offence> {
+        val code = mask(source)
+        val out = ArrayList<Offence>()
+        code.lineSequence().forEachIndexed { i, line ->
+            for ((name, rule) in RULES) {
+                if (rule.containsMatchIn(line)) out += Offence(i + 1, "$name — use Decimals.parse")
+            }
+        }
+        return out
+    }
+
+    /**
+     * Blank out comments, preserving length and newlines so line numbers survive.
+     *
+     * ⚠️ String CONTENTS are left alone deliberately: none of the rules can match inside one without
+     * also being real code, and blanking them would need the same care as a real lexer for no gain.
+     * Comments are what matter, for the reason the comment test states.
+     */
+    private fun mask(src: String): String {
+        val out = StringBuilder(src.length)
+        var i = 0
+        var inLine = false
+        var inBlock = false
+        var inStr = false
+        while (i < src.length) {
+            val ch = src[i]
+            val next = if (i + 1 < src.length) src[i + 1] else '\u0000'
+            when {
+                inLine -> {
+                    if (ch == '\n') { inLine = false; out.append('\n') } else out.append(' ')
+                    i++
+                }
+                inBlock -> {
+                    if (ch == '*' && next == '/') { inBlock = false; out.append("  "); i += 2 }
+                    else { out.append(if (ch == '\n') '\n' else ' '); i++ }
+                }
+                inStr -> {
+                    out.append(ch)
+                    if (ch == '\\') { if (i + 1 < src.length) out.append(next); i += 2 }
+                    else { if (ch == '"') inStr = false; i++ }
+                }
+                ch == '/' && next == '/' -> { inLine = true; out.append("  "); i += 2 }
+                ch == '/' && next == '*' -> { inBlock = true; out.append("  "); i += 2 }
+                ch == '"' -> { inStr = true; out.append(ch); i++ }
+                else -> { out.append(ch); i++ }
+            }
+        }
+        return out.toString()
+    }
+}

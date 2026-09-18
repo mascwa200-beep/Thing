@@ -1,23 +1,31 @@
 package dev.mascwa.pulse.data.sensing
 
+import dev.mascwa.pulse.core.telemetry.AmbientSituation
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvMetrics
 import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
 import dev.mascwa.pulse.core.telemetry.MemoryKind
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.core.telemetry.SenseContext
 import dev.mascwa.pulse.core.telemetry.SenseEvent
 import dev.mascwa.pulse.core.telemetry.SenseFrame
 import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.core.telemetry.SensoriumBaseline
 import dev.mascwa.pulse.core.telemetry.SensoriumEvents
+import dev.mascwa.pulse.core.telemetry.SituationRead
+import dev.mascwa.pulse.data.calendar.CalendarRepository
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.notifications.Notifier
+import dev.mascwa.pulse.security.WifiPolicyController
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * The Sensorium's conductor: the service calls [step] on every heartbeat, and the engine decides —
@@ -38,10 +46,69 @@ class SensoriumEngine(
     private val memoryStream: MemoryStreamStore,
     private val notifier: Notifier,
     private val settings: SettingsRepository,
+    /**
+     * Read ONLY through [LocationProvider.cachedSpeedMps], which cannot start a provider — see its
+     * own note. The invariant that this loop never wakes the GPS is unchanged; what changes is that
+     * a fix somebody else already took is no longer thrown away, so telling driving from walking
+     * stops depending on the microphone happening to hear an engine.
+     */
+    private val location: LocationProvider,
+    /**
+     * What the phone knows about ITSELF — screen, lock, power, thermal, audio, Do Not Disturb.
+     *
+     * ⚠️ Costs no permission and no new sensor, which is why it belongs beside the hardware senses
+     * rather than behind a toggle: the Sensorium had five instruments pointed outward and no idea
+     * whether anybody was holding the handset.
+     */
+    private val senseContext: SenseContextReader,
+    /**
+     * Read ONLY for the home-SSID comparison. It is the app's one honest definition of "home", and
+     * the Oracle already uses exactly this pair of reads; deriving it a second way here would be two
+     * definitions that can disagree about the same place.
+     */
+    private val wifi: WifiPolicyController,
+    /**
+     * The device diary, for the one signal that separates a meeting from a quiet cafe.
+     *
+     * ⚠️ Read on its own slow cadence and dispatched to IO — `upcoming` is a blocking
+     * ContentResolver query rather than a suspend function, and this engine's `step` runs on
+     * `Dispatchers.Default`. That is a trap this repository has already walked into once.
+     */
+    private val calendar: CalendarRepository,
+    /**
+     * Say something aloud. Defaults to doing nothing, which is what every test and every caller that
+     * has no voice gets.
+     *
+     * ⚠️ **A lambda rather than the engine itself, and that is not style.** `AppContainer` warns in
+     * writing that merely READING `textToSpeech` binds a TTS service, so taking one as a constructor
+     * parameter would bind it the moment sensing starts — on every phone, whether or not anything is
+     * ever spoken. A lambda touches it only when invoked, which here is only on an alarm.
+     */
+    private val speakAloud: (String) -> Unit = {},
 ) {
     private val _reading = MutableStateFlow(EnvReading())
     /** The live fused environmental read — the scanner's centerpiece, Computer's context line. */
     val reading: StateFlow<EnvReading> = _reading.asStateFlow()
+
+    private val _phone = MutableStateFlow(SenseContext())
+    /**
+     * The live read of the handset itself, beside [reading]'s read of the room.
+     *
+     * ⚠️ Two flows rather than one wider reading, because they answer different questions and have
+     * different consumers: [reading] is the line the Computer is handed every turn, and stapling
+     * fifteen facts about the phone onto it would double the length of the thing a person sees most
+     * often to carry facts most turns do not need.
+     */
+    val phone: StateFlow<SenseContext> = _phone.asStateFlow()
+
+    private val _situation = MutableStateFlow(SituationRead())
+    /**
+     * What the person appears to be DOING — the read the acting layer will hang off.
+     *
+     * ⚠️ It is fed its own previous value, which is what gives [AmbientSituation] its hysteresis and
+     * what carries `sinceMs`. Nothing else may write it.
+     */
+    val situation: StateFlow<SituationRead> = _situation.asStateFlow()
 
     private val _anomalies = MutableStateFlow<List<EnvAnomaly>>(emptyList())
     /** What's unusual right now vs the learned normal (empty while the baseline is young). */
@@ -69,6 +136,11 @@ class SensoriumEngine(
     private var soundsAtMs = 0L
     private var scenes: List<PerceptLabel> = emptyList()
     private var scenesAtMs = 0L
+    private var soundDbfs: Float? = null
+    private var soundDbfsAtMs = 0L
+
+    private var calendarBusy: Boolean? = null
+    private var calendarAtMs = 0L
 
     private var lastLux: Float? = null
     private var lastMagUt: Float? = null
@@ -76,14 +148,60 @@ class SensoriumEngine(
     private var bleCount: Int? = null
     private var wasStill = false
 
+    private val _liveEvents = MutableStateFlow<List<SenseEvent>>(emptyList())
+
+    /**
+     * Events still considered to be HAPPENING, for the acting layer.
+     *
+     * ⚠️ **Not "this heartbeat's events", and the difference is the whole point.** The mic sips
+     * every 45 seconds at nominal and every 300 at conserve, while the heartbeat is 30 — so an
+     * alarm is heard on one beat and not the next, and a layer reading only the current beat would
+     * assert the alarm response, release it, assert it again, flapping a torch and filling the
+     * history with noise. An alarm sounds for minutes; [EVENT_DWELL_MS] is longer than the slowest
+     * sip so the reading stays true between them.
+     *
+     * ⚠️ It is a DWELL, not a cool-down. [eventCooldownMs] stops the same event being ANNOUNCED
+     * twice; this says how long one goes on being a fact about the room.
+     */
+    val liveEvents: StateFlow<List<SenseEvent>> = _liveEvents.asStateFlow()
+
+    private val seenEvents = mutableListOf<Pair<SenseEvent, Long>>()
+
     private val eventCooldownMs = mutableMapOf<String, Long>()
     private var memoryDay = 0
     private var memoryCountToday = 0
 
-    /** Ask the eyes to look now (scanner button / an external trigger). Honored on the next step
-     *  whenever the current level permits camera work at all. */
-    fun requestLook() {
+    /** What came of asking the eyes to look. [why] is always populated — a control that silently
+     *  does nothing is worse than one that refuses out loud. */
+    data class LookRequest(val accepted: Boolean, val why: String)
+
+    /**
+     * Ask the eyes to look now (scanner button / an external trigger).
+     *
+     * ⚠️ **It used to set a flag and say nothing, and at CONSERVE or STANDDOWN that flag could never
+     * be honoured** — `cameraOnTrigger` is false at both — so the scanner's "▸ LOOK NOW" was a button
+     * that did precisely nothing on a phone low on battery, with no feedback of any kind. Every
+     * refusal now names its own cause, and every one of them is a state the person can act on.
+     */
+    suspend fun requestLook(): LookRequest {
+        val s = runCatching { settings.current() }.getOrNull()
+        val now = System.currentTimeMillis()
+        val refusal = when {
+            s != null && !s.sensing.enabled -> "environment sensing is switched off"
+            s != null && !s.sensing.cameraSensing -> "ambient sight is switched off in Settings"
+            !camArmed.value -> "the eyes are on standby — grant the camera and arm them"
+            !Sensorium.cadenceFor(level.value).cameraOnTrigger ->
+                "the watch is at ${level.value.name.lowercase()} and is not spending the camera"
+            fusion.snapshot.value.proximityNear == true ->
+                "something is against the phone — the lens is covered"
+            now - lastCamMs < CAM_TRIGGER_MIN_GAP_MS ->
+                "it looked ${((now - lastCamMs) / 1000L)}s ago — bursts are spaced " +
+                    "${CAM_TRIGGER_MIN_GAP_MS / 1000L}s apart"
+            else -> null
+        }
+        if (refusal != null) return LookRequest(false, refusal)
         cameraTriggered = true
+        return LookRequest(true, "looking on the next heartbeat")
     }
 
     /**
@@ -99,12 +217,20 @@ class SensoriumEngine(
     ) {
         val snap = fusion.snapshot.value
 
+        val covered = snap.proximityNear == true
+
         // --- ears ---
         if (micAllowed && cadence.micIntervalSec > 0 && nowMs - lastMicMs >= cadence.micIntervalSec * 1000L) {
             lastMicMs = nowMs
             val s = audio.sip()
-            if (s.isNotEmpty()) {
-                sounds = s; soundsAtMs = nowMs
+            // ⚠️ The LEVEL is kept even when nothing was recognised, which is the whole point of
+            // measuring it: a loud room the classifier has no word for is exactly the case the
+            // fused reading used to call quiet.
+            if (s.labels.isNotEmpty()) {
+                sounds = s.labels; soundsAtMs = nowMs
+            }
+            if (s.dbfs != null) {
+                soundDbfs = s.dbfs; soundDbfsAtMs = nowMs
             }
         }
 
@@ -112,11 +238,20 @@ class SensoriumEngine(
         val lightJump = lastLux != null && snap.lightLux != null &&
             kotlin.math.abs(snap.lightLux - lastLux!!) > LIGHT_TRIGGER_LUX
         val startedMoving = wasStill && snap.movement >= Sensorium.MOVEMENT_THRESHOLD
-        if (lightJump || startedMoving) cameraTriggered = true
+        // ⚠️ Not while covered. Walking with the phone in a pocket is "motion after stillness" over
+        // and over, so the opportunistic ramp — whose whole justification is looking exactly when
+        // something is happening — would spend a camera burst every ninety seconds on the inside of
+        // a trouser leg, privacy indicator and all. The SCHEDULED burst is left alone: it is cheap,
+        // and a phone face-down on a desk is also "covered" while its rear lens has a perfectly good
+        // view of the ceiling, which no sensor on the phone can distinguish from a pocket.
+        if (!covered && (lightJump || startedMoving)) cameraTriggered = true
         val camDue = when {
             !camAllowed -> false
             cadence.cameraIntervalSec > 0 && nowMs - lastCamMs >= cadence.cameraIntervalSec * 1000L -> true
-            cameraTriggered && cadence.cameraOnTrigger && nowMs - lastCamMs >= CAM_TRIGGER_MIN_GAP_MS -> true
+            // A trigger raised before the phone went away is not dropped, only held: it fires when
+            // the lens is clear again, which is itself a good moment to look.
+            cameraTriggered && !covered && cadence.cameraOnTrigger &&
+                nowMs - lastCamMs >= CAM_TRIGGER_MIN_GAP_MS -> true
             else -> false
         }
         if (camDue) {
@@ -143,26 +278,44 @@ class SensoriumEngine(
         // --- fuse ---
         if (nowMs - soundsAtMs > LABEL_TTL_MS) sounds = emptyList()
         if (nowMs - scenesAtMs > LABEL_TTL_MS) scenes = emptyList()
+        // ⚠️ The level ages out FASTER than the labels. "There is traffic nearby" stays roughly true
+        // for minutes; "it is 42 dB in here" stops being true the moment somebody starts talking, and
+        // a stale one would be folded into the learned baseline as if it had just been measured.
+        if (nowMs - soundDbfsAtMs > LEVEL_TTL_MS) soundDbfs = null
         val cal = Calendar.getInstance().apply { timeInMillis = nowMs }
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         val weekend = cal.get(Calendar.DAY_OF_WEEK).let { it == Calendar.SATURDAY || it == Calendar.SUNDAY }
         val frame = SenseFrame(
             soundLabels = sounds,
             sceneLabels = scenes,
+            soundDbfs = soundDbfs,
             lightLux = snap.lightLux,
-            pressureHpa = snap.pressureHpa,
             pressureDeltaHpa = snap.pressureDeltaHpa,
-            magneticUt = snap.magneticUt,
             movement = snap.movement,
-            speedMps = null, // GPS deliberately not polled here — sensing must never wake the GPS
+            // ⚠️ From a fix ANOTHER app already took — `cachedSpeedMps` starts no provider, so the
+            // rule that this loop never wakes the GPS is intact. What it ends is `speedMps = null`,
+            // which made MotionState.DRIVING unreachable in the shipped app.
+            speedMps = runCatching { location.cachedSpeedMps() }.getOrNull(),
             wifiApCount = wifiCount,
             btDeviceCount = bleCount,
             proximityNear = snap.proximityNear,
-            hourOfDay = hour,
-            weekend = weekend,
         )
         val fused = Sensorium.distill(frame)
         _reading.value = fused
+
+        // --- the handset's own state, beside the room's ---
+        // Posture rides the accelerometer this class already reads; away-from-home is the same pair
+        // of reads the Oracle makes, so the two cannot end up disagreeing about the same place.
+        _phone.value = runCatching {
+            senseContext.read(
+                posture = snap.posture,
+                awayFromHome = awayFromHome(),
+                calendarBusy = calendarBusyNow(nowMs),
+            )
+        }.getOrDefault(SenseContext())
+
+        // --- and what all of it adds up to ---
+        _situation.value = AmbientSituation.read(fused, _phone.value, hour, nowMs, _situation.value)
 
         // --- learn + judge (throttled so dense heartbeats don't over-weight one moment) ---
         if (nowMs - lastBaselineMs >= BASELINE_GAP_MS) {
@@ -185,7 +338,56 @@ class SensoriumEngine(
         lastMagUt = snap.magneticUt
         wasStill = snap.movement < Sensorium.HANDLING_THRESHOLD
         events.forEach { dispatch(it, nowMs) }
+
+        // Age the dwell window, then publish what is still live. Deduped by key so an alarm heard on
+        // three consecutive sips is one fact about the room rather than three.
+        seenEvents += events.map { it to nowMs }
+        seenEvents.removeAll { nowMs - it.second > EVENT_DWELL_MS }
+        _liveEvents.value = seenEvents.map { it.first }.distinctBy { it.key }
     }
+
+    /**
+     * Whether this phone is on a Wi-Fi network that is not one of the configured home ones.
+     *
+     * ⚠️ **Null is the answer in two quite different situations and both must stay null.** No home
+     * network configured means there is nothing to compare against; an unreadable SSID means the
+     * comparison cannot be made, which on GrapheneOS is the ordinary case because reading it needs
+     * location permission. The Trusted-Network subsystem already paid for getting this wrong once —
+     * an unreadable SSID read as "away" switched somebody's Wi-Fi off inside their own house — so
+     * "away" is only ever a positive fact about a network that was actually read.
+     */
+    /**
+     * Is something on the calendar RIGHT NOW?
+     *
+     * ⚠️ **Null when the calendar cannot be read, never false.** `canRead` exists precisely because
+     * `upcoming` returns an empty list for three different situations — refused, unavailable, and a
+     * genuinely clear diary — and [AmbientSituation] requires a positive `true` before it will call
+     * anything a meeting. A refusal read as "nothing on" would simply mean the meeting rule never
+     * fires, which is a quiet failure rather than a loud one.
+     *
+     * ⚠️ All-day entries are excluded, matching `DayAhead`'s own convention. A holiday or a birthday
+     * spans the whole day, so counting it would say "in a meeting" from midnight to midnight.
+     *
+     * ⚠️ The horizon is short on purpose. The Instances table returns every instance OVERLAPPING the
+     * window, so anything running now is included however long ago it started; a wide horizon would
+     * only spend the row cap on events that have not begun.
+     */
+    private suspend fun calendarBusyNow(nowMs: Long): Boolean? {
+        if (calendarAtMs > 0L && nowMs - calendarAtMs < CALENDAR_GAP_MS) return calendarBusy
+        calendarAtMs = nowMs
+        calendarBusy = runCatching {
+            if (!calendar.canRead()) return@runCatching null
+            withContext(Dispatchers.IO) { calendar.upcoming(nowMs, CALENDAR_HORIZON_MS, max = 20) }
+                .any { !it.allDay && it.startMs <= nowMs && nowMs < it.endMs }
+        }.getOrNull()
+        return calendarBusy
+    }
+
+    private suspend fun awayFromHome(): Boolean? = runCatching {
+        val home = settings.current().security.homeSsids
+        if (home.isEmpty()) null
+        else wifi.currentSsid()?.let { ssid -> home.none { it.equals(ssid, ignoreCase = true) } }
+    }.getOrNull()
 
     private suspend fun dispatch(event: SenseEvent, nowMs: Long) {
         val cooldown = when (event.severity) {
@@ -204,6 +406,23 @@ class SensoriumEngine(
             notifier.notifyUrgentLine(
                 event.title, "Sensorium: ${event.detail}", "sensorium.${event.key}", red = true,
             )
+            // ⚠️ **Spoken as well as shown, and gated on ONE thing: has the user let the phone talk
+            // at all.** Not on quiet hours and not on `STAY_SILENT`, which is the opposite of how
+            // every other spoken line in this app is gated — and the reason is the one this
+            // repository already applies to the board: a RED item is never held, because an alarm
+            // sounding is precisely when interrupting somebody is right. A smoke alarm at three in
+            // the morning is the case quiet hours would suppress, and it is the case this exists
+            // for. `STAY_SILENT` gates VOLUNTEERED remarks by its own KDoc; an alarm is not one.
+            //
+            // ⚠️ It does not REPLACE the torch or the board line, it is added to them. TTS has to
+            // bind and start, which takes seconds a fire does not give you, so speech is the slowest
+            // of the three responses and must never be the only one.
+            //
+            // The per-key cooldown above is what stops this repeating: the speech sits under it
+            // rather than carrying a second throttle that could disagree with the first.
+            if (runCatching { settings.current().jarvis.speakProactive }.getOrDefault(false)) {
+                runCatching { speakAloud("${event.title}. ${event.detail}") }
+            }
         }
         if (event.severity != EventSeverity.LOG && settings.current().sensing.rememberEvents) {
             rememberEvent(event, nowMs)
@@ -225,12 +444,27 @@ class SensoriumEngine(
 
     private companion object {
         const val LABEL_TTL_MS = 4 * 60_000L
+        /** Shorter than [LABEL_TTL_MS] on purpose — see the fuse step. */
+        const val LEVEL_TTL_MS = 90_000L
         const val LIGHT_TRIGGER_LUX = 120f
         const val CAM_TRIGGER_MIN_GAP_MS = 90_000L
+
+        /**
+         * How long an event goes on being a fact about the room — see [liveEvents].
+         *
+         * ⚠️ Derived from the SLOWEST sip rather than chosen: `cadenceFor(CONSERVE)` sips the mic
+         * every 300 seconds, so anything shorter than that guarantees a gap with no evidence in it
+         * and a hold that flaps. Six minutes leaves an overlap at every rung of the ladder.
+         */
+        const val EVENT_DWELL_MS = 360_000L
         const val BASELINE_GAP_MS = 2 * 60_000L
         const val ALERT_COOLDOWN_MS = 10 * 60_000L
         const val NOTABLE_COOLDOWN_MS = 30 * 60_000L
         const val LOG_COOLDOWN_MS = 60 * 60_000L
         const val MEMORY_PER_DAY = 10
+        /** How often the diary is consulted. A meeting does not start between two heartbeats. */
+        const val CALENDAR_GAP_MS = 5 * 60_000L
+        /** See [calendarBusyNow] — wide enough to catch anything in progress, no wider. */
+        const val CALENDAR_HORIZON_MS = 2 * 60 * 60_000L
     }
 }

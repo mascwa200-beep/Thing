@@ -103,6 +103,19 @@ object FoodPortion {
     }
 
     /**
+     * The same, for the twenty-nine further nutrients.
+     *
+     * ⚠️ A twin of [eatenMicros] rather than a generalisation of it, because the two are keyed by
+     * different enums and Kotlin value classes do not share a supertype worth abstracting over. The
+     * rules they enforce are shared where it matters — [SparseNutrition] owns the scaling — so the
+     * duplication here is a signature, not a behaviour.
+     */
+    fun eatenExtras(per100g: NutrientSet.Amounts, grams: Double): NutrientSet.Amounts {
+        if (!grams.isFinite() || grams <= 0.0) return NutrientSet.Amounts()
+        return per100g.scaled(grams / PER)
+    }
+
+    /**
      * The other direction: label figures for a stated weight, back to the per-hundred-gram form
      * every source in this app is normalised to.
      *
@@ -119,6 +132,30 @@ object FoodPortion {
      */
     fun per100gFrom(eaten: NutritionDay.Nutrients, grams: Double): NutritionDay.Nutrients? {
         if (!grams.isFinite() || grams <= 0.0) return null
+        return eaten.scaled(PER / grams)
+    }
+
+    /**
+     * The same direction for the vitamins and minerals somebody typed off a label.
+     *
+     * ⚠️ **Empty rather than null when the weight is unknown, unlike [per100gFrom], and the
+     * difference is deliberate rather than an inconsistency.** That one's null is the refusal that
+     * gates the whole save — a food without a density is not a food — and these ride along with it
+     * on the same weight. A second refusal here would only be a second spelling of "no weight", and
+     * a second thing every caller has to remember to check for no gain: anything reaching this
+     * without a weight already has nothing to save.
+     *
+     * ⚠️ Absent stays absent through the conversion, because the scaling maps over the keys that
+     * exist rather than over the enum. A nutrient nobody typed does not acquire a zero density.
+     */
+    fun per100gMicrosFrom(eaten: Micronutrients.Amounts, grams: Double): Micronutrients.Amounts {
+        if (!grams.isFinite() || grams <= 0.0) return Micronutrients.Amounts()
+        return eaten.scaled(PER / grams)
+    }
+
+    /** The twin of [per100gMicrosFrom] for [NutrientSet], for the reason [eatenExtras] gives. */
+    fun per100gExtrasFrom(eaten: NutrientSet.Amounts, grams: Double): NutrientSet.Amounts {
+        if (!grams.isFinite() || grams <= 0.0) return NutrientSet.Amounts()
         return eaten.scaled(PER / grams)
     }
 

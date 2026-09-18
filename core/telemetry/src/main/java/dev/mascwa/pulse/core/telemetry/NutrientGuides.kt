@@ -39,6 +39,38 @@ object NutrientGuides {
     }
 
     /**
+     * Which of the three a guide is about.
+     *
+     * ⚠️ **Exists because [Guide.label] is display prose, and a caller matching on it is matching on
+     * prose.** A screen that shows all four totals whether or not a guide can be stated for them has
+     * to know which of its own rows a [Serving] belongs to — [forDay] returns between zero and three
+     * of them depending on facts about the reader, so the list alone does not say what is missing.
+     * Answering that with a string comparison means a reworded label silently renders a nutrient
+     * twice, or not at all, on a path that compiles perfectly.
+     *
+     * Sugar is deliberately not a member. It has no guide and cannot honestly be given one — see
+     * [sugarNote] — so a value here would imply a comparison the data does not support.
+     */
+    enum class Nutrient(val label: String, val unit: String) {
+        FIBRE("Fibre", "g"),
+        SATURATED_FAT("Saturated fat", "g"),
+        SODIUM("Sodium", "mg");
+
+        /**
+         * How much of this a day's food came to.
+         *
+         * ⚠️ Here rather than at the screens, because a screen showing a total whether or not a
+         * guide exists would otherwise need its own field lookup — and that lookup and [forDay]'s
+         * are the same fact stated twice, in different files, with only one of them ever revisited.
+         */
+        fun eatenIn(day: NutritionDay.Nutrients): Double = when (this) {
+            FIBRE -> day.fibreG
+            SATURATED_FAT -> day.satFatG
+            SODIUM -> day.sodiumMg
+        }
+    }
+
+    /**
      * One reference intake, with the basis it rests on.
      *
      * [basis] is not decoration. Two of these scale with the calorie target and one does not, so a
@@ -52,6 +84,19 @@ object NutrientGuides {
         val kind: Kind,
         val basis: String,
         val source: String,
+        /**
+         * Which of this file's three this is, or **null when the guide is about something else**.
+         *
+         * ⚠️ Nullable because [Guide] is a shared carrier, not this file's private type: it is also
+         * how [Micronutrients] states a calcium or an iron reference, and there is no honest
+         * [Nutrient] value for those. A required field would force that producer to claim one.
+         *
+         * ⚠️ And the default is null rather than a value for the same reason it is nullable — but a
+         * default does reopen the drift a required field would have blocked, so the guard against a
+         * future producer here forgetting to stamp it is `NutrientGuidesTest`'s assertion that
+         * [forDay] yields every [Nutrient] exactly once, not the type.
+         */
+        val nutrient: Nutrient? = null,
     ) {
         /** How far along the guide a day's intake is. Not clamped: past a LIMIT is exactly the point. */
         fun fractionOf(eaten: Double): Double = if (amount <= 0.0) 0.0 else eaten / amount
@@ -91,9 +136,10 @@ object NutrientGuides {
     fun fibre(targetKcal: Int?): Guide? {
         val kcal = targetKcal?.takeIf { it > 0 } ?: return null
         return Guide(
-            label = "Fibre",
+            nutrient = Nutrient.FIBRE,
+            label = Nutrient.FIBRE.label,
             amount = kcal / 1000.0 * FIBRE_G_PER_1000_KCAL,
-            unit = "g",
+            unit = Nutrient.FIBRE.unit,
             kind = Kind.TARGET,
             basis = "14 g per 1,000 kcal, so it moves with your target",
             source = "US Dietary Reference Intakes, adequate intake",
@@ -104,9 +150,10 @@ object NutrientGuides {
     fun saturatedFat(targetKcal: Int?): Guide? {
         val kcal = targetKcal?.takeIf { it > 0 } ?: return null
         return Guide(
-            label = "Saturated fat",
+            nutrient = Nutrient.SATURATED_FAT,
+            label = Nutrient.SATURATED_FAT.label,
             amount = kcal * SATFAT_MAX_ENERGY_SHARE / KCAL_PER_GRAM_FAT,
-            unit = "g",
+            unit = Nutrient.SATURATED_FAT.unit,
             kind = Kind.LIMIT,
             basis = "under 10% of your calories, so it moves with your target",
             source = "World Health Organization, population guideline",
@@ -125,9 +172,10 @@ object NutrientGuides {
         val age = thisYear - birthYear
         if (age < ADULT_FROM_AGE) return null
         return Guide(
-            label = "Sodium",
+            nutrient = Nutrient.SODIUM,
+            label = Nutrient.SODIUM.label,
             amount = SODIUM_MAX_MG,
-            unit = "mg",
+            unit = Nutrient.SODIUM.unit,
             kind = Kind.LIMIT,
             basis = "a flat daily figure — it does not move with your target",
             source = "World Health Organization, adults",
@@ -177,6 +225,43 @@ object NutrientGuides {
         }
     }
 
+    /** Why fibre and saturated fat cannot be stated: both are a share of energy. */
+    const val NO_TARGET: String =
+        "No reference here yet — this one is a share of your calorie target, and there is no " +
+            "target to take a share of until the plan can be made."
+
+    /** Why sodium cannot be stated: the published figure is an adult one. */
+    const val NO_ADULT_AGE: String =
+        "No reference here — the published figure is written for adults, so it needs a birth year " +
+            "before it can be applied."
+
+    /**
+     * Why [forDay] could not state a guide for [nutrient], or null when it could.
+     *
+     * ⚠️ **This asks the PRODUCER whether a guide exists rather than re-testing its conditions**, so
+     * "is there a guide" has exactly one implementation and the reason can never contradict the
+     * absence. Re-testing `targetKcal > 0` here would be a second copy of the rule, and the copy
+     * that gets forgotten is always the second — this file has three producers and each has its own
+     * gate.
+     *
+     * ⚠️ It exists because a screen that shows a total whether or not a guide can be stated needs
+     * something to put where the comparison would be. A row that simply goes quiet reads as a figure
+     * the app has no opinion about; these are figures the app has an opinion about and cannot yet
+     * apply, which is a different thing and is fixable by the reader.
+     */
+    fun whyAbsent(nutrient: Nutrient, targetKcal: Int?, birthYear: Int, thisYear: Int): String? {
+        val stated = when (nutrient) {
+            Nutrient.FIBRE -> fibre(targetKcal)
+            Nutrient.SATURATED_FAT -> saturatedFat(targetKcal)
+            Nutrient.SODIUM -> sodium(birthYear, thisYear)
+        }
+        if (stated != null) return null
+        return when (nutrient) {
+            Nutrient.FIBRE, Nutrient.SATURATED_FAT -> NO_TARGET
+            Nutrient.SODIUM -> NO_ADULT_AGE
+        }
+    }
+
     /**
      * A guide and the day measured against it.
      *
@@ -200,8 +285,8 @@ object NutrientGuides {
         birthYear: Int,
         thisYear: Int,
     ): List<Serving> = listOfNotNull(
-        fibre(targetKcal)?.let { Serving(it, eaten.fibreG) },
-        saturatedFat(targetKcal)?.let { Serving(it, eaten.satFatG) },
-        sodium(birthYear, thisYear)?.let { Serving(it, eaten.sodiumMg) },
+        fibre(targetKcal)?.let { Serving(it, Nutrient.FIBRE.eatenIn(eaten)) },
+        saturatedFat(targetKcal)?.let { Serving(it, Nutrient.SATURATED_FAT.eatenIn(eaten)) },
+        sodium(birthYear, thisYear)?.let { Serving(it, Nutrient.SODIUM.eatenIn(eaten)) },
     )
 }

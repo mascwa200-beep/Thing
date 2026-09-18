@@ -17,6 +17,8 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifier
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.core.telemetry.Sensorium
+import dev.mascwa.pulse.data.model.ModelFile
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.Executors
@@ -136,6 +138,18 @@ class AmbientCameraSampler(
         classifier = null
     }
 
+    /** How much of the disk this model is holding — see [ModelFile], including a half-fetched one. */
+    fun bytesOnDisk(): Long = ModelFile.bytes(context, MODEL_FILE)
+
+    /**
+     * Give the storage back. Closes the classifier first and re-opens lazily — see
+     * [AmbientAudioSampler.discardModel], which this mirrors exactly, for why both halves matter.
+     */
+    suspend fun discardModel(): Boolean {
+        close()
+        return withContext(Dispatchers.IO) { ModelFile.discard(context, MODEL_FILE) }
+    }
+
     private suspend fun awaitProvider(): ProcessCameraProvider? = suspendCancellableCoroutine { cont ->
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
@@ -173,6 +187,9 @@ class AmbientCameraSampler(
         const val BURST_MS = 3_200L
         const val FRAME_GAP_MS = 900L
         const val MAX_RESULTS = 6
-        const val SCORE_THRESHOLD = 0.20f
+
+        /** ⚠️ Derived from the fusion core's own floor — see [AmbientAudioSampler.SCORE_THRESHOLD],
+         *  which this was 0.20 against 0.30 for the same reason and with the same cost. */
+        const val SCORE_THRESHOLD = Sensorium.MIN_CONF
     }
 }

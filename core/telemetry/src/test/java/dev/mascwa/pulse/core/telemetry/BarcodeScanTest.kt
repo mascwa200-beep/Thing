@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -222,6 +223,171 @@ class BarcodeScanTest {
         for (code in listOf("12345", "", "abcdefgh")) {
             assertFalse(code, BarcodeScan.plausible(code))
             assertNull(code, BarcodeScan.normalize(code))
+        }
+    }
+
+    // ---- expandUpcE: the small-packet codes that used to miss ------------------------------
+
+    /**
+     * ⚠️ **Every value here came out of a run of the real ZXing decoder, not out of my head.**
+     * `UPCEReader.convertUPCEtoUPCA` from the shipped 3.5.3 jar was compared against this rule over
+     * all 2,000,000 number-system-0-and-1 codes, and the two agreed on every one.
+     *
+     * These cover all four branches of the rule — the last data digit being 0–2, 3, 4, and 5–9 —
+     * which is the whole of what there is to get wrong, and each was generated so that its check
+     * digit is genuinely the one its expansion demands.
+     *
+     * ⚠️ **Two mistakes of mine are baked into this list, and both were caught by measuring rather
+     * than reading.** One code I first wrote down expanded to a UPC-A failing its own checksum: I had
+     * invented a barcode. And the list then claimed to cover all four branches while covering only
+     * three — deleting the `'4'` case from the rule failed nothing at all, which the negative-test
+     * pass reported as a sleeping guard. `01234543` is the fixture that closes it.
+     */
+    @Test
+    fun aUpcEExpandsToTheUpcAItStandsFor() {
+        assertEquals("012000003455", BarcodeScan.expandUpcE("01234505")) // last data digit 0
+        assertEquals("042100005264", BarcodeScan.expandUpcE("04252614")) // ...1
+        assertEquals("012300000451", BarcodeScan.expandUpcE("01234531")) // ...3, a different shift
+        assertEquals("012340000053", BarcodeScan.expandUpcE("01234543")) // ...4, another shift again
+        assertEquals("012345000089", BarcodeScan.expandUpcE("01234589")) // ...8, the digit moves last
+    }
+
+    /**
+     * ⚠️ **The property that makes this worth doing at all.** A UPC-E scan and the UPC-A printed on
+     * the same product's outer case have to reach ONE row of the database. Without the expansion the
+     * compressed form normalises to a number four orders of magnitude away from the product's own
+     * key, so the lookup finds nothing — and reports an unknown product for a barcode it read
+     * perfectly, which is indistinguishable from a database gap.
+     */
+    @Test
+    fun theExpandedFormAndTheProductsOwnKeyAreTheSameNumber() {
+        val expanded = BarcodeScan.expandUpcE("01234505")!!
+        assertEquals(BarcodeScan.normalize(expanded), BarcodeScan.normalize("0012000003455"))
+        // ...and the compressed form on its own is emphatically NOT that key, which is the bug.
+        assertNotEquals(BarcodeScan.normalize("01234505"), BarcodeScan.normalize(expanded))
+        assertEquals(12_000_003_455L, BarcodeScan.normalize(expanded))
+        assertEquals(1_234_505L, BarcodeScan.normalize("01234505"))
+    }
+
+    /**
+     * ⚠️ **An EAN-8 is eight digits and is a product code in its own right.** Nothing here can tell
+     * the two apart from the digits, which is exactly why the expansion is not folded into
+     * [BarcodeScan.normalize] and is called only where the decoder has reported the symbology. What
+     * this test pins is the half that IS decidable: a number system GS1 never assigns to UPC-E is not
+     * a UPC-E, and inventing a twelve-digit number from one would name a product that does not exist.
+     */
+    @Test
+    fun onlyTheTwoNumberSystemsUpcEActuallyUsesAreExpanded() {
+        assertNull("EAN-8, number system 4", BarcodeScan.expandUpcE("40170725"))
+        assertNull("EAN-8, number system 9", BarcodeScan.expandUpcE("96181072"))
+        assertNotNull(BarcodeScan.expandUpcE("01234505"))
+        assertNotNull(BarcodeScan.expandUpcE("11234505"))
+    }
+
+    /** Anything that is not eight digits is not a UPC-E, and says so rather than guessing. */
+    @Test
+    fun somethingThatIsNotAUpcEExpandsToNothing() {
+        assertNull(BarcodeScan.expandUpcE(""))
+        assertNull(BarcodeScan.expandUpcE(NUTELLA))
+        assertNull(BarcodeScan.expandUpcE(PRINGLES_UPC))
+        assertNull(BarcodeScan.expandUpcE("0123450"))   // seven
+        assertNull(BarcodeScan.expandUpcE("012345055")) // nine
+        assertNull(BarcodeScan.expandUpcE("abcdefgh"))
+    }
+
+    /**
+     * ⚠️ **A UPC-E's check digit belongs to its EXPANDED form, and that is a real limit on
+     * [BarcodeScan.checkDigitValid]'s "one rule covers every length" claim.** Applying the mod-10
+     * weighting to the compressed eight digits is not a weaker check, it is a check of the wrong
+     * number — and it fails on genuine products: three of the four real codes below do not satisfy it
+     * while every one of their expansions does. Nothing rejects on the checksum anywhere in this file,
+     * so no product is lost to it; what would be lost is a caller who took a `false` here as evidence
+     * of a mistyped code and told somebody their barcode was wrong. Measured over the five genuine
+     * codes below: four fail the compressed check and all five expansions pass.
+     *
+     * This is the property the expansion has to preserve: the digit is carried through unchanged and
+     * lands on a twelve-digit code that genuinely satisfies the rule.
+     */
+    @Test
+    fun anExpandedCodePassesTheChecksumThatTheCompressedFormCannotBeJudgedBy() {
+        var compressedFailures = 0
+        for (e in listOf("01234505", "04252614", "01234531", "01234543", "01234589")) {
+            val a = BarcodeScan.expandUpcE(e)!!
+            assertEquals("$e expands to twelve digits", 12, a.length)
+            assertEquals("check digit carried through in $e", e.last(), a.last())
+            assertTrue("$e -> $a satisfies GS1", BarcodeScan.checkDigitValid(a))
+            if (!BarcodeScan.checkDigitValid(e)) compressedFailures++
+        }
+        assertEquals(
+            "the compressed form is NOT judgeable by the same rule — if this ever reaches 0, the " +
+                "fixtures have drifted to codes that hide the distinction",
+            4, compressedFailures,
+        )
+    }
+
+    // ---- canonical: the one thing both scanners are allowed to decide -----------------------
+
+    /**
+     * ⚠️ **A UPC-E decode has to leave the scanner as the twelve digits it stands for**, or the
+     * lookup asks for a number the database has never heard of and reports an unknown product for a
+     * barcode it read perfectly.
+     */
+    @Test
+    fun aUpcEDecodeLeavesTheScannerExpanded() {
+        assertEquals("012000003455", BarcodeScan.canonical("01234505", BarcodeScan.Symbology.UPC_E))
+        assertEquals("012340000053", BarcodeScan.canonical("01234543", BarcodeScan.Symbology.UPC_E))
+    }
+
+    /**
+     * ⚠️ **And every other symbology is passed through untouched**, which is the half that would be
+     * quietly broken by an over-eager expansion. An EAN-8 is eight digits and is its own product
+     * code; expanding one invents a twelve-digit number naming nothing.
+     */
+    @Test
+    fun everyOtherSymbologyIsTheCodeItAlreadyPrints() {
+        assertEquals("40170725", BarcodeScan.canonical("40170725", BarcodeScan.Symbology.EAN_8))
+        assertEquals("01234505", BarcodeScan.canonical("01234505", BarcodeScan.Symbology.EAN_8))
+        assertEquals(NUTELLA, BarcodeScan.canonical(NUTELLA, BarcodeScan.Symbology.EAN_13))
+        assertEquals(PRINGLES_UPC, BarcodeScan.canonical(PRINGLES_UPC, BarcodeScan.Symbology.UPC_A))
+        assertEquals(NUTELLA, BarcodeScan.canonical("  $NUTELLA\n", BarcodeScan.Symbology.EAN_13))
+    }
+
+    /**
+     * A decode that is not a product code at all yields nothing, whatever the decoder called it —
+     * so the confirmation counter never starts on a QR code or a shipping label that drifted through.
+     */
+    @Test
+    fun somethingThatIsNotAProductCodeIsNotCanonicalisedIntoOne() {
+        assertNull(BarcodeScan.canonical("https://example.com", BarcodeScan.Symbology.OTHER))
+        assertNull(BarcodeScan.canonical("123456789", BarcodeScan.Symbology.OTHER))
+        assertNull(BarcodeScan.canonical("", BarcodeScan.Symbology.EAN_13))
+        // A code the decoder CALLED a UPC-E but which cannot be one is refused rather than passed
+        // through as eight raw digits, which would be the wrong product rather than no product.
+        assertNull(BarcodeScan.canonical("40170725", BarcodeScan.Symbology.UPC_E))
+        assertNull(BarcodeScan.canonical(NUTELLA, BarcodeScan.Symbology.UPC_E))
+    }
+
+    /**
+     * ⚠️ **Whatever leaves here is something the database can be asked for.** `canonical` feeds
+     * `see`, `see` feeds the lookup, and `normalize` is what the lookup keys on — a gap anywhere in
+     * that chain is a scan that visibly succeeds and then finds nothing, for no reason the person
+     * holding the phone can see.
+     */
+    @Test
+    fun anythingCanonicalIsAlsoConfirmableAndLookupable() {
+        val decodes = listOf(
+            NUTELLA to BarcodeScan.Symbology.EAN_13,
+            PRINGLES_UPC to BarcodeScan.Symbology.UPC_A,
+            "40170725" to BarcodeScan.Symbology.EAN_8,
+            "01234505" to BarcodeScan.Symbology.UPC_E,
+            "01234543" to BarcodeScan.Symbology.UPC_E,
+        )
+        for ((text, sym) in decodes) {
+            val code = BarcodeScan.canonical(text, sym)
+            assertNotNull("$text as $sym", code)
+            assertTrue("$text as $sym", BarcodeScan.plausible(code!!))
+            assertNotNull("$text as $sym", BarcodeScan.normalize(code))
+            assertTrue("$text as $sym", run(code, code, code).confirmed)
         }
     }
 }

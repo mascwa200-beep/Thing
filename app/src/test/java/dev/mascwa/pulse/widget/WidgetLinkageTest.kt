@@ -62,6 +62,48 @@ class WidgetLinkageTest {
     // ---------------------------------------------------------------------------------------------
 
     @Test
+    fun `every method a widget reaches by name is one the platform allows remotely`() {
+        // ⚠️ THE FAILURE THIS CATCHES HAPPENS ONLY ON A DEVICE. `RemoteViews.setCharSequence`,
+        // `setString`, `setInt` and friends take a METHOD NAME as a string and dispatch reflectively
+        // in the HOST process. The platform allows that only for methods annotated
+        // @RemotableViewMethod; anything else throws ActionException when the host inflates the
+        // widget. A typo, or a perfectly real method that simply is not remotable, compiles
+        // cleanly, passes every other gate here, ships — and then draws nothing at all.
+        //
+        // The allowlist is hand-maintained ON PURPOSE, and each entry was read out of the platform's
+        // own bytecode (`javap -v` on android.jar, looking for the annotation) rather than recalled.
+        // Adding one means doing that again: the point of the list is that it cannot be extended
+        // without someone checking.
+        val remotable = setOf(
+            // TextClock — verified: these are exactly three of its remotable methods.
+            "setFormat12Hour", "setFormat24Hour", "setTimeZone",
+        )
+
+        val calls = Regex("""set(?:CharSequence|String|Int|Boolean|Long|Float)\s*\(\s*[^,]+,\s*"(\w+)"""")
+            .findAll(kotlinText())
+            .map { it.groupValues[1] }
+            .toList()
+
+        // ⚠️ The fixture guard. Every assertion below is "nothing is wrong", which is vacuously true
+        // over an empty list — so if the regex ever stops matching, this test would go on passing
+        // while checking nothing at all.
+        assertTrue(
+            "the scan found no reflective RemoteViews calls at all — the regex has stopped matching",
+            calls.isNotEmpty(),
+        )
+
+        val offenders = calls.filterNot { it in remotable }.distinct()
+        assertEquals(
+            "widget code reaches these by name but they are not on the verified-remotable list, " +
+                "so they will throw when the host inflates the widget: $offenders",
+            emptyList<String>(),
+            offenders,
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------------
+
+    @Test
     fun `the fixture finds the widget sources it is meant to police`() {
         // Guards the whole file: every assertion below is vacuously true against an empty list, so a
         // moved directory would turn this suite green while checking nothing at all.

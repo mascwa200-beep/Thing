@@ -43,6 +43,10 @@ object SettingsBackup {
         apiKeys = ApiKeys(),
         jarvis = s.jarvis.copy(modelToken = "", githubToken = "", cloudApiKey = ""),
         spotify = SpotifyAuthState(),
+        // ⚠️ The account DEFINITION travels — host, port, username, what you called it — and only
+        // the password is stripped. Carrying the definition means a restore leaves rows that say
+        // what they still need rather than nothing at all; see the matching half in [merge].
+        emailAccounts = s.emailAccounts.map { it.copy(password = "") },
     )
 
     /** Lay a restored backup over the device's CURRENT settings, preserving the device's existing
@@ -55,6 +59,19 @@ object SettingsBackup {
             cloudApiKey = current.jarvis.cloudApiKey,
         ),
         spotify = current.spotify,
+        // ⚠️ The restored definitions are kept and each password is taken from the account on THIS
+        // device that matches it, by host and username. Two halves matter:
+        //
+        //  * without this the restore would write back the blanked passwords from the backup and
+        //    silently sign out every mailbox that was working a moment ago — the export half alone
+        //    is a data-loss bug, not merely an incomplete one;
+        //  * on a phone that has never held the account there is nothing to match, so the password
+        //    stays blank. That is honest and the account is `usable == false`, so nothing asks it
+        //    anything and the settings row says what it is missing. A row that looked configured
+        //    and quietly failed would be worse than an empty one.
+        emailAccounts = restored.emailAccounts.map { r ->
+            r.copy(password = current.emailAccounts.firstOrNull { it.sameAccountAs(r) }?.password.orEmpty())
+        },
         // Paired computers are public keys, not secrets — but the list is an AUTHORIZATION list, and
         // restoring an old backup must never silently re-admit a machine the user deliberately unpaired.
         // The device's own current pairings are the only truth about what may reach it.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      ⚠️ A DARK window theme, unlike the nutrition app's light one, and it is not decoration: this is
+      what the screen shows for the fraction of a second before Compose draws anything. A light flash
+      in front of a star map, outdoors at night, is the one startup detail somebody would actually
+      notice. The colours themselves live in Kotlin, in the Material 3 scheme, so there is one place
+      they are decided.
+    -->
+    <style name="Theme.Sky" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

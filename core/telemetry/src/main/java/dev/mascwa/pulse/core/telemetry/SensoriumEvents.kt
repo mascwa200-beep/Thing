@@ -33,6 +33,16 @@ object SensoriumEvents {
     /** Notable/log sounds may use the ordinary floor. */
     const val NOTABLE_MIN_CONF = 0.40f
 
+    /**
+     * The [SenseEvent.key] of a smoke/fire/CO alarm.
+     *
+     * ⚠️ Named rather than left as a literal because [AmbientRules] now discriminates on it: of the
+     * three ALERT kinds, this is the only one whose right answer is LOUD AND BRIGHT rather than
+     * silent. A key spelled in two files is a key that can drift, and the way it would drift here is
+     * the rule quietly never firing again.
+     */
+    const val KEY_SMOKE_ALARM = "sound.smoke_alarm"
+
     /** (key, vocab, title, detail) — vocab substring-matched on lower-cased labels. */
     private data class SoundRule(
         val key: String,
@@ -44,7 +54,7 @@ object SensoriumEvents {
 
     private val SOUND_RULES = listOf(
         SoundRule(
-            "sound.smoke_alarm", setOf("smoke detector", "smoke alarm", "fire alarm", "carbon monoxide"),
+            KEY_SMOKE_ALARM, setOf("smoke detector", "smoke alarm", "fire alarm", "carbon monoxide"),
             "ALARM HEARD", "a smoke/fire/CO alarm is sounding nearby", EventSeverity.ALERT,
         ),
         SoundRule(

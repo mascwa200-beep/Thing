@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ⚠️ Nothing to exclude, and nothing to include either: this application writes no file of its own.
+  Everything it draws is bundled in the APK or computed, so a backup would restore an empty
+  directory. The element is here because the manifest names it, and an absent resource is a build
+  failure rather than a default.
+-->
+<full-backup-content />

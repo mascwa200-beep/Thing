@@ -23,6 +23,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Reads a [DeviceContext] from system services.
@@ -74,6 +75,28 @@ class DeviceContextProvider(context: Context) {
      * build, memory, storage, power and network. Best-effort — any field that can't be read is omitted, so
      * it never throws. This is the "what device am I on / deeper phone integration" surface.
      */
+    /** How much room is left, in bytes. */
+    data class Storage(val freeBytes: Long, val totalBytes: Long) {
+        /** 0..100, or null when the volume reports no size at all. */
+        val freePct: Int? get() = if (totalBytes > 0L) ((freeBytes * 100.0) / totalBytes).toInt() else null
+    }
+
+    /**
+     * Free and total bytes on the volume this app's own files live on.
+     *
+     * ⚠️ **The one place that reads it.** There were two `StatFs` calls in the app and neither gave
+     * a caller bytes: this class formatted them straight into a human-readable report string, and
+     * the Oracle kept only a percentage. Anything wanting the actual number had to open a third —
+     * which is how a duplicated definition starts, a mistake this project has corrected repeatedly.
+     *
+     * Null when the volume cannot be read at all, which is a different fact from "no space left"
+     * and must not render as zero.
+     */
+    fun storage(): Storage? = runCatching {
+        val stat = StatFs(appContext.filesDir.path)
+        Storage(freeBytes = stat.availableBytes, totalBytes = stat.totalBytes)
+    }.getOrNull()
+
     fun deviceReport(): String {
         val c = snapshot()
         val lines = ArrayList<String>()
@@ -100,10 +123,7 @@ class DeviceContextProvider(context: Context) {
             val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
             lines += "Memory: ${gb(mi.availMem)} free of ${gb(mi.totalMem)}" + if (mi.lowMemory) " (low)" else ""
         }
-        runCatching {
-            val stat = StatFs(appContext.filesDir.path)
-            lines += "Storage: ${gb(stat.availableBytes)} free of ${gb(stat.totalBytes)}"
-        }
+        storage()?.let { lines += "Storage: ${gb(it.freeBytes)} free of ${gb(it.totalBytes)}" }
 
         val battery = if (c.batteryPct >= 0)
             "${c.batteryPct}%" + (if (c.isCharging) " (charging · ${c.powerSource})" else " · ${c.powerSource}") else "unknown"
@@ -212,8 +232,19 @@ class DeviceContextProvider(context: Context) {
             return listOf(maker, model).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "this device" }
         }
 
+    /**
+     * ⚠️ **[Locale.US], because this is a number rather than prose.** The default locale renders
+     * "5,7 GB" on most of Europe, and every consumer of this reads it as data: the `device` tool
+     * hands it to the model, the dossier puts it on a screen, and the persona carries it as
+     * context. A comma decimal there is at best confusing and at worst parsed as a thousands
+     * separator by whatever reads it next.
+     *
+     * Not promoted to `Formatters` alongside `megabytes`, deliberately: this is its only caller, and
+     * the unit is a judgement about what this particular readout is describing — RAM and storage in
+     * the gigabyte range, where `megabytes` would render "7629.4 MB" and be worse.
+     */
     private fun gb(bytes: Long): String =
-        if (bytes <= 0) "?" else String.format("%.1f GB", bytes / 1_073_741_824.0)
+        if (bytes <= 0) "?" else String.format(Locale.US, "%.1f GB", bytes / 1_073_741_824.0)
 
     /** Emits the current context immediately, then on every power / connectivity change. */
     val updates: Flow<DeviceContext> = callbackFlow {

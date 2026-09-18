@@ -18,6 +18,18 @@ import kotlin.math.sqrt
  */
 object LexicalEmbedder {
     const val DIM = 256
+    /**
+     * What joins the two halves of a bigram before it is hashed.
+     *
+     * A control character, so it can never appear inside a token and two different bigrams can
+     * never collide by concatenation. ⚠️ Written as an ESCAPE rather than as the raw byte, which is
+     * what it was: a raw control byte in a source file makes grep report the whole file as binary
+     * and the line invisible, and that is exactly how a NUL hid inside a character literal
+     * elsewhere in this module for long enough to ship. Identical to the compiler, legible to
+     * everything else.
+     */
+    private const val BIGRAM_SEPARATOR = "\u0001"
+
     private const val BIGRAM_WEIGHT = 0.5
 
     /** Embed [text] into a [dim]-length unit vector. Blank/token-less text yields the zero vector. */
@@ -27,7 +39,7 @@ object LexicalEmbedder {
         if (tokens.isEmpty()) return List(dim) { 0f }
         val v = DoubleArray(dim)
         for (token in tokens) accumulate(v, token, 1.0)
-        for (i in 0 until tokens.size - 1) accumulate(v, tokens[i] + "" + tokens[i + 1], BIGRAM_WEIGHT)
+        for (i in 0 until tokens.size - 1) accumulate(v, tokens[i] + BIGRAM_SEPARATOR + tokens[i + 1], BIGRAM_WEIGHT)
         var sumSq = 0.0
         for (x in v) sumSq += x * x
         if (sumSq == 0.0) return List(dim) { 0f }

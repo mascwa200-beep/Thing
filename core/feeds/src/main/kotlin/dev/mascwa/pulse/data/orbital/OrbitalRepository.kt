@@ -14,6 +14,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.text.SimpleDateFormat
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.TimeZone
 
@@ -165,6 +167,15 @@ class OrbitalRepository(
         }.sortedBy { it.missDistanceKm ?: Double.MAX_VALUE }
     }
 
-    private val isoFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-    private fun parseIso(s: String): Long? = runCatching { isoFmt.parse(s)?.time }.getOrNull()
+    /**
+     * ⚠️ **`java.time`, not a shared `SimpleDateFormat` — the same defect `SafetyRepository`
+     * already carried.** A `SimpleDateFormat` keeps a mutable `Calendar`, so one held as a field on
+     * a singleton is not safe to share, and this repository has two independent consumers with
+     * their own scopes: the observatory screen and the Home digest, which can be loading at the
+     * same moment. Concurrent `parse` on one instance can return a time assembled from two
+     * different strings rather than merely throwing. `DateTimeFormatter` is immutable.
+     */
+    private fun parseIso(s: String): Long? = runCatching {
+        OffsetDateTime.parse(s, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant().toEpochMilli()
+    }.getOrNull()
 }
