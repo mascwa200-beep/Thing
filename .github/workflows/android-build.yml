@@ -87,6 +87,30 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # ⚠️ `packages` MUST be given, and the reason is that the action's own default broke.
+          # It defaults to `'tools platform-tools'`, and Google has removed `tools` from the SDK
+          # repository — it has been deprecated for years and the repository XML finally dropped
+          # it. The action loops over the list calling `sdkmanager <pkg>` and a missing package is
+          # a hard failure, so every build here died in 19 seconds with
+          # `Warning: Failed to find package 'tools'` before a line of Kotlin was compiled.
+          #
+          # This is why only THIS workflow broke: `sky-build.yml` and `nutrition-build.yml` never
+          # use the action at all — they build against the runner image's preinstalled SDK and make
+          # no `sdkmanager` call of their own. This one needs one, for the NDK and CMake below.
+          #
+          # The action is still worth keeping for everything else it does, all of which the next
+          # step depends on: it installs cmdline-tools, accepts the licences, exports ANDROID_HOME
+          # and puts `sdkmanager` on PATH. Read out of the action's own `dist/index.js` rather than
+          # recalled — the package list is split, trimmed and empty-filtered, then each entry is
+          # installed; the PATH and licence work happens regardless of what is in it.
+          #
+          # ⚠️ Deliberately NOT the empty string. `''` would leave the list empty and is very
+          # probably fine, but whether the runner treats a present-but-empty `with:` value as an
+          # override or falls back to the default is exactly the kind of thing this repository has
+          # been burned recalling. A non-empty value cannot be ambiguous. `platform-tools` is also
+          # what the next step installs first, so this asks for nothing that was not already wanted.
+          packages: "platform-tools"
 
       - name: Install SDK packages
         run: |
