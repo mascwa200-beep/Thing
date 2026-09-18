@@ -357,10 +357,24 @@ object Oracle {
         val settled = s.movement < MOVEMENT_THRESHOLD
         val imminent = s.events.any { minutesUntil(it.startMs, s.nowMs) in 0.0..20.0 }
         if (!settled || imminent || s.isNight) return null
+        // ⚠️ The ambient read is the EVIDENCE for a claim this rule already makes. "You're settled"
+        // was asserted with nothing behind it while [OracleSignals.envDescription] — the sentence the
+        // Sensorium fuses precisely to answer "what is going on around you" — was handed to the
+        // Oracle and read by nothing at all. This rule already listed "perception" among its sources
+        // while showing none of it, so saying what it saw makes a standing claim true rather than
+        // adding a new one.
+        //
+        // ⚠️ Null is the ordinary case, not an error: sensing is a switch somebody may never turn
+        // on, and the rule has to read exactly as it did before for them.
+        val env = s.envDescription?.takeIf { it.isNotBlank() }
         return Insight(
             id = "focus_task", kind = InsightKind.OPPORTUNITY, urgency = Urgency.NOTABLE,
             title = "Good moment to knock out: $task",
-            detail = "You're settled and clear for a bit — a solid window to get it done.",
+            detail = if (env == null) {
+                "You're settled and clear for a bit — a solid window to get it done."
+            } else {
+                "$env, and nothing on for a while — a solid window to get it done."
+            },
             score = Urgency.NOTABLE.weight * 1000.0 + 20,
             actionRoute = "jarvis",
             sources = listOf("tasks", "perception"),
