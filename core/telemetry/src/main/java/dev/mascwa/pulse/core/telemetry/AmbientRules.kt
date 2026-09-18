@@ -223,6 +223,36 @@ object AmbientRules {
         return AmbientDecision(allowed, refused)
     }
 
+    /**
+     * Why nothing is being held, in the words a person would use. Null when something IS.
+     *
+     * ⚠️ **A layer that silently does nothing is indistinguishable from a broken one**, and this
+     * repository has corrected that shape repeatedly — the scanner's own "▸ LOOK NOW" was a button
+     * that did precisely nothing on a phone low on battery until it was made to say so. Quiet is the
+     * overwhelmingly common and correct state here; what it must not be is unexplained.
+     *
+     * ⚠️ The order matters and is worst-first: a situation nobody is sure of cannot also be waiting
+     * to settle, so reporting the settle timer for an UNKNOWN reading would send somebody away to
+     * wait for something that is never going to arrive.
+     */
+    fun whyQuiet(s: AmbientSignals): String? {
+        if (decide(s).isNotEmpty()) return null
+        val r = s.situation
+        return when {
+            r.situation == Situation.UNKNOWN ->
+                "it is not sure what you are doing — most of what a phone can sense fits several lives"
+            r.confidence < MIN_CONFIDENCE ->
+                "the evidence for ${r.situation.label.lowercase()} is one signal deep"
+            r.sinceMs <= 0L -> "it has only just worked this out"
+            s.nowMs - r.sinceMs < SETTLE_MS ->
+                "waiting to see whether ${r.situation.label.lowercase()} holds — " +
+                    "another ${((SETTLE_MS - (s.nowMs - r.sinceMs)) / 1000L).coerceAtLeast(1L)}s"
+            // ⚠️ Settled, believed, and still nothing: there is genuinely no rule for this one, which
+            // is true of half the situations and is a fact about the rules rather than a fault.
+            else -> "nothing is set up to act on ${r.situation.label.lowercase()}"
+        }
+    }
+
     private fun whyRefused(tier: ActionTier) = when (tier) {
         ActionTier.PHONE -> "phone controls are switched off"
         ActionTier.OWNER -> "device-owner controls are switched off"

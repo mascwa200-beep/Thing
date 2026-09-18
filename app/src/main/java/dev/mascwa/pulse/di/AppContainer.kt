@@ -920,9 +920,12 @@ class AppContainer(private val appContext: Context) {
     /**
      * The acting layer: what the ambient rules want, made to happen and undone again.
      *
-     * ⚠️ **Lazy, so a phone that never switches sensing on never has a holds file on disk** — the
-     * same reasoning as the mail-notice store. The only thing that builds it is
-     * [dev.mascwa.pulse.data.sensing.SensoriumService], which is itself opt-in.
+     * ⚠️ **A phone that never switches sensing on never has a holds file on disk** — the same
+     * property as the mail-notice store, though for a different reason than the laziness here. The
+     * file is created by the first read inside a suspend method, and every one of those is called by
+     * [dev.mascwa.pulse.data.sensing.SensoriumService], which is opt-in; merely constructing this
+     * allocates an object and touches nothing. The `by lazy` saves the allocation, not the file, and
+     * saying otherwise would be claiming more than it does.
      *
      * ⚠️ The effect lambda is deliberately the only coupling to anything playing. Exactly one
      * APP-tier action needs a side effect rather than set membership — pausing is a thing that has

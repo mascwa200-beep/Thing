@@ -221,16 +221,20 @@ class SensoriumService : Service() {
 
                 // ---- and then act on what all that sensing concluded ----
                 runCatching {
-                    val wanted = AmbientRules.decide(
-                        AmbientSignals(
-                            situation = engine.situation.value,
-                            env = engine.reading.value,
-                            phone = engine.phone.value,
-                            events = engine.liveEvents.value,
-                            nowMs = now,
-                        ),
+                    val signals = AmbientSignals(
+                        situation = engine.situation.value,
+                        env = engine.reading.value,
+                        phone = engine.phone.value,
+                        events = engine.liveEvents.value,
+                        nowMs = now,
                     )
-                    acting.apply(AmbientRules.permit(wanted, MAX_TIER), now)
+                    acting.apply(
+                        AmbientRules.permit(AmbientRules.decide(signals), MAX_TIER),
+                        now,
+                        // ⚠️ Computed here, where the signals already are. Quiet is the common and
+                        // correct state for this layer; what it must never be is unexplained.
+                        quietBecause = AmbientRules.whyQuiet(signals),
+                    )
                 }
                 if (now - lastNotifMs >= NOTIF_REFRESH_MS) {
                     lastNotifMs = now

@@ -36,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.AmbientAction
+import dev.mascwa.pulse.core.telemetry.AmbientIntent
 import dev.mascwa.pulse.core.telemetry.AudioRoute
+import dev.mascwa.pulse.data.sensing.AmbientActuator
 import dev.mascwa.pulse.core.telemetry.DndFilter
 import dev.mascwa.pulse.core.telemetry.ElapsedPhrase
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
@@ -86,6 +89,10 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val lookNote by vm.lookNote.collectAsStateWithLifecycle()
     val phone by vm.phone.collectAsStateWithLifecycle()
     val situation by vm.situation.collectAsStateWithLifecycle()
+    val holds by vm.holds.collectAsStateWithLifecycle()
+    val refusedHolds by vm.refusedHolds.collectAsStateWithLifecycle()
+    val quietBecause by vm.quietBecause.collectAsStateWithLifecycle()
+    val holdHistory by vm.holdHistory.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -140,11 +147,36 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 // ⚠️ Above the facets on purpose: the fused reading is the raw material and this is
                 // the conclusion, and a person opening this screen wants the conclusion first.
                 item { SituationCard(situation, nowMs) }
+                // ⚠️ Directly under the situation, because it is the answer to the question
+                // the situation raises — "and what did you do about it?" — and a person who
+                // opens this screen because their phone went quiet should not have to scroll.
+                item {
+                    HoldingNowCard(
+                        holds = holds, refused = refusedHolds, quietBecause = quietBecause,
+                        nowMs = nowMs,
+                        onRelease = { vm.releaseHold(it) }, onReleaseAll = { vm.releaseAllHolds() },
+                    )
+                }
                 item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
                 item { InstrumentsCard(fusion, reading) }
                 item { PhoneCard(phone) }
                 item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
+                // ⚠️ Its own section rather than interleaved with the sensed events below. Those
+                // answer "what happened in the room"; this answers "what did the phone do about it",
+                // and a single merged list would make it hard to tell a cause from an effect. It is
+                // omitted entirely until there is something in it.
+                if (holdHistory.isNotEmpty()) {
+                    item {
+                        Text(
+                            "WHAT IT HAS DONE",
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold, color = c.accent,
+                            modifier = Modifier.padding(top = 6.dp, start = 2.dp),
+                        )
+                    }
+                    items(holdHistory, key = { "${it.atMs}:${it.text}" }) { line -> HoldLineRow(line, nowMs) }
+                }
                 item {
                     Text(
                         "SENSED EVENTS · LAST 48H",
@@ -558,6 +590,120 @@ private fun SituationCard(s: SituationRead, nowMs: Long) {
  * different facts, and rendering the first two as a blank row makes them indistinguishable from each
  * other and from a sense that is working fine.
  */
+/**
+ * What the acting layer is doing to this phone right now, and how to stop it.
+ *
+ * ⚠️ **This card is safety rule 6, and it is why the invasive tiers come after it rather than
+ * before.** A layer that quietly changes what a phone does, with no way to see what it changed or
+ * take it back, is indistinguishable from a fault — and the deleted `PhonePenaltyController` is the
+ * cautionary instance already recorded in CLAUDE.md. Every row names what was done, why, how long it
+ * has been on, and carries its own undo in the words of the thing it will undo.
+ *
+ * ⚠️ It draws nothing at all when nothing is held or refused. A permanently visible panel reading
+ * "nothing" teaches people to skip the part of the screen that matters on the day it says something.
+ */
+@Composable
+private fun HoldingNowCard(
+    holds: List<AmbientIntent>,
+    refused: List<String>,
+    quietBecause: String?,
+    nowMs: Long,
+    onRelease: (AmbientAction) -> Unit,
+    onReleaseAll: () -> Unit,
+) {
+    val c = Pulse.colors
+    // ⚠️ Nothing held, nothing refused and nothing to say about why: draw no card at all. That is
+    // the state before the watch has ever run, and a panel reading "nothing" would be the first
+    // thing somebody learns to scroll past — on the card that matters most when it says something.
+    if (holds.isEmpty() && refused.isEmpty() && quietBecause == null) return
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                // ⚠️ The heading says which of the two things this card is. A panel headed
+                // "HOLDING NOW" above an explanation of why nothing is held would be claiming the
+                // opposite of what it goes on to say.
+                if (holds.isEmpty()) "NOT ACTING, BECAUSE" else "HOLDING NOW",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = c.accent,
+            )
+            Spacer(Modifier.weight(1f))
+            if (holds.size > 1) ActionChip("RELEASE ALL", onReleaseAll)
+        }
+        if (holds.isEmpty() && quietBecause != null) {
+            Text(
+                quietBecause,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        for (h in holds) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(
+                    h.action.label,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                    color = c.ink,
+                )
+                Text(
+                    // ⚠️ The reason, verbatim from the rule that asked. It is mandatory on an intent
+                    // for exactly this line: "Pulse silenced your ringer" with no because reads as a
+                    // fault rather than a decision.
+                    h.reason,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Text(
+                        // ⚠️ How long it has been on AND when it will lift by itself. The second half
+                        // is what stops this reading as something the phone has decided to do for
+                        // ever — every hold has a ceiling it cannot outlive.
+                        "since ${ElapsedPhrase.describe(nowMs - h.fromMs)} · lifts by itself " +
+                            "in ${ElapsedPhrase.describe((h.untilMs - nowMs).coerceAtLeast(0L))}",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    // The undo is phrased as what pressing it will DO, not as "release".
+                    ActionChip(h.action.undo.uppercase(), { onRelease(h.action) })
+                }
+            }
+        }
+        if (refused.isNotEmpty()) {
+            // ⚠️ Shown rather than dropped. A rule that wanted something and could not have it is the
+            // difference between a tier being switched off and the layer being broken, and only this
+            // line can tell somebody which they are looking at.
+            Text(
+                "ASKED FOR, NOT ALLOWED", fontFamily = JetBrainsMono, fontSize = 9.sp,
+                letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = c.muted,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            for (r in refused) {
+                Text(
+                    r, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+/** One line of what the acting layer has done, newest first. */
+@Composable
+private fun HoldLineRow(line: AmbientActuator.Line, nowMs: Long) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            ElapsedPhrase.describe(nowMs - line.atMs),
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(line.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+    }
+}
+
 @Composable
 private fun PhoneCard(p: SenseContext) {
     val c = Pulse.colors

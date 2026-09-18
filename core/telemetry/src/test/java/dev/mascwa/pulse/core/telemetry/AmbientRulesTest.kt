@@ -365,4 +365,43 @@ class AmbientRulesTest {
         assertEquals(wanted.size, d.allowed.size + d.refused.size)
         assertTrue(d.allowed.all { it in wanted })
     }
+    // ---- and when nothing is held, why ----
+
+    /**
+     * ⚠️ Quiet is the common and correct answer here, and a layer that is quiet without saying why
+     * is indistinguishable from a broken one. The scanner's own "LOOK NOW" shipped as exactly that
+     * and had to be fixed; this is the same principle applied to the whole acting layer.
+     */
+    @Test
+    fun `nothing held is always explained, and something held never is`() {
+        // Firing: no explanation, because there is nothing to explain.
+        assertEquals(null, AmbientRules.whyQuiet(signals(Situation.DRIVING)))
+
+        // Every quiet case names its own cause, and none of them repeats another's.
+        val unknown = AmbientRules.whyQuiet(signals(Situation.UNKNOWN))!!
+        val thin = AmbientRules.whyQuiet(signals(Situation.DRIVING, confidence = 0.2f))!!
+        val settling = AmbientRules.whyQuiet(signals(Situation.DRIVING, forMs = 10_000L))!!
+        val noRule = AmbientRules.whyQuiet(signals(Situation.WALKING))!!
+        val all = listOf(unknown, thin, settling, noRule)
+        assertEquals("two causes read the same", 4, all.toSet().size)
+        assertTrue(all.all { it.isNotBlank() })
+
+        // ⚠️ Worst-first. An UNKNOWN reading must NOT be reported as waiting to settle: that sends
+        // somebody away to wait for something that is never going to arrive.
+        assertTrue("an unsure reading was reported as settling", "waiting" !in unknown)
+        assertTrue("the settle timer did not say how long", "s" in settling && "waiting" in settling)
+        assertTrue("the no-rule case did not name the situation", "walking" in noRule)
+    }
+
+    @Test
+    fun `an alarm is never reported as quiet`() {
+        // Safety is exempt from the settle gate, so it fires with nothing else known — and the
+        // explanation has to agree with that rather than talk about settling.
+        val alarm = SenseEvent(
+            key = SensoriumEvents.KEY_SMOKE_ALARM, title = "ALARM HEARD",
+            detail = "a smoke/fire/CO alarm is sounding nearby", severity = EventSeverity.ALERT,
+        )
+        assertEquals(null, AmbientRules.whyQuiet(signals(Situation.UNKNOWN, forMs = 0L, events = listOf(alarm))))
+    }
+
 }

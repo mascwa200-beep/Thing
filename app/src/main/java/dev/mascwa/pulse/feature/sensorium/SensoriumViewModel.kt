@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.sensorium
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.AmbientAction
 import dev.mascwa.pulse.data.sensing.SensoriumService
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,36 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
 
     /** What the person appears to be doing — see [dev.mascwa.pulse.core.telemetry.AmbientSituation]. */
     val situation = c.sensoriumEngine.situation
+
+    /**
+     * What the acting layer is holding, why, and how to take it back.
+     *
+     * ⚠️ These read the actuator rather than [dev.mascwa.pulse.data.sensing.AmbientHolds], which is
+     * the set form and deliberately carries no reasons. A surface that could only say WHICH holds
+     * are on would be the worst of both: enough to alarm somebody, not enough to explain anything.
+     */
+    val holds = c.ambientActuator.holds
+    val holdHistory = c.ambientActuator.history
+
+    /** What the rules asked for and could not have, each with the sentence for it. */
+    val refusedHolds = c.ambientActuator.refused
+
+    /** Why nothing is being held, when nothing is — see [dev.mascwa.pulse.core.telemetry.AmbientRules.whyQuiet]. */
+    val quietBecause = c.ambientActuator.quiet
+
+    /** Let go of one hold. It is barred from coming straight back — otherwise the button looks broken. */
+    fun releaseHold(action: AmbientAction) {
+        viewModelScope.launch {
+            runCatching { c.ambientActuator.releaseByHand(action, System.currentTimeMillis()) }
+        }
+    }
+
+    /** Let go of everything. */
+    fun releaseAllHolds() {
+        viewModelScope.launch {
+            runCatching { c.ambientActuator.releaseAllByHand(System.currentTimeMillis()) }
+        }
+    }
 
     private val _lookNote = MutableStateFlow<String?>(null)
 

@@ -134,6 +134,17 @@ class AmbientActuator(
     /** Newest first, bounded. What the scanner shows under HISTORY. */
     val history: StateFlow<List<Line>> = _history.asStateFlow()
 
+    private val _quiet = MutableStateFlow<String?>(null)
+
+    /**
+     * Why nothing is being held, when nothing is. Null while something is.
+     *
+     * ⚠️ Passed in by the caller rather than worked out here, because the caller is the only thing
+     * that holds the signals — and computing them a second time would be two answers to one question
+     * that can disagree, which is the drift this project has converged seven times.
+     */
+    val quiet: StateFlow<String?> = _quiet.asStateFlow()
+
     private val _refused = MutableStateFlow<List<String>>(emptyList())
 
     /** "would pause your distracting apps · device-owner controls are switched off". */
@@ -189,10 +200,16 @@ class AmbientActuator(
      * yet blocked, and the second of those is long enough for an auto-advance to start the next item
      * under a hold that exists to stop exactly that.
      */
-    suspend fun apply(decision: AmbientDecision, nowMs: Long) = mutex.withLock {
+    suspend fun apply(
+        decision: AmbientDecision,
+        nowMs: Long,
+        /** [AmbientRules.whyQuiet]'s answer, for the surface. Null when something is being held. */
+        quietBecause: String? = null,
+    ) = mutex.withLock {
         if (!loaded) load()
         val r = AmbientReconcile.reconcile(state, decision.allowed, nowMs)
         _refused.value = decision.refused.map { "would ${it.intent.action.label} · ${it.why}" }
+        _quiet.value = quietBecause
 
         // ⚠️ A quiet heartbeat can still have moved the bar — an action whose rule stopped asking
         // drops out of `expiredWhileWanted` with nothing asserted or released to show for it. That
@@ -225,6 +242,7 @@ class AmbientActuator(
         for (r in down.released) runEffect(r.intent.action, asserting = false)
         state = down.state
         _refused.value = emptyList()
+        _quiet.value = why
         addLines(down.released.map { Line(nowMs, "let go of ${it.intent.action.label} — $why") })
         publish()
         persist()
