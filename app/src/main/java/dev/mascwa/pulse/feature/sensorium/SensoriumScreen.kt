@@ -33,11 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.AudioRoute
+import dev.mascwa.pulse.core.telemetry.DndFilter
 import dev.mascwa.pulse.core.telemetry.EnvAnomaly
 import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
 import dev.mascwa.pulse.core.telemetry.LightState
+import dev.mascwa.pulse.core.telemetry.Posture
 import dev.mascwa.pulse.core.telemetry.PressureTrend
+import dev.mascwa.pulse.core.telemetry.SenseContext
 import dev.mascwa.pulse.core.telemetry.Sensorium
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.sensing.FusionSnapshot
@@ -73,6 +77,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
     val fusion by vm.fusion.collectAsStateWithLifecycle()
     val modelBytes by vm.modelBytes.collectAsStateWithLifecycle()
     val lookNote by vm.lookNote.collectAsStateWithLifecycle()
+    val phone by vm.phone.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -113,6 +118,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
                 item { FacetsCard(reading, fusion.present) }
                 item { AnomalyCard(anomalies, normalLine) }
                 item { InstrumentsCard(fusion, reading) }
+                item { PhoneCard(phone) }
                 item { StorageCard(modelBytes = modelBytes, onDiscard = { vm.discardModels(ctx) }) }
                 item {
                     Text(
@@ -431,6 +437,107 @@ private fun InstrumentsCard(f: FusionSnapshot, reading: EnvReading) {
                     reading.soundDbfs?.let { "%.0f dBFS".format(java.util.Locale.US, it) }
                         ?: "waiting for a sip"
                     ),
+            )
+        }
+        rows.forEach { (label, value) ->
+            Row(Modifier.padding(top = 4.dp)) {
+                Text(
+                    label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp,
+                    color = c.muted, modifier = Modifier.padding(end = 10.dp),
+                )
+                Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+            }
+        }
+    }
+}
+
+/**
+ * What the phone knows about ITSELF, beside what the instruments know about the room.
+ *
+ * ⚠️ **Every row says something, and the ways of saying nothing are kept apart.** This is the same
+ * rule the INSTRUMENTS card was rebuilt around: "not read" (the system service never answered),
+ * "moving — cannot tell" (the accelerometer answered and refused) and a real value are three
+ * different facts, and rendering the first two as a blank row makes them indistinguishable from each
+ * other and from a sense that is working fine.
+ */
+@Composable
+private fun PhoneCard(p: SenseContext) {
+    val c = Pulse.colors
+    Column(
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(c.raise.copy(alpha = 0.5f)).padding(12.dp),
+    ) {
+        Text(
+            "THIS PHONE", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.accent,
+        )
+        Text(
+            p.describe(), fontFamily = ChakraPetch, fontSize = 15.sp, color = c.ink,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        val unread = "not read"
+        val rows = buildList {
+            add(
+                "SCREEN" to when (p.screenOn) {
+                    null -> unread
+                    true -> if (p.locked == true) "on, locked" else if (p.locked == false) "on, unlocked" else "on"
+                    false -> "off"
+                },
+            )
+            add(
+                "LAST UNLOCK" to (
+                    // ⚠️ Null here is "none seen since the watch started", not "never" — the service
+                    // can begin while the phone is already in somebody's hand. Saying so beats a
+                    // dash, which would read as "this phone has not been unlocked".
+                    p.msSinceUnlock?.let { "${it / 1000L}s ago" } ?: "none seen since the watch started"
+                    ),
+            )
+            add(
+                "POSTURE" to when (p.posture) {
+                    null -> unread
+                    Posture.UNKNOWN -> "moving — cannot tell"
+                    Posture.FACE_DOWN -> "face-down"
+                    Posture.FACE_UP -> "face-up"
+                    Posture.UPRIGHT -> "upright or held"
+                },
+            )
+            add(
+                "POWER" to when (p.charging) {
+                    null -> unread
+                    true -> "charging · ${p.power?.name?.lowercase() ?: "source unknown"}"
+                    false -> "on battery"
+                },
+            )
+            add(
+                // Null below API 29, where the phone genuinely cannot say — see DeviceProbeReader.
+                "THERMAL" to (p.thermal?.name?.lowercase() ?: "$unread (needs Android 10)"),
+            )
+            add(
+                "AUDIO" to buildList {
+                    if (p.onCall == true) add("on a call")
+                    if (p.musicPlaying == true) add("playing")
+                    p.route?.takeIf { it != AudioRoute.UNKNOWN }?.let { add(it.name.lowercase()) }
+                }.joinToString(" · ").ifEmpty { if (p.route == null) unread else "idle" },
+            )
+            add("RINGER" to (p.ringer?.name?.lowercase() ?: unread))
+            add(
+                "DO NOT DISTURB" to when (p.dnd) {
+                    null, DndFilter.UNKNOWN -> "the phone will not say"
+                    DndFilter.OFF -> "off"
+                    DndFilter.PRIORITY -> "priority only"
+                    DndFilter.ALARMS_ONLY -> "alarms only"
+                    DndFilter.TOTAL_SILENCE -> "total silence"
+                },
+            )
+            add(
+                "HOME NETWORK" to when (p.awayFromHome) {
+                    // ⚠️ Null covers two situations and neither is "away": no home network is
+                    // configured, or the SSID cannot be read — which needs location permission and is
+                    // the ordinary case on GrapheneOS.
+                    null -> "no home Wi-Fi set, or the name cannot be read"
+                    true -> "away"
+                    false -> "at home"
+                },
             )
         }
         rows.forEach { (label, value) ->

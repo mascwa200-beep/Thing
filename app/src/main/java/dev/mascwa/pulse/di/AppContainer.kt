@@ -896,12 +896,25 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sensing.SensoriumStore(appContext, json)
     }
 
+    /**
+     * What the phone knows about itself — screen, lock, power, thermal, audio, Do Not Disturb.
+     *
+     * ⚠️ It BORROWS [deviceProbe] and [deviceContextProvider] rather than reading the thermal status
+     * and the battery intent a second time. Two mappings of the same system service is the
+     * duplicated-definition drift this project has corrected seven times, and the cost of borrowing
+     * is two extra sets of binder calls on a thirty-second heartbeat.
+     */
+    val senseContextReader: dev.mascwa.pulse.data.sensing.SenseContextReader by lazy {
+        dev.mascwa.pulse.data.sensing.SenseContextReader(appContext, deviceProbe, deviceContextProvider)
+    }
+
     /** The Sensorium's conductor: fuses sampler output each heartbeat, learns the baseline, extracts
      *  events, dispatches alerts/memories. Driven by [dev.mascwa.pulse.data.sensing.SensoriumService]. */
     val sensoriumEngine: dev.mascwa.pulse.data.sensing.SensoriumEngine by lazy {
         dev.mascwa.pulse.data.sensing.SensoriumEngine(
             sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
             memoryStream, notifier, settingsRepository, locationProvider,
+            senseContextReader, wifiPolicyController,
         )
     }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,

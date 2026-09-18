@@ -129,6 +129,10 @@ class SensoriumService : Service() {
         if (!looping) {
             looping = true
             c.sensorFusion.start()
+            // ⚠️ Registered here and nowhere else: ACTION_USER_PRESENT is only ever delivered to a
+            // receiver registered at RUNTIME, so a manifest entry would install, compile and never
+            // fire — see SenseContextReader.start.
+            c.senseContextReader.start()
             scope.launch { loop() }
         } else {
             updateOngoing(statusText())
@@ -290,6 +294,7 @@ class SensoriumService : Service() {
 
     override fun onDestroy() {
         runCatching { container?.sensorFusion?.stop() }
+        runCatching { container?.senseContextReader?.stop() }
         val c = container
         scope.launch {
             runCatching { c?.ambientAudioSampler?.close() }

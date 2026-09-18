@@ -14,6 +14,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.net.wifi.WifiManager
 import androidx.core.content.ContextCompat
+import dev.mascwa.pulse.core.telemetry.Posture
 import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlinx.coroutines.delay
@@ -60,6 +61,14 @@ data class FusionSnapshot(
     val pressureDeltaHpa: Float? = null,
     val magneticUt: Float? = null,
     val proximityNear: Boolean? = null,
+    /**
+     * Which way up the phone is lying — see [Posture.from] for why this is a refusal most of the
+     * time it is moving, and null until the accelerometer has said anything at all.
+     *
+     * ⚠️ Costs no new sensor: the accelerometer is already registered for the movement EWMA, and
+     * its z axis was being destructured and discarded on every event.
+     */
+    val posture: Posture? = null,
     /**
      * What this phone has, filled in by [SensorFusionController.start].
      *
@@ -120,7 +129,16 @@ class SensorFusionController(private val context: Context) : SensorEventListener
                 val (x, y, z) = event.values
                 val g = sqrt(x * x + y * y + z * z) / SensorManager.GRAVITY_EARTH
                 movementEwma = MOTION_SMOOTH * movementEwma + (1 - MOTION_SMOOTH) * abs(g - 1f)
-                _snapshot.value = _snapshot.value.copy(movement = movementEwma)
+                // ⚠️ The SMOOTHED deviation, not this sample's — and it must be read AFTER the line
+                // above so it includes the sample being handled. A single raw reading at rest can
+                // land outside the resting band on noise alone, and the engine samples this snapshot
+                // on a heartbeat, so it would eventually catch one of those and report UNKNOWN for a
+                // phone that had been sitting on a table for an hour. The EWMA is the signal this
+                // class already keeps and has already tuned for exactly that reason.
+                _snapshot.value = _snapshot.value.copy(
+                    movement = movementEwma,
+                    posture = Posture.from(zG = z / SensorManager.GRAVITY_EARTH, restDeviationG = movementEwma),
+                )
             }
             Sensor.TYPE_LIGHT ->
                 _snapshot.value = _snapshot.value.copy(lightLux = event.values[0])

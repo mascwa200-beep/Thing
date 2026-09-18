@@ -27,6 +27,9 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
     val events = c.sensoriumStore.eventsFlow
     val fusion = c.sensorFusion.snapshot
 
+    /** What the phone knows about itself — see [dev.mascwa.pulse.core.telemetry.SenseContext]. */
+    val phone = c.sensoriumEngine.phone
+
     private val _lookNote = MutableStateFlow<String?>(null)
 
     /**

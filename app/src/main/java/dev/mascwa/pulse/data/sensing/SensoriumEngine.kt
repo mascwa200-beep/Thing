@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.EnvReading
 import dev.mascwa.pulse.core.telemetry.EventSeverity
 import dev.mascwa.pulse.core.telemetry.MemoryKind
 import dev.mascwa.pulse.core.telemetry.PerceptLabel
+import dev.mascwa.pulse.core.telemetry.SenseContext
 import dev.mascwa.pulse.core.telemetry.SenseEvent
 import dev.mascwa.pulse.core.telemetry.SenseFrame
 import dev.mascwa.pulse.core.telemetry.Sensorium
@@ -15,6 +16,7 @@ import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.notifications.Notifier
+import dev.mascwa.pulse.security.WifiPolicyController
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,10 +48,35 @@ class SensoriumEngine(
      * stops depending on the microphone happening to hear an engine.
      */
     private val location: LocationProvider,
+    /**
+     * What the phone knows about ITSELF — screen, lock, power, thermal, audio, Do Not Disturb.
+     *
+     * ⚠️ Costs no permission and no new sensor, which is why it belongs beside the hardware senses
+     * rather than behind a toggle: the Sensorium had five instruments pointed outward and no idea
+     * whether anybody was holding the handset.
+     */
+    private val senseContext: SenseContextReader,
+    /**
+     * Read ONLY for the home-SSID comparison. It is the app's one honest definition of "home", and
+     * the Oracle already uses exactly this pair of reads; deriving it a second way here would be two
+     * definitions that can disagree about the same place.
+     */
+    private val wifi: WifiPolicyController,
 ) {
     private val _reading = MutableStateFlow(EnvReading())
     /** The live fused environmental read — the scanner's centerpiece, Computer's context line. */
     val reading: StateFlow<EnvReading> = _reading.asStateFlow()
+
+    private val _phone = MutableStateFlow(SenseContext())
+    /**
+     * The live read of the handset itself, beside [reading]'s read of the room.
+     *
+     * ⚠️ Two flows rather than one wider reading, because they answer different questions and have
+     * different consumers: [reading] is the line the Computer is handed every turn, and stapling
+     * fifteen facts about the phone onto it would double the length of the thing a person sees most
+     * often to carry facts most turns do not need.
+     */
+    val phone: StateFlow<SenseContext> = _phone.asStateFlow()
 
     private val _anomalies = MutableStateFlow<List<EnvAnomaly>>(emptyList())
     /** What's unusual right now vs the learned normal (empty while the baseline is young). */
@@ -222,6 +249,13 @@ class SensoriumEngine(
         val fused = Sensorium.distill(frame)
         _reading.value = fused
 
+        // --- the handset's own state, beside the room's ---
+        // Posture rides the accelerometer this class already reads; away-from-home is the same pair
+        // of reads the Oracle makes, so the two cannot end up disagreeing about the same place.
+        _phone.value = runCatching {
+            senseContext.read(posture = snap.posture, awayFromHome = awayFromHome())
+        }.getOrDefault(SenseContext())
+
         // --- learn + judge (throttled so dense heartbeats don't over-weight one moment) ---
         if (nowMs - lastBaselineMs >= BASELINE_GAP_MS) {
             lastBaselineMs = nowMs
@@ -244,6 +278,22 @@ class SensoriumEngine(
         wasStill = snap.movement < Sensorium.HANDLING_THRESHOLD
         events.forEach { dispatch(it, nowMs) }
     }
+
+    /**
+     * Whether this phone is on a Wi-Fi network that is not one of the configured home ones.
+     *
+     * ⚠️ **Null is the answer in two quite different situations and both must stay null.** No home
+     * network configured means there is nothing to compare against; an unreadable SSID means the
+     * comparison cannot be made, which on GrapheneOS is the ordinary case because reading it needs
+     * location permission. The Trusted-Network subsystem already paid for getting this wrong once —
+     * an unreadable SSID read as "away" switched somebody's Wi-Fi off inside their own house — so
+     * "away" is only ever a positive fact about a network that was actually read.
+     */
+    private suspend fun awayFromHome(): Boolean? = runCatching {
+        val home = settings.current().security.homeSsids
+        if (home.isEmpty()) null
+        else wifi.currentSsid()?.let { ssid -> home.none { it.equals(ssid, ignoreCase = true) } }
+    }.getOrNull()
 
     private suspend fun dispatch(event: SenseEvent, nowMs: Long) {
         val cooldown = when (event.severity) {
