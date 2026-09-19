@@ -1,6 +1,9 @@
 package dev.mascwa.pulse.desktop.search
 
+import dev.mascwa.pulse.desktop.DESK_GROUPS
+import dev.mascwa.pulse.desktop.Screen
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
@@ -42,4 +45,62 @@ object DesktopSearchIndex {
 
         return out
     }
+
+    /**
+     * Every screen this machine has, as records — so the box can answer "take me there" as well as
+     * "what should I read".
+     *
+     * The vocabulary is [DESK_GROUPS]' own: the label someone sees in the directory, the description
+     * beside it, and the words that entry already lists for people who call it something else. None
+     * of it is new, and none of it is written twice — the directory stays the one place a screen is
+     * named, which is what makes adding a screen still one entry and one branch.
+     *
+     * ⚠️ **Searched SEPARATELY from [records], and that is a deliberate departure from the phone —
+     * measured, not stylistic.** [DeviceSearch.search] caps each kind at four places and fills the
+     * rest ONLY when everything that matched is a single kind. This machine's corpus is almost
+     * entirely guides, so a guides-only query takes that fill today and comes back with up to twelve;
+     * the moment one screen also matched, the same query would come back with four. Cutting the
+     * library answer by two thirds to make room for one row is the wrong trade on the screen whose
+     * own description is *"Find a page, or a study card, by what you need"*. Two searches over
+     * disjoint corpora make "nothing is displaced" true by construction rather than by a measurement
+     * somebody has to keep re-running.
+     *
+     * ⚠️ **The search terms go in `headings`, not `summary`, and the split is load-bearing.** A
+     * result row renders the summary, so putting them there would print *"Internet radio — near you,
+     * starred, and always on music stream station listen fm somafm audio"* under RADIO. `headings` is
+     * matched (at a heavier weight than summary) and never drawn — exactly how a guide is indexed by
+     * [dev.mascwa.pulse.core.telemetry.toSearchEntry], so one field means one thing on both.
+     *
+     * ⚠️ The phone filters a Settings record's body against its own title; that is **not** done here,
+     * and copying it would be cargo-culting a fix whose reason does not hold. It exists because a
+     * keyword list repeats its own title *by construction* and would otherwise outrank the screen it
+     * describes. These descriptions are human prose that mostly does not repeat the label, and the
+     * only thing a screen record competes with is another screen record — where a self-repeat, as in
+     * RADIO's, ranks the right answer first.
+     */
+    fun screenRecords(): List<DeviceSearch.Record> =
+        DESK_GROUPS.flatMap { group ->
+            group.entries.map { e ->
+                DeviceSearch.Record(
+                    entry = GuideSearch.Entry(
+                        // The enum name, so [screenOf] can turn a result back into somewhere to go.
+                        id = e.screen.name,
+                        title = e.label,
+                        category = group.label,
+                        summary = e.description,
+                        headings = e.searchTerms,
+                    ),
+                    kind = RecordKind.FEATURE,
+                )
+            }
+        }
+
+    /**
+     * The screen a [screenRecords] result points at, or null for anything else.
+     *
+     * Defensive rather than load-bearing — the ids are built from [Screen] a few lines up, so this
+     * cannot miss — but a row that silently went nowhere would be worse than one that is not drawn.
+     */
+    fun screenOf(result: DeviceSearch.Result): Screen? =
+        Screen.entries.firstOrNull { it.name == result.id }
 }

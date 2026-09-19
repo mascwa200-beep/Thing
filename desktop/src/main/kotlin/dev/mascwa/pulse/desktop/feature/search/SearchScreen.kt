@@ -25,6 +25,8 @@ import dev.mascwa.pulse.core.telemetry.DeviceSearch
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.GuideIndexEntry
 import dev.mascwa.pulse.desktop.DeepAnalysis
+import dev.mascwa.pulse.desktop.Screen
+import dev.mascwa.pulse.desktop.search.DesktopSearchIndex
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsButton
@@ -40,11 +42,17 @@ import dev.mascwa.pulse.desktop.theme.Pulse
  * Results are grouped by kind and open in the reader. An emergency recognised in the query is answered
  * above them all, from the same curated table the phone uses, so the first action is on screen before
  * any ranking happens.
+ *
+ * The box answers two different questions and says which is which. **GO HERE** is somewhere to go;
+ * everything under it is something to read. They are ranked separately — see
+ * `DesktopSearchIndex.screenRecords` for why merging them would cost the reading answer two thirds of
+ * its places.
  */
 @Composable
 fun SearchScreen(
     vm: SearchViewModel,
     onOpenGuide: (String) -> Unit,
+    onOpenScreen: (Screen) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by vm.state.collectAsState()
@@ -113,8 +121,27 @@ fun SearchScreen(
                 items(state.deepHits, key = { "deep:" + it.id }) { g -> DeepRow(g, onOpenGuide) }
             }
 
+            // ⚠️ Before the early return below, for the same reason the deep hits are, and the case
+            // is sharper here: the queries most likely to name a screen and nothing else — "settings",
+            // "crash console", "packs", "remote" — are exactly the ones no guide matches. Putting this
+            // after the return would hide the answer in the only situation where it IS the answer.
+            if (state.screens.isNotEmpty()) {
+                item {
+                    Text(
+                        "GO HERE",
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp, letterSpacing = 2.sp, color = c.positive,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+                items(state.screens, key = { "scr:" + it.id }) { r -> ScreenRow(r, onOpenScreen) }
+            }
+
             if (state.results.isEmpty()) {
-                if (state.searched) {
+                // ⚠️ "Nothing" has to mean nothing ANYWHERE, or the sentence contradicts the list
+                // printed a few pixels above it. Screens are the new way that could happen; deep hits
+                // were already one, and the same words were already wrong for them.
+                if (state.searched && state.screens.isEmpty() && state.deepHits.isEmpty()) {
                     item {
                         Text(
                             "Nothing here matches that.",
@@ -202,6 +229,37 @@ private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: (String) ->
                 Spacer(Modifier.height(10.dp))
                 LcarsButton("OPEN THE PROTOCOL", onClick = { onOpenGuide(guide) }, accent = c.magenta)
             }
+        }
+    }
+}
+
+/**
+ * A place to go, rather than a thing to read.
+ *
+ * Accented apart from the result rows below it because it does something different when clicked:
+ * these navigate, those open the reader.
+ */
+@Composable
+private fun ScreenRow(r: DeviceSearch.Result, onOpenScreen: (Screen) -> Unit) {
+    val c = Pulse.colors
+    // Cannot be null — the ids are built from the enum — but a row that looked clickable and went
+    // nowhere would be worse than one that is not drawn.
+    val screen = DesktopSearchIndex.screenOf(r) ?: return
+    LcarsFrame(Modifier.fillMaxWidth().clickable { onOpenScreen(screen) }, accent = c.positive) {
+        Column {
+            Text(r.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+            val summary = r.record.entry.summary
+            if (summary.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    summary,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, lineHeight = 16.sp,
+                    modifier = Modifier.widthIn(max = 900.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            // The directory group, so the row says where on this machine it lives as well as what it is.
+            Text(r.record.entry.category, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint)
         }
     }
 }

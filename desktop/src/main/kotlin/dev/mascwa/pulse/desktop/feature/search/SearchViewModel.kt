@@ -22,6 +22,13 @@ data class SearchUiState(
     val corpus: List<Pair<DeviceSearch.RecordKind, Int>> = emptyList(),
     /** A recognised emergency in what is being typed, shown above every other result. */
     val emergency: EmergencyTriage.Emergency? = null,
+    /**
+     * Screens of this machine that match — the "take me there" answer, ranked among themselves.
+     *
+     * Held apart from [results] rather than merged into them; `DesktopSearchIndex.screenRecords`
+     * carries the measurement that decided it.
+     */
+    val screens: List<DeviceSearch.Result> = emptyList(),
     val searched: Boolean = false,
 
     // ----- Deep search ------------------------------------------------------------------------
@@ -68,12 +75,21 @@ class SearchViewModel(
     fun onQueryChanged(query: String) {
         typingJob?.cancel()
         if (query.isBlank()) {
-            _state.value = _state.value.copy(query = query, results = emptyList(), emergency = null, searched = false)
+            _state.value = _state.value.copy(
+                query = query, results = emptyList(), emergency = null, screens = emptyList(), searched = false,
+            )
             return
         }
         // Set before the debounce: an emergency is a table lookup costing nothing, and it is the one
-        // answer that should not wait for a typing pause.
-        _state.value = _state.value.copy(query = query, emergency = EmergencyTriage.match(query))
+        // answer that should not wait for a typing pause. The screens go with it for the same reason
+        // — there are twenty-odd of them, so ranking them is a table lookup too, and "take me there"
+        // is the answer least worth making somebody stop typing for.
+        _state.value = _state.value.copy(
+            query = query,
+            emergency = EmergencyTriage.match(query),
+            screens = runCatching { DeviceSearch.search(screenRecords, query, limit = SCREEN_LIMIT) }
+                .getOrDefault(emptyList()),
+        )
         typingJob = scope.launch {
             delay(DEBOUNCE_MS)
             val hits = runCatching { DeviceSearch.search(records, query) }.getOrDefault(emptyList())
@@ -146,7 +162,22 @@ class SearchViewModel(
     @Volatile private var indexCache: List<GuideIndexEntry> = emptyList()
     private var deepJob: Job? = null
 
+    /**
+     * Built once: the directory is a compile-time constant, so rebuilding it per keystroke would be
+     * work with no input that could have changed.
+     */
+    private val screenRecords: List<DeviceSearch.Record> = DesktopSearchIndex.screenRecords()
+
     private companion object {
         const val DEBOUNCE_MS = 160L
+
+        /**
+         * How many places to go the box will offer at once.
+         *
+         * Small on purpose. This is the answer to "where is that", which is usually one screen and
+         * occasionally two; a longer list would push the reading answer down the page to hedge a
+         * question that rarely needs hedging.
+         */
+        const val SCREEN_LIMIT = 3
     }
 }
