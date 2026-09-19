@@ -355,21 +355,19 @@ fun PulseApp(
                     // one screen that owns it, which is what RecordKind.route names.
                     onOpenGuide = { id -> navController.navigate("${Routes.SURVIVAL}?guide=$id") },
                     onOpen = { r ->
-                        when (r.kind) {
+                        when {
                             // A guide opens at the guide, via the argumented deep-link.
-                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE ->
+                            r.kind == dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE ->
                                 navController.navigate("${Routes.SURVIVAL}?guide=${r.id}")
-                            // A feature's id IS its route (the FEATURE convention) — typing "radar"
-                            // and tapping the hit opens the radar, through the one navigate idiom.
-                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.FEATURE ->
-                                openApp(r.id)
-                            // ⚠️ A Settings row needs its own branch, and it is not cosmetic: its id
-                            // carries the category argument (`settings?cat=security`), so the `else`
-                            // below would navigate to the bare `route` and silently land on Settings'
-                            // entry category instead of the one that was searched for. `openApp`
-                            // strips the argument for the tab test only and passes the full route on.
-                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.SETTING ->
-                                openApp(r.id)
+                            // A destination's id IS its route — typing "radar" and tapping the hit
+                            // opens the radar, through the one navigate idiom. ⚠️ Reading the flag
+                            // rather than naming FEATURE and SETTING is not tidying: a Settings
+                            // row's id carries the category argument (`settings?cat=security`), so
+                            // the `else` below would navigate to the bare `route` and land on
+                            // Settings' entry category instead of the one searched for — and the
+                            // next destination kind added would inherit that silently. `openApp`
+                            // strips the argument for the tab test only and passes the route on.
+                            r.kind.destination -> openApp(r.id)
                             else -> navController.navigate(r.kind.route)
                         }
                     },

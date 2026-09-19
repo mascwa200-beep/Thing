@@ -30,11 +30,19 @@ object DeviceSearch {
      * as those kinds have been indexed, on the screen the owner has twice said they cannot find
      * things on. One rule in one place, rather than the same rule stated three times and wrong in
      * all three: this repository has corrected a duplicated definition seven times now.
+     *
+     * ⚠️ [destination] says whether this is **somewhere to go** rather than **something to read**,
+     * which is the one distinction a search result list has to draw and the one the phone was not
+     * drawing. Its **invariant is that a destination's entry id IS the route to open it** — stated
+     * in prose on both [FEATURE] and [SETTING] below, and implemented as a two-branch `when` in
+     * `PulseApp`. Setting this true takes on that obligation; a kind whose id is a document id
+     * must leave it false or a tap will navigate to nonsense.
      */
     enum class RecordKind(
         val label: String,
         val route: String,
         val plural: String = label + "s",
+        val destination: Boolean = false,
     ) {
         GUIDE("Guide", "survival"),
         NOTE("Note", "notes"),
@@ -80,7 +88,7 @@ object DeviceSearch {
          * prose about radar. ⚠️ Convention: a FEATURE record's entry **id IS the route to open** —
          * the `route` below is only the fallback for a tap handler that predates the convention.
          */
-        FEATURE("Feature", "menu"),
+        FEATURE("Feature", "menu", destination = true),
 
         /**
          * A place inside Settings — a category, or one section within it.
@@ -113,7 +121,7 @@ object DeviceSearch {
          * user-facing heading to dodge a scoring artefact would be the worse trade. Worth knowing
          * before adding a kind whose label collides with the name of a real screen.
          */
-        SETTING("Setting", "settings"),
+        SETTING("Setting", "settings", destination = true),
         ;
 
         /**

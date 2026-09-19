@@ -205,6 +205,35 @@ class DeviceSearchTest {
         assertTrue(DeviceSearch.of("n", RecordKind.NOTE, "Note", "Body").entry.headings.isEmpty())
     }
 
+    /**
+     * Somewhere to go, told apart from something to read.
+     *
+     * ⚠️ Asserted BY NAME rather than by a rule, in the shape `LiveChannelsTest` uses: what is worth
+     * catching is a new kind whose author did not think about which of the two it is, and any rule
+     * clever enough to derive "a feature is a place and a diary entry is not" would be a worse thing
+     * to maintain than the two entries. The invariant a destination takes on — that its id IS the
+     * route to open it — is why `PulseApp` can read this flag instead of naming the two kinds.
+     */
+    @Test
+    fun aDestinationIsToldApartFromSomethingToRead() {
+        assertEquals(
+            setOf(RecordKind.FEATURE, RecordKind.SETTING),
+            RecordKind.entries.filter { it.destination }.toSet(),
+        )
+        // Everything the user wrote, and everything written for them, is a reading.
+        for (k in listOf(
+            RecordKind.GUIDE, RecordKind.NOTE, RecordKind.DIARY, RecordKind.MEMORY,
+            RecordKind.TASK, RecordKind.PROFILE, RecordKind.FINDING, RecordKind.KNOWLEDGE,
+            RecordKind.STUDY,
+        )) {
+            assertTrue("${k.name} is something to read, not somewhere to go", !k.destination)
+        }
+        // A destination still needs a route to fall back on, like every other kind.
+        RecordKind.entries.filter { it.destination }.forEach {
+            assertTrue("${it.name} has no route", it.route.isNotBlank())
+        }
+    }
+
     // ---- presentation ------------------------------------------------------------------------------
 
     @Test

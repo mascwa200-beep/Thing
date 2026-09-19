@@ -5,10 +5,10 @@
 # SIGTERMed and `finally` does not run — the recorded sixth way a green test proves nothing. The
 # restore is a shell `trap ... EXIT` for the same reason, and it is byte-compared.
 #
-# Usage: ./neg.sh <1|2|3>
+# Usage: ./neg.sh <1|2|3|4|5>
 set -euo pipefail
 ROOT=/home/user/Thing
-CASE="${1:?usage: neg.sh <1|2|3>}"
+CASE="${1:?usage: neg.sh <1|2|3|4|5>}"
 
 CORE="$ROOT/core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/DeviceSearch.kt"
 GS="$ROOT/core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/GuideSearch.kt"
@@ -43,6 +43,10 @@ case "$CASE" in
      WHY="of() joins the terms back into the drawn summary (the shipped phone defect)" ;;
   3) TARGET="$GS"; OLD='    private const val W_HEADING = 5'; NEW='    private const val W_HEADING = 2'
      WHY="a heading stops outweighing a summary" ;;
+  4) TARGET="$CORE"; OLD='        FEATURE("Feature", "menu", destination = true),'; NEW='        FEATURE("Feature", "menu"),'
+     WHY="a screen stops being a destination, so it sinks back into the flat list" ;;
+  5) TARGET="$CORE"; OLD='        GUIDE("Guide", "survival"),'; NEW='        GUIDE("Guide", "survival", destination = true),'
+     WHY="a reading is marked a destination — the mistake with consequences, since its id is a document id and a tap would navigate to nonsense" ;;
   *) echo "unknown case"; exit 1 ;;
 esac
 

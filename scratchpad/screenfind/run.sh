@@ -125,6 +125,20 @@ rm -rf out && mkdir -p out
 java -cp "$KC:$STD:$TROVE:$ANN:$COR" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   "$CORE/GuideSearch.kt" "$CORE/DeviceSearch.kt" Routes.kt Stubs.kt \
   "$ROOT/app/src/main/java/dev/mascwa/pulse/feature/settings/SettingsSections.kt" Probe.kt \
-  -cp "$STD" -d out -nowarn 2>&1 | grep -E '^(e:|error:)' && { echo "COMPILE FAILED"; exit 1; }
+  -cp "$STD" -d out -nowarn > out/compile.log 2>&1 || true
+
+# ⚠️ Two explicit checks, and BOTH were wrong here before they were right.
+#
+# kotlinc reports "Probe.kt:48:31: error: unresolved reference" — the FILE comes first — so the
+# '^(e:|error:)' pattern this script was copied with never fired, however broken the code was, and
+# a deliberately broken probe sailed past it. Only the missing class file caught that.
+#
+# And piping into grep hides it a second way: under `set -o pipefail` the pipeline takes java's own
+# exit code, so `... | grep ... && echo FAILED` never reaches the echo — `set -e` kills the script
+# first, with the errors printed and no word about what they were.
+if grep -qE '(^e: |: error:)' out/compile.log; then
+  grep -E '(^e: |: error:)' out/compile.log | head -20
+  echo "COMPILE FAILED"; exit 1
+fi
 [ -f out/ProbeKt.class ] || { echo "NO CLASSES PRODUCED — the compiler did not run"; exit 1; }
 java -cp "out:$STD" ProbeKt
