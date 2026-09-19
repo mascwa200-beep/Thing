@@ -43,8 +43,20 @@ def strip_noise(s: str) -> str:
             j = n if j < 0 else j
             out.append(" " * (j - i)); i = j
         elif s.startswith('"""', i):
+            # ⚠️ A raw string is closed by the LAST three quotes of the run, not the first three,
+            # so `"""a"""" ` is the content `a"` — and a regex literal written as
+            # Regex("""label\s*=\s*"([^"]*)"""") ends in exactly that four-quote run. Stopping at
+            # the first `"""` leaves one quote outside the literal, which then opens a phantom
+            # string that swallows the rest of the function, INCLUDING its `return`, and the gate
+            # reports a perfectly good function as never returning. Third time this repo has found
+            # a lexer here that did not know about one more Kotlin string form.
             j = s.find('"""', i + 3)
-            j = n if j < 0 else j + 3
+            if j < 0:
+                j = n
+            else:
+                j += 3
+                while j < n and s[j] == '"':
+                    j += 1
             out.append(" " * (j - i)); i = j
         elif s[i] == "'":
             # ⚠️ Character literals, and the reason is a real false positive this gate produced: a
