@@ -804,6 +804,41 @@ jobs:
           fi
           echo "water stations packaged (sentinel correctly absent)"
 
+      - name: Verify the OUI vendor table packaged
+        # ⚠️ Same shape as the water gate, and here for the same reason: the "who's on the Wi-Fi"
+        # collection (TROVE) resolves a device's MAC to a vendor through `assets/recon/oui.tsv`, and
+        # when the table is absent every device shows as "unknown vendor" — indistinguishable, on the
+        # device, from a network of genuinely anonymous hardware. `ReconOuiAssetTest` reads the file on
+        # DISK and proves the core resolves it; nothing else proves the file the phone opens is that
+        # file. `ReconScanner` opens `recon/oui.tsv` by name.
+        #
+        # ⚠️ The size floor is not decoration. A truncated or empty table parses to a map that resolves
+        # nothing, and the collection goes quiet in the same way — so "present" alone would pass on a
+        # file carrying nothing. The real table is ~1.2 MB (40k+ IEEE MA-L rows); the floor is well
+        # under that, so a registry that shed a few thousand stale rows does not fail the build.
+        run: |
+          set -e
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          line=$(unzip -l "$apk" | grep "assets/recon/oui.tsv" || true)
+          if [ -z "$line" ]; then
+            echo "FAIL: the OUI table is in the tree but NOT in the APK."
+            unzip -l "$apk" | grep "assets/recon/" || echo "(nothing under assets/recon/ at all)"
+            exit 1
+          fi
+          bytes=$(echo "$line" | awk '{print $1}')
+          if [ "$bytes" -lt 500000 ]; then
+            echo "FAIL: the OUI table packaged at only $bytes bytes — too small to be the vendor list."
+            exit 1
+          fi
+          echo "  oui.tsv: $bytes bytes"
+          # ⚠️ The sentinel, for the reason every gate here carries one: a grep that matches anything,
+          # or one that silently matches nothing, proves exactly as much as no gate.
+          if unzip -l "$apk" | grep -q "assets/recon/this-must-not-exist.tsv"; then
+            echo "FAIL: the sentinel matched — this check cannot tell present from absent."
+            exit 1
+          fi
+          echo "OUI vendor table packaged (sentinel correctly absent)"
+
       - name: Verify the Python runtime packaged
         # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
         # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64
