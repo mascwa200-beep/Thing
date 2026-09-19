@@ -13375,3 +13375,68 @@ cleanup, enumerated above); whether `ATTESTATION_MIN_GAP_MS` should instead be a
 it means trusting one clock against the other and reintroduces exactly the failure `PassThrottle.due`
 refuses to have); and the systemic gap that a section's `vis()` search keywords are visible only to the
 Settings search box and not to device search — 30 call sites, recorded earlier and still open.
+
+#### The same arc, continued: a fourth pass, and a gate so it cannot recur (`9c83cb3c`, `cb10f0a1`)
+
+**A fourth pass had no time floor, found by walking the rest of the worker rather than by another
+sweep.** `SecurityAuditor.runAudit` **enumerates every installed package** — the call whose cost once
+froze the Security Audit screen when it ran on the main thread — and it ran on every tick. Its comment
+said being off the main thread made it "cheap enough"; ⚠️ off the main thread stops it freezing
+anything, which is not the same as cheap, and that sentence now says so. **No new field was needed**:
+`SecurityAuditStore.saveResult` already stamps `lastScanMs`, so the floor reads what is there and a
+manual scan from the screen paces the background pass as a side effect. The screen's SCAN button is
+not gated at all.
+⚠️ **`lastScan > 0` must stay its own condition, first.** It means "the user has run this once", which
+is what makes the pass opt-in — and `PassThrottle.due` treats a zero stamp as **due**, so folding the
+two together inverts exactly that gate and starts auditing a phone whose owner never asked. That is a
+simplification someone will otherwise make, so the comment says so.
+
+**A gate, because fixing four instances does not stop a fifth.**
+`app/src/test/…/data/settings/ThrottleStampCoverageTest` asserts every `val last…Ms: Long` in the
+settings package is read by something outside the plumbing. A read is a **dotted** access; a write
+inside a `copy(…)` has no dot in front of it, and that distinction is the whole test, since all three
+defects had writes and no reads. Negative-tested both ways against a baseline asserted green first:
+removing the three reads (the tree as it actually was) fails it and **names all three fields**, and
+breaking the declaration regex fails the **self-check** rather than letting the coverage test pass
+vacuously — which is how a gate like this usually dies. ⚠️ It runs locally: no Android dependency, so
+kotlinc + JUnit is enough, **with the JVM started in the module directory**, which is where Gradle
+resolves a test's relative paths from (`scratchpad/throttle/run_gate.sh`).
+
+⚠️ **Scoped to the settings blob, measured rather than guessed, and the reason is structural.** Every
+other `last…Ms` in the app module is alive — `lastScanMs`, `lastEpochMs`, `lastUsedMs`,
+`lastStudiedAtMs`, `lastShownMs`, `lastSeenMs`, `lastRefusalMs`, `lastAccessedMs`. Those are `var`s and
+map entries on live objects, so the write and the read sit a few lines apart in one file where a
+missing read is obvious to anyone reading it; a **persisted** field's writer and reader are in
+different files with nothing connecting them. **`NotifyState` was swept the same way: all eight fields
+have both readers and writers**, so there is nothing of this kind there either — recorded so nobody
+re-sweeps it.
+
+⚠️ **Two of those eight were only settled by correcting my own search, and the same mistake would have
+made the gate wrong.** `lastAccessedMs` is read in `MemoryStream` — a **core** file, not the app at
+all; and `lastRefusalMs` is a `ConcurrentHashMap` read as `lastRefusalMs[reason]`, **no dot**, so a
+dotted grep cannot see it while it is perfectly alive. **Count in-file and cross-module readers before
+calling a field dead** — the same lesson the earlier dead-code sweep recorded, in a new disguise.
+
+**Checked and deliberately NOT changed, so it is not re-chased:** the worker takes a real location fix
+each tick (`fusedFix ?: managerFix ?: lastKnown`), a battery cost with no floor — but the water row,
+the incident check and the weather are all *about where you are*, and caching a stale position into a
+safety check is a worse failure than the wake.
+
+⚠️ **A workflow cost worth the owner's attention, measured rather than felt.** The APK is **662 MB**
+and `latest` is republished on **every push to any branch**, with auto-update on by default firing on
+every foreground — so each push I make costs the owner a 662 MB download, not each merge. Two thirds
+of that is one asset (`assets/food/food.db`, 444 MB; `stars.skycat` is another 295 MB). Three shapes
+that would fix it, none taken because each is the owner's call: **batch pushes** (done from here on in
+a session — supersede an in-flight run before it publishes, so one download covers the lot); **publish
+to `latest` only from `main`**, which trades away the deliberate "a branch push ships immediately"
+behaviour; or **move the food corpus out of the APK onto the pack mechanism the nutrition app already
+uses**, which would take the APK to ~218 MB but leaves the HEALTH tab's offline search and scanner
+empty until the pack is fetched.
+
+⚠️ **One more thing found and deliberately left for the owner: there is a complete CRT scanline effect
+in the tree that nothing can reach.** `ui/effects/Effects.kt`'s `ScanlineOverlay` has **zero call
+sites** and `AppSettings.scanlines` has no control — residue of the pre-LCARS era, when the toggle was
+removed. It is listed among the eleven residue fields above, but unlike the other ten it is a *feature*
+rather than a leftover number, and the current identity arc is a 1960s CRT console, so wiring it back
+to a Settings toggle is at least as defensible as deleting it. Not decided unilaterally: it is a visual
+change to a daily driver.
