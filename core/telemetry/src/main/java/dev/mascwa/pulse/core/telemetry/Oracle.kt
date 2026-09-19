@@ -764,7 +764,17 @@ object Oracle {
         )
     }
 
-    private val RULES: List<(OracleSignals) -> Insight?> = listOf(
+    /**
+     * Every rule, in no particular order — [divine] ranks what they return.
+     *
+     * ⚠️ `internal` rather than `private` **so the reachability gate has an honest denominator.**
+     * `OracleReachabilityTest` sweeps synthetic snapshots and asserts that every rule declared here
+     * can actually fire; counting only the families that DID fire would make a newly-added dead
+     * rule invisible, which is the exact defect the gate exists to catch. `internal` is scoped to
+     * this Gradle module and the test is in it, so nothing outside `:core:telemetry` gains access —
+     * the same reasoning that makes `GuideSearch.wordMatch` internal.
+     */
+    internal val RULES: List<(OracleSignals) -> Insight?> = listOf(
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
         ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
