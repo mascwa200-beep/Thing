@@ -25,11 +25,11 @@ object DeviceSearchIndex {
     /**
      * How much of a long body to index.
      *
-     * A diary entry can run to pages. Beyond a point the extra text stops helping the reader find
-     * the entry and starts making every entry match everything, so the opening is indexed and the
-     * rest is left to the screen that owns it.
+     * ⚠️ Moved to [DeviceSearch.BODY_CHARS] when the desktop index gained notes and diary: both
+     * platforms hold the same writing, so one constant rather than two that can drift. Kept here as
+     * an alias because it is public and the reasoning reads at this call site.
      */
-    const val BODY_CHARS = 1_200
+    const val BODY_CHARS = DeviceSearch.BODY_CHARS
 
     /** Gather. Safe to call on every keystroke — see [records] for why nothing here touches a shard. */
     suspend fun records(c: AppContainer): List<DeviceSearch.Record> {

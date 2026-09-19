@@ -3,6 +3,8 @@ package dev.mascwa.pulse.desktop.search
 import dev.mascwa.pulse.desktop.DESK_GROUPS
 import dev.mascwa.pulse.desktop.Screen
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.notes.DiaryStore
+import dev.mascwa.pulse.desktop.notes.NotesStore
 import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.toSearchEntry
 import dev.mascwa.pulse.desktop.study.StudyStore
@@ -16,14 +18,32 @@ import dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind
  * source that fails costs its own kind and nothing else. Nothing here touches the network, and the
  * guide side reads only the resident index — no shard is opened to answer a keystroke.
  *
- * ⚠️ **The corpus is honestly smaller than the phone's.** The Android version searches notes, diary,
- * tasks, profile, episodic memory, findings and ingested documents; none of those exist on the desktop.
- * What is here is the bundled library and this machine's own study cards. The screen says which, rather
- * than implying the phone's stores are being searched from here.
+ * ⚠️ **The corpus is honestly smaller than the phone's, and this paragraph used to overstate how
+ * much.** It said the Android version searches "notes, diary, tasks, profile, episodic memory,
+ * findings and ingested documents; none of those exist on the desktop" — and **notes and diary do
+ * exist here**, with their own stores, their own screens and their own entries in the directory.
+ * They simply were not indexed, so the two kinds of thing the user WROTE THEMSELVES could not be
+ * found, which is the case [DeviceSearch] opens by arguing is the most important one of all.
+ *
+ * What genuinely does not exist here is the phone's tasks, profile, episodic memory, findings and
+ * knowledge base. What is here is the bundled library, this machine's study cards, and now its
+ * notes and diary. The screen says which, rather than implying the phone's stores are reachable.
  */
 object DesktopSearchIndex {
 
-    suspend fun records(library: LibraryRepository, study: StudyStore): List<DeviceSearch.Record> {
+    /**
+     * ⚠️ Every source is REQUIRED rather than defaulted to null, and that is deliberate. A defaulted
+     * store is a default that quietly means "do not index this" — the shape that shipped twice in
+     * this repository already, where a caller compiled, looked wired, and silently did nothing.
+     * Making them required means adding a source forces every caller to decide about it, which is
+     * how these two came to be noticed missing in the first place.
+     */
+    suspend fun records(
+        library: LibraryRepository,
+        study: StudyStore,
+        notes: NotesStore,
+        diary: DiaryStore,
+    ): List<DeviceSearch.Record> {
         val out = ArrayList<DeviceSearch.Record>(700)
 
         // Guides: the resident index only. Title, category, summary and headings are exactly the fields
@@ -40,7 +60,8 @@ object DesktopSearchIndex {
         // headed DOCUMENT and this machine, which holds no documents at all, reported "14 documents on
         // this machine". It stayed invisible while the phone emitted `KNOWLEDGE` for nothing; now that
         // it emits real ingested documents, one member cannot be labelled truthfully for both.
-        // ⚠️ `cards()`, which LOADS, not `items.value`, which reads a flow that is empty until
+        //
+        // ⚠️ And `cards()`, which LOADS, not `items.value`, which reads a flow that is empty until
         // something else has caused a load. Measured before the change: a fresh store over a saved
         // deck returned five cards warm and ZERO cold, so opening SEARCH first thing after launch
         // found none of them — silently, and only on that path.
@@ -50,6 +71,26 @@ object DesktopSearchIndex {
                 kind = RecordKind.STUDY,
                 title = item.question.guideTitle + " ▸ " + item.question.heading,
                 body = item.question.prompt + " " + item.question.answer,
+            )
+        }
+
+        // What the user wrote themselves. `load()` rather than the published flow, for the reason
+        // `StudyStore.cards` sets out at length: a flow is empty until something causes a load, and
+        // the search index runs before anything has opened either screen.
+        //
+        // ⚠️ A store that cannot read its file yields nothing here, which is the same shape as an
+        // empty one. That is the index's stated contract — a failing source costs its own kind and
+        // nothing else — and both stores carry a `loadFailed` their own screens surface, so the
+        // reader is not left with no way to find out.
+        runCatching { notes.load() }.getOrNull()?.forEach { n ->
+            out += DeviceSearch.of(
+                n.id, RecordKind.NOTE, n.title, n.body.take(DeviceSearch.BODY_CHARS), n.createdMs,
+            )
+        }
+
+        runCatching { diary.load() }.getOrNull()?.forEach { d ->
+            out += DeviceSearch.of(
+                d.id, RecordKind.DIARY, d.title, d.body.take(DeviceSearch.BODY_CHARS), d.createdMs,
             )
         }
 

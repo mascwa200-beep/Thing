@@ -3,6 +3,8 @@ package dev.mascwa.pulse.desktop.feature.search
 import dev.mascwa.pulse.desktop.DeepAnalysis
 import dev.mascwa.pulse.desktop.DeepState
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.notes.DiaryStore
+import dev.mascwa.pulse.desktop.notes.NotesStore
 import dev.mascwa.pulse.desktop.search.DesktopSearchIndex
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
@@ -50,6 +52,8 @@ class SearchViewModel(
     private val scope: CoroutineScope,
     private val library: LibraryRepository,
     private val study: StudyStore,
+    private val notes: NotesStore,
+    private val diary: DiaryStore,
 ) {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
@@ -61,10 +65,23 @@ class SearchViewModel(
 
     fun refresh() {
         scope.launch {
-            val gathered = runCatching { DesktopSearchIndex.records(library, study) }.getOrDefault(emptyList())
+            val gathered = runCatching { DesktopSearchIndex.records(library, study, notes, diary) }.getOrDefault(emptyList())
             if (gathered.isNotEmpty()) {
                 records = gathered
                 _state.value = _state.value.copy(corpus = DeviceSearch.corpusSummary(gathered))
+                // ⚠️ Re-run the standing question, or refreshing the corpus is only half the job and
+                // the visible half is the missing one. Write a note about kayaking, come back to a
+                // screen still showing results for "kayak", and a refresh that updated `records`
+                // alone would leave the same stale list on screen — which reads exactly like the
+                // note not having been indexed.
+                //
+                // Guarded on a query, so the call from `init` (where the box is empty) cannot mark
+                // the screen as having searched and turn its opening prompt into "nothing matches".
+                val q = _state.value.query
+                if (q.isNotBlank()) {
+                    val hits = runCatching { DeviceSearch.search(records, q) }.getOrDefault(emptyList())
+                    _state.value = _state.value.copy(results = hits, searched = true)
+                }
             }
             // The resident index, held so a deep scan's ids can be turned into titles without
             // re-opening the shards it just read.

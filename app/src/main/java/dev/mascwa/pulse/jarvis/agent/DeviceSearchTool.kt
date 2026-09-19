@@ -36,7 +36,7 @@ class DeviceSearchTool(private val container: AppContainer) : JarvisTool {
         val hits = DeviceSearch.search(records, query, limit = LIMIT, perKind = PER_KIND)
         if (hits.isEmpty()) {
             val held = DeviceSearch.corpusSummary(records)
-                .joinToString(", ") { (k, n) -> "$n ${k.label.lowercase()}${if (n == 1) "" else "s"}" }
+                .joinToString(", ") { (k, n) -> k.count(n) }
             return "Nothing on this device matches \"$query\". Searched $held. " +
                 "Say so plainly rather than guessing — then answer from what you know, or the web."
         }

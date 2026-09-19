@@ -299,7 +299,7 @@ fun PulseDesktopApp(
             )
         }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
-        val searchVm = remember { SearchViewModel(scope, library, studyStore) }
+        val searchVm = remember { SearchViewModel(scope, library, studyStore, notesStore, diaryStore) }
         val aboutVm = remember {
             AboutViewModel(scope, DesktopUpdater(http, settings), settings)
         }
