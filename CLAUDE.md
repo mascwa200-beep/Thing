@@ -13100,3 +13100,147 @@ a merge commit whose diff is empty, and a content-free re-sync costs nothing.
 catalogue warmer. **Everything on-device remains owner-verify** — the checklist at the end of
 the acting-layer section above is unchanged, and safety rule 3 is still the one that matters
 most: let something be held, force-stop the app, and confirm reopening releases it.
+
+### TROVE — the movie-hacker "just knows everything" screen (this session, PR #465, S1–S7)
+
+Owner: *"Create a feature that ties into practically every single thing within the app that
+works the same and is similar to … ddossecrets.org."* Two AskUserQuestion rounds settled that
+this is NOT the DDoSecrets **pipeline** (receive → verify → archive → publish) but the
+DDoSecrets **front page** pointed inward — *"like in those movies where the hacker just knows
+everything … who's on the Wi-Fi, devices nearby, this that the other, something invasive."*
+The owner chose ALL SIX collections, **describe-on-demand with no kept history**, and a report
+**exported to a file they pick** (SAF, offline, nothing crosses the network, no external
+ingest). Named TROVE.
+
+⚠️ **The standing *"you can use ultra code, you just can't burn through the usage"* is a HARD
+constraint and it overrode BOTH the ultracode directive AND plan-mode's own instruction to
+dispatch Explore/Plan agents.** Zero subagents and zero workflows the whole arc. Every check
+was local kotlinc + JUnit, `javap`, a live probe, or CI.
+
+**The six collections, each reading the widest existing subsystem** (which is how it "ties into
+practically everything"): (1) **the network + who is on it** — connection laid bare plus a live
+subnet ping-sweep of *other* devices; (2) **radios in range** — the actual BLE + Wi-Fi lists,
+not counts; (3) **this device, laid bare** — hardware/OS/attestation/security/installed apps;
+(4) **the file the app has on you** — profile/interests/tasks/health/usage/memory; (5) **the
+environment now** — the whole Sensorium read; (6) **where you are + what is around** —
+location/aircraft/incidents/POIs/space-wx.
+
+Seven CI-green commits: **S1** `Recon.kt` pure core (`c73c69cc`) · **S2** the OUI table + gate
+(`55c68c14`) · **S3–S5** the scanners + the gathering engine (`2e568998`, and the standalone
+`3d5b8798` for the table build) · **S6** the screen + wiring (`1d188beb`) · **S7** the export
+(`68329402`).
+
+#### ⚠️ THE LOAD-BEARING BUG: a Long's inverse overflows, and the sweep never ran
+
+`core:telemetry/Recon.kt` computes the broadcast address to bound `subnetHosts`. The first cut
+was `broadcast = network or mask.inv()` — and `mask.inv()` on a **Long** flips all 64 bits, not
+32, so the high word came back `0xFFFFFFFF_00000000` and the host loop's `< broadcast` test
+compared against a colossal number the wrong way, yielding **zero hosts** for a /24 that holds
+254. A subnet sweep that silently enumerates nobody. Fixed with a 32-bit clamp:
+`network or (mask.inv() and 0xFFFFFFFFL)`. ⚠️ The first fix double-clamped (redundant), which
+made the R1 negative test unable to fail — simplified to a single clamp so removing it now
+breaks exactly its own test. Caught by *running* `ReconTest`, not by reading.
+
+#### ⚠️ MY OWN TEST EXPECTATION WAS WRONG WHERE THE CODE WAS RIGHT — again
+
+`parseIpv4("192.168.1.1")` is `3232235777`; I asserted `3232235521` (off by the last octet's
+contribution). Caught the instant `ReconTest` ran. Roughly the twenty-first appearance of this
+habit in the arc-series. **Compute the expected value from the shipped function before writing
+the assertion.**
+
+#### The honesty invariants — this app's signature, baked into the core rather than the UI
+
+- ⚠️ **MAC randomization is NAMED, never faked.** A locally-administered MAC (the U/L bit, bit 1
+  of the first octet) resolves to *"randomized (private)"*, never to a wrong vendor —
+  `Recon.macKind`. The multicast bit (bit 0) marks a not-a-device address. `SensorFusionController`'s
+  own comment already knew this mattered; the core now enforces it.
+- **The sweep sees RESPONDERS, not everyone.** A silent device is invisible, and the collection
+  says so — it does not claim to be the whole network. `sweepWasClamped` surfaces when the host
+  range was capped (254).
+- ⚠️ **ARP unreadable → "MAC unavailable on this OS", never blank.** `/proc/net/arp` is
+  restricted on newer Android; on this GrapheneOS-as-Device-Owner phone it *may* be readable but
+  that cannot be settled from here. IP + reachability + reverse-DNS hostname are always
+  available; MAC + vendor are best-effort, and their absence is stated.
+- **Every entry carries `Provenance`** (MEASURED / REPORTED / RESOLVED / INFERRED), shown per
+  line and coloured by trust — so the screen and the exported report cannot drift on what is a
+  measurement versus a guess (`Recon.reportText` is the one formatter both use).
+- **Describe-on-demand; no history kept.** Rebuilt live each open, no log of who was on the
+  Wi-Fi — the owner's own choice and the privacy-cleaner one for a feature that enumerates other
+  people's devices. **Stays on-device**: the only egress is the report to a file the owner picks;
+  it is NOT fed to `DebugUploader`, the audit ledger, or the memory stream.
+
+#### The OUI vendor table — the "we resolved it" payoff
+
+`tools/recon/build_oui.py` fetches the public IEEE registry (`standards-oui.ieee.org/oui/oui.csv`),
+keeps **MA-L only** and emits `PREFIX\tvendor` → `app/src/main/assets/recon/oui.tsv`,
+**40,173 rows, 1.2 MB, committed**. ⚠️ **MA-M and MA-S are deliberately excluded**: they are
+28- and 36-bit assignments, so at a 24-bit prefix they are ambiguous and would attribute the
+wrong vendor — exactly the kind of confident-wrong the randomization rule exists to avoid.
+Unknown prefix → *"unknown vendor"*, never a guess. `data/recon/OuiTable.kt` is the cached loader
+both scanners share; `ReconOuiAssetTest` (5 tests, run locally green) proves the **shipped core
+resolves the shipped table** (000393=Apple, 001A11=Google, 0000F0=Samsung).
+
+⚠️ **CI packaging gate**, mirroring the water-stations one: "Verify the OUI vendor table
+packaged" asserts the asset is in the APK, over a 500 KB floor, with an absent sentinel
+(`assets/recon/this-must-not-exist.tsv`) so the check *can* fail. Green in build #2182.
+
+#### The scanners, and one deviation from the plan
+
+`data/recon/NetworkScanner.kt` — `connection()` reads `LinkProperties` (IP/prefix/gateway/DNS)
++ `WifiManager`; `sweep()` is a bounded parallel `InetAddress.isReachable` ping-sweep
+(`Semaphore(32)`, `PROBE_TIMEOUT_MS = 400`) off the main thread, then `readArp()` + reverse-DNS
++ `Recon.resolveMac`. ⚠️ **No new manifest permission** — Android has no local-network gate, and
+everything else was already declared.
+
+`data/recon/RadioScanner.kt` — `wifiNetworks()` (SSID/BSSID/channel/security/RSSI, capability-string
+parsing) + `bleDevices()` (`BURST_MS = 8000`, empty `ScanFilter` to defeat screen-off suppression).
+⚠️ **Made a SEPARATE file rather than widening `SensorFusionController.wifiApCount()`/`bleBurstCount()`
+as the plan said** — reasoned: the Sensorium is a live, duty-cycled subsystem and *listing* is not
+*counting*; folding a full-list scan into its heartbeat would change its cadence. The count
+methods are left exactly as they are; TROVE reads fresh.
+
+`data/recon/ReconEngine.kt` is the `OracleEngine.snapshot` shape — `full()` and the six
+per-collection methods gather **defensively**, each `runCatching`, so one failing source costs
+only its own section. `ReconViewModel` gathers the six as **independent child coroutines**, so
+the fast sections (device, the file on you, environment) fill at once while the subnet sweep,
+the BLE burst and the around-you feeds resolve over the next several seconds; the screen shows a
+scanning placeholder per pending key. `export(context, uri)` writes `Recon.reportText` to the
+SAF-picked file off the main thread, defensive — a failed write costs only the file.
+
+#### Small fixes found by reading, not by CI
+
+⚠️ `NetworkScanner`'s RSSI guard referenced a nonexistent `WifiManager.UNSPECIFIED_SSID.length-1`
+(would not have compiled) → `it in -127..0`; a dead double-negated `metered` local removed.
+And `tools/kotlin_import_check.py` flagged the core's **enum-entry imports**
+(`import …Recon.Provenance.MEASURED`) as "no such package" — a false positive; fixed so
+`unresolvable_imports` backs off to the longest real package prefix, and negative-tested that it
+still flags a genuinely bad import.
+
+#### Verification
+
+`ReconTest` 14 green, `ReconOuiAssetTest` 5 green, `scratchpad/recon/neg.sh` — **6 load-bearing
+rules negative-tested** against a baseline asserted green first, each perturbation confirmed to
+fail exactly its own test. `tools/android_compile_check.sh` clean on the scanner files (they
+touch only the platform + the core). **CI (LCARS build #2182):** "Run unit tests" GREEN (whole
+feature compiles, 19 tests), the OUI packaging gate GREEN, the R8 keep gate GREEN
+(`kept: dev.mascwa.pulse.data.media.JsRuntime`, sentinel correctly absent), **APK 662 MB
+(694,620,062 bytes)**, published to `latest`. Nutrition #155 green.
+
+⚠️ **PR #465 is a DRAFT → main and NOT merged.** The code head `68329402` was fully CI-green
+before this handoff. ⚠️ **A CLAUDE.md-only commit becomes the PR head, and `android-build.yml`
+ignores `CLAUDE.md` (`paths-ignore`)** — so the PR head after this doc commit shows no android
+check, which is expected and not a regression: the green build is one commit behind it, at the
+code head. (This is the documented behaviour; do not read the missing check as a failure.)
+
+⚠️ **Owner-verify on the Pixel — CI cannot open a socket, a radio, or a subnet, so the whole
+payoff is device-only.** MENU → YOUR THINGS → the TROVE entry (also findable by searching
+"network", "wifi", "who's here"), then: the subnet sweep should list your home-Wi-Fi devices
+with **vendor names** where the MAC is real and **"randomized (private)"** where it is not; the
+radios list should show nearby Wi-Fi networks (with security) and BLE devices; and **EXPORT**
+should write a plain-text dossier to a file you pick. The ARP/MAC ceiling on *this specific OS*
+(whether `/proc/net/arp` is readable as Device Owner) is the one thing only the Pixel settles —
+where MACs are unavailable, vendor resolution degrades honestly rather than guessing.
+
+**Open / steerable:** nothing outstanding on TROVE. The subnet sweep is /24-scoped and capped at
+254; a wider prefix would need a larger cap and a longer sweep budget, which is an owner call.
+Task #20 (retire IMAP) stays HELD pending the owner confirming notification-mail on the Pixel.
