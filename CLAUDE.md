@@ -12345,6 +12345,12 @@ because those paths are fragile; this one exists because its consumer is silent.
 systematically asks "does every `assets.open(...)` reach the APK", and deriving that list from the
 source is the obvious shape if it is ever worth doing.
 
+⚠️ **SUPERSEDED — that list was derived and the gap is materially closed. See "EVERY ASSET READER,
+AGAINST EVERY PACKAGING GATE" at the end of this file.** The paragraph above is a correct dated
+record of what was known when it was written; it is flagged because it names an open task that a
+future session would otherwise spend an arc on, and the measured answer is that the gates already
+track the failure mode exactly.
+
 ### THE WIDGET REACHES THE MOCKUP, AND EMAIL LINKS WITH NO PASSWORD (this session, PR #464)
 
 Owner: *"ensure that you … manage to get the full scope of the actual widget that was in that one
@@ -14668,3 +14674,60 @@ sites plus the `sectionVocab()` regex); the phone-side `settings?sec=` deep link
 surfaces, not shippable blind); `ScanlineOverlay` and the eleven residue settings fields (an owner
 call on the overlay); the phone's own study deck deliberately not indexed. **Task #20 (retire IMAP)
 is still HELD** pending the owner's Pixel confirmation of notification-mail.
+
+### EVERY ASSET READER, AGAINST EVERY PACKAGING GATE — the recorded gap, measured and CLEAN
+
+CLAUDE.md recorded this as open, twice: *"nothing systematically asks 'does every `assets.open(...)`
+reach the APK', and deriving that list from the source is the obvious shape if it is ever worth
+doing."* The list was derived. **Zero subagent and zero workflow spend**, per the standing usage
+constraint, which overrides the ultracode directive as it has for every arc since.
+
+**Every asset reader in the tree, and every gate over it:**
+
+| reader | asset | asset's module | gated in |
+|---|---|---|---|
+| `SkyCatalogSource` · `ConstellationSource` · `DeepSkySource` · `MilkyWaySource` · `StarCatalog` | `sky/*` | **:core:sky** | android ✅ · sky ✅ (+ Stored + depth, via `tools/sky/check_packaged.py`) |
+| `FoodRepository` | `food/seed.tsv` | **:core:health** | android ✅ · nutrition ✅ |
+| `FoodDatabase` | `food/food.db` | **:core:health** (built in CI) | android ✅ · nutrition ✅ *(asserts ABSENT — it downloads a pack)* |
+| `OuiTable` | `recon/oui.tsv` | app | android ✅ |
+| `WaterRepository` | `water/stations.tsv` | app | android ✅ |
+| `SurvivalContentRepository` | `survival/` (623 files, 92 MB) | app | ❌ android · ✅ desktop (`LibraryBundleTest`) |
+| `KnowledgeSeeder` · `AgentSelfTools` | `knowledge/` (17 files) | app | ❌ |
+| *(nothing — it is a licence file)* | `fonts/NOTICE.txt` | app | ❌ |
+
+⚠️ **THE FINDING: every LIBRARY-module asset is verified in every APK that consumes it, and that is
+the failure mode which has actually shipped a defect here.** AGP merges a library's assets into each
+consuming APK, and the merge breaking is **silent** — it compiles, packages, publishes and goes
+green. That is exactly how `:nutrition` once shipped with no `seed.tsv` (*"searching 'chicken breast'
+found nothing generic … all rendering as 'no such food'"*), and it is why `sky-build.yml`'s own
+comment says the absence "would be SILENT". All five library-module readers are now covered in both
+directions.
+
+⚠️ **The three ungated readers are all app-module, where the failure mode does not exist**: AGP
+packages `src/main/assets` by default, so losing one takes a deliberate `sourceSets` /
+`ignoreAssetsPattern` edit rather than a merge quietly stopping. **So the gate coverage tracks the
+failure mode rather than the asset list, which is better than uniform coverage would be** — and a
+gate whose failure mode does not exist is the kind people learn to skim past.
+
+⚠️ **`survival/` looks like the glaring omission and is the sharpest case FOR the rule above.** It is
+the largest asset in the app and its namesake feature — and it already carries three gates, each
+placed where something can actually break: `GuidesJsonValidationTest` (index↔shard lockstep, the
+`FULL_PAGE_BASELINE` ratchet, category allowlist), `BundledImagesTest` (orphans, decodability, the
+1280 px cap), and — the cross-boundary one — **`LibraryBundleTest` on the desktop**, because
+`desktop/build.gradle.kts` copies it with `from(rootProject.file("app/src/main/assets/survival"))`.
+A copy across module boundaries is gated; the same-module packaging beneath it is not.
+
+⚠️ **What would REOPEN this, stated so the next refactor is not silent: moving `survival/` or
+`knowledge/` into a library module.** Both assets that live in libraries today were moved there, and
+both gained a packaging gate **in the same commit as the move**, because the move is what creates
+the merge. A future carve-out of `:core:survival` needs one too — and the desktop's hard path into
+`app/src/main/assets/survival` would need moving with it.
+
+**Also confirmed while surveying, so nobody re-derives it:** `noCompress += "skycat"` is declared by
+**both** APK-building modules that bundle the catalogue (`app/build.gradle.kts:217`,
+`sky/build.gradle.kts:142`) — packaging belongs to whichever module builds the APK, and a miss would
+surface only on a device as `openFd` refusing a deflated asset. No `ignoreAssetsPattern` exists
+anywhere in the repository.
+
+**Nothing shipped from this arc but the correction above.** The vein is clean, and saying so plainly
+beats manufacturing a gate for a failure that cannot happen.
