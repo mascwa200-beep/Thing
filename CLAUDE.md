@@ -13716,3 +13716,93 @@ screen in it, and clicking it should navigate rather than open the reader. Then 
 or "packs" — words no guide matches — and confirm the screen still appears rather than *"Nothing
 here matches that."* And check the library answer is unchanged: a subject query should still return
 a full page of guides, not four.
+
+### EVERY SETTINGS ROW CAN BE FOUND BY TYPING ITS OWN NAME (this session, PR #468)
+
+Owner's standing *"merge it into main, then continue autonomously"*, with the usage constraint that
+overrides both the ultracode directive and plan mode's own instruction to dispatch Explore/Plan
+agents. **Zero subagent and zero workflow spend.** PR #467 merged as `7c178fd5` first (squash; two
+redundant main runs cancelled after `git diff --stat` proved the APK and MSI byte-identical to what
+`latest` and `desktop-latest` already held — 662 MB + 180 MB of pointless auto-download saved).
+
+Then the last recorded piece of the findability arc, one layer below the section table. The section
+table made 26 section headings findable; a control **inside** one was not. Nothing matches a
+control's own title, so somebody who wants to paste an EIA key types `eia`, somebody filling in
+their medical card types `allergies`, and both got nothing from either search surface.
+
+**⚠️ THE FIGURES `SettingsCategory`'s OWN KDoc GAVE WERE WRONG, AND IT SAID "measured so nobody
+re-measures it".** Re-measured with a self-checked extractor: **114 actionable rows, not 83**, of
+which **32 could not be reached by any word of their own name, not 23**. The old count missed
+`SingleChoiceRow` outright — it is declared `private fun <T> SingleChoiceRow(`, and an enumerator
+whose regex expects the name straight after `fun` cannot see it. Twelve rows. **32 → 0.**
+
+The fix is the one that comment already predicted: a control is findable when the SECTION holding it
+says one of its words, so the words went into `SettingsSections` and there is no per-control gating.
+⚠️ Never into the CATEGORY's keywords — five sections live under CONTENT, so a word lifted up there
+makes searching it *inside* Settings return all five, which is the pollution the table exists to
+avoid and is written on the class itself.
+
+**⚠️ THREE OF MY OWN MEASUREMENTS WERE WRONG BEFORE ONE WAS RIGHT, and each inflated the answer:**
+1. the four `Add*Row` builders and `EditableValueRow`'s delegation are declared **below** the
+   composable's body, so a position-based section assignment filed them under whichever section came
+   last — *"Add symbol"* was reported as living in *"Storage & about"*;
+2. reachability was tested by set membership where `GuideSearch.wordMatch` scores a **prefix relation
+   at ≥ 4 chars in both directions**, so eight Notifications rows were called unreachable when the
+   category keywords carry `market` and the rows say `markets`;
+3. **"Wi-Fi" tokenises to "wi" and "fi"**, both under the stem floor, so the word a person actually
+   types — `wifi` — was invisible. The hyphen-collapsed form is a token now, and **only** hyphens:
+   `NewsAPI.org` must not become `newsapiorg`.
+43 reported, **32 real**.
+
+**⚠️ AND THE SWEEP CAUGHT A HOLE THE ADDITIONS OPENED.** `searchRecords()` skips a section whose
+title duplicates its category's — right, since three would otherwise emit a row identical to an
+existing one, same destination **and** same title. But it dropped their WORDS with the row, so ten of
+the new ones reached the Settings box and **nothing at all** in device search. ⚠️ The skip used to be
+lossless **by coincidence**: measured both ways, every word those sections owned was already in their
+category's title, blurb or keywords (`country` and `language` sit in REGION's **blurb**, `alerts` in
+NOTIFICATIONS'), so before this change the loss was empty and nothing said the skip was lossy. A
+skipped section's keywords are now folded onto the category row that stands in for it — no extra row,
+no extra place, lossless by construction. **The sweep harness mirrors the fold, because it restates
+the rule; move them together.**
+
+**Verification, all local:** the gate 8/8 green; **six rules negative-tested** against a baseline
+asserted green first, each perturbation asserted to have matched and each failing exactly the test
+that names it; the ranking sweep over the real corpus **0 screens evicted, 0 top flips, 0 of 90 gap
+words still unreachable**; a `vis()` **control run** proving every section the new words newly match
+genuinely holds a control about that word; and a **typed probe that compiles AND RUNS** the rewritten
+`searchRecords()` against the real types.
+
+⚠️ **One negative test came back asleep and it was MY PERTURBATION, not the guard**: `a || false || b`
+is `a || b`, so the stem rule was never removed — recorded mechanism #2 (touched the code without
+removing the property). And the probe's first assertion was a case that **cannot fail**: `country` is
+in REGION's blurb, so the category row carries it with or without the fold. Both rewritten.
+
+⚠️ **The pre-existing `vis()` noise is now attributable rather than suspected**: `board` already
+matched three sections because **`dashboard` contains it**, and `audit`/`ledger` already matched all
+five SECURITY sections through the category keywords. Neither is this change's.
+
+**The MENU matcher reads the same table, so it inherited the vocabulary with no change.**
+
+#### ⚠️ TWO CORRECTIONS TO THIS FILE'S OWN OPEN LIST, both measured
+
+- **"Remembering a network-found product" is largely ALREADY SOLVED and the open item is wrong as
+  written.** It says nothing writes a network result locally "so the same product is fetched again
+  tomorrow". `OpenFoodFactsRepository.byBarcode` **caches every product it parses**, serves it for
+  `PRODUCT_TTL` = **7 days** with no request at all, and on a network failure reads it back with
+  `readAny` — **ignoring the TTL** — under the comment *"a scanned product does not change"*. The
+  genuine residual is narrower and worth stating precisely: `DiskCache` prunes by **least recently
+  WRITTEN, not least recently read**, so a product you scan often but wrote once is evicted on the
+  same schedule as one you never used again. In `:nutrition` the cache holds little else; in LCARS it
+  is shared with every feed, so ordinary browsing can evict a scanned product and the offline
+  fallback then finds nothing. A dedicated store would close that — measure whether it bites before
+  building it.
+- **`SettingsSection.key` has ZERO reads**, and its KDoc claims "Used by the coverage gate and for
+  reading a diff". The gate uses `tableKeys()`, which extracts the **Kotlin val identifier**, not
+  this field. Measured: all 26 keys are exactly `valName.lowercase()`, so the field is pure
+  redundancy that can drift, carrying a false claim. Deleting it touches 26 constructor call sites
+  and my new `sectionVocab()` regex; recorded rather than bundled into a verified PR.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a search box and never types into one.** Search `eia`,
+`finnhub` or `nasa` → a `Settings · API keys` row. `allergies` or `medications` → the medical card.
+`python` or `anchor` → Storage & about. Then the control: `weather` must still lead with WEATHER and
+`sos` with SOS.
