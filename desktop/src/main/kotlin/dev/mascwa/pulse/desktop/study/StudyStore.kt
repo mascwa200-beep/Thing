@@ -220,6 +220,22 @@ class StudyStore(
         return Curriculum.compose(s.goal, e, CATEGORY_SUPERGROUP, perDay = s.perDay)
     }
 
+    /**
+     * Every card held, having made sure the deck is loaded first.
+     *
+     * ⚠️ **Reading [items] instead is the trap this exists to close, and it was a live defect rather
+     * than a theoretical one.** That flow holds an empty list until something causes a load, so a
+     * caller who arrives before anything has touched this store sees no cards and cannot tell that
+     * from an empty deck. Measured: teach a guide, flush, then ask a FRESH store over the same file
+     * — five cards warm, **zero cold**, with 3,328 bytes of deck sitting on the disk.
+     *
+     * The search index was doing exactly that, so opening SEARCH first thing after launch found none
+     * of them. The phone's own index carries a paragraph warning about this shape, written when the
+     * same thing hid its findings and memories; the desktop copy inherited the shape without the
+     * warning.
+     */
+    suspend fun cards(): List<Item> = ensureLoaded().cards.map { it.item() }
+
     /** Which guides are recorded as finished. */
     suspend fun completedIds(): Set<String> = ensureLoaded().completed.toSet()
 

@@ -42,6 +42,34 @@ class DesktopSearchIndexTest {
     }
 
     /**
+     * A deck saved on disk reaches the index even though nothing has touched the store yet.
+     *
+     * ⚠️ **This is the case the test above structurally cannot reach, and it was a live defect.**
+     * That one calls `teach` first, which loads the store as a side effect — so its fixture AVOIDS
+     * the branch, which is this repository's third recorded way a green test proves nothing. The
+     * index read `study.items.value`, a flow that holds an empty list until something causes a load,
+     * so opening SEARCH first thing after launch found no cards at all while the deck sat on the
+     * disk. Measured at the time: five cards warm, ZERO cold, over 3,328 bytes of saved deck.
+     *
+     * Two stores over one path is what makes it a real test rather than a restatement: the second
+     * stands in for a fresh process, and nothing may touch it before the index is asked.
+     */
+    @Test
+    fun aSavedDeckIsSearchableInAFreshProcess() = runBlocking {
+        val path = tmp.root.toPath().resolve("cold-study.json")
+
+        val warm = StudyStore(library, path = path)
+        warm.teach(library.index().first().id)
+        warm.flushNow()
+        val taught = DesktopSearchIndex.records(library, warm).count { it.kind == RecordKind.STUDY }
+        assertTrue("the fixture taught no cards, so the cold half proves nothing", taught > 0)
+
+        val cold = StudyStore(library, path = path)
+        val found = DesktopSearchIndex.records(library, cold).count { it.kind == RecordKind.STUDY }
+        assertEquals("a saved deck did not reach a fresh process's search index", taught, found)
+    }
+
+    /**
      * The ranking itself is already held by the mirrored `DeviceSearchTest`; what this adds is that it
      * behaves on the REAL corpus, where a common word appears in hundreds of guides.
      *

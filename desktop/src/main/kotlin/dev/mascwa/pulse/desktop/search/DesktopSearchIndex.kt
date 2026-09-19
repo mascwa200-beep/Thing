@@ -40,7 +40,11 @@ object DesktopSearchIndex {
         // headed DOCUMENT and this machine, which holds no documents at all, reported "14 documents on
         // this machine". It stayed invisible while the phone emitted `KNOWLEDGE` for nothing; now that
         // it emits real ingested documents, one member cannot be labelled truthfully for both.
-        runCatching { study.items.value }.getOrNull()?.forEach { item ->
+        // ⚠️ `cards()`, which LOADS, not `items.value`, which reads a flow that is empty until
+        // something else has caused a load. Measured before the change: a fresh store over a saved
+        // deck returned five cards warm and ZERO cold, so opening SEARCH first thing after launch
+        // found none of them — silently, and only on that path.
+        runCatching { study.cards() }.getOrNull()?.forEach { item ->
             out += DeviceSearch.of(
                 id = item.question.id,
                 kind = RecordKind.STUDY,
