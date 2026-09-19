@@ -30,7 +30,37 @@ object DeviceSearch {
         TASK("Task", "jarvis_memory"),
         PROFILE("Profile", "jarvis_memory"),
         FINDING("Finding", "jarvis_memory"),
+
+        /**
+         * A document the user loaded into the Computer's knowledge base, so it can retrieve from it.
+         *
+         * The label is what the results list shows, so it has to be true of everything that emits
+         * this kind. ⚠️ It was not: for a long stretch the **only** producer anywhere was the
+         * desktop, for its STUDY CARDS, and a question-and-answer pair is not a document. The
+         * desktop's own test said as much — it asserted `KNOWLEDGE in kinds` under the message
+         * "study cards are not searchable" — while the screen headed them DOCUMENT and the corpus
+         * line offered "14 documents on this machine" to a machine holding none. That went unnoticed
+         * because the phone, which owns the documents, emitted this kind for nothing at all.
+         *
+         * Now that both platforms produce, one member cannot be labelled correctly for both — hence
+         * [STUDY] below.
+         */
         KNOWLEDGE("Document", "jarvis_memory"),
+
+        /**
+         * A card in the study deck — one question, its answer, and the guide it came from.
+         *
+         * Searching these is how "wasn't there a question about bleach dilution?" gets answered
+         * without re-reading the guide it came from, which is a different act from finding the
+         * guide itself and deserves its own heading.
+         *
+         * ⚠️ Emitted only by the desktop today, and the route is nevertheless honest rather than a
+         * placeholder: `study` is a registered destination on the phone (`Routes.STUDY`), which has
+         * a deck of its own that its search does not yet index. So the phone's `else -> navigate`
+         * branch would land somewhere real the day it does, and nobody has to remember to come back
+         * and fix a route that was only ever a stand-in.
+         */
+        STUDY("Study card", "study"),
 
         /**
          * An app feature itself, so typing "radar" here opens the radar instead of only finding

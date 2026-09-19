@@ -33,7 +33,12 @@ class DesktopSearchIndexTest {
         val s = study()
         s.teach(library.index().first().id)
         val kinds = DeviceSearch.corpusSummary(DesktopSearchIndex.records(library, s)).map { it.first }
-        assertTrue("study cards are not searchable", RecordKind.KNOWLEDGE in kinds)
+        assertTrue("study cards are not searchable", RecordKind.STUDY in kinds)
+        // ⚠️ The second half is what makes this a gate rather than a restatement. This assertion read
+        // `KNOWLEDGE in kinds` under that same message for as long as the mislabel shipped — the test
+        // and its own failure text disagreeing about what the kind was. A card must not come back as a
+        // document, and a machine with no ingested documents must not report holding any.
+        assertTrue("a study card is being reported as a document", RecordKind.KNOWLEDGE !in kinds)
     }
 
     /**

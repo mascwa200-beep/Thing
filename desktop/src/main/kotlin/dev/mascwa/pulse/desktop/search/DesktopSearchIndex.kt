@@ -34,10 +34,16 @@ object DesktopSearchIndex {
 
         // Study cards: what you have actually been asked. Searching them is how "wasn't there a question
         // about bleach dilution?" gets answered without re-reading the guide it came from.
+        //
+        // ⚠️ `STUDY`, not `KNOWLEDGE`, and that is a user-visible correction rather than tidying. The
+        // label is drawn twice — as the section heading and in the corpus line — so these rows were
+        // headed DOCUMENT and this machine, which holds no documents at all, reported "14 documents on
+        // this machine". It stayed invisible while the phone emitted `KNOWLEDGE` for nothing; now that
+        // it emits real ingested documents, one member cannot be labelled truthfully for both.
         runCatching { study.items.value }.getOrNull()?.forEach { item ->
             out += DeviceSearch.of(
                 id = item.question.id,
-                kind = RecordKind.KNOWLEDGE,
+                kind = RecordKind.STUDY,
                 title = item.question.guideTitle + " ▸ " + item.question.heading,
                 body = item.question.prompt + " " + item.question.answer,
             )
