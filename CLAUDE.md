@@ -14017,3 +14017,120 @@ different property):** `% 997` on `windDown` made it fire *zero* times rather th
 reachability test caught it and the floor was never exercised (`% 30` gives 61 hits against a floor
 of 120 — the arithmetic predicted ~59); and *replacing* a real exemption simply deleted it, so the
 coverage test failed instead of the exemption check. The bogus entry must be **added**.
+
+### THE SECOND RULE ENGINE GETS THE SAME TWO QUESTIONS (this session cont., PR #470)
+
+The Oracle gate asks *can every rule fire, and is every signal filled in?* The app has a **second**
+rule engine of exactly that shape and considerably higher stakes — the ambient acting layer can
+pause every app on the phone, silence a ringer and light a torch — and nothing had ever asked
+either question of it. **Zero subagent and zero workflow spend**, as with every arc since the
+credit directive.
+
+⚠️ **Five actions were deleted from `AmbientAction` because nothing asked for them, and all five
+were found by hand, one at a time.** A capability there is dead if **either** end is missing, and
+the two ends cannot see each other — so it takes two gates, in two modules, because that is where
+each end lives:
+
+| | where | what it asks |
+|---|---|---|
+| producer | `AmbientRulesTest`, in `:core:telemetry` | does any rule ASK for this action? |
+| consumer | `AmbientActionCoverageTest`, in `:app` | does anything CARRY IT OUT? |
+
+**Measured: all nine actions are asked for, and eight of nine are consumed.** `SPEAK_DONT_BUZZ` is
+the documented exception, and the exemption is **checked rather than trusted** — it claims the
+absence is written down at a named place, and the gate goes and reads that place for both the
+action's name and the words "no consumer". The other direction is covered too: an exemption for
+something that *is* now wired fails, because a stale allowlist entry silently stops covering what
+it names.
+
+⚠️ **The producer sweep is a blind cross-product of the declared inputs on purpose.** If a new
+action needs a dimension it does not vary, the right outcome is that the test fails and whoever
+adds it widens the sweep deliberately; a hand-written list of situations silently stops covering
+whatever it was not updated for. `decide`, never `permit` — the question is whether a rule ASKS,
+and `permit` filters by tier, so the owner-tier action would be refused at the APP floor and read
+as dead.
+
+#### `SourceGate` — the plumbing behind four gates, extracted with its own test
+
+Every one of these gates asks whether a NAME appears in a body, and this codebase writes a
+paragraph explaining each dead symbol — so **a gate that counts comments passes on the
+documentation of the defect it exists to find.** Two gates had grown a byte-identical copy of
+`stripComments` and a third was about to; this repository has corrected a duplicated definition
+seven times, and the way it goes wrong is never that the copies disagree from the start. One
+definition now, with its own test, because four gates trusting it all go quietly green if it stops
+working.
+
+⚠️ Its two limitations are **measured and pinned as behaviour**, so changing either is deliberate:
+nested block comments leave residue (**zero** files in the three swept trees have one, and the
+sweep keeps that true), and a `//` inside a string literal takes the rest of its line (**13 live
+instances** — tolerable only because it fails LOUD, removing a real reference rather than admitting
+a fake one). ⚠️ `nestedBlockComment` has a third: it does not lex, so a file writing the delimiters
+as TEXT reports a false positive — which is exactly why `app/src/test`, where `SourceGate` itself
+lives, is outside the sweep.
+
+#### ⚠️ Extracting it immediately found a latent hole in the Oracle gate written an hour earlier
+
+`OracleSignalCoverageTest` had no stripper, so a commented-out named argument would have read as a
+populated field. Measured: the phone's construction carries no comments and the desktop's carries
+four contributing no names — **latent, not live**, one edit away, in the file most likely to get one.
+
+⚠️ **That fix could NOT be negative-tested against the live tree for exactly that reason** —
+removing it fails nothing, the third recorded way a green test proves nothing. It needed fixtures,
+and writing them found something sharper: **a plain `// dead = 2,` is ALREADY excluded** by
+`namedArgs`' own anchor (the name must follow a `(`, `,` or line start, and the `//` sits between),
+so the obvious fixture *also* never reaches the branch. What does get through is **a comma inside
+ordinary English prose** — `// see the note above, disabled = 3` — which puts the name straight
+after an anchor. Without the stripping the shipped fixture reports `disabled` and `blocked` as
+populated fields.
+
+#### ⚠️ TWO SELF-OWNS WORTH NOT REPEATING
+
+1. **I put a literal block-comment opener inside a KDoc — in the KDoc explaining why nested block
+   comments are dangerous.** Kotlin block comments nest, so it opened two, never closed them, ate
+   the rest of the file, and produced sixteen "unresolved reference" errors pointing at the test
+   below. The paragraph now describes those delimiters in words and says why; the test pins the
+   behaviour with string literals, where the characters are safe.
+2. **The app-module test runner compiles against the COMPILED core** (`core/telemetry/build/classes/kotlin/main`),
+   so a perturbation to core *source* is invisible to it and every app gate reports "asleep" for a
+   reason that has nothing to do with the rule under test. **A new false-asleep mechanism**; the
+   harness routes core-source cases to the core suite and says so at the dispatch.
+
+Plus two smaller ones: a conditional `grep` for an unused import **matched its own import line**
+(the harness-excuses-the-thing shape in miniature), and my first blind-spot fixture used `"/*"` and
+`"*/"` in sequence, which does **not** demonstrate it — one opens, one closes, the depth returns to
+zero with nothing between, and the scanner correctly answered null. **It failed, and the scanner
+was right.**
+
+#### The import gate: the promised comparison, and one word
+
+⚠️ **The full-tree before/after promised in `f3ce94c7` has reported and the claim is discharged:**
+self-check passed on both versions, **BEFORE 5, AFTER 3, zero new findings**, and it *removed* two
+— `HoldEffect` (declared on line 36 of the very file it was reported in) and `SpotifyRepository`'s
+16 DTOs. Then `AutoCloseable` joined the builtins — available unimported in both `java.lang` and
+`kotlin`, and missing from a list that already carries `System`, `Math` and `StackTraceElement`.
+**Standing findings 3 → 2**, and both that remain are the documented nested-classifier shape
+(`FoodDatabase.JournalMode`, `TranscriptDatabase.Callback`), false positives by construction since
+both files compile green in CI.
+
+#### Verification
+
+`:core:telemetry:test` **2,777 tests, 0 failures** through Gradle (the task CI runs);
+`:desktop:build` **293 tests, 0 failures** (the tandem check, since a core test changed); the five
+source-reading gates together **22 tests green**; the gate chain clean across all eight checks.
+**12 rules negative-tested** against a baseline asserted green first, each perturbation asserted to
+have matched the source, restored under a shell `trap … EXIT` and byte-compared
+(`scratchpad/gates/neg.sh`, one case per invocation).
+
+⚠️ **The decisive case is worth copying: add an action to the enum that no rule asks for.** Exactly
+ONE test fails and it is the new one, naming the member, while the other 32 stay green — which is
+the gap made visible rather than argued about. Compare the weaker version, which removes an action
+from a rule that already has three tests of its own and therefore proves much less.
+
+**Nothing in this arc changes runtime behaviour** — every file is a test or a test helper, plus one
+word in a local tooling script. There is nothing to check on the Pixel.
+
+**Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
+sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the phone-side
+`settings?sec=` deep link (five interaction surfaces, not shippable blind); `ScanlineOverlay` and
+the eleven residue settings fields (an owner call on the overlay). **Task #20 (retire IMAP) is
+still HELD** pending the owner's Pixel confirmation of notification-mail.
