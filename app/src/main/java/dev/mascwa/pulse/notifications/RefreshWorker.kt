@@ -275,12 +275,22 @@ class RefreshWorker(
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         //
         // ⚠️ Skipped at MINIMAL. It enumerates every installed package, which on the main thread once
-        // froze the Security Audit screen outright (see `hasUsageAccess`); it is cheap enough here
-        // because it is off the main thread, and it is still the second-heaviest local pass.
+        // froze the Security Audit screen outright (see `hasUsageAccess`); being off the main thread
+        // keeps it from freezing anything, which is not the same as it being cheap — it is still the
+        // second-heaviest local pass, and it too had no time floor, so it re-enumerated every package
+        // on the phone on every tick. It needs no new field for one: `lastScanMs` is already stamped
+        // by `saveResult`, so a manual scan from the screen paces the background pass as well.
+        //
+        // ⚠️ `lastScan > 0` must stay its OWN condition and must come first. It means "the user has
+        // run this once", which is what makes the pass opt-in — and `PassThrottle.due` treats a zero
+        // stamp as DUE, so folding the two together would invert exactly that gate and start auditing
+        // a phone whose owner never asked for it.
         if (anyWork) runCatching {
             container.securityAuditStore.load()
             val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
-            if (lastScan > 0) {
+            if (lastScan > 0 &&
+                PassThrottle.due(lastScan, System.currentTimeMillis(), SECURITY_AUDIT_MIN_GAP_MS)
+            ) {
                 val crit = dev.mascwa.pulse.core.telemetry.SecurityAudit.Severity.CRITICAL
                 val prevCritical = container.securityAuditStore.auditFlow.value.findings
                     .filter { it.severity == crit }.map { it.id }.toSet()
@@ -674,5 +684,15 @@ class RefreshWorker(
          * cannot creep later each day and skip one.
          */
         private const val LEDGER_ANCHOR_MIN_GAP_MS = 20L * 60 * 60 * 1000
+
+        /**
+         * `SecurityAuditor.runAudit` enumerates every installed package — the call whose cost once froze
+         * the Security Audit screen when it ran on the main thread. What it looks for (developer options,
+         * USB debugging, sideloading, an app holding something alarming, the lock state) changes on a
+         * human timescale, so six hours loses nothing in practice, and the screen's own SCAN button is
+         * never gated. The floor reads the store's existing `lastScanMs`, so a manual scan paces the
+         * background pass too.
+         */
+        private const val SECURITY_AUDIT_MIN_GAP_MS = 6L * 60 * 60 * 1000
     }
 }
