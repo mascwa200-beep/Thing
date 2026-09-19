@@ -91,6 +91,8 @@ val GROUPS = listOf(
             listOf("oracle", "insights", "suggestions", "recommendations", "advice")),
         MenuEntry("Environment Scanner", "What the ship's senses read around you right now", Routes.SENSORIUM,
             listOf("sensorium", "ambient", "sensors", "surroundings", "listening")),
+        MenuEntry("Trove", "Everything this device can see: the network, who's on it, the radios, itself, you", Routes.TROVE,
+            listOf("trove", "recon", "reconnaissance", "network", "wifi", "who is on my wifi", "devices nearby", "dossier", "scan", "surveillance")),
         MenuEntry("Interrogator", "Listens, writes down what is said, and questions weak reasoning", Routes.INTERROGATOR,
             listOf("transcript", "fallacies", "arguments", "debate")),
         MenuEntry("Saved Places", "Places you track, plus calendar stops", Routes.OBJECTIVES,

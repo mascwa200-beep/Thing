@@ -404,6 +404,11 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.sensorium.SensoriumScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            composable(Routes.TROVE) {
+                val vm: dev.mascwa.pulse.feature.recon.ReconViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.recon.ReconScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             composable(Routes.INTERROGATOR) {
                 val vm: dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.interrogator.InterrogatorScreen(

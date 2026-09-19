@@ -134,6 +134,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
 
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
                 dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.recon.ReconViewModel::class.java) ->
+                dev.mascwa.pulse.feature.recon.ReconViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sensorium.SensoriumViewModel::class.java) ->
                 dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
 

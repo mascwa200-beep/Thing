@@ -55,6 +55,9 @@ object Routes {
     // SENSORIUM — the ambient environment scanner (the ship's senses)
     const val SENSORIUM = "sensorium"
 
+    // TROVE — the reconnaissance dossier: everything this device can see (network, radios, itself, you)
+    const val TROVE = "trove"
+
     // The acoustic interrogator — continuous speech capture, transcription and fallacy screening.
     const val INTERROGATOR = "interrogator"
 
