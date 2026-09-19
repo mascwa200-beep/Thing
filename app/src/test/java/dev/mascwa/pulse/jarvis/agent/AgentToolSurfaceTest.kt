@@ -52,6 +52,18 @@ class AgentToolSurfaceTest {
     private val agentDir = File("src/main/java/dev/mascwa/pulse/jarvis")
     private val indexFile = File("src/main/java/dev/mascwa/pulse/data/search/DeviceSearchIndex.kt")
     private val searchTool = File("src/main/java/dev/mascwa/pulse/jarvis/agent/DeviceSearchTool.kt")
+    private val container = File("src/main/java/dev/mascwa/pulse/di/AppContainer.kt")
+
+    /**
+     * The one tool whose `name` is a string template, so no textual gate can know what it is.
+     *
+     * `ProposeDocTool` is constructed three times with `mode` = add/edit/delete, and its `usage` is
+     * a `when` over that same `mode` with the right prefix in each branch. Pinned by name in the
+     * shape `LiveChannelsTest` uses for its unverified channels: a SECOND templated tool fails
+     * [everyToolsUsageLeadsWithTheNameThatDispatchesIt] and whoever adds it decides what the gate
+     * should do, rather than inheriting an exemption written for somebody else's tool.
+     */
+    private val templatedNames = setOf("propose_doc_\$mode")
 
     /**
      * The word in [DeviceSearchTool]'s `usage` that counts as naming each kind the index emits.
@@ -113,6 +125,82 @@ class AgentToolSurfaceTest {
     }
 
     /**
+     * Every class that implements `JarvisTool`, paired with the file that declares it.
+     *
+     * ⚠️ **The pattern must cross newlines, and a naive one understates by more than half.** Most
+     * of these declare their dependencies in a constructor list that wraps, so
+     * `class X(...) : JarvisTool` on one line finds **30** where the real figure is 57. A gate built
+     * on the naive form would have been silent about 27 tools — including every one in
+     * `DeviceActionTools.kt`, which is where the collision this class exists for lived.
+     */
+    private fun declaredToolClasses(): Map<String, String> {
+        val re = Regex("""\bclass\s+([A-Za-z0-9_]+)\s*(?:\([^{]*?\))?\s*:\s*[^{\n]*\bJarvisTool\b""")
+        val found = SourceGate.kotlinFilesUnder(agentDir).flatMap { f ->
+            re.findAll(SourceGate.stripComments(f.readText())).map { it.groupValues[1] to f.name }
+        }.toMap()
+        // ⚠️ Two self-checks, not one: DeviceSearchTool declares its constructor on a single line and
+        // OpenLinkTool wraps. A pattern that had silently stopped crossing newlines would still find
+        // the first, and the whole "is everything registered?" verdict below would pass vacuously.
+        assertTrue(
+            "the tool-class extractor missed DeviceSearchTool — the parse is broken, not the tree",
+            "DeviceSearchTool" in found,
+        )
+        assertTrue(
+            "the tool-class extractor missed OpenLinkTool, so it is no longer crossing newlines — " +
+                "it would now be blind to most of the registry",
+            "OpenLinkTool" in found,
+        )
+        return found
+    }
+
+    /**
+     * Each tool's declared `name`, the first string literal of its `usage`, and its file.
+     *
+     * ⚠️ **[ToolText.usage] is null when the usage could not be READ, and that distinction is the
+     * whole point.** My first version returned only the pairs it managed to parse, so
+     * `ProposeDocTool` — whose usage is a `when (mode)` rather than a literal — was dropped on the
+     * floor, and the pinned-exception assertion below saw an empty set and could not tell "no
+     * templated tools exist" from "the extractor cannot see the one that does". A harness that
+     * discards what it cannot read reports the same silence as a tree with nothing in it.
+     */
+    private data class ToolText(val name: String, val usage: String?, val file: String)
+
+    private fun nameAndUsage(): List<ToolText> {
+        val names = Regex("""override\s+val\s+name\s*=\s*"([^"]*)"""")
+        val usage = Regex("""override\s+val\s+usage\s*=\s*"((?:[^"\\]|\\.)*)"""")
+        val out = SourceGate.kotlinFilesUnder(agentDir).flatMap { f ->
+            val src = SourceGate.stripComments(f.readText())
+            val hits = names.findAll(src).toList()
+            hits.mapIndexed { i, m ->
+                // ⚠️ Bounded by the NEXT `name` declaration rather than by a character count. Several
+                // of these files hold a dozen tools in a row, and a fixed window that overran would
+                // pair one tool's name with the next tool's usage — a mismatch that reads as a real
+                // finding and is purely the harness's.
+                val end = hits.getOrNull(i + 1)?.range?.first ?: src.length
+                val within = src.substring(m.range.last + 1, end)
+                ToolText(m.groupValues[1], usage.find(within)?.groupValues?.get(1), f.name)
+            }
+        }
+        assertTrue(
+            "the name/usage extractor read nothing — the parse is broken, not the tools",
+            out.any { it.name == "search" },
+        )
+        // ⚠️ Cross-checked against the OTHER extractor, which finds the same tools a different way.
+        // Every JarvisTool must override `name`, so the two counts are the same number reached
+        // independently — and a silent drop by either one stops being silent.
+        assertEquals(
+            "the two extractors disagree about how many tools exist, so at least one of them is " +
+                "quietly skipping something and every verdict built on it is worthless. Two causes " +
+                "to look for: one of the patterns stopped matching a declaration shape, or two tool " +
+                "classes now share a name in different packages, which Kotlin allows and the map in " +
+                "declaredToolClasses would silently collapse",
+            declaredToolClasses().size,
+            out.size,
+        )
+        return out
+    }
+
+    /**
      * The text of `DeviceSearchTool.usage`, concatenation chain and all.
      *
      * ⚠️ Comments are stripped FIRST. A gate that reads prose can otherwise be satisfied by the
@@ -147,6 +235,51 @@ class AgentToolSurfaceTest {
                 "the schema without saying so: " +
                 dupes.map { (n, fs) -> "$n in ${fs.map { it.second }}" },
             dupes.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `every tool class the app declares is actually constructed`() {
+        val declared = declaredToolClasses()
+        val src = SourceGate.stripComments(container.readText())
+        val orphans = declared.filterKeys { !Regex("""\b$it\s*\(""").containsMatchIn(src) }
+        // ⚠️ "Constructed anywhere in AppContainer", NOT "present in agentTools". Several tools are
+        // built conditionally — the self-edit ones behind `selfEditEnabled`, `code`/`selfcode` behind
+        // `selfCodingEnabled` — and LoggingTool is a decorator that wraps the list rather than an
+        // entry in it. Demanding membership of that one list would report four working tools as dead.
+        assertTrue(
+            "these implement JarvisTool and AppContainer never builds them, so they are dead in the " +
+                "same way a name collision makes a tool dead — one link earlier in the chain: " +
+                orphans.map { (n, f) -> "$n ($f)" },
+            orphans.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `every tool's usage leads with the name that dispatches it`() {
+        val pairs = nameAndUsage()
+
+        // ⚠️ Keyed on what the extractor could not READ, not on a `$` in the name. Those coincide
+        // today — `ProposeDocTool` is the only tool with either — but they are different properties,
+        // and keying on the name would let a tool with a literal name and a `when`-based usage slip
+        // through unchecked and unreported, which is the shape that already bit this harness once.
+        val unreadable = pairs.filter { it.name.contains('$') || it.usage == null }.map { it.name }
+        assertEquals(
+            "a tool's name or usage is no longer a plain literal, so no textual gate can read it. " +
+                "Check by hand that every branch of its `usage` leads with the name that branch " +
+                "produces, then add it to templatedNames with a note saying you did",
+            templatedNames,
+            unreadable.toSet(),
+        )
+
+        // ⚠️ The same defect the `open` collision was, one step earlier: the model is told to call
+        // one verb and dispatch answers to another. Nothing else in the app relates these two
+        // strings, and a mismatch costs a tool exactly as much as being unreachable does.
+        val mismatched = pairs.filter { it.name !in unreadable && it.usage?.trimStart()?.startsWith(it.name) == false }
+        assertTrue(
+            "these tools tell the model to call one thing while dispatch answers to another: " +
+                mismatched.map { "${it.file}: name=${it.name}, usage starts \"${it.usage?.take(40)}\"" },
+            mismatched.isEmpty(),
         )
     }
 
