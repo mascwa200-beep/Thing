@@ -30,11 +30,19 @@ object DeviceSearch {
      * as those kinds have been indexed, on the screen the owner has twice said they cannot find
      * things on. One rule in one place, rather than the same rule stated three times and wrong in
      * all three: this repository has corrected a duplicated definition seven times now.
+     *
+     * ⚠️ [destination] says whether this is **somewhere to go** rather than **something to read**,
+     * which is the one distinction a search result list has to draw and the one the phone was not
+     * drawing. Its **invariant is that a destination's entry id IS the route to open it** — stated
+     * in prose on both [FEATURE] and [SETTING] below, and implemented as a two-branch `when` in
+     * `PulseApp`. Setting this true takes on that obligation; a kind whose id is a document id
+     * must leave it false or a tap will navigate to nonsense.
      */
     enum class RecordKind(
         val label: String,
         val route: String,
         val plural: String = label + "s",
+        val destination: Boolean = false,
     ) {
         GUIDE("Guide", "survival"),
         NOTE("Note", "notes"),
@@ -80,7 +88,7 @@ object DeviceSearch {
          * prose about radar. ⚠️ Convention: a FEATURE record's entry **id IS the route to open** —
          * the `route` below is only the fallback for a tap handler that predates the convention.
          */
-        FEATURE("Feature", "menu"),
+        FEATURE("Feature", "menu", destination = true),
 
         /**
          * A place inside Settings — a category, or one section within it.
@@ -113,7 +121,7 @@ object DeviceSearch {
          * user-facing heading to dodge a scoring artefact would be the worse trade. Worth knowing
          * before adding a kind whose label collides with the name of a real screen.
          */
-        SETTING("Setting", "settings"),
+        SETTING("Setting", "settings", destination = true),
         ;
 
         /**
@@ -224,6 +232,18 @@ object DeviceSearch {
      * The body goes in `summary` because that is the field [GuideSearch] searches for prose; a note
      * has no headings and its "category" is what kind of thing it is, which is what the reader wants
      * to see beside it anyway.
+     *
+     * @param terms extra words to match on that are **never drawn** — the synonyms somebody types
+     *   when they call a thing by another name ("planes" for the radar, "aurora" for space weather).
+     *   ⚠️ These belong here and NOT in [body], for two measured reasons. A result row renders the
+     *   summary, so a synonym list put there is printed as though it were the description: the
+     *   phone's own SOS row read *"Call, strobe and alarm for help emergency help 911 rescue
+     *   distress"*, and `DeviceSearchTool` handed the same string to the model as that screen's
+     *   description. And [GuideSearch] weights a heading at 5 against a summary's 2, so synonyms in
+     *   the body are worth less than half what they should be — moving the phone's 31 term lists
+     *   across improved **108** synonym queries, left 62 unchanged and made **none** worse.
+     *   ⚠️ Last in the parameter list on purpose: `atMs` is passed positionally at several call
+     *   sites, so inserting anything before it would silently re-bind those arguments.
      */
     fun of(
         id: String,
@@ -231,12 +251,14 @@ object DeviceSearch {
         title: String,
         body: String = "",
         atMs: Long = 0L,
+        terms: List<String> = emptyList(),
     ): Record = Record(
         entry = GuideSearch.Entry(
             id = id,
             title = title.ifBlank { body.take(TITLE_FALLBACK_CHARS) },
             category = kind.label,
             summary = body,
+            headings = terms,
         ),
         kind = kind,
         atMs = atMs,

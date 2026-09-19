@@ -36,10 +36,10 @@ object DeviceSearchIndex {
         val out = ArrayList<DeviceSearch.Record>(700)
 
         // The app's own features, so typing "radar" OPENS the radar instead of only finding prose
-        // about radar. Ids are the nav routes (the FEATURE convention); the body carries the menu
-        // pitch plus each entry's declared synonyms, so "planes" matches the radar here exactly as
-        // it does in the MENU's own search. The search screen itself is excluded — being offered
-        // the screen you are standing on is noise.
+        // about radar. Ids are the nav routes (the FEATURE convention); the body is the menu pitch
+        // and the declared synonyms ride alongside it as match-only terms, so "planes" finds the
+        // radar here exactly as it does in the MENU's own search without the row printing the word.
+        // The search screen itself is excluded — being offered the screen you are standing on is noise.
         out += featureRecords()
 
         // Guides: the resident index only. Title, category, summary and headings are exactly the
@@ -113,7 +113,16 @@ object DeviceSearchIndex {
                     id = f.key,
                     kind = RecordKind.FEATURE,
                     title = f.label,
-                    body = (listOf(f.pitch) + terms[f.key].orEmpty()).joinToString(" "),
+                    body = f.pitch,
+                    // ⚠️ The synonyms go here rather than into the body, and the desktop's index
+                    // has had the note explaining why since it was written — on the platform that
+                    // does not have the bug. A row draws the summary, so with the two joined the
+                    // SOS result read "Call, strobe and alarm for help emergency help 911 rescue
+                    // distress", and `DeviceSearchTool` handed that to the model as the screen's
+                    // description. Separating them also moves the words from a field weighted 2 to
+                    // one weighted 5: measured over the real corpus, 108 synonym queries improved,
+                    // 62 were unchanged and none got worse.
+                    terms = terms[f.key].orEmpty(),
                 )
             }
         // Every place inside Settings — each CATEGORY by name ("notifications", "storage"), and

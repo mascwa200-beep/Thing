@@ -67,6 +67,10 @@ fun SearchScreen(
  * diary, their tasks and the assistant's memory, and until now the only thing this box could do was
  * hand the question to a search engine. Typing now answers from the device first — offline, with no
  * key and no request — and the engine picker sits below for when it genuinely is a web question.
+ *
+ * The device half answers **two** questions and says which is which: **GO HERE** is somewhere to go,
+ * everything under it is something to read. They are ranked together and drawn apart — see the split
+ * below for why ranking a destination against a document answers neither.
  */
 @Composable
 fun SearchBody(
@@ -117,13 +121,36 @@ fun SearchBody(
                     color = c.muted, modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            if (results.isNotEmpty()) {
+            // ⚠️ Somewhere to GO and something to READ are two different questions, and ranking
+            // them against each other answers neither. The ranker is not wrong — "The Troposphere
+            // and Where Weather Happens" really does say "weather" across four fields where the
+            // WEATHER screen says it in a title and a pitch — but text relevance is the wrong axis
+            // between a destination and a document. Measured over the real corpus, that put ELEVEN
+            // of thirty-nine screens below at least one guide when you typed their own full name,
+            // six of them at #5, behind four guides each.
+            //
+            // The arrangement that fixes it is already in this repository twice: the emergency card
+            // a few lines above, which outranks the ranker for the same reason, and the desktop's
+            // own GO HERE block, whose comment reads "the box answers two different questions and
+            // says which is which".
+            //
+            // Nothing is added or dropped — the same twelve results, split by what they are. The
+            // cost was measured rather than hoped: across the 1,993 distinct words in the guide
+            // titles, 88% see no destination above the readings at all and 7% see exactly one.
+            val (destinations, readings) = results.partition { it.kind.destination }
+            if (destinations.isNotEmpty()) {
+                LcarsHeaderBar("Go here")
+                destinations.forEach { r -> DeviceResultRow(r, onOpen) }
+            }
+            if (readings.isNotEmpty()) {
                 LcarsHeaderBar("On this device")
-                results.forEach { r -> DeviceResultRow(r, onOpen) }
-            } else if (searched && corpus.isNotEmpty()) {
-                // Gated on the corpus being gathered: during the first moments after the screen
-                // opens there is nothing to search, and "nothing matches" would be a claim about
-                // your device rather than about the query.
+                readings.forEach { r -> DeviceResultRow(r, onOpen) }
+            } else if (searched && destinations.isEmpty() && corpus.isNotEmpty()) {
+                // ⚠️ "Nothing" has to mean nothing ANYWHERE, or the sentence contradicts the list
+                // printed a few pixels above it — the desktop learned this when its own GO HERE
+                // block arrived. Still gated on the corpus being gathered: during the first moments
+                // after the screen opens there is nothing to search, and "nothing matches" would be
+                // a claim about your device rather than about the query.
                 LcarsHeaderBar("On this device")
                 Text(
                     "Nothing here matches that. The web is below.",

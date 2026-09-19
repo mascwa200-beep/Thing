@@ -14319,3 +14319,125 @@ argued from the code — it already runs after every answer, and it `copy`s with
 ⚠️ **A general gate for this class is NOT cheaply automatable and that is recorded rather than
 faked.** It needs receiver-type resolution, which no grep has. The per-platform bounded version
 above is the practical shape if it is ever wanted as a standing gate.
+
+### THE PHONE'S SEARCH STOPS BURYING THE SCREEN YOU ASKED FOR (this session, PR #471)
+
+PR #470 merged as **`a8e5194f`** (squash, the repo norm); the dev branch was re-synced with
+`--no-ff` so the tip committer stays ours. ⚠️ **Four redundant main builds cancelled** — LCARS
+#2200, Desktop #328, Nutrition #164, Sky #48 — after checking each against the tree that had
+already been built and published from the branch (LCARS #2199, Desktop #326, Nutrition #163, Sky
+#47 all on `ec3dc4a7`). `git diff --stat ec3dc4a7 origin/main` differs only in `CLAUDE.md` and one
+`desktop/` file, and neither is in the workflow that would rebuild, so all four would have
+republished byte-identical artifacts under new versionCodes: **~1.3 GB** of the owner's
+auto-download for nothing. Fifth instance; the check is one command.
+
+**Three veins swept and CLEAN, recorded so nobody re-chases them.** The naive-plural shape
+(`if (n == 1) "" else "s"`) exists in ~21 places and every one pairs it with a **literal** noun in
+the same expression, which is why it was readable and right — the `RecordKind` defect was the only
+place the noun was a *variable*. (`MetricRegistry`'s is north/south; `RecipeImport`'s inverted one
+is the verb "need"/"needs", correct.) The **`JarvisTool` registry** is complete: 58 declared tool
+classes (not the 30 a file count suggests — `AgentTools.kt`, `DeviceActionTools.kt` and
+`AgentSelfTools.kt` each declare several), 58 constructed in `AppContainer`. And every phone screen
+is findable by its own name **when features are scored in isolation** — 0 absent, 0 not-first.
+
+⚠️ **That last measurement was the trap, and only scoring the other side found the defect.** The
+phone renders ONE FLAT LIST against 865 guides, so "findable among 39 features" says nothing about
+where a screen actually appears on the page.
+
+#### Defect 1 — eleven screens are not first for their own full name
+
+Measured with the shipped ranker over the real corpus (39 screens, 33 Settings rows, 865 guides):
+six of the eleven sit at **#5**, behind four guides each.
+
+    "Weather"   -> four guides about weather, then WEATHER
+    "Computer"  -> four guides about computing, then the assistant
+    "Map"       -> four guides about cartography, then NAV
+    "Settings"  -> four Settings categories, then Settings
+
+⚠️ **The ranker is NOT wrong, and that is what makes the fix a presentation change rather than a
+scoring hack.** A guide has four fields (title, category, summary, headings) where a feature has
+two, and a guide about weather says the word in all of them while the WEATHER screen's pitch —
+*"Forecast, feels-like & air quality"* — does not repeat it at all. **Text relevance is the wrong
+axis between a place to go and a thing to read**; ordering them against each other answers neither.
+
+The arrangement that fixes it was in the tree **twice**: the phone's own emergency card (*"an
+emergency outranks everything, including the ranker"*) and the desktop's GO HERE block (*"the box
+answers two different questions and says which is which"*). The phone now splits the same way —
+same twelve results, drawn apart by what they are.
+
+⚠️ **The cost was measured rather than hoped**, because lifting destinations necessarily pushes
+readings down: over the 1,993 distinct guide-title words, **88% see no destination above the
+readings at all**, 7% see one, 0.5% see four or more; and of twenty realistic reading questions only
+five have any destination in the slate, the worst moving the best reading from #1 to #3.
+
+**`RecordKind.destination`** replaces a rule that was stated in prose on `FEATURE`, again on
+`SETTING`, and implemented as a two-branch `when` in `PulseApp`. Its invariant is on the
+declaration: **a destination's entry id IS the route to open it** — which is why the next such kind
+added navigates correctly instead of falling to the `else` and losing its `?cat=` argument silently.
+⚠️ *"Nothing here matches that"* now requires nothing **anywhere**, or it contradicts the GO HERE
+list a few pixels above — the desktop learned that when its own block arrived.
+
+#### Defect 2 — a screen's synonyms were printed as its description
+
+`FEATURE` records carry the words somebody types when they call a screen something else. The phone
+put them in `summary`; the desktop puts them in `headings`. ⚠️ **The desktop's index has carried the
+note explaining why since it was written — on the platform that does not have the bug**: *"A result
+row renders the summary, so putting them there would print 'Internet radio — near you, starred, and
+always on music stream station listen fm somafm audio' under RADIO."* Measured from the real
+Directory, the phone prints exactly that:
+
+    SOS            "Call, strobe and alarm for help emergency help 911 rescue distress"
+    Nearby Danger  "Earthquakes, disasters and severe weather near you quake alerts warning
+                    crime incidents safety"
+
+And not only on screen — `DeviceSearchTool` reads the same field and hands it to the model, so the
+assistant was told that is the screen's description too. The **larger** consequence is the ranking:
+`W_HEADING` is 5 against `W_SUMMARY`'s 2, so the synonyms were worth less than half what they should
+be. Moving the 31 term lists across: **108 synonym queries better, 62 unchanged, 0 worse** (`"911"`
+#3→#1, `"quake"` #3→#1, `"book"` #5→#1). ⚠️ `DeviceSearch.of` gained `terms` **last in the parameter
+list on purpose** — `atMs` is passed positionally at several call sites, so inserting before it
+would silently re-bind those arguments rather than fail to compile.
+
+#### ⚠️ BOTH OF THE HARNESS'S COMPILE CHECKS WERE WRONG BEFORE THEY WERE RIGHT
+
+This is the reusable part, and it applies to `scratchpad/deskfind/rank.sh` and every script copied
+from it.
+
+1. **kotlinc reports `Probe.kt:48:31: error: unresolved reference` — the FILE comes first.** So the
+   `grep -E '^(e:|error:)'` pattern these scripts carry **never fires**, however broken the code is.
+   A deliberately broken probe compiled "cleanly" past it and was caught only by the
+   `[ -f out/ProbeKt.class ]` belt-and-braces check. Use `grep -E '(^e: |: error:)'`.
+2. **Piping into grep hides it a second way.** Under `set -o pipefail` the pipeline takes *java's*
+   exit code, so `java … | grep … && { echo "COMPILE FAILED"; exit 1; }` never reaches the echo —
+   `set -e` kills the script first, printing the errors with no word about what they meant. Write
+   the compiler output to a file and check it explicitly.
+
+Both were proven to fire afterwards, in both directions. ⚠️ And the perturbation that exposed it was
+first aimed at a string that lives in `SearchScreen.kt` rather than in the probe — the harness's own
+*"PERTURBATION DID NOT APPLY"* guard caught that and refused to report a verdict, which is the
+discipline working rather than a near miss.
+
+⚠️ **A third harness note:** `scratchpad/screenfind/run.sh` extracts from the real tree on **every**
+run rather than reading a checked-in snapshot, and its generated data is gitignored. A probe that can
+go stale against the source it measures has a silence that means nothing — and this one needed
+`SettingsCategory` stubs, which are **generated from the real declarations** for the same reason.
+
+**Verification:** `:core:telemetry:test` **2,780 green** (+2), `:desktop:build` **295 green** (the
+tandem check, since a shared core changed), the gate chain clean across all nine checks, and **five
+rules negative-tested** against a baseline asserted green first, each perturbation asserted to have
+matched the source and each restore byte-compared. `SearchScreen` pulls in the app's own kit so no
+local gate can compile it — a **typed probe compiled and ran** the partition and the rewritten
+`when` against the real core types, and was itself negative-tested with a planted typo.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles a search box and never types into one. Search
+`weather`, `map`, `computer` or `health`: each should lead with a **GO HERE** block naming the
+screen, guides under *"On this device"* below. Then `knots` or `cpr` — the guides should still come
+first with **no GO HERE block at all** — and `sponsorblock` should still reach its Settings row. A
+feature result should show its plain description and no longer trail a list of synonyms.
+
+**Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
+sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the phone-side
+`settings?sec=` deep link (five interaction surfaces, not shippable blind); `ScanlineOverlay` and the
+eleven residue settings fields (an owner call on the overlay); the phone's own study deck is
+deliberately not indexed, with the reasoning recorded above. **Task #20 (retire IMAP) is still HELD**
+pending the owner's Pixel confirmation of notification-mail.
