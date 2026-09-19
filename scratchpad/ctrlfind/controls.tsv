@@ -1,0 +1,118 @@
+PrefSwitch	442	Disable USB data (charging only)
+PrefSwitch	455	Disable all cameras
+PrefSwitch	592	High contrast
+PrefSwitch	595	Haptics
+PrefSwitch	610	Auto-send debug reports
+PrefSwitch	632	Haptics
+PrefSwitch	635	Interface sounds
+PrefSwitch	647	Boot sequence
+PrefSwitch	682	24-hour clock
+PrefSwitch	694	Refresh on Wi-Fi only
+PrefSwitch	708	Look up who else is carrying a story
+PrefSwitch	784	Enable notifications
+PrefSwitch	790	Show news on the board
+PrefSwitch	792	Show markets on the board
+PrefSwitch	794	Show weather on the board
+PrefSwitch	796	Show your agenda on the board
+PrefSwitch	798	Show what you have eaten on the board
+PrefSwitch	805	Urgent alerts (sound & vibration)
+PrefSwitch	810	Breaking news card
+PrefSwitch	819	Official emergency alerts (full screen + alarm)
+PrefSwitch	848	Live news polling (~90s, needs the resident Computer)
+PrefSwitch	851	Quiet hours
+PrefSwitch	877	Remote link
+PrefSwitch	929	Community channel catalogue
+PrefSwitch	945	Skip flagged segments
+PrefSwitch	960	Environment sensing
+PrefSwitch	972	Ambient hearing (mic sips)
+PrefSwitch	979	Ambient sight (camera sips)
+PrefSwitch	986	Acoustic interrogator
+PrefSwitch	1002	Radio density (crowd sense)
+PrefSwitch	1009	Remember sensed events
+PrefSwitch	1046	Let it change the phone
+PrefSwitch	1065	Let it pause other apps while driving
+PrefSwitch	1091	Trusted Network Mode
+PrefSwitch	1135	Notify if not provisioned
+PrefSwitch	1141	Encrypt secrets at rest
+PrefSwitch	1147	HTTPS-only egress
+PrefSwitch	1321	Auto-send SOS SMS
+PrefSwitch	1409	Detailed activity log
+PrefSwitch	1441	Reflect on memories
+PrefSwitch	1485	Auto-anchor audit ledger
+PrefClickable	328	Hardware
+PrefClickable	334	Operating system
+PrefClickable	341	Device owner
+PrefClickable	353	Hardware attestation
+PrefClickable	385	Device class
+PrefClickable	395	Sensors
+PrefClickable	409	GrapheneOS per-app controls
+PrefClickable	537	Exploit protection (Memory Tagging)
+PrefClickable	545	USB-C port control
+PrefClickable	552	Sandboxed Google Play
+PrefClickable	565	Allow restricted settings
+PrefClickable	571	Usage access
+PrefClickable	576	Install unknown apps
+PrefClickable	581	App info
+PrefClickable	598	System accessibility
+PrefClickable	616	Crash console
+PrefClickable	641	Test the console sounds
+PrefClickable	737	Count unread texts
+PrefClickable	778	Grant notification permission
+PrefClickable	834	Allow the takeover over other apps
+PrefClickable	863	Send test notification
+PrefClickable	887	Pair a computer
+PrefClickable	912	Unpair all computers
+PrefClickable	1085	Security auditor
+PrefClickable	1099	Wi-Fi control
+PrefClickable	1113	Add current Wi-Fi as home
+PrefClickable	1360	Back up settings
+PrefClickable	1366	Restore from backup
+PrefClickable	1395	Cached data
+PrefClickable	1402	Clear cache
+PrefClickable	1417	Clear usage data
+PrefClickable	1423	Reset learned reflexes
+PrefClickable	1429	Clear remembered profile
+PrefClickable	1435	Clear tracked tasks
+PrefClickable	1447	Clear mail counts
+PrefClickable	1454	Clear what the Oracle learned
+PrefClickable	1460	Clear episodic memory
+PrefClickable	1466	Clear study progress
+PrefClickable	1472	Verify audit ledger
+PrefClickable	1479	Clear audit ledger
+PrefClickable	1492	Run ledger self-test
+PrefClickable	1501	Test the Python runtime
+PrefClickable	1509	Crash log
+PrefClickable	1511	Reset all settings
+PrefClickable	1807	Add a mailbox
+PrefClickable	1860	Add symbol
+PrefClickable	1891	Add RSS feed
+PrefClickable	1918	Add emergency contact
+EditableValueRow	664	News region code (gl)
+EditableValueRow	667	News language (hl)
+EditableValueRow	670	Currency code
+EditableValueRow	1262	NewsAPI.org
+EditableValueRow	1265	FRED (US economy)
+EditableValueRow	1268	EIA (US fuel)
+EditableValueRow	1271	Finnhub (markets)
+EditableValueRow	1274	OpenWeatherMap
+EditableValueRow	1277	NASA (asteroids)
+EditableValueRow	1280	Brave Search (the open web)
+EditableValueRow	1303	Full name
+EditableValueRow	1306	Blood type
+EditableValueRow	1309	Allergies
+EditableValueRow	1312	Medications
+EditableValueRow	1315	Conditions
+EditableValueRow	1318	Notes
+SingleChoiceRow	466	Wipe after failed unlocks
+SingleChoiceRow	673	Temperature
+SingleChoiceRow	676	Wind speed
+SingleChoiceRow	679	Precipitation
+SingleChoiceRow	690	Background refresh
+SingleChoiceRow	700	Data allowance resets on
+SingleChoiceRow	704	Articles per category
+SingleChoiceRow	800	Market row threshold
+SingleChoiceRow	854	Quiet start
+SingleChoiceRow	858	Quiet end
+SingleChoiceRow	1022	Stop sensing below
+SingleChoiceRow	1130	Re-probe after
+AddTextRow	1242	Add keyword to mute

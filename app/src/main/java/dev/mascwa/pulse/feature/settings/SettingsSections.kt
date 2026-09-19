@@ -66,7 +66,7 @@ object SettingsSections {
     )
     val DEVICE_OS = SettingsSection(
         "device_os", SettingsCategory.DEVICE, "Device & OS",
-        "hardware os graphene attestation sensors",
+        "hardware os operating graphene attestation sensors",
     )
     val DEVICE_OWNER = SettingsSection(
         "device_owner", SettingsCategory.DEVICE, "Device-owner controls",
@@ -74,7 +74,7 @@ object SettingsSections {
     )
     val GRAPHENE_HARDENING = SettingsSection(
         "graphene_hardening", SettingsCategory.DEVICE, "GrapheneOS hardening",
-        "graphene hardening mte usb sandboxed play",
+        "graphene hardening mte exploit tagging usb sandboxed play",
     )
     val SPECIAL_ACCESS = SettingsSection(
         "special_access", SettingsCategory.DEVICE, "Special access & restricted settings",
@@ -98,7 +98,7 @@ object SettingsSections {
     )
     val DATA_REFRESH = SettingsSection(
         "data_refresh", SettingsCategory.CONTENT, "Data & refresh",
-        "refresh interval wifi articles data",
+        "refresh interval wifi articles data coverage story outlets cluster",
     )
     val TEXTS_MAIL = SettingsSection(
         "texts_mail", SettingsCategory.CONTENT, "Texts & mail",
@@ -106,7 +106,7 @@ object SettingsSections {
     )
     val NOTIFICATIONS = SettingsSection(
         "notifications", SettingsCategory.NOTIFICATIONS, "Notifications",
-        "notifications alerts push quiet hours",
+        "notifications alerts push quiet hours board news agenda eaten takeover",
     )
     val REMOTE_LINK = SettingsSection(
         "remote_link", SettingsCategory.SECURITY, "Remote link",
@@ -123,11 +123,11 @@ object SettingsSections {
     val AMBIENT_SENSING = SettingsSection(
         "ambient_sensing", SettingsCategory.SECURITY, "Ambient sensing (Sensorium)",
         "ambient sensing sensorium camera mic microphone environment scanner light barometer " +
-            "driving ringer torch pause apps",
+            "driving ringer torch pause apps acoustic interrogator crowd density remember events change",
     )
     val SECURITY_NETWORK = SettingsSection(
         "security_network", SettingsCategory.SECURITY, "Security & network",
-        "security network wifi ssid encryption https audit ledger",
+        "security network wifi ssid encryption https audit ledger provisioned notify control probe",
     )
     val HOME_DASHBOARD = SettingsSection(
         "home_dashboard", SettingsCategory.INTERFACE, "Home dashboard",
@@ -147,11 +147,11 @@ object SettingsSections {
     )
     val API_KEYS = SettingsSection(
         "api_keys", SettingsCategory.KEYS, "Optional API keys",
-        "api key token openrouter github openai google brave search web",
+        "api key token openrouter github openai google brave search web newsapi fred eia finnhub openweathermap nasa",
     )
     val SAFETY_SOS = SettingsSection(
         "safety_sos", SettingsCategory.SAFETY, "Safety (SOS)",
-        "safety sos medical emergency contact blood allergy sms",
+        "safety sos medical emergency contact blood allergy allergies medications conditions notes name sms",
     )
     val BACKUP_RESTORE = SettingsSection(
         "backup_restore", SettingsCategory.SYSTEM, "Backup & restore",
@@ -159,7 +159,7 @@ object SettingsSections {
     )
     val STORAGE_ABOUT = SettingsSection(
         "storage_about", SettingsCategory.STORAGE, "Storage & about",
-        "storage cache clear activity log memory profile tasks reflexes episodic reset about",
+        "storage cache clear activity log memory profile tasks reflexes episodic reset about reflect audit ledger anchor python",
     )
 
     val ALL: List<SettingsSection> = listOf(
@@ -209,22 +209,37 @@ object SettingsSections {
      * page — re-creating inside device search exactly the five-of-five pollution the class KDoc
      * above forbids for `vis`. The category's own vocabulary already has its own row.
      *
-     * ⚠️ **A section whose title equals its category's title is skipped.** Three would otherwise
-     * duplicate the category row *exactly* — same destination and same title (Notifications, Region
-     * & units, Safety (SOS)) — showing the identical row twice and spending two of four places on
-     * one page.
+     * ⚠️ **A section whose title equals its category's title is skipped — but its VOCABULARY is
+     * folded into the category row that stands in for it.** Three would otherwise duplicate the
+     * category row *exactly* — same destination and same title (Notifications, Region & units,
+     * Safety (SOS)) — showing the identical row twice and spending two of four places on one page.
+     *
+     * ⚠️ **The skip used to be lossless by coincidence, and the fold makes it lossless by
+     * construction.** Measured both ways: before control vocabulary was added, every word those
+     * three sections owned was already said by their category's title, blurb or keywords — `country`
+     * and `language` sit in REGION's blurb, `alerts` in NOTIFICATIONS'. Nothing was lost, so nothing
+     * said the skip was lossy. Adding words for the controls those sections hold broke that at once:
+     * ten of them (`agenda`, `board`, `eaten`, `news`, `takeover`, `allergies`, `conditions`,
+     * `medications`, `name`, `notes`) reached the Settings search box and **nothing at all** in
+     * device search, because the only row that could have carried them was the one being skipped.
+     * The sweep caught it. The fold costs no row and no place — the category row already exists and
+     * already opens the same page.
      *
      * ⚠️ **The routes are deliberately NOT unique**: 23 rows share 10 destinations, because a
      * section deep-links to its category. The row's TITLE is what distinguishes it. The coverage
      * gate asserts this on purpose so a later reader cannot mistake it for an accident.
      */
     fun searchRecords(): List<Triple<String, String, String>> {
+        val (folded, ownRow) = ALL.partition { it.title == it.category.title }
         val categories = SettingsCategory.entries.map { c ->
-            row("${Routes.SETTINGS}?cat=${c.name.lowercase()}", c.title, "${c.blurb} ${c.keywords}")
+            val inherited = folded.filter { it.category == c }.joinToString(" ") { it.keywords }
+            row(
+                "${Routes.SETTINGS}?cat=${c.name.lowercase()}",
+                c.title,
+                "${c.blurb} ${c.keywords} $inherited",
+            )
         }
-        val sections = ALL.filter { it.title != it.category.title }
-            .map { row(it.route, it.title, it.keywords) }
-        return categories + sections
+        return categories + ownRow.map { row(it.route, it.title, it.keywords) }
     }
 
     /**

@@ -81,7 +81,15 @@ for cat, title, kwexpr in sec:
     sec_raw.append((f"settings?cat={cat.lower()}", f"Settings · {title}", f"{title} {kw}"))
 pathlib.Path("sections_raw.tsv").write_text("".join("\t".join(x) + "\n" for x in sec_raw))
 
-after = [row(f"settings?cat={n.lower()}", t, f"{b} {k}") for n, t, b, _, k in cats]
+# ⚠️ Mirrors the SHIPPED searchRecords(), fold included: a section whose title duplicates its
+# category's gets no row of its own, and its keywords ride on the category row instead. This
+# harness and that function are two statements of one rule — move them together.
+folded = {}
+for c, t, kw in sec_parsed:
+    if t in cat_titles:
+        folded.setdefault(t, []).append(kw)
+after = [row(f"settings?cat={n.lower()}", t, f"{b} {k} " + " ".join(folded.get(t, [])))
+         for n, t, b, _, k in cats]
 after += [row(f"settings?cat={c.lower()}", t, kw) for c, t, kw in sec_parsed if t not in cat_titles]
 pathlib.Path("settings_after.tsv").write_text("".join("\t".join(x) + "\n" for x in after))
 print(f"extracted: {len(feats)} features, {len(cat_rows_raw)} categories, {len(sec_raw)} sections "

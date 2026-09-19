@@ -23,9 +23,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * They are not, and never were: `PrefSection`, `PrefSwitch` and friends take no query, so nothing
  * matches a control's own title. What IS matched is the SECTION — see [SettingsSections], which is where
  * each section's own title and vocabulary now live so that both the Settings search box and the app's
- * device search can read them. Control-level vocabulary (83 actionable rows, 23 of them reachable from
- * no surface at all) remains out of scope; the cheap version would be a `keywords` parameter on
- * `PrefSection` folded into the emitted record, not per-control gating.
+ * device search can read them.
+ *
+ * ⚠️ **Control-level vocabulary is now covered, and the figures this used to give were wrong.** It
+ * said "83 actionable rows, 23 of them reachable from no surface at all", measured so nobody would
+ * re-measure it. Re-measured with a self-checked extractor: **114 rows**, of which **32** could not
+ * be reached by any word of their own name. The old count missed `SingleChoiceRow` entirely — it is
+ * declared `private fun <T> SingleChoiceRow(`, and an enumerator whose regex expects the name
+ * straight after `fun` does not see it.
+ *
+ * The fix is the one this comment already predicted: a control is findable when the SECTION holding
+ * it says one of its words, so the missing words went into [SettingsSections] rather than into any
+ * per-control gating. `SettingsSectionCoverageTest` holds it at zero.
  */
 enum class SettingsCategory(
     val title: String,
