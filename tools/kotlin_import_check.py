@@ -129,7 +129,7 @@ BUILTINS = set(
     System Math Locale UUID Runtime Thread Error Runnable LinkageError
     UnsatisfiedLinkError NoClassDefFoundError StackOverflowError OutOfMemoryError
     AssertionError CloneNotSupportedException InterruptedException
-    StackTraceElement StringBuffer ThreadLocal Iterable""".split()
+    StackTraceElement StringBuffer ThreadLocal Iterable AutoCloseable""".split()
 )
 
 
@@ -265,9 +265,21 @@ def declarations(text: str) -> set:
     # `suspend fun` declarations on the desktop side were reported as broken imports — and a report
     # with two false alarms in it is one somebody stops reading.
     names = set(re.findall(
-        r'^\s*(?:internal |private |public |abstract |open |sealed |expect |actual |suspend |'
+        # ⚠️ A LEADING ANNOTATION, and its absence was the largest of this scanner's blind spots.
+        # `@Serializable private data class ApiProfile(` begins with something that is neither a
+        # modifier nor a keyword, so the whole declaration was invisible and every use of it in its
+        # own file reported as unimported — sixteen of them in `SpotifyRepository.kt` alone.
+        # Measured across the repo: 545 `@Test fun`, 67 `@Volatile var`, 16 `@Serializable class`.
+        r'^\s*(?:@[\w.]+(?:\([^)\n]*\))?\s+)*'
+        r'(?:internal |private |public |abstract |open |sealed |expect |actual |suspend |'
         r'inline |operator |infix |tailrec |external |override |final |value )*'
-        r'(?:fun|val|var|const val|class|object|enum class|interface|data class|'
+        # ⚠️ `fun interface` MUST precede `fun`: alternation is left-to-right at a fixed position,
+        # so a bare `fun` matches first and the name capture then takes the word `interface` as the
+        # declared name. `fun interface HoldEffect` declared "interface", and `HoldEffect` — used
+        # twice in its own file — reported as unimported.
+        # ⚠️ `data object` is its own form and was in neither list: `data` is not a modifier, so all
+        # 43 of them in this repo were collected as nothing at all.
+        r'(?:fun interface|data object|fun|val|var|const val|class|object|enum class|interface|data class|'
         # ⚠️ The optional dotted group is the EXTENSION RECEIVER, and without it this captured the
         # receiver as the declared name: `fun BoxScope.CornerTag(` declared `BoxScope`, never
         # `CornerTag`. It rarely showed, because extension function names are usually lowercase and

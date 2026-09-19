@@ -25,11 +25,11 @@ object DeviceSearchIndex {
     /**
      * How much of a long body to index.
      *
-     * A diary entry can run to pages. Beyond a point the extra text stops helping the reader find
-     * the entry and starts making every entry match everything, so the opening is indexed and the
-     * rest is left to the screen that owns it.
+     * ⚠️ Moved to [DeviceSearch.BODY_CHARS] when the desktop index gained notes and diary: both
+     * platforms hold the same writing, so one constant rather than two that can drift. Kept here as
+     * an alias because it is public and the reasoning reads at this call site.
      */
-    const val BODY_CHARS = 1_200
+    const val BODY_CHARS = DeviceSearch.BODY_CHARS
 
     /** Gather. Safe to call on every keystroke — see [records] for why nothing here touches a shard. */
     suspend fun records(c: AppContainer): List<DeviceSearch.Record> {
@@ -73,6 +73,30 @@ object DeviceSearchIndex {
         runCatching { c.memoryStream.all() }.getOrNull()?.forEach { m ->
             // A memory is one line of text with no title of its own; `of` uses the opening as both.
             out += DeviceSearch.of("memory:${m.id}", RecordKind.MEMORY, "", m.text, m.createdMs)
+        }
+
+        // The documents the user loaded into the knowledge base.
+        //
+        // ⚠️ **`RecordKind.KNOWLEDGE` had no producer on this platform at all** — it is labelled
+        // "Document", it is routed at the Memory screen, and the only thing anywhere that emitted
+        // one was the DESKTOP, for study cards. So a document somebody imported so the Computer
+        // could answer from it was unfindable by the person who imported it, while the sentence at
+        // the top of this file said "everything on this device that can be searched".
+        //
+        // ⚠️ **The title only, and that is the same rule the guides above follow for the same
+        // reason.** `titles()` is one DISTINCT query; `fullText` joins every chunk of a document
+        // and a loaded reference doc runs to pages, so indexing bodies here would cost every
+        // refresh what the sharded guide loader exists to avoid. The honest consequence, worth
+        // knowing: a document is found by its NAME here. The Computer's own retrieval
+        // (`KnowledgeStore.search`, FTS4 over the chunks) is what reaches the text, and that is a
+        // question you ask it rather than the search box.
+        // ⚠️ No timestamp, and what that costs was checked rather than shrugged at: `atMs` is a
+        // TIEBREAK on equal score (`thenByDescending`) and nothing renders it, so a document shows
+        // no false date — it only loses a tie against a dated record that scored the same.
+        // `titles()` returns strings and the store exposes no per-document time, so supplying one
+        // would mean inventing it.
+        runCatching { c.knowledgeStore.titles() }.getOrNull()?.forEach { title ->
+            out += DeviceSearch.of("doc:$title", RecordKind.KNOWLEDGE, title, "")
         }
 
         return out

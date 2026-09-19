@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,19 @@ fun StudyScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by vm.state.collectAsState()
+
+    // ⚠️ Re-derive on the way in, for the same reason SEARCH does and one sharper. `refresh` was
+    // called from the view model's own init and after each study action, and the view model is
+    // remembered for the life of the composition — but what it computes is DATED. `today()` is a
+    // daily lesson, and a console left open overnight is exactly what this machine is for, so
+    // somebody coming back the next morning without having answered anything saw yesterday's
+    // lesson, yesterday's due count and yesterday's refresher plan. `syllabus()` and
+    // `suggestedGoals()` read `library.index()` live, so a pack installed on PACKS never reached
+    // here either.
+    //
+    // Safe to re-run: it is already called after every answer, and it `copy`s without touching
+    // `ask`, so a question part-way through is not disturbed.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     val c = Pulse.colors
     val session = state.session

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.testing.SourceGate
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -63,15 +64,14 @@ class ThrottleStampCoverageTest {
      */
     private val exempt = emptyMap<String, String>()
 
-    /** Block comments first, so a `//` inside one cannot swallow the rest of the file. */
-    private fun stripComments(src: String): String = src
-        .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), " ")
-        .replace(Regex("""//[^\n]*"""), " ")
+    /**
+     * ⚠️ Both shared with the other source-reading gates rather than copied. Stripping matters here
+     * because all three defects this gate was written for carry a comment calling the pass
+     * throttled — counting those would make the gate pass on the very sentences that were wrong.
+     */
+    private fun stripComments(src: String): String = SourceGate.stripComments(src)
 
-    private fun kotlinFilesUnder(dir: File): List<File> {
-        assertTrue("missing: ${dir.absolutePath}", dir.isDirectory)
-        return dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
-    }
+    private fun kotlinFilesUnder(dir: File): List<File> = SourceGate.kotlinFilesUnder(dir)
 
     /** Every `val last…Ms: Long` declared anywhere in the settings package. */
     private fun stamps(): List<String> {

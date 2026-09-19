@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,14 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val audit by vm.audit.collectAsState()
     val ledgerStatus by vm.ledgerStatus.collectAsState()
     val anchoring by vm.anchoring.collectAsState()
+    val documents by vm.documents.collectAsState()
+    val openDocument by vm.openDocument.collectAsState()
+
+    // ⚠️ The knowledge base publishes no flow, so the list is a snapshot rather than something that
+    // keeps itself current. A document added on the setup screen while this view model is alive
+    // would otherwise not appear until the process restarted. A pushed destination leaves
+    // composition, so this re-runs on the way back — the same reason the MENU recents strip needs it.
+    LaunchedEffect(Unit) { vm.refreshDocuments() }
 
     PulseScaffold(
         title = "MEMORY",
@@ -213,6 +222,33 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                 item {
                     MemButton("CLEAR PROCEDURES", c.magenta) { vm.clearProcedures() }
                 }
+            }
+
+            item { SectionBar("DOCUMENTS · ${documents.size}") }
+            item {
+                Text(
+                    if (documents.isEmpty()) {
+                        "No documents loaded. Add reference docs on the Computer's setup screen and " +
+                            "it retrieves the relevant bits into its answers. They appear here to " +
+                            "read back and remove."
+                    } else {
+                        "Reference docs the Computer retrieves from when it answers — on-device, " +
+                            "never trained on. Tap READ to see one exactly as it was stored. Some " +
+                            "came bundled with the app, and forgetting any of them is permanent: " +
+                            "there is no way to put one back from here."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                )
+            }
+            items(documents, key = { "document:$it" }) { title ->
+                DocumentCard(
+                    title = title,
+                    text = openDocument?.takeIf { it.title == title }?.text,
+                    c = c,
+                    onRead = { vm.readDocument(title) },
+                    onClose = { vm.closeDocument() },
+                    onForget = { vm.forgetDocument(title) },
+                )
             }
 
             item { SectionBar("AUDIT LEDGER · ${audit.size}") }
@@ -447,6 +483,57 @@ private fun MemoryCard(
         }
     }
 }
+
+/**
+ * One document in the knowledge base.
+ *
+ * [text] is null until the user asks to read it — see `JarvisMemoryViewModel.readDocument` for why
+ * a list of these does not carry its own text.
+ */
+@Composable
+private fun DocumentCard(
+    title: String,
+    text: String?,
+    c: NightwirePalette,
+    onRead: () -> Unit,
+    onClose: () -> Unit,
+    onForget: () -> Unit,
+) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                title,
+                fontFamily = JetBrainsMono, fontSize = 12.sp,
+                fontWeight = FontWeight.Bold, color = c.ink,
+            )
+            if (text != null) {
+                // ⚠️ Capped. A loaded reference doc can run to hundreds of kilobytes, and putting
+                // all of it into one Text inside a lazy item is a stall on the frame that draws it.
+                // The cut is stated rather than silent: a reader who cannot tell a truncated
+                // document from a short one has been told something untrue about what is stored.
+                val shown = text.take(DOCUMENT_PREVIEW_CHARS)
+                Text(
+                    when {
+                        text.isBlank() -> "This document's text could not be read back."
+                        shown.length < text.length ->
+                            shown + "\n\n… ${text.length - shown.length} more characters stored " +
+                                "and not shown here."
+                        else -> shown
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (text == null) MemButton("READ", c.accent, onRead)
+                else MemButton("CLOSE", c.accent, onClose)
+                MemButton("FORGET", c.magenta, onForget)
+            }
+        }
+    }
+}
+
+/** How much of a read-back document to draw. See [DocumentCard] for why there is a cap at all. */
+private const val DOCUMENT_PREVIEW_CHARS = 8_000
 
 @Composable
 private fun MemButton(text: String, color: Color, onClick: () -> Unit) {

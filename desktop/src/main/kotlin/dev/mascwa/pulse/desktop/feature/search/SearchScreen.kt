@@ -91,6 +91,18 @@ fun SearchScreen(
             color = if (state.deep.failedFor != null) c.magenta else c.faint,
             modifier = Modifier.padding(top = 3.dp),
         )
+        // ⚠️ Re-gather on the way in. `refresh` had **no caller outside the view model's own init**,
+        // and the view model is `remember`ed for the life of the composition — so the corpus was
+        // frozen at app start and a note written, or a card taught, a minute later could not be
+        // found until the app was restarted. Its own KDoc says it "exists for when it is genuinely
+        // stale"; nothing ever decided it was. `ScreenHost` draws one screen, so leaving SEARCH
+        // removes this composable and returning re-runs the effect — the same mechanism
+        // `CrashScreen` already uses one screen over, and the phone's MENU recents strip.
+        //
+        // Costs one gather per visit and nothing per keystroke, which is the split the view model's
+        // own comment asks for: it is per-CHARACTER rebuilding that would be ruinous, not per-visit.
+        LaunchedEffect(Unit) { vm.refresh() }
+
         // ⚠️ The ONLY thing that starts a deep scan: the switch going on, or the question changing
         // while it is already on. No clock is involved, and with the switch off `runDeep` returns
         // immediately — which is what makes opening this screen cost nothing.
@@ -300,6 +312,6 @@ private fun corpusLine(corpus: List<Pair<DeviceSearch.RecordKind, Int>>): String
         "Nothing indexed yet."
     } else {
         "Searching " + corpus.joinToString(" · ") { (kind, n) ->
-            "$n ${kind.label.lowercase()}${if (n == 1) "" else "s"}"
+            kind.count(n)
         } + " on this machine."
     }

@@ -21,16 +21,59 @@ package dev.mascwa.pulse.core.telemetry
  */
 object DeviceSearch {
 
-    /** Where a result came from. The label is user-facing; the route is where tapping it should go. */
-    enum class RecordKind(val label: String, val route: String) {
+    /**
+     * Where a result came from. The label is user-facing; the route is where tapping it should go.
+     *
+     * ⚠️ [plural] exists because English plurals are not `label + "s"`, and three separate surfaces
+     * were assuming they are — the phone's search screen, the assistant's own search tool, and the
+     * desktop's. So the corpus line has been reading **"3 diarys"** and **"2 memorys"** for as long
+     * as those kinds have been indexed, on the screen the owner has twice said they cannot find
+     * things on. One rule in one place, rather than the same rule stated three times and wrong in
+     * all three: this repository has corrected a duplicated definition seven times now.
+     */
+    enum class RecordKind(
+        val label: String,
+        val route: String,
+        val plural: String = label + "s",
+    ) {
         GUIDE("Guide", "survival"),
         NOTE("Note", "notes"),
-        DIARY("Diary", "diary"),
-        MEMORY("Memory", "jarvis_memory"),
+        DIARY("Diary", "diary", plural = "Diary entries"),
+        MEMORY("Memory", "jarvis_memory", plural = "Memories"),
         TASK("Task", "jarvis_memory"),
         PROFILE("Profile", "jarvis_memory"),
         FINDING("Finding", "jarvis_memory"),
+
+        /**
+         * A document the user loaded into the Computer's knowledge base, so it can retrieve from it.
+         *
+         * The label is what the results list shows, so it has to be true of everything that emits
+         * this kind. ⚠️ It was not: for a long stretch the **only** producer anywhere was the
+         * desktop, for its STUDY CARDS, and a question-and-answer pair is not a document. The
+         * desktop's own test said as much — it asserted `KNOWLEDGE in kinds` under the message
+         * "study cards are not searchable" — while the screen headed them DOCUMENT and the corpus
+         * line offered "14 documents on this machine" to a machine holding none. That went unnoticed
+         * because the phone, which owns the documents, emitted this kind for nothing at all.
+         *
+         * Now that both platforms produce, one member cannot be labelled correctly for both — hence
+         * [STUDY] below.
+         */
         KNOWLEDGE("Document", "jarvis_memory"),
+
+        /**
+         * A card in the study deck — one question, its answer, and the guide it came from.
+         *
+         * Searching these is how "wasn't there a question about bleach dilution?" gets answered
+         * without re-reading the guide it came from, which is a different act from finding the
+         * guide itself and deserves its own heading.
+         *
+         * ⚠️ Emitted only by the desktop today, and the route is nevertheless honest rather than a
+         * placeholder: `study` is a registered destination on the phone (`Routes.STUDY`), which has
+         * a deck of its own that its search does not yet index. So the phone's `else -> navigate`
+         * branch would land somewhere real the day it does, and nobody has to remember to come back
+         * and fix a route that was only ever a stand-in.
+         */
+        STUDY("Study card", "study"),
 
         /**
          * An app feature itself, so typing "radar" here opens the radar instead of only finding
@@ -71,6 +114,20 @@ object DeviceSearch {
          * before adding a kind whose label collides with the name of a real screen.
          */
         SETTING("Setting", "settings"),
+        ;
+
+        /**
+         * "1 note", "3 diary entries" — how many of this kind, said correctly.
+         *
+         * ⚠️ The whole sentence, not just the noun, and that is the point: three surfaces each wrote
+         * their own `"$n ${label.lowercase()}${if (n == 1) "" else "s"}"`, so the singular/plural
+         * decision was stated three times as well. Returning the pieces would leave two thirds of
+         * the duplication in place.
+         *
+         * Lower-cased because all three read mid-sentence ("Searching 577 guides · 2 notes on this
+         * machine"). A caller wanting a heading upper-cases it, as the result rows already do.
+         */
+        fun count(n: Int): String = "$n " + (if (n == 1) label else plural).lowercase()
     }
 
     /**
@@ -187,4 +244,18 @@ object DeviceSearch {
 
     /** Untitled writing still needs something to show and something to match a title against. */
     const val TITLE_FALLBACK_CHARS = 60
+
+    /**
+     * How much of a long body to index.
+     *
+     * A diary entry can run to pages. Beyond a point the extra text stops helping the reader find
+     * the entry and starts making every entry match everything, so the opening is indexed and the
+     * rest is left to the screen that owns it.
+     *
+     * ⚠️ Here rather than on either index, because both platforms hold the same writing and the
+     * reason is a property of writing, not of a platform. It lived on the phone's index alone while
+     * the desktop did not index notes at all; when the desktop gained them the choice was one
+     * constant or two that could drift, and [TITLE_FALLBACK_CHARS] two lines up is the precedent.
+     */
+    const val BODY_CHARS = 1_200
 }

@@ -111,7 +111,7 @@ fun SearchBody(
             if (corpus.isNotEmpty()) {
                 Text(
                     "ON THIS DEVICE · " + corpus.joinToString(" · ") { (k, n) ->
-                        "$n ${k.label.lowercase()}${if (n == 1) "" else "s"}"
+                        k.count(n)
                     },
                     fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp,
                     color = c.muted, modifier = Modifier.padding(top = 10.dp),

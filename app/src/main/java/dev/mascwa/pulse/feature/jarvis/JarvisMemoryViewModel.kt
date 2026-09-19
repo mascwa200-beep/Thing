@@ -15,6 +15,7 @@ import dev.mascwa.pulse.data.findings.FindingStore
 import dev.mascwa.pulse.data.interests.Interest
 import dev.mascwa.pulse.data.interests.InterestStore
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
+import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.procedure.ProcedureStore
@@ -42,6 +43,7 @@ class JarvisMemoryViewModel(
     private val findingStore: FindingStore,
     private val procedureStore: ProcedureStore,
     private val auditLedger: AuditLedgerStore,
+    private val knowledge: KnowledgeStore,
 ) : ViewModel() {
 
     val notes: StateFlow<List<AgentNoteEntity>> =
@@ -84,6 +86,25 @@ class JarvisMemoryViewModel(
     private val _anchoring = MutableStateFlow(false)
     val anchoring: StateFlow<Boolean> = _anchoring.asStateFlow()
 
+    /**
+     * The documents in the on-device knowledge base, by title.
+     *
+     * ⚠️ **A plain [MutableStateFlow] rather than a store flow, because [KnowledgeStore] publishes
+     * none.** Every other section here reads a flow its store keeps current; this one is a Room
+     * table behind suspend functions, so the list is pulled and re-pulled around each change. That
+     * also means it does not notice a document added on the Setup screen while this screen is
+     * alive — the screen calls [refreshDocuments] on entry, which is what covers coming back.
+     */
+    private val _documents = MutableStateFlow<List<String>>(emptyList())
+    val documents: StateFlow<List<String>> = _documents.asStateFlow()
+
+    /** The one document currently read back, or null. Loaded on demand — see [readDocument]. */
+    private val _openDocument = MutableStateFlow<DocumentView?>(null)
+    val openDocument: StateFlow<DocumentView?> = _openDocument.asStateFlow()
+
+    /** A document's text, reconstructed from its chunks for reading back. */
+    data class DocumentView(val title: String, val text: String)
+
     init {
         // Trigger a load so the profile + task + episodic + interest + finding flows populate on open.
         viewModelScope.launch { runCatching { profileStore.all() } }
@@ -93,7 +114,52 @@ class JarvisMemoryViewModel(
         viewModelScope.launch { runCatching { findingStore.load() } }
         viewModelScope.launch { runCatching { procedureStore.all() } }
         viewModelScope.launch { runCatching { auditLedger.entries() } }
+        refreshDocuments()
         refreshLedgerStatus()
+    }
+
+    /** Re-read the document titles. Cheap — one DISTINCT query; no chunk text is touched. */
+    fun refreshDocuments() {
+        viewModelScope.launch {
+            _documents.value = runCatching { knowledge.titles() }.getOrDefault(emptyList())
+        }
+    }
+
+    /**
+     * Read one document back.
+     *
+     * ⚠️ On demand, one document at a time, and that is the whole reason the list above carries
+     * titles only. `fullText` joins every chunk of a document, and a loaded reference doc can run
+     * to pages — pulling all of them to draw a list would cost the screen its open.
+     */
+    fun readDocument(title: String) {
+        viewModelScope.launch {
+            val text = runCatching { knowledge.fullText(title) }.getOrDefault("")
+            _openDocument.value = DocumentView(title, text)
+        }
+    }
+
+    fun closeDocument() {
+        _openDocument.value = null
+    }
+
+    /**
+     * Forget one document.
+     *
+     * ⚠️ **There is deliberately no "clear all" here, unlike every other section on this screen.**
+     * `KnowledgeStore.clear()` would take the reference docs bundled with the app with it, and
+     * `KnowledgeSeeder.seedIfNeeded` returns at its first line once the seed marker is set — so
+     * they would not come back until `SEED_VERSION` is bumped in a future build. A button that
+     * permanently destroys content the user never added, with no way back, is not worth the
+     * symmetry. Forgetting one at a time is the same hazard in a dose somebody chose, and the
+     * section says so on screen.
+     */
+    fun forgetDocument(title: String) {
+        viewModelScope.launch {
+            runCatching { knowledge.deleteDocument(title) }
+            if (_openDocument.value?.title == title) _openDocument.value = null
+            _documents.value = runCatching { knowledge.titles() }.getOrDefault(emptyList())
+        }
     }
 
     /** Recompute the audit-ledger integrity readout (chain verify + head signature + anchor time). */

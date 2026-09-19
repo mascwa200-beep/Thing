@@ -13939,7 +13939,383 @@ would be **wrong**: `tools/food/build_food_db.py` and `tools/sky/check_packaged.
 that build (lines 413, 520, 771). One build is the honest cost of touching a shared tool.
 
 **Open / steerable:** the phone-side `settings?sec=` deep link stands unchanged (five interaction
-surfaces, not shippable blind). `SettingsSection.key` still has zero reads despite a KDoc claiming
-otherwise — 26 constructor call sites plus the `sectionVocab()` regex, recorded rather than bundled
-into a verified PR. **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation
-of notification-mail.
+surfaces, not shippable blind). ~~`SettingsSection.key` still has zero reads despite a KDoc claiming
+otherwise~~ — **the false KDoc is corrected (`c4883bbb`); the field still has zero reads and
+deleting it is still open**, 26 constructor call sites plus the `sectionVocab()` regex.
+**Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
+notification-mail.
+
+### EVERY ORACLE RULE CAN FIRE, AND EVERY SIGNAL IT READS IS FILLED IN (this session, PR #470)
+
+PR #469 merged as `5c11c988` (squash, the repo norm; the dev branch re-synced with `--no-ff` so the
+tip committer stays ours). ⚠️ **LCARS #2194 and Desktop #321 on main were cancelled** after
+`git diff --stat` proved main's tree byte-identical to the branch tip that #2193/#320 had already
+built and published — they would have republished the same two apps under new versionCodes for
+**662 MB + 180 MB** of the owner's auto-download. Same move, same check, as the four earlier
+instances recorded above. **Zero subagent and zero workflow spend this whole session.**
+
+Then, hunting rather than working a list. **Five veins came back CLEAN and are recorded so nobody
+re-chases them:** `HealthSettings` (all 28 fields read; the `published*` cluster funnels through
+`PublishedPlan` as designed); the shared health view model (the 8 "dead" members are in-file locals
+— ⚠️ I made the recorded mistake of excluding in-file callers on the first pass; the 10 LCARS-only
+ones are deliberate, photos being the AI half the nutrition app excludes); the fixed-slot widget
+layouts (`MAX_SOURCES`/`MAX_READOUTS`/`MAX_PAIRS`/`COLUMN_LINES` are all honoured, and the three
+unbounded column producers cap at 3, 2 and exactly 4 against a 4-line column — latent, not live);
+`kotlin_import_check.py`'s raw-string lexer (already correct, and its comment records finding it
+there too); and Radio Browser, already probed and remediated.
+
+⚠️ **And the nutrition app has NO onboarding gate deliberately** — it never reads `configured` and
+never calls `setConfigured`, because it opens onto an honest empty state ("Fill in your height,
+birth year and goal on Plan, then record a weight on Body") rather than a modal setup flow. That is
+a design, not a gap; `setConfigured` being LCARS-only is correct.
+
+**The find.** The Oracle is the headline proactive feature — 26 rules over 44 signal domains,
+deciding what to put in front of you unasked — and **nothing had ever asked whether its rules can
+fire.** That defect class has been found here repeatedly and always by hand, one at a time:
+`tempoNudge` computed and consumed nowhere, `windKmh` declared and populated by nothing,
+`VitalsAnalyzer`'s motion argument defaulted at its one caller. Two gates now ask the whole set at
+once, because **a rule is dead if either half fails and neither half can see the other's defect**:
+
+- **`OracleReachabilityTest`** (`:core:telemetry:test`, 4 tests) — a seeded sweep invoking each
+  entry of `Oracle.RULES` **directly**. ⚠️ Directly rather than through `divine()`, which ranks,
+  truncates *and* de-duplicates: a rule absent from its output could be absent for three reasons
+  and only one is the defect. A third assertion covers the dropping — two rules producing the same
+  id for one snapshot means `distinctBy` silently discards one.
+  ⚠️ `Oracle.RULES` goes `private` → `internal` so the gate has an honest denominator; counting
+  only the rules that DID fire would make a newly-added dead rule invisible. The cross-module gate
+  confirms nothing outside the module reaches it.
+- **`OracleSignalCoverageTest`** (`:app:testDebugUnitTest`, 3 tests) — textual, in the
+  `ThrottleStampCoverageTest` shape. ⚠️ **The exemption list is CHECKED, not trusted:** an entry
+  does not merely excuse a field, it *claims a named platform populates it*, and that claim is
+  verified against that platform's source. A field set by nobody cannot be parked there, which is
+  the only failure mode worth designing against.
+
+**Measured: all 26 rules fire, and 42 of 44 signals are populated by the phone.** The two that are
+not are the ledger pair, desktop-only because only that machine keeps a long-watch ledger — and the
+gate proves the desktop really fills them rather than taking the comment's word for it.
+
+⚠️ **TWO HARNESS DEFECTS CAUGHT ON THE WAY, and the first would have been a false report.** The
+opening sweep said three rules never fire and **all three were fine**: `OracleEvent.startMs` is an
+**absolute** epoch timestamp and the draw built it as a small relative offset against a `nowMs` of
+~1.6e12, so `startMs > nowMs` was never true — `leaveNow` and `meetingPrep` could not fire and the
+event branches of `chargeNow` and `weatherPrep` were never exercised either. And the coverage
+gate's own exemption check caught a bug in its parser: a bare `OracleSignals\(` **also matches
+inside `gatherOracleSignals(`**, so it parsed a function's parameter list instead of the
+construction and reported the desktop as not populating what it demonstrably does. *A harness that
+mis-shapes or mis-locates one field accuses the thing it is checking.*
+
+⚠️ **Re-reading my own gate adversarially found a third**: it asserted `RULES.size ==
+families.size`, which five rules setting `family` explicitly make fragile — two of them sharing one
+family is reasonable (the field exists to pool a rule's instances for `OracleMemory`) and would
+have reported a dead rule that fires happily. Per-rule indexing removes the question and names the
+offender.
+
+**Four rules negative-tested** against a baseline asserted green first, each perturbation asserted
+to have matched the source, restored under a `trap … EXIT` and byte-compared — and ⚠️ **two of the
+four were wrong on the first writing, both recorded mechanism #2 (the perturbation removed a
+different property):** `% 997` on `windDown` made it fire *zero* times rather than rarely, so the
+reachability test caught it and the floor was never exercised (`% 30` gives 61 hits against a floor
+of 120 — the arithmetic predicted ~59); and *replacing* a real exemption simply deleted it, so the
+coverage test failed instead of the exemption check. The bogus entry must be **added**.
+
+### THE SECOND RULE ENGINE GETS THE SAME TWO QUESTIONS (this session cont., PR #470)
+
+The Oracle gate asks *can every rule fire, and is every signal filled in?* The app has a **second**
+rule engine of exactly that shape and considerably higher stakes — the ambient acting layer can
+pause every app on the phone, silence a ringer and light a torch — and nothing had ever asked
+either question of it. **Zero subagent and zero workflow spend**, as with every arc since the
+credit directive.
+
+⚠️ **Five actions were deleted from `AmbientAction` because nothing asked for them, and all five
+were found by hand, one at a time.** A capability there is dead if **either** end is missing, and
+the two ends cannot see each other — so it takes two gates, in two modules, because that is where
+each end lives:
+
+| | where | what it asks |
+|---|---|---|
+| producer | `AmbientRulesTest`, in `:core:telemetry` | does any rule ASK for this action? |
+| consumer | `AmbientActionCoverageTest`, in `:app` | does anything CARRY IT OUT? |
+
+**Measured: all nine actions are asked for, and eight of nine are consumed.** `SPEAK_DONT_BUZZ` is
+the documented exception, and the exemption is **checked rather than trusted** — it claims the
+absence is written down at a named place, and the gate goes and reads that place for both the
+action's name and the words "no consumer". The other direction is covered too: an exemption for
+something that *is* now wired fails, because a stale allowlist entry silently stops covering what
+it names.
+
+⚠️ **The producer sweep is a blind cross-product of the declared inputs on purpose.** If a new
+action needs a dimension it does not vary, the right outcome is that the test fails and whoever
+adds it widens the sweep deliberately; a hand-written list of situations silently stops covering
+whatever it was not updated for. `decide`, never `permit` — the question is whether a rule ASKS,
+and `permit` filters by tier, so the owner-tier action would be refused at the APP floor and read
+as dead.
+
+#### `SourceGate` — the plumbing behind four gates, extracted with its own test
+
+Every one of these gates asks whether a NAME appears in a body, and this codebase writes a
+paragraph explaining each dead symbol — so **a gate that counts comments passes on the
+documentation of the defect it exists to find.** Two gates had grown a byte-identical copy of
+`stripComments` and a third was about to; this repository has corrected a duplicated definition
+seven times, and the way it goes wrong is never that the copies disagree from the start. One
+definition now, with its own test, because four gates trusting it all go quietly green if it stops
+working.
+
+⚠️ Its two limitations are **measured and pinned as behaviour**, so changing either is deliberate:
+nested block comments leave residue (**zero** files in the three swept trees have one, and the
+sweep keeps that true), and a `//` inside a string literal takes the rest of its line (**13 live
+instances** — tolerable only because it fails LOUD, removing a real reference rather than admitting
+a fake one). ⚠️ `nestedBlockComment` has a third: it does not lex, so a file writing the delimiters
+as TEXT reports a false positive — which is exactly why `app/src/test`, where `SourceGate` itself
+lives, is outside the sweep.
+
+#### ⚠️ Extracting it immediately found a latent hole in the Oracle gate written an hour earlier
+
+`OracleSignalCoverageTest` had no stripper, so a commented-out named argument would have read as a
+populated field. Measured: the phone's construction carries no comments and the desktop's carries
+four contributing no names — **latent, not live**, one edit away, in the file most likely to get one.
+
+⚠️ **That fix could NOT be negative-tested against the live tree for exactly that reason** —
+removing it fails nothing, the third recorded way a green test proves nothing. It needed fixtures,
+and writing them found something sharper: **a plain `// dead = 2,` is ALREADY excluded** by
+`namedArgs`' own anchor (the name must follow a `(`, `,` or line start, and the `//` sits between),
+so the obvious fixture *also* never reaches the branch. What does get through is **a comma inside
+ordinary English prose** — `// see the note above, disabled = 3` — which puts the name straight
+after an anchor. Without the stripping the shipped fixture reports `disabled` and `blocked` as
+populated fields.
+
+#### ⚠️ TWO SELF-OWNS WORTH NOT REPEATING
+
+1. **I put a literal block-comment opener inside a KDoc — in the KDoc explaining why nested block
+   comments are dangerous.** Kotlin block comments nest, so it opened two, never closed them, ate
+   the rest of the file, and produced sixteen "unresolved reference" errors pointing at the test
+   below. The paragraph now describes those delimiters in words and says why; the test pins the
+   behaviour with string literals, where the characters are safe.
+2. **The app-module test runner compiles against the COMPILED core** (`core/telemetry/build/classes/kotlin/main`),
+   so a perturbation to core *source* is invisible to it and every app gate reports "asleep" for a
+   reason that has nothing to do with the rule under test. **A new false-asleep mechanism**; the
+   harness routes core-source cases to the core suite and says so at the dispatch.
+
+Plus two smaller ones: a conditional `grep` for an unused import **matched its own import line**
+(the harness-excuses-the-thing shape in miniature), and my first blind-spot fixture used `"/*"` and
+`"*/"` in sequence, which does **not** demonstrate it — one opens, one closes, the depth returns to
+zero with nothing between, and the scanner correctly answered null. **It failed, and the scanner
+was right.**
+
+#### The import gate: the promised comparison, and one word
+
+⚠️ **The full-tree before/after promised in `f3ce94c7` has reported and the claim is discharged:**
+self-check passed on both versions, **BEFORE 5, AFTER 3, zero new findings**, and it *removed* two
+— `HoldEffect` (declared on line 36 of the very file it was reported in) and `SpotifyRepository`'s
+16 DTOs. Then `AutoCloseable` joined the builtins — available unimported in both `java.lang` and
+`kotlin`, and missing from a list that already carries `System`, `Math` and `StackTraceElement`.
+**Standing findings 3 → 2**, and both that remain are the documented nested-classifier shape
+(`FoodDatabase.JournalMode`, `TranscriptDatabase.Callback`), false positives by construction since
+both files compile green in CI.
+
+#### Verification
+
+`:core:telemetry:test` **2,777 tests, 0 failures** through Gradle (the task CI runs);
+`:desktop:build` **293 tests, 0 failures** (the tandem check, since a core test changed); the five
+source-reading gates together **22 tests green**; the gate chain clean across all eight checks.
+**12 rules negative-tested** against a baseline asserted green first, each perturbation asserted to
+have matched the source, restored under a shell `trap … EXIT` and byte-compared
+(`scratchpad/gates/neg.sh`, one case per invocation).
+
+⚠️ **The decisive case is worth copying: add an action to the enum that no rule asks for.** Exactly
+ONE test fails and it is the new one, naming the member, while the other 32 stay green — which is
+the gap made visible rather than argued about. Compare the weaker version, which removes an action
+from a rule that already has three tests of its own and therefore proves much less.
+
+**Nothing in this arc changes runtime behaviour** — every file is a test or a test helper, plus one
+word in a local tooling script. There is nothing to check on the Pixel.
+
+**Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
+sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the phone-side
+`settings?sec=` deep link (five interaction surfaces, not shippable blind); `ScanlineOverlay` and
+the eleven residue settings fields (an owner call on the overlay). **Task #20 (retire IMAP) is
+still HELD** pending the owner's Pixel confirmation of notification-mail.
+
+### FOUR THINGS THAT EXISTED AND WERE READ BY NOTHING — the search corpus (this session, PR #470)
+
+Same defect class as the arc above, four more instances, found by asking the same question of a
+different subsystem. **Zero subagent and zero workflow spend**, per the standing usage constraint,
+which overrides the ultracode directive as it has for every arc since. Four commits: `5bd3c8eb`
+the knowledge base · `72c886ab` the study-card label · `340a262f` the cold deck · `ec3dc4a7` the
+desktop corpus.
+
+#### The knowledge base was write-only from the user's side (`5bd3c8eb`)
+
+The user can load documents into the Computer's knowledge base — ADD DOC and IMPORT FILE on its
+setup screen, into a `knowledge_docs` Room table the agent retrieves from. The only thing that
+surface reported back was a **count**. A document could be added and never read, never listed,
+never removed, never found.
+
+⚠️ **`RecordKind.KNOWLEDGE("Document", "jarvis_memory")` had ZERO producers on the phone.** Its
+route already pointed at the Memory screen, which carries PROFILE / TASKS / EPISODIC / PROCEDURES /
+AUDIT LEDGER by exactly that precedent — **the kind was written for a section nobody built.** And
+`titles()`, `fullText()` and `deleteDocument()` all had callers: every one in the agent/self-edit
+layer (`ArchitectureTool`, `AgentSelfTools`, `ApprovalGate`), none in a screen. The Computer could
+read the user's documents back; the user could not.
+
+- A DOCUMENTS section on the Memory screen, and the missing search producer.
+- ⚠️ **A plain `MutableStateFlow`, because `KnowledgeStore` publishes none** — so the list is a
+  snapshot and the screen calls `refreshDocuments()` from a `LaunchedEffect(Unit)`, which re-runs
+  on the way back because a pushed destination leaves composition.
+- **Titles in the list, text on demand**, capped at 8000 characters and **saying so**: a reader who
+  cannot tell a truncated document from a short one has been told something untrue about what is
+  stored.
+- ⚠️ **No CLEAR DOCUMENTS button, unlike every other section, and the trap is written down before
+  somebody adds one for symmetry:** `KnowledgeStore.clear()` would take the reference docs bundled
+  with the app with it, and `KnowledgeSeeder.seedIfNeeded` returns at its first line once the seed
+  marker is set — so they would not come back until `SEED_VERSION` is bumped in a future build.
+- ⚠️ **No timestamp on the search record, and what that costs was checked rather than shrugged at:**
+  `atMs` is a TIEBREAK on equal score and nothing renders it, so a document shows no false date — it
+  only loses a tie. `titles()` returns strings and the store exposes no per-document time, so
+  supplying one would mean inventing it.
+
+#### A study card was being reported as a document (`72c886ab`)
+
+The desktop emitted `KNOWLEDGE` — **labelled "Document"** — for **study cards**. The label is drawn
+twice on that screen, as the section heading and in the corpus line, so it headed them DOCUMENT and
+told a machine holding no documents that it was *"searching 14 documents on this machine"*.
+
+⚠️ **Its own test said so and nobody noticed:** the assertion read `KNOWLEDGE in kinds` under the
+failure message *"study cards are not searchable"* — the test and its own text disagreeing about
+what the kind was. It stayed invisible because the phone, which owns the documents, emitted the
+kind for nothing at all. **One member with one producer can be labelled for that producer however
+wrong the name reads; with two it cannot.**
+
+`RecordKind.STUDY("Study card", "study")`. ⚠️ The route is honest rather than a placeholder —
+`study` is a registered destination on the phone (`Routes.STUDY`, a composable and a MENU entry),
+which has a deck of its own that its search does not yet index. Neither `when` over `RecordKind`
+needed a branch, checked rather than assumed: the phone's falls through to
+`else -> navigate(r.kind.route)` and the desktop's to `else -> null`, whose comment already gives
+the reason a study card belongs there.
+
+#### A saved study deck was invisible to search in a fresh process (`340a262f`)
+
+`DesktopSearchIndex` read `study.items.value` — a StateFlow that holds an empty list until something
+causes a load — and `SearchViewModel` indexes from its own `init`. So opening SEARCH first thing
+after launch asked a store nothing had touched.
+
+⚠️ **Measured, because that is the only way to tell a latent shape from a live one.** Teach a guide,
+flush, then ask a FRESH store over the same file: **`warm=5 cold=0`, with 3,328 bytes of deck on the
+disk.**
+
+⚠️ **This is written down.** The phone's own `DeviceSearchIndex` carries a paragraph about exactly
+this — *"Each store is asked to load, not read off its published flow… reading it would have made
+findings and memories invisible on a screen opened cold"* — which exists **because the phone shipped
+this defect once.** The desktop index is shaped after it and inherited the shape without the fix.
+Swept the phone while there: eight sources, every one a suspend loader.
+
+⚠️ **The existing test could not have caught it, and that is shown rather than argued.**
+`studyCardsJoinTheCorpusOnceThereAreAny` calls `teach` first, which loads the store as a side effect
+— its fixture AVOIDS the branch, the third recorded way a green test proves nothing. Under the
+perturbation the old test stays green and **only** the new one fails.
+
+#### Three more on the desktop corpus, one of them live on the PHONE (`ec3dc4a7`)
+
+1. ⚠️ **The KDoc said notes and diary do not exist on the desktop. They do** — stores, screens and
+   directory entries — and were simply not indexed, so the two kinds of thing somebody TYPED could
+   not be found on a machine whose search screen exists to find things.
+   ⚠️ **Every source is now a REQUIRED parameter, never one defaulted to null.** A defaulted store is
+   a default that quietly means "do not index this" — the shape that has shipped twice here already
+   (`VitalsAnalyzer`'s motion argument, `LlamaEngine.prepare(allowDownload=false)`). Required means
+   adding a source forces every caller to decide, which is how these two were noticed missing.
+2. ⚠️ **`SearchViewModel.refresh()` had NO caller outside the view model's own `init`**, and the view
+   model is `remember`ed for the life of the composition — so the corpus was **frozen at app start**
+   and a note written a minute later could not be found until restart. Its own KDoc says it "exists
+   for when it is genuinely stale"; nothing ever decided it was. Every other desktop view model with
+   a `refresh()` has it on a button or a `LaunchedEffect`; `CrashScreen` does exactly this one screen
+   over. ⚠️ And refreshing the corpus alone is **half the job with the visible half missing** — come
+   back to a screen still showing results for "kayak" and an updated `records` leaves the same stale
+   list, which reads exactly like the note not having been indexed. `refresh()` re-runs the standing
+   question, guarded on a non-blank box so the `init` call cannot mark the screen as searched.
+3. ⚠️ **"3 diarys" — and this one was LIVE ON THE PHONE.** The corpus line is
+   `"$n ${kind.label.lowercase()}${if (n == 1) "" else "s"}"`, written out **three times**: the
+   phone's search screen, the assistant's own `DeviceSearchTool`, and the desktop's. English plurals
+   are not `label + "s"`, and two labels are not: **DIARY → "3 diarys"** and **MEMORY → "2 memorys"**.
+   The phone has indexed both kinds all along, so it has been printing that on the screen the owner
+   has **twice** said they cannot find things on, and handing it to the model.
+   `RecordKind.count(n)` returns **the whole sentence, not just the noun** — returning the pieces
+   would leave two thirds of the duplication in place, since the singular/plural decision was stated
+   three times too. Eight kinds take the default; two name themselves.
+   `BODY_CHARS` moved to `DeviceSearch` beside `TITLE_FALLBACK_CHARS` for the same reason, with an
+   alias on the phone so no call site moved.
+
+#### Verification
+
+`:core:telemetry:test` **2,778** and `:desktop:build` **295**, both executed locally; CI green on
+both compile gates (`5bd3c8eb` 3m04s, `72c886ab` 3m02s) and **LCARS #2198 fully green and published
+to `latest`**, including all seven packaging assertions and the R8 keep gate.
+
+**Ten rules negative-tested** across the four commits, each against a baseline asserted green first,
+each perturbation asserted to have matched the source and each restore byte-compared.
+⚠️ **The decisive one is the general guard rather than a named case**, because what is worth catching
+is a kind nobody thought about: adding a plausible new member — `ITINERARY`, consonant + y, no
+plural — fails with **`[ITINERARY -> Itinerarys]`**, naming it. The two irregulars are asserted by
+name in the shape `LiveChannelsTest` uses; a rule clever enough to derive them would be worse to
+maintain than the two entries.
+
+⚠️ **The resolve gate's five complaints on K1 were PROVEN the documented cascade, not shrugged at.**
+`KnowledgeStore` lives in **`core:database`**, which that gate's classpath does not carry, and
+`LaunchedEffect` is androidx. The decisive control is **a known-good sibling on the same absent
+module**: `memory.clearHistory()` — a member of `JarvisMemory`, which lives in `core/database`, is
+already imported in that very file, and unquestionably compiles in CI — reports **identically**.
+
+⚠️ **`desktop/**` in `android-build.yml`'s `paths-ignore` was confirmed working in practice**, not
+merely on paper: a desktop-only push produced exactly one check run and did **not** supersede the
+in-flight Android build on the previous commit, which went on to publish.
+
+#### Decided against, with the reasoning
+
+**Indexing the phone's own study deck**, which is now three lines since the kind exists and
+`Routes.STUDY` is real. The desktop's rationale rests on a **grouped, wide** results layout; the
+phone renders a **flat list** with a kind tag per row, so cards would interleave with the guides
+they were drawn from on a small screen. Nothing claims the phone indexes them, so this is a feature
+rather than a defect, and the one surface the owner has complained about twice is the wrong place to
+add unmeasurable noise. It is `StudyStore.cards()` plus three lines whenever the owner wants it.
+
+⚠️ **`DesktopSearchIndex`'s KDoc claim that Android searches "ingested documents" became TRUE only
+with `5bd3c8eb`** — it was false when written and is correct now. Worth knowing before reading that
+paragraph as evidence of anything.
+
+**Open / steerable, unchanged from the arc above**, plus: the SEARCH directory entry still describes
+its corpus as *"Find a page, or a study card, by what you need"*, which is now an understatement
+rather than a false claim — changing it would alter what words reach device search, so it wants the
+same ranking sweep the D3 arc ran rather than a blind edit.
+
+#### The same question asked of every desktop view model (`abe9d206`)
+
+Having found `SearchViewModel.refresh()` with no caller by *reading*, the honest next move was to ask
+it of all of them. `StudyViewModel.refresh()` is the second instance, and the sharper one, because
+what it computes is **dated**: `today()` is a daily lesson, `dueCount()` and `refresher()` are
+time-relative, and `syllabus()`/`suggestedGoals()` read `library.index()` live. A console left open
+overnight — which is the premise of the long watch — showed yesterday's lesson to anyone who came
+back without having answered a card, and a pack installed on PACKS never reached the syllabus.
+
+⚠️ **THE SWEEP THAT FOUND IT FAILED ITS OWN SELF-CHECK FIRST, and that is the transferable part.**
+The obvious version greps for `\brefresh()` and asks whether every hit is inside the declaring file.
+It reported the tree clean — and reported the tree clean **against the pre-fix state too**, where
+the defect provably existed. Structurally incapable: about fourteen classes have a `refresh()`, so
+the grep returns all 138 calls and **a receiver cannot be resolved from text** — `vm.refresh()` on a
+RadarViewModel is indistinguishable from one on a SearchViewModel.
+
+What works, and only because the set is bounded: `ScreenHost` maps each `Screen` to exactly one
+composable taking exactly one view model, so the (view model, screen) pairing is **enumerable rather
+than inferred**. That sweep self-checks against `CrashScreen` — known to call refresh — before
+reporting anything, and named two candidates, both then judged on merit:
+
+- **NEWS — not a defect.** It has its own currency mechanism, a visibility-driven five-minute loop.
+  ⚠️ My first grep looked for `setVisible` where the real name is `setOnScreen`, and so reported the
+  visibility signal missing when `NewsScreen` feeds it from a `DisposableEffect`. Its `refresh()` is
+  a dead public function with no false claim on screen: recorded, not churned.
+- **STUDY — the defect above.**
+
+**No test covers the fix, and saying so beats implying otherwise:** it is a Compose effect and the
+desktop has no UI test harness. What is checkable is that `refresh()` is safe to re-run, and that is
+argued from the code — it already runs after every answer, and it `copy`s without touching `ask`.
+
+⚠️ **A general gate for this class is NOT cheaply automatable and that is recorded rather than
+faked.** It needs receiver-type resolution, which no grep has. The per-platform bounded version
+above is the practical shape if it is ever wanted as a standing gate.

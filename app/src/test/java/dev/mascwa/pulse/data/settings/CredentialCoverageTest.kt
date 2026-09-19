@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.testing.SourceGate
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -83,11 +84,11 @@ class CredentialCoverageTest {
      * paragraph explaining it behind — and the gate reported everything covered. The comment that
      * documents a rule must not be able to stand in for the rule.
      *
-     * Block comments first, so a `//` inside one cannot swallow the rest of the file.
+     * ⚠️ Shared with the other source-reading gates rather than copied — the paragraph above is why
+     * it is load-bearing here specifically, and [SourceGate.stripComments] carries the rule, its two
+     * measured limitations, and its own test.
      */
-    private fun stripComments(src: String): String = src
-        .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), " ")
-        .replace(Regex("""//[^\n]*"""), " ")
+    private fun stripComments(src: String): String = SourceGate.stripComments(src)
 
     /** Every `val <name>: String` declared anywhere in the settings source. */
     private fun stringProperties(src: String): List<String> =

@@ -129,7 +129,47 @@ class DeviceSearchTest {
         for (k in RecordKind.entries) {
             assertTrue("${k.name} has no route", k.route.isNotBlank())
             assertTrue("${k.name} has no label", k.label.isNotBlank())
+            assertTrue("${k.name} has no plural", k.plural.isNotBlank())
         }
+    }
+
+    /**
+     * How many of a kind there are, said in English.
+     *
+     * ⚠️ Three surfaces each wrote `label.lowercase() + "s"` — the phone's search screen, the
+     * assistant's search tool, and the desktop's screen — so the corpus line has read **"3 diarys"**
+     * and **"2 memorys"** for as long as those kinds have been indexed. The irregulars are asserted
+     * BY NAME rather than by a rule, in the shape `LiveChannelsTest` uses: what is worth catching is
+     * a NEW kind whose plural nobody thought about, and a rule clever enough to derive these two
+     * would be a worse thing to maintain than the two entries themselves.
+     */
+    @Test
+    fun aKindCanSayHowManyOfItThereAreWithoutInventingAnEnglishPlural() {
+        assertEquals("1 note", RecordKind.NOTE.count(1))
+        assertEquals("4 notes", RecordKind.NOTE.count(4))
+        assertEquals("0 guides", RecordKind.GUIDE.count(0))
+
+        // The two the naive rule got wrong.
+        assertEquals("1 diary", RecordKind.DIARY.count(1))
+        assertEquals("3 diary entries", RecordKind.DIARY.count(3))
+        assertEquals("1 memory", RecordKind.MEMORY.count(1))
+        assertEquals("2 memories", RecordKind.MEMORY.count(2))
+
+        // A multi-word label pluralises on its last word, not by being wrapped in something.
+        assertEquals("5 study cards", RecordKind.STUDY.count(5))
+
+        // ⚠️ The general guard, and the one that catches a NEW kind: a plural that is the label with
+        // an "s" stuck on is only acceptable when that is genuinely the English plural. Anything
+        // ending in a consonant + "y" is not, which is exactly how both defects arose.
+        val naiveOnAWord = RecordKind.entries.filter {
+            it.plural == it.label + "s" && it.label.length >= 2 &&
+                it.label.last().lowercaseChar() == 'y' && it.label[it.label.length - 2] !in "aeiou"
+        }
+        assertTrue(
+            "these kinds pluralise a consonant+y label by appending 's', which is not English: " +
+                naiveOnAWord.map { "${it.name} -> ${it.plural}" },
+            naiveOnAWord.isEmpty(),
+        )
     }
 
     // ---- presentation ------------------------------------------------------------------------------
