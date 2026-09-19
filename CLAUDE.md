@@ -13473,3 +13473,128 @@ from "fixing" three things that were already correct. Two separate mistakes, bot
 **Also clean, swept the same way:** `NotifyState` (all eight fields have readers and writers) and every
 non-settings `last…Ms` in the app module. See the gate section above for why the settings blob is
 structurally the one place this happens.
+
+### "SPONSORBLOCK" FINDS THE SETTING — the findability gap, closed (this session)
+
+Owner: *"Mark it ready and merge into main, then continue autonomously"*, then — relaxing the
+standing constraint — *"you are allowed to use ultra code"* while still not burning the plan. So
+PR #465 (TROVE) was squash-merged as `530405a1`, the dev branch re-synced with `--no-ff`, and the
+next arc was **found by hunting**: the systemic half of the owner's own twice-repeated complaint
+(*"I can't find it"*), recorded as open twice and never closed.
+
+**`SettingsScreen.kt:165`'s `vis` is a Kotlin LOCAL function inside the composable**, so the 26
+keyword strings passed to it were unreachable from anywhere else in the app *by construction*
+(proven five ways by an auditor). The Settings search box found "sponsorblock", "anydesk", "stooq"
+and "iptv"; the app's own SEARCH screen found none of them, because `DeviceSearchIndex` only ever
+saw a category's blurb and keywords. **52 words a person would plausibly type reached no Settings
+destination**, measured against the whole 472-word vocabulary device search can see.
+
+Shipped: `2ff8688c` the gate fix · `dec02725` the table + `vis` · `0cf983af` the search wiring.
+
+#### ⚠️ THE MEASUREMENT THAT RESHAPED THE DESIGN, and the naive version is a REGRESSION
+
+Emitting the sections as `RecordKind.FEATURE` — the obvious implementation — puts a Settings row
+above **five real screens** for ordinary one-word queries (Device Health, Social Feeds, Home,
+Markets, Security Check), sending you somewhere else entirely. **Two independent causes, and BOTH
+had to be fixed:**
+
+1. **`RecordKind.SETTING`** gives Settings rows their own per-kind budget so they cannot take a
+   *place* from a screen. ⚠️ **On its own it is NOT enough** — `search` returns one merged list and
+   `SearchScreen` renders it flat, so a separate kind stops a row taking a place and does **not**
+   stop it outranking one. (The audit that found the regression proposed this as the whole fix; my
+   own probe refuted that half.)
+2. **The body is filtered against the title.** `GuideSearch.fieldScore` sums a best-match-per-field
+   with **no length normalisation**, so a row saying a word in its title *and* again in its body
+   scores it twice — and a keyword list repeats its own name by construction, where a screen's
+   pitch does not repeat its label by editorial convention:
+
+       "markets"   Settings · Markets watchlist   title 20 + body 4 = 24   <- wins
+                   Markets (the tab)              title 20 + body 0 = 20
+
+   ⚠️ The filter mirrors **`wordMatch`'s STEM rule**, not equality: an exact filter left `feeds`
+   standing, because `feed` stem-matches it. And ⚠️ **the 10 category rows needed the same filter
+   and were missing it** — their blurbs repeat their names too ("Device & owner" / "Hardware ·
+   **device** owner"), which is what beat Device Health. They were built inline in
+   `DeviceSearchIndex` while the sections were built in the table, which is *exactly* how one got
+   the rule and the other did not. Both now come from `SettingsSections.searchRecords()`.
+
+**Final sweep — 341 words, the shipped scorer, the real corpus: 0 screens displaced, 0 evicted,
+against 5 for the naive design; all 57 trapped words reach a Settings row.**
+(`scratchpad/findability/rank.sh`.)
+
+#### ⚠️ A KIND'S LABEL IS SCORED — worth knowing before naming one
+
+`DeviceSearch.of` puts `kind.label` in the record's `category` field, which `fieldScore` weights at
+**4**. So every `SETTING` row gains a free stem match on the query **"settings"**, and for that one
+query a Settings row outranks the Settings screen. **Left deliberately**: every competing row opens
+Settings, so nothing is mis-navigated, and renaming a user-facing heading to dodge a scoring
+artefact is the worse trade. Recorded on the enum.
+
+#### The rest of the design, briefly
+
+`vis` gained the section's own title **APPENDED, not inserted** — it is a *contiguous substring*
+match, so a join boundary moved in the middle loses 84 straddling phrases, while appending leaves
+the old haystack a strict **prefix** of the new one, making "nothing that matched stops matching"
+true by construction. That fixes **5 of 26** sections that could not be found by their own name
+(⚠️ five, not the four an earlier line-window count claimed — it missed `Device-owner controls`).
+Three sections whose title equals their category's are **skipped**, or they would duplicate the
+category row *exactly* — same destination and same title. MENU's matcher reads the same table,
+because its box is the search behind a bottom-nav tab where SEARCH is not. Three false comments
+corrected in the blocks being rewritten (the `:153-156` title claim, `collapsibleHeader`'s
+five-callers-for-four, and `SettingsCategory:22`'s claim that control titles are matched — they are
+not, and never were).
+
+#### ⚠️ FOUR HARNESSES WERE WRONG BEFORE ONE WAS RIGHT, and the pattern is always the same
+
+1. `re.findall(r'"([^"]{2,})"', src)` **shifts every quote pair by one** from the first *empty*
+   literal onward — `val keywords: String = ""` is too short to match, so its closing quote pairs
+   with the next literal's opening quote and everything after is the *code between* literals. It
+   reported 123 missing words where the truth is 57.
+2. The title measurement used the enum **name** (`KEYS`) where `vis` uses `cat.title +
+   cat.keywords` — 10 unfindable sections reported against a real 5.
+3. **The tell was arithmetic, not intuition:** set 2 must have been a subset of set 1 and was
+   larger. A contradiction between two of your own measurements is the cheapest bug detector there
+   is.
+4. The ranking probe called a *category* row a "real screen" because it judged by **kind** rather
+   than by identity — 44 phantom evictions, the harness accusing the change of doing exactly what
+   it was supposed to. And its feature ids were the `Routes` **constant names** (`SETTINGS`), not
+   their values.
+
+**Always begin with an assertion that the extractor can see a value you know is present.**
+
+#### ⚠️ TWO OF THE NEW GATE'S OWN RULES WERE ASLEEP, and one was this arc's defect one level up
+
+`SettingsSectionCoverageTest` has six rules, all negative-tested. Two failed to fire on the first
+writing: a table entry **declared and left out of `ALL`** gates its screen perfectly and is
+invisible to both search surfaces — the exact silent failure the sections had before the table
+existed — and the arg comparison was too strict to survive a **multi-line** `vis(` site, which is
+the case the whole extractor design exists for. ⚠️ Its extractor is **paren-balanced, not
+line-oriented**, and the KDoc says why: `Texts & mail` spans several lines, so a line matcher sees
+29 sites, finds a self-consistent 29-entry table, and passes.
+
+#### `tools/kotlin_missing_return.py` — the char-literal blind spot
+
+Its `strip_noise` knew about `/* */`, `//`, `"""` and `"` and **not about character literals**, so
+`c == '"'` read as a string opener and swallowed the function's `return`. Three functions green in
+CI were reported broken (`NewsAnalysisEngine.parse`, `LazyKeyTest.mask`, `Csv.splitLine`). Measured
+repo-wide: findings **3 → 0**, zero lines appearing only in the AFTER run. ⚠️ This repo had already
+fixed the same blind spot **one lexical form over** in the import gate.
+
+**Verification:** gate chain clean; `:core:telemetry:test` green; **`:desktop:build` green**
+(a shared core changed — the tandem check); the coverage gate 6/6 locally; the ranking sweep above.
+No desktop change is needed and that was checked rather than assumed — `desktop/` has no
+`SettingsCategory`, no `vis`, and emits no settings records.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a search box and never types into one.** SEARCH
+"sponsorblock" → a `Settings · Viewscreen` row that opens Security & privacy; "anydesk" → Remote
+link; the Settings box "software" → the Software update section; and the control: "weather" still
+leads with WEATHER, "sos" with SOS. Ask the Computer *"where do I turn on sponsor skipping"*, then
+*"open the SOS screen"* — the second must still name the SOS screen.
+
+**Open / steerable:** control-level vocabulary (**83 actionable rows, 23 reachable from no surface
+at all**) is named out of scope at `SettingsCategory:22`; the cheap version is a `keywords`
+parameter on `PrefSection` folded into the emitted record, not per-control gating. A per-section
+deep link (`settings?sec=`) would land on the section rather than its category — it needs a nav
+argument, a seed-once VM field, a focused branch in `vis`, a visible "SHOW ALL" affordance and two
+clearing wires, so it was not shipped blind. The desktop's own search can find neither a screen nor
+a setting — a real gap, and a different arc.
