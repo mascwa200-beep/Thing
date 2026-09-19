@@ -63,7 +63,8 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
   (Vosk fallback); optional cloud transcript cleanup (`voiceCloudInterpret`); follow-up/conversation modes;
   spoken commands run the **agent loop** (tools) when enabled; opt-in spoken proactive remarks.
 - **Memory**: durable facts (`JarvisMemory.remember/recall`) + short-term conversation (recentContext threaded
-  into chat AND the agent loop). Curiosity engine (rate-capped) + Approvals/Memory screens.
+  into chat AND the agent loop). Curiosity engine (rate-capped — ⚠️ **only since `0cabc489`**; before that
+  the cap was missing outright, see the throttle arc at the end of this file) + Approvals/Memory screens.
 - **TTS** (`jarvis/voice/TextToSpeechEngine.kt`): strips Markdown before speaking.
 - **Image/file interpretation**: console attach buttons → `JarvisViewModel.sendImage`/`sendFile` →
   vision (images, PDFs via `PdfRenderer`→pages) or text read; cloud-only for vision.
@@ -483,8 +484,13 @@ now **provisioned as a Device Owner** via adb). Also a long Spaceballs "Ludicrou
 ### Reflection pass · console fixes · Phase 4 skills (this session cont., #202–#206 merged + a procedure tool)
 - **Mnemosyne reflection pass (#202):** `jarvis/reflection/ReflectionEngine.kt` — when enough recent
   observation-importance accrues, the model synthesises 1–3 higher-level INSIGHTS from the top seeds, recorded
-  as `MemoryKind.REFLECTION`. Cloud-gated (no-op unless a backend is Ready) + throttled ~4h via
-  `AppSettings.lastReflectionMs`; driven from `RefreshWorker` beside the curiosity pass. Surfaces in recall
+  as `MemoryKind.REFLECTION`. Cloud-gated (no-op unless a backend is Ready); driven from `RefreshWorker`
+  beside the curiosity pass. ⚠️ **NOT "throttled ~4h via `AppSettings.lastReflectionMs`" as this line
+  claimed** — there is no 4h anywhere in `ReflectionEngine` and no timer at all. That stamp is a BOOKMARK
+  the engine reads as its `since` bound, and the real gate is `MemoryStream.shouldReflect` over accrued
+  observation importance, which is better than a clock: running with nothing new to read is a genuine
+  no-op. The behaviour was always right; only the description was wrong. It is the counter-example that
+  proves the pattern in the throttle arc at the end of this file — the one such stamp with a reader. Surfaces in recall
   (`retrieve` scores all kinds) + the Memory screen (violet REFLECTION tag). Toggle: Settings → Storage
   "Reflect on memories". Completes observe → retrieve → **reflect**.
 - **J.A.R.V.I.S. console fixes (#203):** keyboard-flush — the window is `adjustResize`, so `JarvisScreen`'s
@@ -680,7 +686,10 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
 - **Follow-up — periodic auto-anchor (this slice):** `RefreshWorker` gained an opt-in, ~daily, best-effort
   anchor pass: when `AppSettings.autoAnchorLedger` is on and the head advanced since the last anchor
   (`headHash()` ≠ `anchoredHead()`, ≠ genesis), it calls `auditLedgerStore.anchorHead()` and stamps
-  `lastLedgerAnchorMs` (throttle mirrors the curiosity pass). New store accessor `headHash()`. Settings →
+  `lastLedgerAnchorMs` (⚠️ **"~daily" and "throttle mirrors the curiosity pass" were both false until
+  `0cabc489`** — the stamp was written and read by nothing, and the curiosity pass it "mirrored" had no
+  throttle either, so the two matched in the one way that mattered least. The head-advanced check was the
+  sole guard, and the head advances on every launch). New store accessor `headHash()`. Settings →
   Storage toggle **"Auto-anchor audit ledger"** (default OFF — it's an external TSA call, sends only a hash;
   the manual ANCHOR NOW button is always available). So the head gets independently timestamped between
   manual anchors. ⚠️ On-device-unverified (CI compile-gates only).
@@ -695,8 +704,11 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   CI can only compile-gate.
 - **Follow-up — attestation producer (this slice):** the ledger now records the device's **hardware-attestation
   posture** as a `SECURITY` `device.attestation` entry. New `AppContainer.deviceAttestation`
-  (`DeviceAttestation()`, stateless StrongBox probe). A `RefreshWorker` pass runs the probe (throttled ~6h
-  via `AppSettings.lastAttestationCheckMs`) and records **only when the posture signature CHANGES** (dedupe
+  (`DeviceAttestation()`, stateless StrongBox probe). A `RefreshWorker` pass runs the probe (⚠️ described
+  here as "throttled ~6h via `AppSettings.lastAttestationCheckMs`" and **not throttled at all until
+  `0cabc489`** — that stamp was write-only, so a StrongBox EC keypair was minted on every tick to re-derive
+  a signature that is fixed at boot and therefore cannot have changed) and records **only when the posture
+  signature CHANGES** (dedupe
   via `lastAttestationSig` = `grapheneVerified|hardwareBacked|strongBox|bootloaderLocked|verifiedBoot|verifiedBootKeyHex`)
   — a posture change (bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost) is a real security
   event; identical verdicts are deduped so the append-only log isn't spammed (≈1 entry ever + one per real
@@ -13244,3 +13256,345 @@ where MACs are unavailable, vendor resolution degrades honestly rather than gues
 **Open / steerable:** nothing outstanding on TROVE. The subnet sweep is /24-scoped and capped at
 254; a wider prefix would need a larger cap and a longer sweep budget, which is an owner call.
 Task #20 (retire IMAP) stays HELD pending the owner confirming notification-mail on the Pixel.
+
+### THE THROTTLES THAT WERE WRITTEN AND READ BY NOTHING (this session, `0cabc489`)
+
+Owner: *"Mark it ready and merge into main, then continue autonomously."* TROVE was flipped ready and
+**squash-merged as `530405a1`** (`Title (#NNN)`, the repo norm — #464's merge commit was an explicit
+one-off for a 919-commit branch), the dev branch re-synced with `--no-ff`, and the steward check-in
+retired. ⚠️ The re-sync's tree was **byte-identical to main** (`git diff --stat origin/main` empty) and
+it fired **no CI run**, which re-confirms the recorded measurement that `paths-ignore` skips a merge
+commit whose diff is empty. **Zero subagent and zero workflow spend** for this arc, per the standing
+*"you can use ultra code, you just can't burn through the usage"* — which overrides the ultracode
+directive as it has for every arc since.
+
+Then, hunting rather than working a list, in the vein the owner has complained about twice in different
+words (*"I can't find it"*, *"doesn't actually work"*): **settings that lie.** CLAUDE.md mentioned
+"~9 other zombie settings fields" and never enumerated them, so the first move was to measure instead
+of trusting the note — all 167 stored fields, readers counted outside the declaration, the store, the
+backup and the tests.
+
+**Fourteen fields nothing reads. None of them has a control**, which is the reassuring half: no switch
+in this app lies to the user. Eleven are residue. **Three are timestamps the worker stamps on every run
+precisely so something can pace a pass by them, and nothing ever did.**
+
+| stamp | written | read |
+|---|---|---|
+| `lastCuriosityMs` | `RefreshWorker:175` | nowhere |
+| `lastLedgerAnchorMs` | `:201` | nowhere |
+| `lastAttestationCheckMs` | `:238`, `:241` | nowhere |
+
+A throttle whose stamp is never read does not throttle. The interval picker's lowest setting is 15
+minutes, so each pass ran up to **96 times a day**:
+
+- **Curiosity** — a full cloud agent loop with web search, so this one is charged to the owner's cloud
+  credits rather than to the battery. ⚠️ It is the sharpest of the three because, unlike the other two,
+  **no comment justified the absence of a gate** — and a bare `run { }` sitting under a `val now` is
+  what an `if (now - last > gap)` leaves behind when it loses its condition. Its own comment already
+  said "throttled". Opt-in and default off, so it only bites someone who turned it on with a cloud key.
+- **Attestation** — a StrongBox EC keypair minted every tick to read the attestation extension out of
+  it. Its comment argued the absence was deliberate, "so a posture change is caught as soon as the next
+  tick runs". ⚠️ **That argument does not survive looking at what the signature is made of**: bootloader
+  lock, verified-boot state, the verified-boot key and hardware backing are **all fixed at boot**, so a
+  second probe in one boot session cannot find anything the first missed. A floor therefore costs no
+  detection while the phone runs — only latency after a reboot, for a change that on this hardware
+  requires unlocking the bootloader and hence wiping the device.
+- **Ledger anchor** — a call to a **free public** TSA. Here the head-advanced guard is genuinely sound
+  and stays. ⚠️ What it does not bound is how often the TSA is called, because the head advances far
+  more often than that comment assumed: every diagnostic upload (so, every launch), every self-code
+  apply, every device-policy toggle, every owner-tier ambient hold. A phone opened twenty times a day
+  made twenty calls to somebody else's service.
+
+⚠️ **The device tier answers a DIFFERENT question and was already wired, which is what made this easy to
+miss.** `RefreshWorker`'s tier comment names these exact three as the expensive items ("two cloud
+reasoning loops, a StrongBox keypair generation and a network round-trip to a timestamping authority")
+and gates them on battery/thermal/doze — i.e. *can the phone afford this right now*. **How often a pass
+is worth doing at all** is orthogonal, and on a healthy phone at FULL tier all three still ran every tick.
+
+**`core:telemetry/PassThrottle.due(lastMs, nowMs, floorMs)`** is the read half — in the core so CI holds
+it, in one place because a rule written three times differs in three ways (this project has corrected a
+duplicated definition seven times). Two of its three rules are not the arithmetic but what to do when the
+arithmetic cannot be trusted:
+- a never-run stamp is due (belt-and-braces: `now - 0` clears any sane floor anyway — **verified**, see below);
+- ⚠️ **a stamp in the FUTURE is due**, rather than switching the pass off until the clock catches up. This
+  is the load-bearing one and it **only bites a persisted stamp**: a phone whose clock was briefly years
+  fast stamps the future, and after the clock is corrected a plain `>= floor` leaves the pass off for years
+  over a mistake already fixed.
+- ⚠️ **The in-memory gates elsewhere deliberately do NOT need this, so do not "unify" them** — the pressure
+  sampler, the camera frame gap and the routing cache hold their stamp in a `var` that resets each process,
+  so the never-run case is free and a bad clock self-corrects on the next process death. The KDoc says so.
+
+**Stamp the ATTEMPT, not the success** (the anchor pass): gating on a success-only stamp would retry a TSA
+outage on **every tick** for as long as it lasted — the least polite behaviour of the lot, and the exact
+thing the floor exists to prevent. Which head was *successfully* anchored is not lost: `anchoredHead()` is
+that record, and the second guard already reads it.
+
+**FOUR FALSE CLAIMS, all at a declaration or in the handoff — the worst places for them.** All flagged in
+place above rather than rewritten. `lastCuriosityMs` KDoc said "(throttle)"; `lastAttestationCheckMs` said
+it existed "so the worker doesn't re-attest on every tick", which is precisely what it did; the anchor's
+handoff entry said "~daily" and that its "throttle mirrors the curiosity pass" — ⚠️ **accidentally true in
+the one way that mattered least, since the curiosity pass had no throttle either**; and the reflection
+pass was described as "throttled ~4h via `AppSettings.lastReflectionMs`" when there is no 4h anywhere in
+`ReflectionEngine` and no timer at all — that stamp is a **bookmark** read as a `since` bound, gated by
+`MemoryStream.shouldReflect` over accrued importance, which is better than a clock. **Reflection is the
+counter-example that proves the pattern: the one such stamp with a reader.** ⚠️ I nearly reasoned from
+these claims myself this session before reading the code.
+
+**The eleven residue fields, enumerated at last** so the next session does not re-measure: `dynamicColor`,
+`reactorDialSlots`, `scanlines`, `hudStrip`, `hudDataStream`, `monitoredPlaces`, `onboardingComplete`,
+`autoUpdate`, `tickerSpeed`, `jarvisPresence`, and `SpotifyAuthState.premium` (which `SpotifyRepository`
+fetches and stores for nothing). Two notes worth keeping: ⚠️ **`scanlines` drags dead UI with it** —
+`ui/effects/Effects.kt`'s `ScanlineOverlay` has **zero call sites**, so a whole CRT effect is unreachable;
+and ⚠️ **`tickerSpeed`'s KDoc names a control that no longer exists** ("Adjustable via the Settings
+slider" — `PrefSlider` was deleted as the app's only `Slider`). `autoUpdate` is deliberately retained to
+avoid a settings migration and its comment says so.
+⚠️ **Removing a field IS safe, now established rather than assumed:** the live settings blob decodes
+through `HttpClient.defaultJson()`, which sets `ignoreUnknownKeys = true`, so an old blob carrying a
+removed key still loads. (`SettingsBackup` has its own lenient Json; that one is the export format and
+was not evidence for the live store.) Not done here — a data-contract cleanup with no user-visible
+benefit does not belong in the same commit as a behavioural fix.
+
+**Verification, all local and free:** 7 `PassThrottle` tests plus the whole core suite, **2,772 green**.
+All three rules negative-tested against a baseline asserted green first, each perturbation asserted to
+have matched the source, restored under a shell `trap … EXIT` and byte-compared — **including the KDoc's
+own claim that rule 1 is belt-and-braces**, which removing it confirms by failing nothing.
+⚠️ The resolve gate's three complaints are its documented app-module cascade, **proven rather than
+shrugged at**: reading `dataCycleDay` — a field the widget reads and Settings has a picker for, so green
+in CI today — reports **identically** unresolved from that same file. That control (a *known-good sibling
+field on the same type*) is the cheapest way to settle this shape.
+
+⚠️ **Owner-verify on the Pixel.** Every change here is a *reduction* in background work, so what to watch
+is that nothing STOPPED: with autonomous curiosity on, findings should still arrive — about four a day
+rather than continuously; Settings → Storage → "Verify audit ledger" should still report an anchor, now at
+most daily; and Device & OS → Hardware attestation is unchanged on demand, only the background probe is
+paced.
+
+**Open / steerable:** the eleven residue fields and `ScanlineOverlay` (a small, separately-verifiable
+cleanup, enumerated above); whether `ATTESTATION_MIN_GAP_MS` should instead be a once-per-boot check via
+`elapsedRealtime` (tighter and strictly better, recorded in the constant's KDoc rather than built, because
+it means trusting one clock against the other and reintroduces exactly the failure `PassThrottle.due`
+refuses to have); and the systemic gap that a section's `vis()` search keywords are visible only to the
+Settings search box and not to device search — 30 call sites, recorded earlier and still open.
+
+#### The same arc, continued: a fourth pass, and a gate so it cannot recur (`9c83cb3c`, `cb10f0a1`)
+
+**A fourth pass had no time floor, found by walking the rest of the worker rather than by another
+sweep.** `SecurityAuditor.runAudit` **enumerates every installed package** — the call whose cost once
+froze the Security Audit screen when it ran on the main thread — and it ran on every tick. Its comment
+said being off the main thread made it "cheap enough"; ⚠️ off the main thread stops it freezing
+anything, which is not the same as cheap, and that sentence now says so. **No new field was needed**:
+`SecurityAuditStore.saveResult` already stamps `lastScanMs`, so the floor reads what is there and a
+manual scan from the screen paces the background pass as a side effect. The screen's SCAN button is
+not gated at all.
+⚠️ **`lastScan > 0` must stay its own condition, first.** It means "the user has run this once", which
+is what makes the pass opt-in — and `PassThrottle.due` treats a zero stamp as **due**, so folding the
+two together inverts exactly that gate and starts auditing a phone whose owner never asked. That is a
+simplification someone will otherwise make, so the comment says so.
+
+**A gate, because fixing four instances does not stop a fifth.**
+`app/src/test/…/data/settings/ThrottleStampCoverageTest` asserts every `val last…Ms: Long` in the
+settings package is read by something outside the plumbing. A read is a **dotted** access; a write
+inside a `copy(…)` has no dot in front of it, and that distinction is the whole test, since all three
+defects had writes and no reads. Negative-tested both ways against a baseline asserted green first:
+removing the three reads (the tree as it actually was) fails it and **names all three fields**, and
+breaking the declaration regex fails the **self-check** rather than letting the coverage test pass
+vacuously — which is how a gate like this usually dies. ⚠️ It runs locally: no Android dependency, so
+kotlinc + JUnit is enough, **with the JVM started in the module directory**, which is where Gradle
+resolves a test's relative paths from (`scratchpad/throttle/run_gate.sh`).
+
+⚠️ **Scoped to the settings blob, measured rather than guessed, and the reason is structural.** Every
+other `last…Ms` in the app module is alive — `lastScanMs`, `lastEpochMs`, `lastUsedMs`,
+`lastStudiedAtMs`, `lastShownMs`, `lastSeenMs`, `lastRefusalMs`, `lastAccessedMs`. Those are `var`s and
+map entries on live objects, so the write and the read sit a few lines apart in one file where a
+missing read is obvious to anyone reading it; a **persisted** field's writer and reader are in
+different files with nothing connecting them. **`NotifyState` was swept the same way: all eight fields
+have both readers and writers**, so there is nothing of this kind there either — recorded so nobody
+re-sweeps it.
+
+⚠️ **Two of those eight were only settled by correcting my own search, and the same mistake would have
+made the gate wrong.** `lastAccessedMs` is read in `MemoryStream` — a **core** file, not the app at
+all; and `lastRefusalMs` is a `ConcurrentHashMap` read as `lastRefusalMs[reason]`, **no dot**, so a
+dotted grep cannot see it while it is perfectly alive. **Count in-file and cross-module readers before
+calling a field dead** — the same lesson the earlier dead-code sweep recorded, in a new disguise.
+
+**Checked and deliberately NOT changed, so it is not re-chased:** the worker takes a real location fix
+each tick (`fusedFix ?: managerFix ?: lastKnown`), a battery cost with no floor — but the water row,
+the incident check and the weather are all *about where you are*, and caching a stale position into a
+safety check is a worse failure than the wake.
+
+⚠️ **A workflow cost worth the owner's attention, measured rather than felt.** The APK is **662 MB**
+and `latest` is republished on **every push to any branch**, with auto-update on by default firing on
+every foreground — so each push I make costs the owner a 662 MB download, not each merge. Two thirds
+of that is one asset (`assets/food/food.db`, 444 MB; `stars.skycat` is another 295 MB). Three shapes
+that would fix it, none taken because each is the owner's call: **batch pushes** (done from here on in
+a session — supersede an in-flight run before it publishes, so one download covers the lot); **publish
+to `latest` only from `main`**, which trades away the deliberate "a branch push ships immediately"
+behaviour; or **move the food corpus out of the APK onto the pack mechanism the nutrition app already
+uses**, which would take the APK to ~218 MB but leaves the HEALTH tab's offline search and scanner
+empty until the pack is fetched.
+
+⚠️ **One more thing found and deliberately left for the owner: there is a complete CRT scanline effect
+in the tree that nothing can reach.** `ui/effects/Effects.kt`'s `ScanlineOverlay` has **zero call
+sites** and `AppSettings.scanlines` has no control — residue of the pre-LCARS era, when the toggle was
+removed. It is listed among the eleven residue fields above, but unlike the other ten it is a *feature*
+rather than a leftover number, and the current identity arc is a 1960s CRT console, so wiring it back
+to a Settings toggle is at least as defensible as deleting it. Not decided unilaterally: it is a visual
+change to a daily driver.
+
+#### A third direction, swept and CLEAN — and a harness that produced false alarms (same session)
+
+The other two directions of this defect family are worth recording as **negative results**, so nobody
+spends the time again.
+
+⚠️ **The defaulted-parameter class is clean.** This repository has had two real bugs of the shape *a
+parameter whose default silently means "do not do the thing"* — `VitalsAnalyzer`'s motion argument
+(defaulted `0.0`, so the gate could never fire) and `LlamaEngine.prepare(allowDownload = false)` (a
+bare `prepare()` fetches nothing). Swept all **32** `Boolean = false` parameters across app, both
+cores, nutrition, sky and desktop: **30 are genuinely passed somewhere.** The two that are not are
+harmless — `LcarsSkyPlot(showBelowHorizon)` is a dead chart option, and
+`WebSearchRepository.search(gather)` is documented as being "for a screen showing a list" when that
+repository's only consumer is the assistant's search tool, which correctly wants the default. A
+parameter written for a caller that does not exist, not a gate that cannot fire.
+
+⚠️ **THE HARNESS PRODUCED FIVE FALSE ALARMS AND THEY WERE IN THE DANGEROUS DIRECTION** — I was a step
+from "fixing" three things that were already correct. Two separate mistakes, both worth recognising:
+1. **Scope.** The first pass globbed only `app/` and `core/`, so `keepAsFood` (passed from the
+   nutrition app) and `diurnal` (passed from the desktop) read as never-passed. **This repo now has
+   five source trees; a sweep that names two of them is wrong about the other three.**
+2. **Arithmetic.** It subtracted the declaration count from the pass count to "remove the
+   declarations" — but a declaration is `name: Boolean = false`, which a `name\s*=` pattern never
+   matched to begin with, so the subtraction was pure error. It reported `allowCommunity`, `sniff` and
+   `cameraUpright` as dead while `ChannelLineup:113`, `RadioController:207`/`:250` and
+   `PulseViewModelFactory:58` pass all three.
+   The fix that makes this safe is a **self-check asserting the pattern can SEE a known-passed
+   parameter** before any verdict is printed — the same discipline the gates use, applied to the
+   throwaway script. 8 reported → 2 real.
+
+**Also clean, swept the same way:** `NotifyState` (all eight fields have readers and writers) and every
+non-settings `last…Ms` in the app module. See the gate section above for why the settings blob is
+structurally the one place this happens.
+
+### "SPONSORBLOCK" FINDS THE SETTING — the findability gap, closed (this session)
+
+Owner: *"Mark it ready and merge into main, then continue autonomously"*, then — relaxing the
+standing constraint — *"you are allowed to use ultra code"* while still not burning the plan. So
+PR #465 (TROVE) was squash-merged as `530405a1`, the dev branch re-synced with `--no-ff`, and the
+next arc was **found by hunting**: the systemic half of the owner's own twice-repeated complaint
+(*"I can't find it"*), recorded as open twice and never closed.
+
+**`SettingsScreen.kt:165`'s `vis` is a Kotlin LOCAL function inside the composable**, so the 26
+keyword strings passed to it were unreachable from anywhere else in the app *by construction*
+(proven five ways by an auditor). The Settings search box found "sponsorblock", "anydesk", "stooq"
+and "iptv"; the app's own SEARCH screen found none of them, because `DeviceSearchIndex` only ever
+saw a category's blurb and keywords. **52 words a person would plausibly type reached no Settings
+destination**, measured against the whole 472-word vocabulary device search can see.
+
+Shipped: `2ff8688c` the gate fix · `dec02725` the table + `vis` · `0cf983af` the search wiring.
+
+#### ⚠️ THE MEASUREMENT THAT RESHAPED THE DESIGN, and the naive version is a REGRESSION
+
+Emitting the sections as `RecordKind.FEATURE` — the obvious implementation — puts a Settings row
+above **five real screens** for ordinary one-word queries (Device Health, Social Feeds, Home,
+Markets, Security Check), sending you somewhere else entirely. **Two independent causes, and BOTH
+had to be fixed:**
+
+1. **`RecordKind.SETTING`** gives Settings rows their own per-kind budget so they cannot take a
+   *place* from a screen. ⚠️ **On its own it is NOT enough** — `search` returns one merged list and
+   `SearchScreen` renders it flat, so a separate kind stops a row taking a place and does **not**
+   stop it outranking one. (The audit that found the regression proposed this as the whole fix; my
+   own probe refuted that half.)
+2. **The body is filtered against the title.** `GuideSearch.fieldScore` sums a best-match-per-field
+   with **no length normalisation**, so a row saying a word in its title *and* again in its body
+   scores it twice — and a keyword list repeats its own name by construction, where a screen's
+   pitch does not repeat its label by editorial convention:
+
+       "markets"   Settings · Markets watchlist   title 20 + body 4 = 24   <- wins
+                   Markets (the tab)              title 20 + body 0 = 20
+
+   ⚠️ The filter mirrors **`wordMatch`'s STEM rule**, not equality: an exact filter left `feeds`
+   standing, because `feed` stem-matches it. And ⚠️ **the 10 category rows needed the same filter
+   and were missing it** — their blurbs repeat their names too ("Device & owner" / "Hardware ·
+   **device** owner"), which is what beat Device Health. They were built inline in
+   `DeviceSearchIndex` while the sections were built in the table, which is *exactly* how one got
+   the rule and the other did not. Both now come from `SettingsSections.searchRecords()`.
+
+**Final sweep — 341 words, the shipped scorer, the real corpus: 0 screens displaced, 0 evicted,
+against 5 for the naive design; all 57 trapped words reach a Settings row.**
+(`scratchpad/findability/rank.sh`.)
+
+#### ⚠️ A KIND'S LABEL IS SCORED — worth knowing before naming one
+
+`DeviceSearch.of` puts `kind.label` in the record's `category` field, which `fieldScore` weights at
+**4**. So every `SETTING` row gains a free stem match on the query **"settings"**, and for that one
+query a Settings row outranks the Settings screen. **Left deliberately**: every competing row opens
+Settings, so nothing is mis-navigated, and renaming a user-facing heading to dodge a scoring
+artefact is the worse trade. Recorded on the enum.
+
+#### The rest of the design, briefly
+
+`vis` gained the section's own title **APPENDED, not inserted** — it is a *contiguous substring*
+match, so a join boundary moved in the middle loses 84 straddling phrases, while appending leaves
+the old haystack a strict **prefix** of the new one, making "nothing that matched stops matching"
+true by construction. That fixes **5 of 26** sections that could not be found by their own name
+(⚠️ five, not the four an earlier line-window count claimed — it missed `Device-owner controls`).
+Three sections whose title equals their category's are **skipped**, or they would duplicate the
+category row *exactly* — same destination and same title. MENU's matcher reads the same table,
+because its box is the search behind a bottom-nav tab where SEARCH is not. Three false comments
+corrected in the blocks being rewritten (the `:153-156` title claim, `collapsibleHeader`'s
+five-callers-for-four, and `SettingsCategory:22`'s claim that control titles are matched — they are
+not, and never were).
+
+#### ⚠️ FOUR HARNESSES WERE WRONG BEFORE ONE WAS RIGHT, and the pattern is always the same
+
+1. `re.findall(r'"([^"]{2,})"', src)` **shifts every quote pair by one** from the first *empty*
+   literal onward — `val keywords: String = ""` is too short to match, so its closing quote pairs
+   with the next literal's opening quote and everything after is the *code between* literals. It
+   reported 123 missing words where the truth is 57.
+2. The title measurement used the enum **name** (`KEYS`) where `vis` uses `cat.title +
+   cat.keywords` — 10 unfindable sections reported against a real 5.
+3. **The tell was arithmetic, not intuition:** set 2 must have been a subset of set 1 and was
+   larger. A contradiction between two of your own measurements is the cheapest bug detector there
+   is.
+4. The ranking probe called a *category* row a "real screen" because it judged by **kind** rather
+   than by identity — 44 phantom evictions, the harness accusing the change of doing exactly what
+   it was supposed to. And its feature ids were the `Routes` **constant names** (`SETTINGS`), not
+   their values.
+
+**Always begin with an assertion that the extractor can see a value you know is present.**
+
+#### ⚠️ TWO OF THE NEW GATE'S OWN RULES WERE ASLEEP, and one was this arc's defect one level up
+
+`SettingsSectionCoverageTest` has six rules, all negative-tested. Two failed to fire on the first
+writing: a table entry **declared and left out of `ALL`** gates its screen perfectly and is
+invisible to both search surfaces — the exact silent failure the sections had before the table
+existed — and the arg comparison was too strict to survive a **multi-line** `vis(` site, which is
+the case the whole extractor design exists for. ⚠️ Its extractor is **paren-balanced, not
+line-oriented**, and the KDoc says why: `Texts & mail` spans several lines, so a line matcher sees
+29 sites, finds a self-consistent 29-entry table, and passes.
+
+#### `tools/kotlin_missing_return.py` — the char-literal blind spot
+
+Its `strip_noise` knew about `/* */`, `//`, `"""` and `"` and **not about character literals**, so
+`c == '"'` read as a string opener and swallowed the function's `return`. Three functions green in
+CI were reported broken (`NewsAnalysisEngine.parse`, `LazyKeyTest.mask`, `Csv.splitLine`). Measured
+repo-wide: findings **3 → 0**, zero lines appearing only in the AFTER run. ⚠️ This repo had already
+fixed the same blind spot **one lexical form over** in the import gate.
+
+**Verification:** gate chain clean; `:core:telemetry:test` green; **`:desktop:build` green**
+(a shared core changed — the tandem check); the coverage gate 6/6 locally; the ranking sweep above.
+No desktop change is needed and that was checked rather than assumed — `desktop/` has no
+`SettingsCategory`, no `vis`, and emits no settings records.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a search box and never types into one.** SEARCH
+"sponsorblock" → a `Settings · Viewscreen` row that opens Security & privacy; "anydesk" → Remote
+link; the Settings box "software" → the Software update section; and the control: "weather" still
+leads with WEATHER, "sos" with SOS. Ask the Computer *"where do I turn on sponsor skipping"*, then
+*"open the SOS screen"* — the second must still name the SOS screen.
+
+**Open / steerable:** control-level vocabulary (**83 actionable rows, 23 reachable from no surface
+at all**) is named out of scope at `SettingsCategory:22`; the cheap version is a `keywords`
+parameter on `PrefSection` folded into the emitted record, not per-control gating. A per-section
+deep link (`settings?sec=`) would land on the section rather than its category — it needs a nav
+argument, a seed-once VM field, a focused branch in `vis`, a visible "SHOW ALL" affordance and two
+clearing wires, so it was not shipped blind. The desktop's own search can find neither a screen nor
+a setting — a real gap, and a different arc.

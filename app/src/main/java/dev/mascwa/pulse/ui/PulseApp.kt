@@ -363,6 +363,13 @@ fun PulseApp(
                             // and tapping the hit opens the radar, through the one navigate idiom.
                             dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.FEATURE ->
                                 openApp(r.id)
+                            // ⚠️ A Settings row needs its own branch, and it is not cosmetic: its id
+                            // carries the category argument (`settings?cat=security`), so the `else`
+                            // below would navigate to the bare `route` and silently land on Settings'
+                            // entry category instead of the one that was searched for. `openApp`
+                            // strips the argument for the tab test only and passes the full route on.
+                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.SETTING ->
+                                openApp(r.id)
                             else -> navController.navigate(r.kind.route)
                         }
                     },

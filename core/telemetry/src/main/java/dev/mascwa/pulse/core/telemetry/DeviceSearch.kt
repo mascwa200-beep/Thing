@@ -38,6 +38,39 @@ object DeviceSearch {
          * the `route` below is only the fallback for a tap handler that predates the convention.
          */
         FEATURE("Feature", "menu"),
+
+        /**
+         * A place inside Settings — a category, or one section within it.
+         *
+         * ⚠️ **This is a separate kind for a measured reason, not for tidiness.** These records were
+         * [FEATURE]s, and a Settings record systematically OUTRANKS the screen it describes. The
+         * mechanism is field redundancy, not length: [GuideSearch.fieldScore] sums the best match
+         * per field and never divides by length, so what matters is how many fields carry the word.
+         * A Settings record's body is a keyword list, which by construction repeats its own title,
+         * so it scores a title hit *and* a body hit where a real feature scores only the title hit
+         * (its human pitch does not repeat its label). Measured over the real corpus, that put a
+         * Settings row above the real screen for sixteen ordinary one-word queries — `sos`, `home`,
+         * `markets`, `settings`, `security`, `network` among them — and for `device` it pushed two
+         * real screens off the capped slate entirely.
+         *
+         * Giving them their own kind hands them their own [DEFAULT_PER_KIND] budget, so they cannot
+         * take a place from a screen **by construction** rather than by a measurement someone has to
+         * keep re-running. It also lets the results list say "Setting", which is what they are.
+         *
+         * ⚠️ Shares the FEATURE convention that **the entry id IS the route to open**, and here that
+         * route carries an argument (`settings?cat=…`), so a tap handler MUST open `r.id` — falling
+         * through to [route] would drop the argument and land on Settings' entry category instead of
+         * the one the user searched for.
+         *
+         * ⚠️ **A kind's [label] is scored, so naming one is not a purely cosmetic act.** [of] puts
+         * it in the record's `category` field, which [GuideSearch] weights at 4 — so every record of
+         * this kind gains a free stem match on the query "settings", and for that one query a
+         * Settings row therefore outranks the Settings screen itself. Left alone deliberately:
+         * every competing row opens Settings, so nothing is mis-navigated, and renaming a
+         * user-facing heading to dodge a scoring artefact would be the worse trade. Worth knowing
+         * before adding a kind whose label collides with the name of a real screen.
+         */
+        SETTING("Setting", "settings"),
     }
 
     /**

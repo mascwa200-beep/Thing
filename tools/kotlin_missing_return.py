@@ -46,6 +46,18 @@ def strip_noise(s: str) -> str:
             j = s.find('"""', i + 3)
             j = n if j < 0 else j + 3
             out.append(" " * (j - i)); i = j
+        elif s[i] == "'":
+            # ⚠️ Character literals, and the reason is a real false positive this gate produced: a
+            # lexer that knows about "..." but not '...' reads the quote inside `c == '"'` as a
+            # string opener, swallows everything to the next quote in the file — including the
+            # function's `return` — and reports a perfectly good function as never returning. This
+            # repo has already fixed the same blind spot, one lexical form over, in the import gate.
+            j = i + 1
+            while j < n and s[j] != "'":
+                if s[j] == "\\": j += 1
+                j += 1
+            j = min(j + 1, n)
+            out.append(" " * (j - i)); i = j
         elif s[i] == '"':
             j = i + 1
             while j < n and s[j] != '"':

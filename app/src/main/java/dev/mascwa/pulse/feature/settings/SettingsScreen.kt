@@ -152,7 +152,9 @@ fun SettingsScreen(
 
     // Steam-style master-detail state: which category is open (null = the compact master list), and the
     // cross-category search query. A section is visible when it belongs to the active category, or (while
-    // searching) when its title/keywords match — so a search result is the real, live control.
+    // searching) when its own title, its keywords, or its category's title/keywords match — so a search
+    // result is the real, live control. (This comment used to claim the section's title was matched when
+    // only the CATEGORY's was; that was false for five sections, which is why `vis` now appends it.)
     // VM-backed (see SettingsViewModel.selectedCategory) — a remember{} here died on tab-away.
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.seedCategory(initialCategory) }
     val selectedCat by vm.selectedCategory.collectAsStateWithLifecycle()
@@ -162,10 +164,21 @@ fun SettingsScreen(
     // from three levels deep. Gated on the sub-state, per the app-wide BackHandler rule.
     androidx.activity.compose.BackHandler(enabled = selectedCat != null) { vm.selectedCategory.value = null }
     val activeCat = selectedCat ?: SettingsCategory.FIRST
-    fun vis(cat: SettingsCategory, keywords: String): Boolean {
+    // ⚠️ The section's own title is APPENDED, not inserted before its keywords, and the order is
+    // load-bearing: this is a CONTIGUOUS substring match, so putting the title in the middle moves a
+    // join boundary and multi-word queries that straddled it stop matching (measured: 84 phrases
+    // lost). Appending leaves the old haystack a strict PREFIX of the new one for all 26 sections,
+    // so "nothing that used to match stops matching" holds by construction rather than by sampling.
+    //
+    // Adding the title at all is what makes five sections findable by their own name — Software
+    // update ("software"), Device-owner controls ("controls"), GrapheneOS hardening, Special access
+    // & restricted settings ("settings") and Optional API keys ("optional") could not be. It cannot
+    // pollute: a section only ever sees its OWN title, never a sibling's.
+    fun vis(s: SettingsSection): Boolean {
         val q = query.trim()
-        return if (q.isBlank()) cat == activeCat
-        else "${cat.title} ${cat.keywords} $keywords".contains(q, ignoreCase = true)
+        return if (q.isBlank()) s.category == activeCat
+        else "${s.category.title} ${s.category.keywords} ${s.keywords} ${s.title}"
+            .contains(q, ignoreCase = true)
     }
 
     // The detail pane: the settings sections as a LazyColumn, each gated by category/search. Rendered by the
@@ -174,7 +187,7 @@ fun SettingsScreen(
         LazyColumn(modifier = detailModifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
 
             // ----- Software update (in-app updater) -----
-            if (vis(SettingsCategory.SYSTEM, "update version build install download apk")) item {
+            if (vis(SettingsSections.SOFTWARE_UPDATE)) item {
                 val u by vm.updateState.collectAsStateWithLifecycle()
                 // Auto-check on open so arriving from the update notification lands on the action.
                 LaunchedEffect(Unit) { vm.checkForUpdate() }
@@ -224,7 +237,7 @@ fun SettingsScreen(
             }
 
             // ----- The companion nutrition app -----
-            if (vis(SettingsCategory.SYSTEM, "nutrition companion app download install food macros")) item {
+            if (vis(SettingsSections.NUTRITION_APP)) item {
                 val n by vm.companionState.collectAsStateWithLifecycle()
                 PrefSection("Nutrition app") {
                     val status = when (val st = n) {
@@ -297,7 +310,7 @@ fun SettingsScreen(
             }
 
             // ----- Device, OS & special access -----
-            if (vis(SettingsCategory.DEVICE, "hardware os graphene attestation sensors")) item {
+            if (vis(SettingsSections.DEVICE_OS)) item {
                 val graphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context) }
                 val gate = remember { dev.mascwa.pulse.core.device.DeviceGate.evaluate() }
                 val deviceOwner = remember {
@@ -402,7 +415,7 @@ fun SettingsScreen(
             }
 
             // ----- Device-owner security policies (effective only once provisioned) -----
-            if (vis(SettingsCategory.DEVICE, "owner usb camera wipe")) item {
+            if (vis(SettingsSections.DEVICE_OWNER)) item {
                 val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
                 val isOwner = remember { dpc.isDeviceOwner() }
                 // ⚠️ The explanation comes from the controller, not from here. This screen used to
@@ -509,7 +522,7 @@ fun SettingsScreen(
             }
 
             // ----- GrapheneOS hardening (surface the OS's own controls; they beat app-level versions) -----
-            if (vis(SettingsCategory.DEVICE, "graphene hardening mte usb sandboxed play")) item {
+            if (vis(SettingsSections.GRAPHENE_HARDENING)) item {
                 val isGraphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context).isGraphene }
                 val sandboxedPlay = remember { dev.mascwa.pulse.core.device.GrapheneOs.hasSandboxedPlay(context) }
                 PrefSection("GrapheneOS hardening") {
@@ -547,7 +560,7 @@ fun SettingsScreen(
             }
 
             // ----- Special access & restricted settings -----
-            if (vis(SettingsCategory.DEVICE, "special access restricted usage install app info")) item {
+            if (vis(SettingsSections.SPECIAL_ACCESS)) item {
                 PrefSection("Special access & restricted settings") {
                     PrefClickable(
                         "Allow restricted settings",
@@ -574,7 +587,7 @@ fun SettingsScreen(
             }
 
             // ----- Accessibility -----
-            if (vis(SettingsCategory.INTERFACE, "accessibility contrast haptics")) item {
+            if (vis(SettingsSections.ACCESSIBILITY)) item {
                 PrefSection("Accessibility") {
                     PrefSwitch("High contrast", "Stronger contrast across the UI", s.highContrast) { v ->
                         vm.update { it.copy(highContrast = v) }
@@ -592,7 +605,7 @@ fun SettingsScreen(
             }
 
             // ----- Diagnostics & debug reporting -----
-            if (vis(SettingsCategory.SYSTEM, "diagnostics debug crash console report")) item {
+            if (vis(SettingsSections.DIAGNOSTICS)) item {
                 PrefSection("Diagnostics") {
                     PrefSwitch(
                         "Auto-send debug reports",
@@ -614,7 +627,7 @@ fun SettingsScreen(
             // colour changed nothing on screen. A control that does nothing is worse than no
             // control, so they are gone. The settings fields survive — they are serialization keys,
             // and dropping one silently discards the rest of the blob.
-            if (vis(SettingsCategory.INTERFACE, "appearance haptics sounds audio boot theme")) item {
+            if (vis(SettingsSections.APPEARANCE)) item {
                 PrefSection("Appearance") {
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
@@ -638,7 +651,7 @@ fun SettingsScreen(
             }
 
             // ----- Region & units -----
-            if (vis(SettingsCategory.REGION, "region country currency units temperature wind precipitation clock language")) item {
+            if (vis(SettingsSections.REGION_UNITS)) item {
                 PrefSection("Region & units") {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -672,7 +685,7 @@ fun SettingsScreen(
             }
 
             // ----- Data & refresh -----
-            if (vis(SettingsCategory.CONTENT, "refresh interval wifi articles data")) item {
+            if (vis(SettingsSections.DATA_REFRESH)) item {
                 PrefSection("Data & refresh") {
                     SingleChoiceRow(
                         "Background refresh", s.refreshIntervalMinutes,
@@ -702,11 +715,7 @@ fun SettingsScreen(
             }
 
             // ----- What is waiting for you: unread texts and unread mail -----
-            if (vis(
-                    SettingsCategory.CONTENT,
-                    "unread texts sms email imap mail inbox accounts notification access gmail outlook",
-                )
-            ) item {
+            if (vis(SettingsSections.TEXTS_MAIL)) item {
                 // ⚠️ No `initiallyExpanded = false`. This was the ONE section of the twenty-two in
                 // this file that rendered collapsed, so the whole of "link your mail" was a bare
                 // header you had to know to tap — and the owner reported not being able to find it.
@@ -763,7 +772,7 @@ fun SettingsScreen(
             }
 
             // ----- Notifications -----
-            if (vis(SettingsCategory.NOTIFICATIONS, "notifications alerts push quiet hours")) item {
+            if (vis(SettingsSections.NOTIFICATIONS)) item {
                 PrefSection("Notifications") {
                     if (Build.VERSION.SDK_INT >= 33) {
                         PrefClickable(
@@ -863,7 +872,7 @@ fun SettingsScreen(
             }
 
             // ----- Security & network (Trusted Network Mode + encryption) -----
-            if (vis(SettingsCategory.SECURITY, "remote link desktop computer pair lan wifi control anydesk")) item {
+            if (vis(SettingsSections.REMOTE_LINK)) item {
                 PrefSection("Remote link") {
                     PrefSwitch(
                         "Remote link",
@@ -915,7 +924,7 @@ fun SettingsScreen(
                 }
             }
 
-            if (vis(SettingsCategory.SECURITY, "live tv television channels community catalogue iptv news video stream")) item {
+            if (vis(SettingsSections.LIVE_TV)) item {
                 PrefSection("Live television") {
                     PrefSwitch(
                         "Community channel catalogue",
@@ -931,7 +940,7 @@ fun SettingsScreen(
                 }
             }
 
-            if (vis(SettingsCategory.SECURITY, "viewscreen sponsor skip sponsorblock segments on-demand video playback")) item {
+            if (vis(SettingsSections.VIEWSCREEN)) item {
                 PrefSection("Viewscreen") {
                     PrefSwitch(
                         "Skip flagged segments",
@@ -946,7 +955,7 @@ fun SettingsScreen(
                 }
             }
 
-            if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer driving ringer torch pause apps")) item {
+            if (vis(SettingsSections.AMBIENT_SENSING)) item {
                 PrefSection("Ambient sensing (Sensorium)") {
                     PrefSwitch(
                         "Environment sensing",
@@ -1071,7 +1080,7 @@ fun SettingsScreen(
                     )
                 }
             }
-            if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {
+            if (vis(SettingsSections.SECURITY_NETWORK)) item {
                 PrefSection("Security & network") {
                     PrefClickable(
                         "Security auditor",
@@ -1147,8 +1156,8 @@ fun SettingsScreen(
             }
 
             // ----- Home dashboard -----
-            if (vis(SettingsCategory.INTERFACE, "home dashboard layout sections reorder")) collapsibleHeader("Home dashboard", homeCollapsed) { homeCollapsed = !homeCollapsed }
-            if (vis(SettingsCategory.INTERFACE, "home dashboard layout sections reorder") && !homeCollapsed) {
+            if (vis(SettingsSections.HOME_DASHBOARD)) collapsibleHeader("Home dashboard", homeCollapsed) { homeCollapsed = !homeCollapsed }
+            if (vis(SettingsSections.HOME_DASHBOARD) && !homeCollapsed) {
                 item {
                     Text(
                         "Toggle and reorder the sections shown on Home.",
@@ -1166,8 +1175,8 @@ fun SettingsScreen(
             }
 
             // ----- Watchlist -----
-            if (vis(SettingsCategory.CONTENT, "watchlist markets crypto symbols stooq coingecko")) collapsibleHeader("Markets watchlist", watchlistCollapsed) { watchlistCollapsed = !watchlistCollapsed }
-            if (vis(SettingsCategory.CONTENT, "watchlist markets crypto symbols stooq coingecko") && !watchlistCollapsed) {
+            if (vis(SettingsSections.MARKETS_WATCHLIST)) collapsibleHeader("Markets watchlist", watchlistCollapsed) { watchlistCollapsed = !watchlistCollapsed }
+            if (vis(SettingsSections.MARKETS_WATCHLIST) && !watchlistCollapsed) {
                 watchlistEditor(
                     title = "Symbols (Stooq) & crypto (CoinGecko)",
                     items = s.watchlist + s.cryptoList,
@@ -1191,8 +1200,8 @@ fun SettingsScreen(
             }
 
             // ----- Custom feeds -----
-            if (vis(SettingsCategory.CONTENT, "custom rss feed news source")) collapsibleHeader("Custom RSS feeds", feedsCollapsed) { feedsCollapsed = !feedsCollapsed }
-            if (vis(SettingsCategory.CONTENT, "custom rss feed news source") && !feedsCollapsed) {
+            if (vis(SettingsSections.CUSTOM_FEEDS)) collapsibleHeader("Custom RSS feeds", feedsCollapsed) { feedsCollapsed = !feedsCollapsed }
+            if (vis(SettingsSections.CUSTOM_FEEDS) && !feedsCollapsed) {
                 itemsIndexed(s.customFeeds) { i, feed ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1216,8 +1225,8 @@ fun SettingsScreen(
             }
 
             // ----- Muted keywords -----
-            if (vis(SettingsCategory.CONTENT, "muted keyword filter hide block")) collapsibleHeader("Muted keywords", mutedCollapsed) { mutedCollapsed = !mutedCollapsed }
-            if (vis(SettingsCategory.CONTENT, "muted keyword filter hide block") && !mutedCollapsed) {
+            if (vis(SettingsSections.MUTED_KEYWORDS)) collapsibleHeader("Muted keywords", mutedCollapsed) { mutedCollapsed = !mutedCollapsed }
+            if (vis(SettingsSections.MUTED_KEYWORDS) && !mutedCollapsed) {
                 itemsIndexed(s.mutedKeywords) { i, kw ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
@@ -1242,7 +1251,7 @@ fun SettingsScreen(
             // field itself stays (property names are a data contract; old blobs still carry it).
 
             // ----- Optional API keys -----
-            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google brave search web")) item {
+            if (vis(SettingsSections.API_KEYS)) item {
                 PrefSection("Optional API keys") {
                     Text(
                         "All sections work without keys. Add free keys to unlock richer sources.",
@@ -1283,7 +1292,7 @@ fun SettingsScreen(
             }
 
             // ----- Safety (SOS) -----
-            if (vis(SettingsCategory.SAFETY, "safety sos medical emergency contact blood allergy sms")) item {
+            if (vis(SettingsSections.SAFETY_SOS)) item {
                 PrefSection("Safety (SOS)") {
                     Text(
                         "Medical info & contacts for the SOS screen. Stays on this device.",
@@ -1339,7 +1348,7 @@ fun SettingsScreen(
             }
 
             // ----- Backup & restore (local, offline) -----
-            if (vis(SettingsCategory.SYSTEM, "backup restore export import settings")) item {
+            if (vis(SettingsSections.BACKUP_RESTORE)) item {
                 val backupStatus by vm.backupStatus.collectAsStateWithLifecycle()
                 val exportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/json"),
@@ -1372,7 +1381,7 @@ fun SettingsScreen(
             }
 
             // ----- Storage & about -----
-            if (vis(SettingsCategory.STORAGE, "storage cache clear activity log memory profile tasks reflexes episodic reset about")) item {
+            if (vis(SettingsSections.STORAGE_ABOUT)) item {
                 val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
                 val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
                 val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
@@ -1592,8 +1601,11 @@ fun SettingsScreen(
 
 /**
  * A standalone collapsible section header for sections whose body is rendered as separate LazyColumn
- * items (Home dashboard, watchlist, feeds, muted keywords, image sites). The caller gates the body items
- * with `if (!collapsed)`, so the chevron actually hides the content — same look as [PrefSection]'s header.
+ * items — Home dashboard, markets watchlist, custom feeds and muted keywords. (It used to name a fifth,
+ * "image sites"; that section was deleted as a zombie and the list outlived it.) The caller gates the
+ * body items with `if (!collapsed)`, so the chevron actually hides the content — same look as
+ * [PrefSection]'s header. These four are also why [SettingsSection.title] does not say "the PrefSection
+ * title": a quarter of the table's headings come from here instead.
  */
 private fun LazyListScope.collapsibleHeader(title: String, collapsed: Boolean, onToggle: () -> Unit) {
     item {

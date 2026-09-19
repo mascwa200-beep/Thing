@@ -43,6 +43,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.navigation.GROUPS
 import dev.mascwa.pulse.navigation.MenuEntry
+import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -310,11 +311,26 @@ private fun EntryTile(
     }
 }
 
-/** Case-insensitive contains over everything an entry says about itself. */
+/**
+ * Case-insensitive contains over everything an entry says about itself.
+ *
+ * ⚠️ The Settings entry additionally speaks for the sections inside it. MENU's box is the search
+ * behind a bottom-nav tab — SEARCH is not — so leaving it blind to "sponsorblock", "anydesk" or
+ * "gmail" would fix the finding problem only on the surface people reach less often. Widening one
+ * entry cannot bury anything, because it still names exactly one destination; that is the same
+ * reasoning under the five mail words already hand-added to its `searchTerms`, except this reads
+ * the table instead of repeating it.
+ */
 private fun matches(e: MenuEntry, q: String): Boolean =
     e.label.contains(q, ignoreCase = true) ||
         e.description.contains(q, ignoreCase = true) ||
-        e.searchTerms.any { it.contains(q, ignoreCase = true) }
+        e.searchTerms.any { it.contains(q, ignoreCase = true) } ||
+        (
+            e.route == Routes.SETTINGS &&
+                dev.mascwa.pulse.feature.settings.SettingsSections.ALL.any {
+                    it.title.contains(q, ignoreCase = true) || it.keywords.contains(q, ignoreCase = true)
+                }
+            )
 
 @Composable
 private fun accentByRoute(): Map<String, (NightwirePalette) -> Color> =

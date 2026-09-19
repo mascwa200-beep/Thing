@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.DeviceClass
+import dev.mascwa.pulse.core.telemetry.PassThrottle
 import dev.mascwa.pulse.core.telemetry.QuietHours
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -147,12 +148,19 @@ class RefreshWorker(
             }
         }
 
-        // --- Computer autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
-        // interest or the device itself, record ONE finding via the agent's `finding` tool, then notify. ---
+        // --- Computer autonomous curiosity (opt-in, cloud-gated, throttled to CURIOSITY_MIN_GAP_MS):
+        // research a standing interest or the device itself, record ONE finding via the agent's
+        // `finding` tool, then notify.
+        //
+        // ⚠️ This comment already said "throttled" while the gate was missing outright. `lastCuriosityMs`
+        // was stamped at the bottom of this block and read by nothing, and a bare `run { }` sitting under
+        // a `val now` is what an `if (now - last > gap)` leaves behind when it loses its condition. Until
+        // this line existed, opting in bought a full cloud agent loop with web search on every full tick —
+        // ninety-six of them a day at the lowest refresh setting, paid for in the owner's cloud credits. ---
         if (fullWork && jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
             runCatching {
                 val now = System.currentTimeMillis()
-                run {
+                if (PassThrottle.due(settings.lastCuriosityMs, now, CURIOSITY_MIN_GAP_MS)) {
                     // Rotate over the standing interests + a "your own device" subject so it covers both the
                     // owner's orders and the Computer's own substrate over time.
                     val subjects = container.interestStore.all().map { it.topic } +
@@ -185,21 +193,34 @@ class RefreshWorker(
             runCatching { container.reflectionEngine.reflectIfDue() }
         }
 
-        // --- Blackbox ledger: periodic RFC-3161 anchor (opt-in, throttled ~daily, best-effort) so the head
-        // is independently timestamped between manual anchors. Sends only a hash to a public TSA. ---
+        // --- Blackbox ledger: periodic RFC-3161 anchor (opt-in, at most once a day, best-effort) so the
+        // head is independently timestamped between manual anchors. Sends only a hash to a public TSA. ---
         if (fullWork && settings.autoAnchorLedger) {
             runCatching {
                 val now = System.currentTimeMillis()
                 val head = container.auditLedgerStore.headHash()
-                // Only anchor when the head advanced since the last anchor (don't re-stamp the same head) —
-                // this alone keeps anchoring from spamming the TSA even with no time-based cooldown, since
-                // an unchanged head is a genuine no-op regardless of how often the worker ticks.
+                // Two guards, and they answer different questions. The head-advanced check is the primary
+                // one and its reasoning stands: re-stamping an unchanged head is a genuine no-op, so this
+                // alone stops the pass doing pointless work.
+                //
+                // ⚠️ What it does NOT bound is how often the TSA is called, because the head advances far
+                // more often than the old comment here assumed — every diagnostic upload (so, every launch),
+                // every self-code apply, every device-policy toggle, every owner-tier ambient hold. A phone
+                // opened twenty times a day made twenty calls to somebody else's free service. So the floor
+                // is what makes "~daily" true; `lastLedgerAnchorMs` was written for it and read by nothing.
                 if (head != dev.mascwa.pulse.core.telemetry.HashChain.GENESIS_HASH &&
-                    head != container.auditLedgerStore.anchoredHead()
+                    head != container.auditLedgerStore.anchoredHead() &&
+                    PassThrottle.due(settings.lastLedgerAnchorMs, now, LEDGER_ANCHOR_MIN_GAP_MS)
                 ) {
-                    if (container.auditLedgerStore.anchorHead()) {
-                        container.settingsRepository.update { it.copy(lastLedgerAnchorMs = now) }
-                    }
+                    // ⚠️ Stamp the ATTEMPT, not the success. Gating on a success-only stamp would mean a TSA
+                    // outage retried on every tick for as long as it lasted — the least polite behaviour of
+                    // the lot, and the exact thing the floor exists to prevent. Which head was *successfully*
+                    // anchored is not lost by this: `anchoredHead()` is that record, and it is what the second
+                    // guard above reads. The cost is that a failed anchor waits a day, which is acceptable for
+                    // a best-effort belt-and-braces timestamp over a chain whose integrity rests on the hash
+                    // links and the head signature rather than on this.
+                    container.settingsRepository.update { it.copy(lastLedgerAnchorMs = now) }
+                    container.auditLedgerStore.anchorHead()
                 }
             }
         }
@@ -207,15 +228,24 @@ class RefreshWorker(
         // --- Hardware-attestation posture into the ledger: record ONLY when the verdict changes (a posture
         // change — bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost — is a real security
         // event; identical verdicts are deduped so the append-only log isn't spammed). Local-only probe, no
-        // network — no time throttle, so a posture change is caught as soon as the next tick runs. ---
+        // network, throttled to ATTESTATION_MIN_GAP_MS. ---
         //
         // ⚠️ Skipped at MINIMAL, and it is the most expensive local pass here: `DeviceAttestation.run`
-        // GENERATES A STRONGBOX EC KEYPAIR to read the attestation extension out of it, every tick.
-        // A posture change is a real security event, so this is the last of the three local passes
-        // to go — but on a phone that is too hot or has been restricted, minting a hardware key on a
-        // timer is exactly the discretionary work that should wait for the next pass.
+        // GENERATES A STRONGBOX EC KEYPAIR to read the attestation extension out of it. It used to do
+        // that on every tick — this comment previously argued that having no time throttle was the
+        // point, "so a posture change is caught as soon as the next tick runs", while `lastAttestationCheckMs`
+        // sat below being stamped and read by nothing.
+        //
+        // That argument does not survive looking at what the signature is made of: bootloader lock,
+        // verified-boot state, the verified-boot key and hardware backing are all fixed at boot, so a
+        // second probe in the same boot session cannot discover anything the first one missed. The floor
+        // therefore costs no detection while the phone is running — only latency after a reboot, for a
+        // change that on this hardware requires unlocking the bootloader and so wiping the device. On a
+        // phone that is too hot or has been restricted, minting a hardware key on a timer is exactly the
+        // discretionary work that should wait; now it waits on a healthy phone too.
         if (anyWork) runCatching {
             val now = System.currentTimeMillis()
+            if (!PassThrottle.due(settings.lastAttestationCheckMs, now, ATTESTATION_MIN_GAP_MS)) return@runCatching
             val report = container.deviceAttestation.run()
             val v = report.verdict
             val sig: String
@@ -245,12 +275,22 @@ class RefreshWorker(
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         //
         // ⚠️ Skipped at MINIMAL. It enumerates every installed package, which on the main thread once
-        // froze the Security Audit screen outright (see `hasUsageAccess`); it is cheap enough here
-        // because it is off the main thread, and it is still the second-heaviest local pass.
+        // froze the Security Audit screen outright (see `hasUsageAccess`); being off the main thread
+        // keeps it from freezing anything, which is not the same as it being cheap — it is still the
+        // second-heaviest local pass, and it too had no time floor, so it re-enumerated every package
+        // on the phone on every tick. It needs no new field for one: `lastScanMs` is already stamped
+        // by `saveResult`, so a manual scan from the screen paces the background pass as well.
+        //
+        // ⚠️ `lastScan > 0` must stay its OWN condition and must come first. It means "the user has
+        // run this once", which is what makes the pass opt-in — and `PassThrottle.due` treats a zero
+        // stamp as DUE, so folding the two together would invert exactly that gate and start auditing
+        // a phone whose owner never asked for it.
         if (anyWork) runCatching {
             container.securityAuditStore.load()
             val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
-            if (lastScan > 0) {
+            if (lastScan > 0 &&
+                PassThrottle.due(lastScan, System.currentTimeMillis(), SECURITY_AUDIT_MIN_GAP_MS)
+            ) {
                 val crit = dev.mascwa.pulse.core.telemetry.SecurityAudit.Severity.CRITICAL
                 val prevCritical = container.securityAuditStore.auditFlow.value.findings
                     .filter { it.severity == crit }.map { it.id }.toSet()
@@ -601,5 +641,58 @@ class RefreshWorker(
 
     companion object {
         const val UNIQUE_NAME = "pulse_periodic_refresh"
+
+        // ⚠️ **How often these three passes are worth doing at all — which is a different question
+        // from whether the phone can afford them right now.** The device tier above answers the
+        // second and was wired; the first was not. Three `last…Ms` stamps in the settings blob were
+        // being WRITTEN and read by nothing, so on a healthy phone at FULL tier each pass ran on
+        // every tick — and the interval picker's lowest setting is 15 minutes, which is 96 ticks a
+        // day. `PassThrottle.due` is the read half; these are the floors.
+        //
+        // They are deliberately named constants next to nothing else, so moving one is a one-line
+        // change with no arithmetic to redo.
+
+        /**
+         * A full cloud agent loop with web search, so this one costs the owner money rather than
+         * battery. Six hours bounds it at four runs a day whatever the refresh interval is, and
+         * still walks the whole rotation of standing interests within a day or two. Findings pile up
+         * in a list with an unread badge, so a tighter gap would also read as spam; a looser one is
+         * a fair choice and this is the number to move.
+         */
+        private const val CURIOSITY_MIN_GAP_MS = 6L * 60 * 60 * 1000
+
+        /**
+         * `DeviceAttestation.run` mints a StrongBox EC keypair to read the attestation extension out
+         * of it. ⚠️ Every field of the posture signature — bootloader lock, verified-boot state and
+         * key, hardware backing — is fixed at boot, so probing more than once per boot cannot detect
+         * anything that probing once would miss. A floor therefore loses no detection *within* a boot
+         * session; the whole cost is up to six hours of latency after a reboot, for a change that on
+         * this hardware requires unlocking the bootloader and hence wiping the device.
+         *
+         * A tighter guarantee — probe once per boot, via `elapsedRealtime` against the wall clock —
+         * is the better shape and is recorded rather than built: it means trusting one clock against
+         * the other, which reintroduces exactly the failure [PassThrottle.due] refuses to have.
+         */
+        private const val ATTESTATION_MIN_GAP_MS = 6L * 60 * 60 * 1000
+
+        /**
+         * A network round-trip to a **free public** timestamping authority. The primary guard is that
+         * the chain head advanced, and that guard is sound — but the head advances on every
+         * diagnostic upload (so, every launch), every self-code apply, every device-policy toggle and
+         * every owner-tier ambient hold, so a phone opened twenty times a day made twenty calls to
+         * somebody else's free service. Twenty hours rather than twenty-four so a once-a-day cadence
+         * cannot creep later each day and skip one.
+         */
+        private const val LEDGER_ANCHOR_MIN_GAP_MS = 20L * 60 * 60 * 1000
+
+        /**
+         * `SecurityAuditor.runAudit` enumerates every installed package — the call whose cost once froze
+         * the Security Audit screen when it ran on the main thread. What it looks for (developer options,
+         * USB debugging, sideloading, an app holding something alarming, the lock state) changes on a
+         * human timescale, so six hours loses nothing in practice, and the screen's own SCAN button is
+         * never gated. The floor reads the store's existing `lastScanMs`, so a manual scan paces the
+         * background pass too.
+         */
+        private const val SECURITY_AUDIT_MIN_GAP_MS = 6L * 60 * 60 * 1000
     }
 }
