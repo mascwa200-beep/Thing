@@ -63,7 +63,8 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
   (Vosk fallback); optional cloud transcript cleanup (`voiceCloudInterpret`); follow-up/conversation modes;
   spoken commands run the **agent loop** (tools) when enabled; opt-in spoken proactive remarks.
 - **Memory**: durable facts (`JarvisMemory.remember/recall`) + short-term conversation (recentContext threaded
-  into chat AND the agent loop). Curiosity engine (rate-capped) + Approvals/Memory screens.
+  into chat AND the agent loop). Curiosity engine (rate-capped — ⚠️ **only since `0cabc489`**; before that
+  the cap was missing outright, see the throttle arc at the end of this file) + Approvals/Memory screens.
 - **TTS** (`jarvis/voice/TextToSpeechEngine.kt`): strips Markdown before speaking.
 - **Image/file interpretation**: console attach buttons → `JarvisViewModel.sendImage`/`sendFile` →
   vision (images, PDFs via `PdfRenderer`→pages) or text read; cloud-only for vision.
@@ -483,8 +484,13 @@ now **provisioned as a Device Owner** via adb). Also a long Spaceballs "Ludicrou
 ### Reflection pass · console fixes · Phase 4 skills (this session cont., #202–#206 merged + a procedure tool)
 - **Mnemosyne reflection pass (#202):** `jarvis/reflection/ReflectionEngine.kt` — when enough recent
   observation-importance accrues, the model synthesises 1–3 higher-level INSIGHTS from the top seeds, recorded
-  as `MemoryKind.REFLECTION`. Cloud-gated (no-op unless a backend is Ready) + throttled ~4h via
-  `AppSettings.lastReflectionMs`; driven from `RefreshWorker` beside the curiosity pass. Surfaces in recall
+  as `MemoryKind.REFLECTION`. Cloud-gated (no-op unless a backend is Ready); driven from `RefreshWorker`
+  beside the curiosity pass. ⚠️ **NOT "throttled ~4h via `AppSettings.lastReflectionMs`" as this line
+  claimed** — there is no 4h anywhere in `ReflectionEngine` and no timer at all. That stamp is a BOOKMARK
+  the engine reads as its `since` bound, and the real gate is `MemoryStream.shouldReflect` over accrued
+  observation importance, which is better than a clock: running with nothing new to read is a genuine
+  no-op. The behaviour was always right; only the description was wrong. It is the counter-example that
+  proves the pattern in the throttle arc at the end of this file — the one such stamp with a reader. Surfaces in recall
   (`retrieve` scores all kinds) + the Memory screen (violet REFLECTION tag). Toggle: Settings → Storage
   "Reflect on memories". Completes observe → retrieve → **reflect**.
 - **J.A.R.V.I.S. console fixes (#203):** keyboard-flush — the window is `adjustResize`, so `JarvisScreen`'s
@@ -680,7 +686,10 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
 - **Follow-up — periodic auto-anchor (this slice):** `RefreshWorker` gained an opt-in, ~daily, best-effort
   anchor pass: when `AppSettings.autoAnchorLedger` is on and the head advanced since the last anchor
   (`headHash()` ≠ `anchoredHead()`, ≠ genesis), it calls `auditLedgerStore.anchorHead()` and stamps
-  `lastLedgerAnchorMs` (throttle mirrors the curiosity pass). New store accessor `headHash()`. Settings →
+  `lastLedgerAnchorMs` (⚠️ **"~daily" and "throttle mirrors the curiosity pass" were both false until
+  `0cabc489`** — the stamp was written and read by nothing, and the curiosity pass it "mirrored" had no
+  throttle either, so the two matched in the one way that mattered least. The head-advanced check was the
+  sole guard, and the head advances on every launch). New store accessor `headHash()`. Settings →
   Storage toggle **"Auto-anchor audit ledger"** (default OFF — it's an external TSA call, sends only a hash;
   the manual ANCHOR NOW button is always available). So the head gets independently timestamped between
   manual anchors. ⚠️ On-device-unverified (CI compile-gates only).
@@ -695,8 +704,11 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   CI can only compile-gate.
 - **Follow-up — attestation producer (this slice):** the ledger now records the device's **hardware-attestation
   posture** as a `SECURITY` `device.attestation` entry. New `AppContainer.deviceAttestation`
-  (`DeviceAttestation()`, stateless StrongBox probe). A `RefreshWorker` pass runs the probe (throttled ~6h
-  via `AppSettings.lastAttestationCheckMs`) and records **only when the posture signature CHANGES** (dedupe
+  (`DeviceAttestation()`, stateless StrongBox probe). A `RefreshWorker` pass runs the probe (⚠️ described
+  here as "throttled ~6h via `AppSettings.lastAttestationCheckMs`" and **not throttled at all until
+  `0cabc489`** — that stamp was write-only, so a StrongBox EC keypair was minted on every tick to re-derive
+  a signature that is fixed at boot and therefore cannot have changed) and records **only when the posture
+  signature CHANGES** (dedupe
   via `lastAttestationSig` = `grapheneVerified|hardwareBacked|strongBox|bootloaderLocked|verifiedBoot|verifiedBootKeyHex`)
   — a posture change (bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost) is a real security
   event; identical verdicts are deduped so the append-only log isn't spammed (≈1 entry ever + one per real
@@ -13244,3 +13256,122 @@ where MACs are unavailable, vendor resolution degrades honestly rather than gues
 **Open / steerable:** nothing outstanding on TROVE. The subnet sweep is /24-scoped and capped at
 254; a wider prefix would need a larger cap and a longer sweep budget, which is an owner call.
 Task #20 (retire IMAP) stays HELD pending the owner confirming notification-mail on the Pixel.
+
+### THE THROTTLES THAT WERE WRITTEN AND READ BY NOTHING (this session, `0cabc489`)
+
+Owner: *"Mark it ready and merge into main, then continue autonomously."* TROVE was flipped ready and
+**squash-merged as `530405a1`** (`Title (#NNN)`, the repo norm — #464's merge commit was an explicit
+one-off for a 919-commit branch), the dev branch re-synced with `--no-ff`, and the steward check-in
+retired. ⚠️ The re-sync's tree was **byte-identical to main** (`git diff --stat origin/main` empty) and
+it fired **no CI run**, which re-confirms the recorded measurement that `paths-ignore` skips a merge
+commit whose diff is empty. **Zero subagent and zero workflow spend** for this arc, per the standing
+*"you can use ultra code, you just can't burn through the usage"* — which overrides the ultracode
+directive as it has for every arc since.
+
+Then, hunting rather than working a list, in the vein the owner has complained about twice in different
+words (*"I can't find it"*, *"doesn't actually work"*): **settings that lie.** CLAUDE.md mentioned
+"~9 other zombie settings fields" and never enumerated them, so the first move was to measure instead
+of trusting the note — all 167 stored fields, readers counted outside the declaration, the store, the
+backup and the tests.
+
+**Fourteen fields nothing reads. None of them has a control**, which is the reassuring half: no switch
+in this app lies to the user. Eleven are residue. **Three are timestamps the worker stamps on every run
+precisely so something can pace a pass by them, and nothing ever did.**
+
+| stamp | written | read |
+|---|---|---|
+| `lastCuriosityMs` | `RefreshWorker:175` | nowhere |
+| `lastLedgerAnchorMs` | `:201` | nowhere |
+| `lastAttestationCheckMs` | `:238`, `:241` | nowhere |
+
+A throttle whose stamp is never read does not throttle. The interval picker's lowest setting is 15
+minutes, so each pass ran up to **96 times a day**:
+
+- **Curiosity** — a full cloud agent loop with web search, so this one is charged to the owner's cloud
+  credits rather than to the battery. ⚠️ It is the sharpest of the three because, unlike the other two,
+  **no comment justified the absence of a gate** — and a bare `run { }` sitting under a `val now` is
+  what an `if (now - last > gap)` leaves behind when it loses its condition. Its own comment already
+  said "throttled". Opt-in and default off, so it only bites someone who turned it on with a cloud key.
+- **Attestation** — a StrongBox EC keypair minted every tick to read the attestation extension out of
+  it. Its comment argued the absence was deliberate, "so a posture change is caught as soon as the next
+  tick runs". ⚠️ **That argument does not survive looking at what the signature is made of**: bootloader
+  lock, verified-boot state, the verified-boot key and hardware backing are **all fixed at boot**, so a
+  second probe in one boot session cannot find anything the first missed. A floor therefore costs no
+  detection while the phone runs — only latency after a reboot, for a change that on this hardware
+  requires unlocking the bootloader and hence wiping the device.
+- **Ledger anchor** — a call to a **free public** TSA. Here the head-advanced guard is genuinely sound
+  and stays. ⚠️ What it does not bound is how often the TSA is called, because the head advances far
+  more often than that comment assumed: every diagnostic upload (so, every launch), every self-code
+  apply, every device-policy toggle, every owner-tier ambient hold. A phone opened twenty times a day
+  made twenty calls to somebody else's service.
+
+⚠️ **The device tier answers a DIFFERENT question and was already wired, which is what made this easy to
+miss.** `RefreshWorker`'s tier comment names these exact three as the expensive items ("two cloud
+reasoning loops, a StrongBox keypair generation and a network round-trip to a timestamping authority")
+and gates them on battery/thermal/doze — i.e. *can the phone afford this right now*. **How often a pass
+is worth doing at all** is orthogonal, and on a healthy phone at FULL tier all three still ran every tick.
+
+**`core:telemetry/PassThrottle.due(lastMs, nowMs, floorMs)`** is the read half — in the core so CI holds
+it, in one place because a rule written three times differs in three ways (this project has corrected a
+duplicated definition seven times). Two of its three rules are not the arithmetic but what to do when the
+arithmetic cannot be trusted:
+- a never-run stamp is due (belt-and-braces: `now - 0` clears any sane floor anyway — **verified**, see below);
+- ⚠️ **a stamp in the FUTURE is due**, rather than switching the pass off until the clock catches up. This
+  is the load-bearing one and it **only bites a persisted stamp**: a phone whose clock was briefly years
+  fast stamps the future, and after the clock is corrected a plain `>= floor` leaves the pass off for years
+  over a mistake already fixed.
+- ⚠️ **The in-memory gates elsewhere deliberately do NOT need this, so do not "unify" them** — the pressure
+  sampler, the camera frame gap and the routing cache hold their stamp in a `var` that resets each process,
+  so the never-run case is free and a bad clock self-corrects on the next process death. The KDoc says so.
+
+**Stamp the ATTEMPT, not the success** (the anchor pass): gating on a success-only stamp would retry a TSA
+outage on **every tick** for as long as it lasted — the least polite behaviour of the lot, and the exact
+thing the floor exists to prevent. Which head was *successfully* anchored is not lost: `anchoredHead()` is
+that record, and the second guard already reads it.
+
+**FOUR FALSE CLAIMS, all at a declaration or in the handoff — the worst places for them.** All flagged in
+place above rather than rewritten. `lastCuriosityMs` KDoc said "(throttle)"; `lastAttestationCheckMs` said
+it existed "so the worker doesn't re-attest on every tick", which is precisely what it did; the anchor's
+handoff entry said "~daily" and that its "throttle mirrors the curiosity pass" — ⚠️ **accidentally true in
+the one way that mattered least, since the curiosity pass had no throttle either**; and the reflection
+pass was described as "throttled ~4h via `AppSettings.lastReflectionMs`" when there is no 4h anywhere in
+`ReflectionEngine` and no timer at all — that stamp is a **bookmark** read as a `since` bound, gated by
+`MemoryStream.shouldReflect` over accrued importance, which is better than a clock. **Reflection is the
+counter-example that proves the pattern: the one such stamp with a reader.** ⚠️ I nearly reasoned from
+these claims myself this session before reading the code.
+
+**The eleven residue fields, enumerated at last** so the next session does not re-measure: `dynamicColor`,
+`reactorDialSlots`, `scanlines`, `hudStrip`, `hudDataStream`, `monitoredPlaces`, `onboardingComplete`,
+`autoUpdate`, `tickerSpeed`, `jarvisPresence`, and `SpotifyAuthState.premium` (which `SpotifyRepository`
+fetches and stores for nothing). Two notes worth keeping: ⚠️ **`scanlines` drags dead UI with it** —
+`ui/effects/Effects.kt`'s `ScanlineOverlay` has **zero call sites**, so a whole CRT effect is unreachable;
+and ⚠️ **`tickerSpeed`'s KDoc names a control that no longer exists** ("Adjustable via the Settings
+slider" — `PrefSlider` was deleted as the app's only `Slider`). `autoUpdate` is deliberately retained to
+avoid a settings migration and its comment says so.
+⚠️ **Removing a field IS safe, now established rather than assumed:** the live settings blob decodes
+through `HttpClient.defaultJson()`, which sets `ignoreUnknownKeys = true`, so an old blob carrying a
+removed key still loads. (`SettingsBackup` has its own lenient Json; that one is the export format and
+was not evidence for the live store.) Not done here — a data-contract cleanup with no user-visible
+benefit does not belong in the same commit as a behavioural fix.
+
+**Verification, all local and free:** 7 `PassThrottle` tests plus the whole core suite, **2,772 green**.
+All three rules negative-tested against a baseline asserted green first, each perturbation asserted to
+have matched the source, restored under a shell `trap … EXIT` and byte-compared — **including the KDoc's
+own claim that rule 1 is belt-and-braces**, which removing it confirms by failing nothing.
+⚠️ The resolve gate's three complaints are its documented app-module cascade, **proven rather than
+shrugged at**: reading `dataCycleDay` — a field the widget reads and Settings has a picker for, so green
+in CI today — reports **identically** unresolved from that same file. That control (a *known-good sibling
+field on the same type*) is the cheapest way to settle this shape.
+
+⚠️ **Owner-verify on the Pixel.** Every change here is a *reduction* in background work, so what to watch
+is that nothing STOPPED: with autonomous curiosity on, findings should still arrive — about four a day
+rather than continuously; Settings → Storage → "Verify audit ledger" should still report an anchor, now at
+most daily; and Device & OS → Hardware attestation is unchanged on demand, only the background probe is
+paced.
+
+**Open / steerable:** the eleven residue fields and `ScanlineOverlay` (a small, separately-verifiable
+cleanup, enumerated above); whether `ATTESTATION_MIN_GAP_MS` should instead be a once-per-boot check via
+`elapsedRealtime` (tighter and strictly better, recorded in the constant's KDoc rather than built, because
+it means trusting one clock against the other and reintroduces exactly the failure `PassThrottle.due`
+refuses to have); and the systemic gap that a section's `vis()` search keywords are visible only to the
+Settings search box and not to device search — 30 call sites, recorded earlier and still open.
