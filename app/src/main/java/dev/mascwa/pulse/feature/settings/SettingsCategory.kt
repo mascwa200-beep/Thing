@@ -17,7 +17,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * The Steam-style settings taxonomy — a fixed category list on the left (or a master list on a phone),
  * each opening a detail page of the folded-in sections. Every one of the old flat sections maps to exactly
  * one category. [tag] is the short label used by the narrow icon rail; [keywords] widen search hits for the
- * category itself (individual controls are also matched by their own titles at emission time).
+ * category itself.
+ *
+ * ⚠️ This used to claim "individual controls are also matched by their own titles at emission time".
+ * They are not, and never were: `PrefSection`, `PrefSwitch` and friends take no query, so nothing
+ * matches a control's own title. What IS matched is the SECTION — see [SettingsSections], which is where
+ * each section's own title and vocabulary now live so that both the Settings search box and the app's
+ * device search can read them. Control-level vocabulary (83 actionable rows, 23 of them reachable from
+ * no surface at all) remains out of scope; the cheap version would be a `keywords` parameter on
+ * `PrefSection` folded into the emitted record, not per-control gating.
  */
 enum class SettingsCategory(
     val title: String,
