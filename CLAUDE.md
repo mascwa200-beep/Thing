@@ -13440,3 +13440,36 @@ removed. It is listed among the eleven residue fields above, but unlike the othe
 rather than a leftover number, and the current identity arc is a 1960s CRT console, so wiring it back
 to a Settings toggle is at least as defensible as deleting it. Not decided unilaterally: it is a visual
 change to a daily driver.
+
+#### A third direction, swept and CLEAN — and a harness that produced false alarms (same session)
+
+The other two directions of this defect family are worth recording as **negative results**, so nobody
+spends the time again.
+
+⚠️ **The defaulted-parameter class is clean.** This repository has had two real bugs of the shape *a
+parameter whose default silently means "do not do the thing"* — `VitalsAnalyzer`'s motion argument
+(defaulted `0.0`, so the gate could never fire) and `LlamaEngine.prepare(allowDownload = false)` (a
+bare `prepare()` fetches nothing). Swept all **32** `Boolean = false` parameters across app, both
+cores, nutrition, sky and desktop: **30 are genuinely passed somewhere.** The two that are not are
+harmless — `LcarsSkyPlot(showBelowHorizon)` is a dead chart option, and
+`WebSearchRepository.search(gather)` is documented as being "for a screen showing a list" when that
+repository's only consumer is the assistant's search tool, which correctly wants the default. A
+parameter written for a caller that does not exist, not a gate that cannot fire.
+
+⚠️ **THE HARNESS PRODUCED FIVE FALSE ALARMS AND THEY WERE IN THE DANGEROUS DIRECTION** — I was a step
+from "fixing" three things that were already correct. Two separate mistakes, both worth recognising:
+1. **Scope.** The first pass globbed only `app/` and `core/`, so `keepAsFood` (passed from the
+   nutrition app) and `diurnal` (passed from the desktop) read as never-passed. **This repo now has
+   five source trees; a sweep that names two of them is wrong about the other three.**
+2. **Arithmetic.** It subtracted the declaration count from the pass count to "remove the
+   declarations" — but a declaration is `name: Boolean = false`, which a `name\s*=` pattern never
+   matched to begin with, so the subtraction was pure error. It reported `allowCommunity`, `sniff` and
+   `cameraUpright` as dead while `ChannelLineup:113`, `RadioController:207`/`:250` and
+   `PulseViewModelFactory:58` pass all three.
+   The fix that makes this safe is a **self-check asserting the pattern can SEE a known-passed
+   parameter** before any verdict is printed — the same discipline the gates use, applied to the
+   throwaway script. 8 reported → 2 real.
+
+**Also clean, swept the same way:** `NotifyState` (all eight fields have readers and writers) and every
+non-settings `last…Ms` in the app module. See the gate section above for why the settings blob is
+structurally the one place this happens.
