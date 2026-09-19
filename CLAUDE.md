@@ -14441,3 +14441,176 @@ sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the
 eleven residue settings fields (an owner call on the overlay); the phone's own study deck is
 deliberately not indexed, with the reasoning recorded above. **Task #20 (retire IMAP) is still HELD**
 pending the owner's Pixel confirmation of notification-mail.
+
+### A TOOL THAT COULD NEVER RUN, AND A CORPUS THE MODEL WAS NOT TOLD ABOUT (this session, PR #472)
+
+PR #471 merged as **`4a70e8e8`** (squash, the repo norm); the dev branch re-synced with
+`git merge --no-ff` so the tip committer stays ours. ⚠️ **Four redundant main builds cancelled** —
+LCARS #2202, Desktop #330, Nutrition #166, Sky #50 — after `git diff --stat 9ec37519 origin/main`
+came back **`CLAUDE.md | 122 +`, and nothing else**: main's buildable tree is byte-identical to what
+LCARS #2201 had already built and published to `latest`, so all four would have republished the same
+artifacts under new versionCodes for **~1.3 GB** of the owner's auto-download. Sixth instance; the
+check is one command and it is worth running every time.
+
+Then, hunting rather than working a list. **Zero subagent and zero workflow spend**, per the standing
+usage constraint, which overrides the ultracode directive as it has for every arc since.
+
+#### The find: two registered tools were both called `open`
+
+`OpenScreenTool` opens one of the app's own screens; `OpenLinkTool` opens a URL. Both declare
+`override val name = "open"`, both are in `AppContainer.agentTools`, and dispatch is
+`tools.firstOrNull { it.name.equals(call.name, ignoreCase = true) }`. `OpenScreenTool` is the
+**first entry of that list** (`:1110`) and `OpenLinkTool` the thirteenth (`:1161`) — read, not
+inferred — so `OpenLinkTool` was **constructed on every launch and unreachable by any path.** Ask the
+assistant to open a URL and it answers *"No screen called https://… . The screens are: …"*.
+
+⚠️ **The near-miss is the instructive part, and it is a shape worth recognising.** The native path is
+`tools.distinctBy { it.name.lowercase() }`, so the function schema stayed well-formed — the OpenAI
+tools API rejects duplicate names, and the serious failure was already averted. But that line's own
+comment says what it was written for: *"an authored tool could collide with a built-in"*. It absorbed
+a collision between two **built-ins** in silence. **A guard doing its job for the wrong reason reads
+exactly like no problem at all** — the truncation-reads-as-covered shape, one layer further in than
+usual.
+
+Measured before deciding it deserved a gate: **one collision across 56 declared tool names.** Narrow
+and real. `OpenLinkTool` becomes `open_url`; `OpenScreenTool` keeps the bare `open`, because it is
+the commoner act by far and leaving the working tool's name alone means the fix cannot regress it.
+
+#### And the search tool named seven kinds while the index emitted ten
+
+`DeviceSearchIndex` produces `FEATURE`, `GUIDE`, `NOTE`, `DIARY`, `TASK`, `PROFILE`, `FINDING`,
+`MEMORY`, `KNOWLEDGE` and `SETTING`. `DeviceSearchTool.usage` said *"guides, notes, diary, memory,
+tasks, profile, findings"*. The three missing were **screens, settings and ingested documents** — and
+settings and documents were both added in the very session that found this.
+
+⚠️ A tool's `usage` is the model's **whole basis for choosing it**, so *"where do I turn on sponsor
+skipping"* has been answerable from the device index since #466 and the model has had no reason to
+look there. That is the owner's twice-repeated *"I can't find it"*, one layer up from the screen it
+was first reported on, and it is the two-independent-statements shape again: the index grew and
+nothing made the sentence grow with it.
+
+⚠️ **The grouped OUTPUT never had this problem and needs no fix — checked rather than assumed,
+because the two look alike.** It is built from `DeviceSearch.byKind`, so each kind heads its own
+block and the model already sees the split `SearchScreen` had to be taught in #471. Only the prose
+was stale. The closing line now names `open` as well as `library read`, because a Feature or Setting
+row's id **is** its route (the `RecordKind.destination` invariant); telling the model only how to
+*read* would leave the two kinds it most needs to **act** on looking like something to quote.
+
+#### The gate, and the one design decision in it
+
+`AgentToolSurfaceTest` — four properties: no two tools share a name; every kind the index emits is
+named in the usage; the map does not promise a kind the index stopped emitting; and `STUDY`'s
+deliberate absence stays a decision rather than a drift.
+
+⚠️ **The kind-to-word map is the thing a new kind forces someone to update, and that IS the design.**
+Demanding the literal `RecordKind.label` would force the sentence to say *"Feature"* where
+*"screens"* is the honest English for a model to read — the label is UI copy for a section heading,
+this is prose for a prompt. They are allowed to differ; a kind with **no word at all** is not. So
+adding a kind fails on the missing map entry, and whoever adds it has to decide what to call it.
+
+#### Verification
+
+4 tests green locally, **run from the module directory** because Gradle resolves a test's relative
+paths from there. **Five rules negative-tested** against a baseline asserted green first, each
+perturbation asserted to have matched the source, the restore under a shell `trap … EXIT` and
+byte-compared. All five awake.
+
+⚠️ **The decisive case is the REAL defect rather than a synthetic one.** Restoring `name = "open"`
+fails exactly one test and names it: *"two tools share a name, so only the first one registered can
+ever run and the other is dead: [open in [DeviceActionTools.kt, DeviceActionTools.kt]]"*. Compare a
+synthetic perturbation, which proves the assertion runs and not that it catches anything that has
+ever actually happened.
+
+⚠️ **And case 2 proves the comment-stripping as a side effect, which is worth copying.** Cutting
+three kinds out of the usage string reports `KNOWLEDGE` and `FEATURE` missing **while the class's own
+KDoc says "screens" and "ingested documents" three lines above the assertion** — so the gate is
+demonstrably reading the thing and not the documentation of it. `CredentialCoverageTest` records
+being negative-tested against exactly that failure; here it falls out of a perturbation written for
+something else.
+
+⚠️ **My own neg harness died on its quoting before it ran once**: an apostrophe inside a
+double-quoted shell string, and a regex full of parens inside a `case` body. **A harness that cannot
+parse itself proves nothing.** The perturbation strings live in python heredocs now — put them there
+from the start.
+
+⚠️ **The resolve gate's four complaints were PROVEN its documented cascade, not shrugged at.**
+`app/src/test` is on neither of its classpaths, so `SourceGate` does not resolve there and the
+inference fallout follows (`not enough information to infer type argument`, a bare `it`, a member on
+the result). The decisive control is the general one recorded earlier in this file: copy a shipping,
+CI-green gate to a **NEW** path so it has no baseline either — `AmbientActionCoverageTest` reports
+the same set. **That caveat is now written into `tools/android_resolve_check.sh`**, since five gates
+read source through `SourceGate` and this will recur. Note also the far stronger positive evidence
+available here: an app-module gate with no Android import **compiles and runs** under kotlinc + JUnit
+in under a minute, which beats the absence of a complaint.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles a tool registry and never calls one. Ask the Computer
+to **open a link** and check it opens rather than hunting for a screen by that name; then ask *"where
+do I turn on sponsor skipping"* and check it **searches** rather than guessing.
+
+#### Two more ways a tool can be dead, gated in the same file (`this commit`)
+
+The collision gate asked one question of the tool surface. Two neighbours had never been asked of
+it, and both guard drift more plausible than the collision that prompted them: **a class that
+implements `JarvisTool` and that `AppContainer` never builds** (dead exactly as `OpenLinkTool` was,
+one link earlier in the chain), and **a `usage` that leads with a verb dispatch does not answer
+to** (the `open` defect's own shape — the model told one thing, dispatch doing another).
+
+**Both are clean today — 57 declared, 57 constructed, 57 usages leading correctly** — so these are
+gates rather than fixes. CLAUDE.md recorded the registry as complete from a **one-off sweep**, and
+a one-off sweep is precisely what lets it drift back. **CI green on `df4f1505`** — `Run unit
+tests` 2m19s.
+
+⚠️ Two more negative results on the same surface, so nobody re-chases them: every tool name is a
+valid OpenAI function identifier (longest 18 against a 64 limit, so the constraint is nowhere
+near binding and a gate there would be noise), and the collision-vs-dispatch casing is
+consistent — schema `distinctBy { lowercase() }`, dispatch `equals(ignoreCase = true)`, gate
+`groupBy { lowercase() }`.
+
+⚠️ **A naive `class X(...) : JarvisTool` pattern finds 30 of the 57.** Most of these wrap their
+constructor list, so a single-line regex is blind to more than half the registry — including every
+tool in `DeviceActionTools.kt`, which is where the collision lived. Both self-checks anchor on that
+distinction: one tool that declares on one line, one that wraps.
+
+⚠️ **My first extractor had the bug this file keeps recording, and it presented as an empty set.**
+It returned only the pairs it managed to parse, so `ProposeDocTool` — whose `usage` is a
+`when (mode)` rather than a literal — was dropped on the floor, and the pinned-exception assertion
+saw `{}` with no way to tell *no templated tools exist* from *I cannot see the one that does*.
+`ToolText.usage` is nullable now, the discriminator is **what the extractor could not READ** rather
+than a `$` in the name (they coincide today and are different properties), and the two extractors
+**cross-check their counts**, so neither can drop a tool quietly.
+
+⚠️ **AND A NEGATIVE TEST THAT REPORTED NOTHING AT ALL, which is nastier than one that reports a
+compile error.** CLAUDE.md already records a perturbation being invalid ("it referenced a function
+that does not exist, so it reported a compile error, which is not evidence a guard is awake"). This
+was that *plus* a harness detail: emptying the pinned set to `setOf()` cannot infer `T` in a Kotlin
+property initializer, so it failed to COMPILE — and my loop piped each case through
+`grep -E 'perturbation applied|^OK \(|Tests run|AssertionError|restored'`, which **matches no
+compiler error line**. The case printed "perturbation applied" then "restored byte-identical" and
+nothing between, reading exactly like a sleeping guard. Two rules: the perturbation must COMPILE
+and still remove the property, and **never filter a negative test's output through a grep that
+cannot match a compiler error** — run the decisive case unfiltered.
+
+⚠️ **The harness's own baseline check hardcoded `OK (4 tests)`**, so adding a test read as "baseline
+not green" — a harness failure wearing the costume of a real one. It checks `OK (` now. A count in
+a guard drifts exactly like a count anywhere else.
+
+**Verification:** 6 tests green locally; four rules negative-tested against a baseline asserted
+green first, each perturbation asserted to have matched the source, each restore byte-compared.
+Case 6 restores a real drift and names the orphaned tool (`[OracleTool (OracleTool.kt)]`); case 9
+skips one file so the two counts disagree (`expected:<57> but was:<56>`). ⚠️ Case 7 produces TWO
+failures, and the second is correct rather than collateral: its perturbation changes the very
+literal `usageText()`'s self-check anchors on, so that self-check fires too — the self-check doing
+its job.
+
+**Registered but never asked, so recorded rather than gated:** every declared tool IS constructed
+and every usage DOES lead with its name, so neither gate changes behaviour today. And two veins
+came back clean — a naive tool-class sweep reports 30 of 57, which is a caveat for whoever
+re-measures rather than a finding; `LoggingTool` is a decorator and four tools are built
+conditionally, which is why the registration gate asks "constructed anywhere in `AppContainer`"
+rather than "present in `agentTools`" (the narrower question would report four working tools dead).
+
+**Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
+sites plus the `sectionVocab()` regex); the phone-side `settings?sec=` deep link (five interaction
+surfaces, not shippable blind); `ScanlineOverlay` and the eleven residue settings fields (an owner
+call on the overlay); the phone's own study deck deliberately not indexed. **Task #20 (retire IMAP)
+is still HELD** pending the owner's Pixel confirmation of notification-mail.
