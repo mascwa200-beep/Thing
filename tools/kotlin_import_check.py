@@ -349,26 +349,30 @@ def declares(directory: pathlib.Path, symbol: str) -> bool:
 def unresolvable_imports(text: str) -> list:
     out = []
     for imp in re.findall(r'^import (' + re.escape(OWN) + r'[\w.]+)$', text, re.M):
-        pkg, _, sym = imp.rpartition(".")
+        _, _, sym = imp.rpartition(".")
         if sym in GENERATED:
             continue
-        rel = pathlib.Path(*pkg.split("."))
-        dirs = [r / rel for r in SRC_ROOTS if (r / rel).is_dir()]
-        if dirs:
-            if not any(declares(d, sym) for d in dirs):
-                out.append(f"{imp} (package exists, {sym} is not in it)")
-            continue
-        # ⚠️ No such directory does not mean no such import. `import …core.telemetry.VoiceMachine.settle`
-        # imports a MEMBER of an object, so the last two segments are type and member rather than
-        # package and type. Back off one segment: if the shorter path is a real package declaring that
-        # type, this is a nested member — unverifiable from source without parsing the type's body, so
-        # it is passed over rather than reported. Claiming a working import is broken is the failure
-        # mode that gets a whole gate ignored.
-        outer_pkg, _, outer = pkg.rpartition(".")
-        outer_rel = pathlib.Path(*outer_pkg.split(".")) if outer_pkg else None
-        nested = outer_rel is not None and any(
-            (r / outer_rel).is_dir() and declares(r / outer_rel, outer) for r in SRC_ROOTS)
-        if not nested:
+        segs = imp.split(".")
+        # ⚠️ No such directory does not mean no such import. `import …telemetry.VoiceMachine.settle`
+        # imports a MEMBER of an object, and `import …telemetry.Recon.Provenance.MEASURED` imports an
+        # enum ENTRY of a nested enum — so the trailing segments are a type/member chain, not a package.
+        # Back off to the LONGEST prefix that is a real package directory; the first segment after it is
+        # the outermost type. If the package declares that type, the rest is a member chain we cannot
+        # verify from source without parsing the type's body, so it is passed over — claiming a working
+        # import is broken is the failure mode that gets a whole gate ignored. (A one-segment back-off
+        # missed the doubly-nested enum-entry case; this handles any depth.)
+        reported = False
+        for cut in range(len(segs) - 1, 0, -1):
+            rel = pathlib.Path(*segs[:cut])
+            dirs = [r / rel for r in SRC_ROOTS if (r / rel).is_dir()]
+            if not dirs:
+                continue
+            head = segs[cut]
+            if not any(declares(d, head) for d in dirs):
+                out.append(f"{imp} (package exists, {head} is not in it)")
+            reported = True
+            break
+        if not reported:
             out.append(f"{imp} (no such package)")
     return out
 

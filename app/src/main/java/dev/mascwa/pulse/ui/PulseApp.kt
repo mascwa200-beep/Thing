@@ -404,6 +404,19 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.sensorium.SensoriumScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            composable(Routes.TROVE) {
+                val vm: dev.mascwa.pulse.feature.recon.ReconViewModel = viewModel(factory = factory)
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
+                ) { uri -> uri?.let { vm.export(ctx, it) } }
+                dev.mascwa.pulse.feature.recon.ReconScreen(
+                    vm,
+                    onExport = { exportLauncher.launch("trove-dossier.txt") },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             composable(Routes.INTERROGATOR) {
                 val vm: dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.interrogator.InterrogatorScreen(
