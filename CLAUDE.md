@@ -13939,7 +13939,81 @@ would be **wrong**: `tools/food/build_food_db.py` and `tools/sky/check_packaged.
 that build (lines 413, 520, 771). One build is the honest cost of touching a shared tool.
 
 **Open / steerable:** the phone-side `settings?sec=` deep link stands unchanged (five interaction
-surfaces, not shippable blind). `SettingsSection.key` still has zero reads despite a KDoc claiming
-otherwise — 26 constructor call sites plus the `sectionVocab()` regex, recorded rather than bundled
-into a verified PR. **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation
-of notification-mail.
+surfaces, not shippable blind). ~~`SettingsSection.key` still has zero reads despite a KDoc claiming
+otherwise~~ — **the false KDoc is corrected (`c4883bbb`); the field still has zero reads and
+deleting it is still open**, 26 constructor call sites plus the `sectionVocab()` regex.
+**Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
+notification-mail.
+
+### EVERY ORACLE RULE CAN FIRE, AND EVERY SIGNAL IT READS IS FILLED IN (this session, PR #470)
+
+PR #469 merged as `5c11c988` (squash, the repo norm; the dev branch re-synced with `--no-ff` so the
+tip committer stays ours). ⚠️ **LCARS #2194 and Desktop #321 on main were cancelled** after
+`git diff --stat` proved main's tree byte-identical to the branch tip that #2193/#320 had already
+built and published — they would have republished the same two apps under new versionCodes for
+**662 MB + 180 MB** of the owner's auto-download. Same move, same check, as the four earlier
+instances recorded above. **Zero subagent and zero workflow spend this whole session.**
+
+Then, hunting rather than working a list. **Five veins came back CLEAN and are recorded so nobody
+re-chases them:** `HealthSettings` (all 28 fields read; the `published*` cluster funnels through
+`PublishedPlan` as designed); the shared health view model (the 8 "dead" members are in-file locals
+— ⚠️ I made the recorded mistake of excluding in-file callers on the first pass; the 10 LCARS-only
+ones are deliberate, photos being the AI half the nutrition app excludes); the fixed-slot widget
+layouts (`MAX_SOURCES`/`MAX_READOUTS`/`MAX_PAIRS`/`COLUMN_LINES` are all honoured, and the three
+unbounded column producers cap at 3, 2 and exactly 4 against a 4-line column — latent, not live);
+`kotlin_import_check.py`'s raw-string lexer (already correct, and its comment records finding it
+there too); and Radio Browser, already probed and remediated.
+
+⚠️ **And the nutrition app has NO onboarding gate deliberately** — it never reads `configured` and
+never calls `setConfigured`, because it opens onto an honest empty state ("Fill in your height,
+birth year and goal on Plan, then record a weight on Body") rather than a modal setup flow. That is
+a design, not a gap; `setConfigured` being LCARS-only is correct.
+
+**The find.** The Oracle is the headline proactive feature — 26 rules over 44 signal domains,
+deciding what to put in front of you unasked — and **nothing had ever asked whether its rules can
+fire.** That defect class has been found here repeatedly and always by hand, one at a time:
+`tempoNudge` computed and consumed nowhere, `windKmh` declared and populated by nothing,
+`VitalsAnalyzer`'s motion argument defaulted at its one caller. Two gates now ask the whole set at
+once, because **a rule is dead if either half fails and neither half can see the other's defect**:
+
+- **`OracleReachabilityTest`** (`:core:telemetry:test`, 4 tests) — a seeded sweep invoking each
+  entry of `Oracle.RULES` **directly**. ⚠️ Directly rather than through `divine()`, which ranks,
+  truncates *and* de-duplicates: a rule absent from its output could be absent for three reasons
+  and only one is the defect. A third assertion covers the dropping — two rules producing the same
+  id for one snapshot means `distinctBy` silently discards one.
+  ⚠️ `Oracle.RULES` goes `private` → `internal` so the gate has an honest denominator; counting
+  only the rules that DID fire would make a newly-added dead rule invisible. The cross-module gate
+  confirms nothing outside the module reaches it.
+- **`OracleSignalCoverageTest`** (`:app:testDebugUnitTest`, 3 tests) — textual, in the
+  `ThrottleStampCoverageTest` shape. ⚠️ **The exemption list is CHECKED, not trusted:** an entry
+  does not merely excuse a field, it *claims a named platform populates it*, and that claim is
+  verified against that platform's source. A field set by nobody cannot be parked there, which is
+  the only failure mode worth designing against.
+
+**Measured: all 26 rules fire, and 42 of 44 signals are populated by the phone.** The two that are
+not are the ledger pair, desktop-only because only that machine keeps a long-watch ledger — and the
+gate proves the desktop really fills them rather than taking the comment's word for it.
+
+⚠️ **TWO HARNESS DEFECTS CAUGHT ON THE WAY, and the first would have been a false report.** The
+opening sweep said three rules never fire and **all three were fine**: `OracleEvent.startMs` is an
+**absolute** epoch timestamp and the draw built it as a small relative offset against a `nowMs` of
+~1.6e12, so `startMs > nowMs` was never true — `leaveNow` and `meetingPrep` could not fire and the
+event branches of `chargeNow` and `weatherPrep` were never exercised either. And the coverage
+gate's own exemption check caught a bug in its parser: a bare `OracleSignals\(` **also matches
+inside `gatherOracleSignals(`**, so it parsed a function's parameter list instead of the
+construction and reported the desktop as not populating what it demonstrably does. *A harness that
+mis-shapes or mis-locates one field accuses the thing it is checking.*
+
+⚠️ **Re-reading my own gate adversarially found a third**: it asserted `RULES.size ==
+families.size`, which five rules setting `family` explicitly make fragile — two of them sharing one
+family is reasonable (the field exists to pool a rule's instances for `OracleMemory`) and would
+have reported a dead rule that fires happily. Per-rule indexing removes the question and names the
+offender.
+
+**Four rules negative-tested** against a baseline asserted green first, each perturbation asserted
+to have matched the source, restored under a `trap … EXIT` and byte-compared — and ⚠️ **two of the
+four were wrong on the first writing, both recorded mechanism #2 (the perturbation removed a
+different property):** `% 997` on `windDown` made it fire *zero* times rather than rarely, so the
+reachability test caught it and the floor was never exercised (`% 30` gives 61 hits against a floor
+of 120 — the arithmetic predicted ~59); and *replacing* a real exemption simply deleted it, so the
+coverage test failed instead of the exemption check. The bogus entry must be **added**.
