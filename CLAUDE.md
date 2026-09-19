@@ -14134,3 +14134,153 @@ sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the
 `settings?sec=` deep link (five interaction surfaces, not shippable blind); `ScanlineOverlay` and
 the eleven residue settings fields (an owner call on the overlay). **Task #20 (retire IMAP) is
 still HELD** pending the owner's Pixel confirmation of notification-mail.
+
+### FOUR THINGS THAT EXISTED AND WERE READ BY NOTHING — the search corpus (this session, PR #470)
+
+Same defect class as the arc above, four more instances, found by asking the same question of a
+different subsystem. **Zero subagent and zero workflow spend**, per the standing usage constraint,
+which overrides the ultracode directive as it has for every arc since. Four commits: `5bd3c8eb`
+the knowledge base · `72c886ab` the study-card label · `340a262f` the cold deck · `ec3dc4a7` the
+desktop corpus.
+
+#### The knowledge base was write-only from the user's side (`5bd3c8eb`)
+
+The user can load documents into the Computer's knowledge base — ADD DOC and IMPORT FILE on its
+setup screen, into a `knowledge_docs` Room table the agent retrieves from. The only thing that
+surface reported back was a **count**. A document could be added and never read, never listed,
+never removed, never found.
+
+⚠️ **`RecordKind.KNOWLEDGE("Document", "jarvis_memory")` had ZERO producers on the phone.** Its
+route already pointed at the Memory screen, which carries PROFILE / TASKS / EPISODIC / PROCEDURES /
+AUDIT LEDGER by exactly that precedent — **the kind was written for a section nobody built.** And
+`titles()`, `fullText()` and `deleteDocument()` all had callers: every one in the agent/self-edit
+layer (`ArchitectureTool`, `AgentSelfTools`, `ApprovalGate`), none in a screen. The Computer could
+read the user's documents back; the user could not.
+
+- A DOCUMENTS section on the Memory screen, and the missing search producer.
+- ⚠️ **A plain `MutableStateFlow`, because `KnowledgeStore` publishes none** — so the list is a
+  snapshot and the screen calls `refreshDocuments()` from a `LaunchedEffect(Unit)`, which re-runs
+  on the way back because a pushed destination leaves composition.
+- **Titles in the list, text on demand**, capped at 8000 characters and **saying so**: a reader who
+  cannot tell a truncated document from a short one has been told something untrue about what is
+  stored.
+- ⚠️ **No CLEAR DOCUMENTS button, unlike every other section, and the trap is written down before
+  somebody adds one for symmetry:** `KnowledgeStore.clear()` would take the reference docs bundled
+  with the app with it, and `KnowledgeSeeder.seedIfNeeded` returns at its first line once the seed
+  marker is set — so they would not come back until `SEED_VERSION` is bumped in a future build.
+- ⚠️ **No timestamp on the search record, and what that costs was checked rather than shrugged at:**
+  `atMs` is a TIEBREAK on equal score and nothing renders it, so a document shows no false date — it
+  only loses a tie. `titles()` returns strings and the store exposes no per-document time, so
+  supplying one would mean inventing it.
+
+#### A study card was being reported as a document (`72c886ab`)
+
+The desktop emitted `KNOWLEDGE` — **labelled "Document"** — for **study cards**. The label is drawn
+twice on that screen, as the section heading and in the corpus line, so it headed them DOCUMENT and
+told a machine holding no documents that it was *"searching 14 documents on this machine"*.
+
+⚠️ **Its own test said so and nobody noticed:** the assertion read `KNOWLEDGE in kinds` under the
+failure message *"study cards are not searchable"* — the test and its own text disagreeing about
+what the kind was. It stayed invisible because the phone, which owns the documents, emitted the
+kind for nothing at all. **One member with one producer can be labelled for that producer however
+wrong the name reads; with two it cannot.**
+
+`RecordKind.STUDY("Study card", "study")`. ⚠️ The route is honest rather than a placeholder —
+`study` is a registered destination on the phone (`Routes.STUDY`, a composable and a MENU entry),
+which has a deck of its own that its search does not yet index. Neither `when` over `RecordKind`
+needed a branch, checked rather than assumed: the phone's falls through to
+`else -> navigate(r.kind.route)` and the desktop's to `else -> null`, whose comment already gives
+the reason a study card belongs there.
+
+#### A saved study deck was invisible to search in a fresh process (`340a262f`)
+
+`DesktopSearchIndex` read `study.items.value` — a StateFlow that holds an empty list until something
+causes a load — and `SearchViewModel` indexes from its own `init`. So opening SEARCH first thing
+after launch asked a store nothing had touched.
+
+⚠️ **Measured, because that is the only way to tell a latent shape from a live one.** Teach a guide,
+flush, then ask a FRESH store over the same file: **`warm=5 cold=0`, with 3,328 bytes of deck on the
+disk.**
+
+⚠️ **This is written down.** The phone's own `DeviceSearchIndex` carries a paragraph about exactly
+this — *"Each store is asked to load, not read off its published flow… reading it would have made
+findings and memories invisible on a screen opened cold"* — which exists **because the phone shipped
+this defect once.** The desktop index is shaped after it and inherited the shape without the fix.
+Swept the phone while there: eight sources, every one a suspend loader.
+
+⚠️ **The existing test could not have caught it, and that is shown rather than argued.**
+`studyCardsJoinTheCorpusOnceThereAreAny` calls `teach` first, which loads the store as a side effect
+— its fixture AVOIDS the branch, the third recorded way a green test proves nothing. Under the
+perturbation the old test stays green and **only** the new one fails.
+
+#### Three more on the desktop corpus, one of them live on the PHONE (`ec3dc4a7`)
+
+1. ⚠️ **The KDoc said notes and diary do not exist on the desktop. They do** — stores, screens and
+   directory entries — and were simply not indexed, so the two kinds of thing somebody TYPED could
+   not be found on a machine whose search screen exists to find things.
+   ⚠️ **Every source is now a REQUIRED parameter, never one defaulted to null.** A defaulted store is
+   a default that quietly means "do not index this" — the shape that has shipped twice here already
+   (`VitalsAnalyzer`'s motion argument, `LlamaEngine.prepare(allowDownload=false)`). Required means
+   adding a source forces every caller to decide, which is how these two were noticed missing.
+2. ⚠️ **`SearchViewModel.refresh()` had NO caller outside the view model's own `init`**, and the view
+   model is `remember`ed for the life of the composition — so the corpus was **frozen at app start**
+   and a note written a minute later could not be found until restart. Its own KDoc says it "exists
+   for when it is genuinely stale"; nothing ever decided it was. Every other desktop view model with
+   a `refresh()` has it on a button or a `LaunchedEffect`; `CrashScreen` does exactly this one screen
+   over. ⚠️ And refreshing the corpus alone is **half the job with the visible half missing** — come
+   back to a screen still showing results for "kayak" and an updated `records` leaves the same stale
+   list, which reads exactly like the note not having been indexed. `refresh()` re-runs the standing
+   question, guarded on a non-blank box so the `init` call cannot mark the screen as searched.
+3. ⚠️ **"3 diarys" — and this one was LIVE ON THE PHONE.** The corpus line is
+   `"$n ${kind.label.lowercase()}${if (n == 1) "" else "s"}"`, written out **three times**: the
+   phone's search screen, the assistant's own `DeviceSearchTool`, and the desktop's. English plurals
+   are not `label + "s"`, and two labels are not: **DIARY → "3 diarys"** and **MEMORY → "2 memorys"**.
+   The phone has indexed both kinds all along, so it has been printing that on the screen the owner
+   has **twice** said they cannot find things on, and handing it to the model.
+   `RecordKind.count(n)` returns **the whole sentence, not just the noun** — returning the pieces
+   would leave two thirds of the duplication in place, since the singular/plural decision was stated
+   three times too. Eight kinds take the default; two name themselves.
+   `BODY_CHARS` moved to `DeviceSearch` beside `TITLE_FALLBACK_CHARS` for the same reason, with an
+   alias on the phone so no call site moved.
+
+#### Verification
+
+`:core:telemetry:test` **2,778** and `:desktop:build` **295**, both executed locally; CI green on
+both compile gates (`5bd3c8eb` 3m04s, `72c886ab` 3m02s) and **LCARS #2198 fully green and published
+to `latest`**, including all seven packaging assertions and the R8 keep gate.
+
+**Ten rules negative-tested** across the four commits, each against a baseline asserted green first,
+each perturbation asserted to have matched the source and each restore byte-compared.
+⚠️ **The decisive one is the general guard rather than a named case**, because what is worth catching
+is a kind nobody thought about: adding a plausible new member — `ITINERARY`, consonant + y, no
+plural — fails with **`[ITINERARY -> Itinerarys]`**, naming it. The two irregulars are asserted by
+name in the shape `LiveChannelsTest` uses; a rule clever enough to derive them would be worse to
+maintain than the two entries.
+
+⚠️ **The resolve gate's five complaints on K1 were PROVEN the documented cascade, not shrugged at.**
+`KnowledgeStore` lives in **`core:database`**, which that gate's classpath does not carry, and
+`LaunchedEffect` is androidx. The decisive control is **a known-good sibling on the same absent
+module**: `memory.clearHistory()` — a member of `JarvisMemory`, which lives in `core/database`, is
+already imported in that very file, and unquestionably compiles in CI — reports **identically**.
+
+⚠️ **`desktop/**` in `android-build.yml`'s `paths-ignore` was confirmed working in practice**, not
+merely on paper: a desktop-only push produced exactly one check run and did **not** supersede the
+in-flight Android build on the previous commit, which went on to publish.
+
+#### Decided against, with the reasoning
+
+**Indexing the phone's own study deck**, which is now three lines since the kind exists and
+`Routes.STUDY` is real. The desktop's rationale rests on a **grouped, wide** results layout; the
+phone renders a **flat list** with a kind tag per row, so cards would interleave with the guides
+they were drawn from on a small screen. Nothing claims the phone indexes them, so this is a feature
+rather than a defect, and the one surface the owner has complained about twice is the wrong place to
+add unmeasurable noise. It is `StudyStore.cards()` plus three lines whenever the owner wants it.
+
+⚠️ **`DesktopSearchIndex`'s KDoc claim that Android searches "ingested documents" became TRUE only
+with `5bd3c8eb`** — it was false when written and is correct now. Worth knowing before reading that
+paragraph as evidence of anything.
+
+**Open / steerable, unchanged from the arc above**, plus: the SEARCH directory entry still describes
+its corpus as *"Find a page, or a study card, by what you need"*, which is now an understatement
+rather than a false claim — changing it would alter what words reach device search, so it wants the
+same ranking sweep the D3 arc ran rather than a blind edit.
