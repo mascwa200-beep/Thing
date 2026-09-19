@@ -130,9 +130,14 @@ fun main() {
         val nowSetting = a.any { it.kind == RecordKind.SETTING }
         if (b.isEmpty() && nowSetting) reached++ else if (!nowSetting) stillNothing += w
     }
+    // ⚠️ Three buckets, not two. `reached` counts only words that returned LITERALLY NOTHING
+    // before, so a word that already returned a screen and now also returns a Settings row falls
+    // in neither — and printing just "80 of 90" read as ten failures when there were none.
     println("GAP WORDS (${gap.size} measured as reaching no Settings destination):")
-    println("  now reach a Settings row: $reached")
-    if (stillNothing.isNotEmpty()) println("  still reach nothing: ${stillNothing.joinToString()}")
+    println("  returned nothing before, reach a Settings row now: $reached")
+    println("  already returned something, reach a Settings row now: ${gap.size - reached - stillNothing.size}")
+    println("  STILL reach no Settings row: ${stillNothing.size}" +
+        if (stillNothing.isNotEmpty()) " — ${stillNothing.joinToString()}" else "")
 
     println()
     println()
