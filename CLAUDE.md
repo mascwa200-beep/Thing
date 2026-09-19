@@ -14547,6 +14547,68 @@ in under a minute, which beats the absence of a complaint.
 to **open a link** and check it opens rather than hunting for a screen by that name; then ask *"where
 do I turn on sponsor skipping"* and check it **searches** rather than guessing.
 
+#### Two more ways a tool can be dead, gated in the same file (`this commit`)
+
+The collision gate asked one question of the tool surface. Two neighbours had never been asked of
+it, and both guard drift more plausible than the collision that prompted them: **a class that
+implements `JarvisTool` and that `AppContainer` never builds** (dead exactly as `OpenLinkTool` was,
+one link earlier in the chain), and **a `usage` that leads with a verb dispatch does not answer
+to** (the `open` defect's own shape — the model told one thing, dispatch doing another).
+
+**Both are clean today — 57 declared, 57 constructed, 57 usages leading correctly** — so these are
+gates rather than fixes. CLAUDE.md recorded the registry as complete from a **one-off sweep**, and
+a one-off sweep is precisely what lets it drift back. **CI green on `df4f1505`** — `Run unit
+tests` 2m19s.
+
+⚠️ Two more negative results on the same surface, so nobody re-chases them: every tool name is a
+valid OpenAI function identifier (longest 18 against a 64 limit, so the constraint is nowhere
+near binding and a gate there would be noise), and the collision-vs-dispatch casing is
+consistent — schema `distinctBy { lowercase() }`, dispatch `equals(ignoreCase = true)`, gate
+`groupBy { lowercase() }`.
+
+⚠️ **A naive `class X(...) : JarvisTool` pattern finds 30 of the 57.** Most of these wrap their
+constructor list, so a single-line regex is blind to more than half the registry — including every
+tool in `DeviceActionTools.kt`, which is where the collision lived. Both self-checks anchor on that
+distinction: one tool that declares on one line, one that wraps.
+
+⚠️ **My first extractor had the bug this file keeps recording, and it presented as an empty set.**
+It returned only the pairs it managed to parse, so `ProposeDocTool` — whose `usage` is a
+`when (mode)` rather than a literal — was dropped on the floor, and the pinned-exception assertion
+saw `{}` with no way to tell *no templated tools exist* from *I cannot see the one that does*.
+`ToolText.usage` is nullable now, the discriminator is **what the extractor could not READ** rather
+than a `$` in the name (they coincide today and are different properties), and the two extractors
+**cross-check their counts**, so neither can drop a tool quietly.
+
+⚠️ **AND A NEGATIVE TEST THAT REPORTED NOTHING AT ALL, which is nastier than one that reports a
+compile error.** CLAUDE.md already records a perturbation being invalid ("it referenced a function
+that does not exist, so it reported a compile error, which is not evidence a guard is awake"). This
+was that *plus* a harness detail: emptying the pinned set to `setOf()` cannot infer `T` in a Kotlin
+property initializer, so it failed to COMPILE — and my loop piped each case through
+`grep -E 'perturbation applied|^OK \(|Tests run|AssertionError|restored'`, which **matches no
+compiler error line**. The case printed "perturbation applied" then "restored byte-identical" and
+nothing between, reading exactly like a sleeping guard. Two rules: the perturbation must COMPILE
+and still remove the property, and **never filter a negative test's output through a grep that
+cannot match a compiler error** — run the decisive case unfiltered.
+
+⚠️ **The harness's own baseline check hardcoded `OK (4 tests)`**, so adding a test read as "baseline
+not green" — a harness failure wearing the costume of a real one. It checks `OK (` now. A count in
+a guard drifts exactly like a count anywhere else.
+
+**Verification:** 6 tests green locally; four rules negative-tested against a baseline asserted
+green first, each perturbation asserted to have matched the source, each restore byte-compared.
+Case 6 restores a real drift and names the orphaned tool (`[OracleTool (OracleTool.kt)]`); case 9
+skips one file so the two counts disagree (`expected:<57> but was:<56>`). ⚠️ Case 7 produces TWO
+failures, and the second is correct rather than collateral: its perturbation changes the very
+literal `usageText()`'s self-check anchors on, so that self-check fires too — the self-check doing
+its job.
+
+**Registered but never asked, so recorded rather than gated:** every declared tool IS constructed
+and every usage DOES lead with its name, so neither gate changes behaviour today. And two veins
+came back clean — a naive tool-class sweep reports 30 of 57, which is a caveat for whoever
+re-measures rather than a finding; `LoggingTool` is a decorator and four tools are built
+conditionally, which is why the registration gate asks "constructed anywhere in `AppContainer`"
+rather than "present in `agentTools`" (the narrower question would report four working tools dead).
+
 **Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
 sites plus the `sectionVocab()` regex); the phone-side `settings?sec=` deep link (five interaction
 surfaces, not shippable blind); `ScanlineOverlay` and the eleven residue settings fields (an owner
