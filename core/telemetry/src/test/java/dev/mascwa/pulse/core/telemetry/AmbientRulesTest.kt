@@ -465,6 +465,57 @@ class AmbientRulesTest {
         assertEquals(wanted.size, d.allowed.size + d.refused.size)
         assertTrue(d.allowed.all { it in wanted })
     }
+
+    // ---- every capability the list declares is one a rule can reach ----
+
+    /**
+     * ⚠️ **Five actions were deleted from this enum because nothing asked for them, and all five
+     * were found by hand, one at a time.** `REQUEST_DND`, `RAISE_ALARM_VOLUME`, `DISABLE_CAMERA`,
+     * `HIDE_STATUS_BAR` and `BLOCK_SCREENSHOTS` were declared, given a label, an undo and a hold
+     * ceiling, and asked for by no rule at all — the "computed and never used" shape this repository
+     * keeps finding. Every test above it asks whether a *rule* behaves; none asks whether every
+     * *capability* is live, so a tenth action could be added tomorrow, pass all thirty of them, and
+     * be exactly as dead as those five.
+     *
+     * The sweep is a blind cross-product of the declared inputs on purpose. If a new action needs a
+     * dimension this does not vary, the right outcome is that this test fails and whoever adds it
+     * widens the sweep deliberately — the alternative is a hand-written list of situations that
+     * silently stops covering whatever it was not updated for.
+     *
+     * ⚠️ `decide`, never `permit`: the question is whether a rule ASKS, and `permit` filters by
+     * tier, so `SUSPEND_DISTRACTING_APPS` would be refused at the APP floor and read as dead.
+     */
+    @Test
+    fun `every action the closed list declares can be asked for by some rule`() {
+        val dark = EnvReading(light = LightState.DARK)
+        val alarm = SenseEvent(
+            key = SensoriumEvents.KEY_SMOKE_ALARM, title = "ALARM HEARD",
+            detail = "a smoke/fire/CO alarm is sounding nearby", severity = EventSeverity.ALERT,
+        )
+        val asked = mutableSetOf<AmbientAction>()
+        for (what in Situation.entries) {
+            for (phone in listOf(SenseContext(), ringing)) {
+                for (env in listOf(EnvReading(), dark)) {
+                    for (events in listOf(emptyList(), listOf(alarm))) {
+                        asked += actions(signals(what, env = env, phone = phone, events = events))
+                    }
+                }
+            }
+        }
+        val dead = AmbientAction.entries.filter { it !in asked }
+        assertTrue(
+            "no rule can ask for $dead — either the action is dead (delete it, as five others " +
+                "were) or this sweep does not vary the input it needs (widen it deliberately)",
+            dead.isEmpty(),
+        )
+        // ⚠️ And the sweep must be able to fail: if `decide` ever returned everything for every
+        // input, the assertion above would pass while testing nothing. A situation with no rule
+        // asks for nothing at all, which is the property `walking and sitting at a desk` names.
+        assertTrue(
+            "the sweep found every action for an input that should ask for none",
+            AmbientRules.decide(signals(Situation.WALKING)).isEmpty(),
+        )
+    }
     // ---- and when nothing is held, why ----
 
     /**

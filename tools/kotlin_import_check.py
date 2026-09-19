@@ -129,7 +129,7 @@ BUILTINS = set(
     System Math Locale UUID Runtime Thread Error Runnable LinkageError
     UnsatisfiedLinkError NoClassDefFoundError StackOverflowError OutOfMemoryError
     AssertionError CloneNotSupportedException InterruptedException
-    StackTraceElement StringBuffer ThreadLocal Iterable""".split()
+    StackTraceElement StringBuffer ThreadLocal Iterable AutoCloseable""".split()
 )
 
 

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.oracle
 
+import dev.mascwa.pulse.testing.SourceGate
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -72,8 +73,22 @@ class OracleSignalCoverageTest {
      */
     private val construction = Regex("""(?<![A-Za-z0-9_])OracleSignals\(""")
 
-    /** The body of the first `(` … `)` after [decl], brace-matched so a multi-line call survives. */
-    private fun argsAfter(src: String, decl: Regex): String {
+    /**
+     * The body of the first `(` … `)` after [decl], brace-matched so a multi-line call survives.
+     *
+     * ⚠️ **Comments are stripped first, and both halves of that matter.** Without it a
+     * commented-out named argument — the natural way somebody disables a signal for an afternoon —
+     * reads as a populated field, so this gate would pass on the documentation of a defect rather
+     * than on its absence, which is the exact failure `CredentialCoverageTest` was negative-tested
+     * against. And the paren matching needs it too: an unbalanced bracket inside a comment
+     * (`// closes the loop )`) would end the body early and silently drop every field after it.
+     *
+     * Measured at the time of writing: the phone's construction carries no comments at all and the
+     * desktop's carries four lines contributing no names, so this is **latent rather than live** —
+     * one edit away, in the file most likely to get one.
+     */
+    private fun argsAfter(rawSrc: String, decl: Regex): String {
+        val src = SourceGate.stripComments(rawSrc)
         val m = decl.find(src) ?: error("not found in source: ${decl.pattern}")
         val open = src.indexOf('(', m.range.last)
         var depth = 0
@@ -133,6 +148,57 @@ class OracleSignalCoverageTest {
                 "with the platform that does: $missing",
             missing.isEmpty(),
         )
+    }
+
+    /**
+     * ⚠️ A fixture rather than the live source, and that is the whole reason it exists.
+     *
+     * The stripping in [argsAfter] guards a case that is **latent**: measured at the time of
+     * writing, the phone's construction carries no comments at all and the desktop's carries four
+     * that contribute no names. So deleting the strip changes nothing about today's tree — a
+     * negative test against the live source would report the guard asleep when it is simply not
+     * reached, which is this repository's third recorded way a green test proves nothing.
+     *
+     * A fixture reaches the branch. Both halves are here because they fail differently: a
+     * commented-out argument is a **silent false pass** (a field nobody sets reads as populated),
+     * while an unbalanced bracket inside a comment ends the body early and **silently drops every
+     * field after it**, which would report live fields as missing.
+     */
+    @Test
+    fun `a commented-out argument is not a populated field`() {
+        // ⚠️ The COMMA inside the comment is what makes this fixture reach the branch, and finding
+        // that out took a negative test. A plain `// dead = 2,` is already excluded by `namedArgs`'
+        // own anchor — the name has to follow a `(`, a `,` or a line start, and the `//` sits
+        // between — so a fixture built only from those passes with the stripping deleted and proves
+        // nothing. A comma inside ordinary English prose ("see the note above, disabled = 3") puts
+        // the name straight after an anchor, and that one really does get through.
+        val src = """
+            fun build() = OracleSignals(
+                alive = 1,
+                // dead = 2,
+                // see the note above, disabled = 3
+                /* and here too, blocked = 4 */
+                stillAlive = 5,
+            )
+        """.trimIndent()
+        val got = namedArgs(argsAfter(src, construction))
+        assertTrue("a live argument was lost", "alive" in got && "stillAlive" in got)
+        assertTrue("a commented-out argument was counted as populated: $got", "dead" !in got)
+        assertTrue("a name after a comma in a line comment was counted: $got", "disabled" !in got)
+        assertTrue("a name after a comma in a block comment was counted: $got", "blocked" !in got)
+    }
+
+    @Test
+    fun `a bracket inside a comment does not end the argument list early`() {
+        val src = """
+            fun build() = OracleSignals(
+                first = 1,
+                // this closes the loop )
+                last = 2,
+            )
+        """.trimIndent()
+        val got = namedArgs(argsAfter(src, construction))
+        assertTrue("the body ended at a comment's bracket and lost everything after it: $got", "last" in got)
     }
 
     @Test
