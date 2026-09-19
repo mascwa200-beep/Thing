@@ -174,7 +174,14 @@ fun ScreenHost(
             modifier = m,
         )
         Screen.STUDY -> StudyScreen(vms.study, onOpenGuide = onOpenGuide, modifier = m)
-        Screen.SEARCH -> SearchScreen(vms.search, onOpenGuide = onOpenGuide, modifier = m)
+        Screen.SEARCH -> SearchScreen(
+            vm = vms.search,
+            onOpenGuide = onOpenGuide,
+            // The box can now answer "where is that", and going there is the one thing only a host
+            // can do — the same reason ANOMALIES and ADVISORIES are handed this.
+            onOpenScreen = onOpenScreen,
+            modifier = m,
+        )
         Screen.LIBRARY -> LibraryScreen(
             vm = vms.libraryVm,
             repository = vms.library,

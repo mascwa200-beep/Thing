@@ -47,6 +47,22 @@ on:
       # an application cannot depend on an application.
       - "sky/**"
       - ".github/workflows/sky-build.yml"
+      # ⚠️ The Windows companion — the THIRD time this list has been missing a module that cannot
+      # affect this build, after `nutrition/**` and `sky/**`, and it has been the most expensive:
+      # every desktop-only commit has fired a full thirteen-minute build here and republished a
+      # 662 MB APK that the in-app updater then pulls in full.
+      #
+      # Checked rather than assumed, to the same bar the entries above set: NOTHING declares
+      # `project(":desktop")` anywhere, no build script reads a path under `desktop/`, and the
+      # dependency runs one way only — `:desktop` declares `:core:telemetry` and `:core:feeds`, and
+      # neither declares it back. `desktop/build.gradle.kts` is inside this pattern and is a leaf,
+      # so a change there cannot move what `:app:assembleRelease` compiles either.
+      #
+      # ⚠️ The desktop bundles assets OUT OF `app/` and `core/sky/` — its own workflow lists them —
+      # but that is it reading this app, never the reverse, and those paths are deliberately not
+      # listed here because a change to them really can move this build.
+      - "desktop/**"
+      - ".github/workflows/desktop-build.yml"
       # ⚠️ The manual catalogue warmer, for the same reason and with one wrinkle worth stating:
       # it does touch something this build reads — it fills the shared Actions cache entry the
       # star-catalogue action restores. But that is the only thing it does, and a miss simply

@@ -13598,3 +13598,121 @@ deep link (`settings?sec=`) would land on the section rather than its category �
 argument, a seed-once VM field, a focused branch in `vis`, a visible "SHOW ALL" affordance and two
 clearing wires, so it was not shipped blind. The desktop's own search can find neither a screen nor
 a setting — a real gap, and a different arc.
+
+### #466 MERGED, AND THE DESKTOP'S SEARCH CAN FIND A SCREEN (this session cont.)
+
+Owner: *"Mark it ready and merge into main, then continue autonomously"*, with the standing
+relaxation *"don't burn through the usage but you are allowed to use ultra code."* **Zero subagent
+and zero workflow spend**, which is what that instruction still buys most cheaply here.
+
+**PR #466 merged as `db229ef4`** (squash, the repo norm — #464's merge commit was an explicit
+one-off for a 919-commit branch). Dev branch re-synced with `--no-ff`; committer confirmed
+`Claude <noreply@anthropic.com>` rather than GitHub's, which is what the stop-hook flags.
+
+⚠️ **FOUR REDUNDANT MAIN BUILDS CANCELLED, and the check that justifies it is one command.**
+`git diff --stat origin/main 92dbf7ad` came back **empty** — a squash onto an unmoved base produces
+a tree identical to the branch tip — and `latest` already held build **#2187 from `92dbf7ad`**
+(694,620,890 bytes, uploaded 08:17). So LCARS #2188, Nutrition #159, Sky #43 and Desktop #317 would
+each have republished byte-identical apps under new versionCodes, costing the owner **662 + 180 +
+291 MB** of auto-download for nothing. The precedent is recorded above for LCARS #2181/Sky #38;
+this is the same move, and main is verified by transitivity from a fully green build of the same
+tree. ⚠️ The re-sync push that followed fired **no runs at all**, re-confirming that `paths-ignore`
+skips a merge commit whose diff is empty.
+
+#### The desktop's search could not find a screen (`701e1c7c`)
+
+The gap the last arc's own tandem verdict recorded as open. `DesktopSearchIndex` held the bundled
+library and this machine's study cards; **no screen was in it at all**, so typing "weather" found
+guides about weather and never the WEATHER screen. Same defect class as the phone's Settings
+vocabulary, one layer over — except `DESK_GROUPS` is already a **top-level** list carrying a label,
+a description and the words people type when they call a screen something else. Nothing new had to
+be written down; it was simply never fed to search.
+
+⚠️ **Screens are searched SEPARATELY from the library, which departs from the phone, and the reason
+is arithmetic rather than taste.** `DeviceSearch.search` caps a kind at four places and fills the
+rest **only when everything that matched is one kind**. This machine's corpus is ~96% guides, so a
+guides-only query takes that fill today and returns twelve; the moment one screen also matched, the
+same query would return **four**. Cutting the reading answer by two thirds to make room for one row
+is the wrong trade on a screen whose own description is *"Find a page, or a study card, by what you
+need"*. Two searches over disjoint corpora make *"nothing is displaced"* true **by construction**
+rather than by a measurement someone must keep re-running — the same argument `RecordKind.SETTING`'s
+KDoc makes on the phone. ⚠️ The phone does NOT have this problem and needs no matching change: with
+ten kinds its fill branch essentially never fires, so guides are capped at four there regardless.
+
+⚠️ **GO HERE renders BEFORE the empty-results early return**, for the reason the deep-hits block
+already documents and more sharply: the queries most likely to name a screen and nothing else —
+"settings", "crash console", "packs", "remote" — are exactly the ones **no guide matches**, so
+putting it after would hide the answer in the only case where it IS the answer. Fixing that exposed
+an adjacent one: *"Nothing here matches that."* now requires nothing **anywhere**, which it already
+did not for deep hits.
+
+⚠️ **Search terms go in `headings`, never `summary`.** A row draws the summary, so terms there would
+render *"Internet radio — near you, starred, and always on music stream station listen fm somafm
+audio"*. `headings` is matched at a heavier weight (5 vs 2) and never drawn — exactly how a guide is
+indexed by `toSearchEntry`, so one field means one thing on both.
+
+⚠️ **The phone's body-vs-title filter is deliberately NOT copied.** It exists because a keyword list
+repeats its own title *by construction* and would outrank the screen it describes. Here the
+descriptions are human prose and the only thing a screen record competes with is another screen
+record — where a self-repeat (RADIO's) ranks the right answer first. Copying a fix whose reason does
+not hold would need a KDoc that is false.
+
+**Verified:** `:desktop:build` green, **288 tests, 0 failures on a forced re-run**; three rules
+negative-tested against a baseline asserted green first, each failing exactly the test that names
+it, tree restored byte-identical.
+
+⚠️ **My own assertion was wrong where the code was right, ~22nd in this arc-series.** I first
+required that no search term appear anywhere in a description — and **sixteen entries across eleven
+screens** break that with ordinary English: "Your daily log" contains "log", "The forecast, and what
+it will actually feel like" contains "forecast". The two equalities beside it (`summary ==
+description`, `headings == searchTerms`) already pin the split *exactly*, since a summary equal to
+the description cannot also be a concatenation. **Compute the expected value from the shipped data
+before writing the assertion** — running the extractor first would have shown all sixteen.
+
+⚠️ **A harness bug worth recognising instantly: bash cannot pass a NUL byte in argv.** The
+negative-test script encoded each perturbation as `old\x00new` in one argument; the NUL is stripped,
+the split found one field, and **every case reported itself invalid**. It did NOT report three
+sleeping guards, because the script asserts the substitution landed before running anything — which
+is the guard that turned a silent false result into a loud one. Pass `old` and `new` as separate
+arguments. (`scratchpad/desksearch/neg.sh`.)
+
+#### A desktop-only commit stopped rebuilding the phone app (`5f709313`)
+
+⚠️ **`desktop/**` was never in `android-build.yml`'s `paths-ignore` — the THIRD instance of an
+omission that file documents twice, and the most expensive.** Every desktop-only commit has fired a
+full thirteen-minute Android build and republished a **662 MB** APK the in-app updater pulls in
+full, for a change that cannot reach the Android app.
+
+Checked to the bar those comments set rather than assumed: **nothing declares `project(":desktop")`
+anywhere**, no build script reads a path under `desktop/`, and the dependency runs one way only
+(`:desktop` declares `:core:telemetry` and `:core:feeds`; neither declares it back).
+⚠️ What keeps it safe is that `paths-ignore` skips only when **EVERY** changed path matches, so a
+commit touching the desktop alongside a shared core still builds. Simulated against the real file
+across eight change shapes, matcher asserted able to see a known-ignored path first:
+
+    desktop only ................. SKIP     (the saving)
+    desktop + a shared core ...... BUILD    (the safety net)
+    a shared core alone .......... BUILD
+    app code alone ............... BUILD
+    the android workflow itself .. BUILD
+
+⚠️ The desktop bundles assets **out of** `app/` and `core/sky/` — its own workflow lists them — but
+that is it reading this app, never the reverse, so those paths are deliberately not ignored here.
+Confirmed in practice on the very next push: only Desktop Build fired; Sky and Nutrition correctly
+did not, their allowlists not matching. The one Android run that did fire (because the push changes
+that workflow, a path not in the list) was cancelled after
+`git diff --stat 92dbf7ad HEAD -- app/ core/ gradle/ settings.gradle.kts build.gradle.kts` came
+back empty, proving the APK byte-identical.
+
+**Open / steerable:** the desktop's settings half of that recorded gap needs nothing — its Settings
+is a single screen with no sections, and "units"/"location" already reach it through its own search
+terms. The phone-side items from the last arc stand unchanged (control-level vocabulary,
+`settings?sec=`). **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
+notification-mail.
+
+⚠️ **Owner-verify on Windows — this container has no GL context, so nothing here is render-proven.**
+Type "weather" into SEARCH: a **GO HERE** block should appear above the guides with the WEATHER
+screen in it, and clicking it should navigate rather than open the reader. Then type "crash console"
+or "packs" — words no guide matches — and confirm the screen still appears rather than *"Nothing
+here matches that."* And check the library answer is unchanged: a subject query should still return
+a full page of guides, not four.
