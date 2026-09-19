@@ -1,0 +1,1 @@
+latitude longitude place fahrenheit celsius miles kilometres kilometers feet metres meters clock hour country code iso refresh interval recording token github key api eia automatic community reports standby screensaver wallpaper lock

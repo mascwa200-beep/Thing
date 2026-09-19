@@ -1,0 +1,27 @@
+HOME	OVERVIEW	Home	Everything worth knowing, on one page	dashboard overview start summary today
+LIBRARY	KNOWLEDGE	Library	Every bundled page, by subject — works offline	guides wiki encyclopedia reference read book
+SEARCH	KNOWLEDGE	Search	Find a page, or a study card, by what you need	find lookup
+STUDY	KNOWLEDGE	Study	Learn the library a piece a day, and be asked again	quiz practice flashcards course teach
+PACKS	KNOWLEDGE	Packs	Add more subjects — downloads once, then offline	expansion download more guides
+ANOMALIES	THE WORLD	Anomalies	What is unusual right now, judged against what this machine has watched	unusual strange normal baseline record history ledger long watch highest lowest
+ADVISORIES	THE WORLD	Advisories	What is worth knowing right now, across every feed at once	oracle insights alerts brief briefing what matters now
+NEWS	THE WORLD	News	Headlines, refreshed while you watch	headlines stories press wire lemmy mastodon hacker news
+LIVE	THE WORLD	Live	Television news, in a window of its own	tv channels broadcast watch
+RADIO	THE WORLD	Radio	Internet radio — near you, starred, and always on	music stream station listen fm somafm audio
+SAFETY	THE WORLD	Nearby danger	Earthquakes, disasters and official warnings near you	emergency alerts quake warning incident crime
+PLACES	THE WORLD	Nearest help	Hospitals, shelters and food banks, with how to reach them	hospital shelter clinic food bank a&e emergency room
+WILDLIFE	THE WORLD	Wildlife	What lives around here and what to do about it	animals snake bear bite sting fauna
+MARKETS	THE WORLD	Markets	Your watch list, and whether the market is even open	stocks shares crypto prices ticker forex commodities
+WEATHER	THE WORLD	Weather	The forecast, and what it will actually feel like	forecast rain temperature wind air quality uv
+ECONOMY	THE WORLD	Economy	A country's figures, each with how old it is	inflation gdp unemployment world bank indicators
+FUEL	THE WORLD	Fuel & energy	What crude, gas and petrol cost	oil petrol gasoline diesel crude brent wti natural gas pump
+MAP	MAPS & SKY	Map	Where everything is — aircraft, incidents, help, and the night	atlas terrain satellite streets where location coordinates mgrs navigate
+SPACE_WEATHER	MAPS & SKY	Space weather	What the Sun is doing, and what it is doing to us	solar aurora kp flare sunspot radio hf geomagnetic
+OBSERVATORY	MAPS & SKY	Observatory	The station, the Sun and Moon, what is passing, what is launching	iss satellite moon sunrise sunset planets asteroid launch rocket
+RADAR	MAPS & SKY	Radar	Aircraft and earthquakes within range	planes flights aviation adsb quake seismic
+NOTES	YOUR THINGS	Notes	Filed snippets, by category	memo write jot library
+DIARY	YOUR THINGS	Diary	Your daily log	journal entries log
+REMOTE	THIS MACHINE	Remote	Pair with your phone and control it over the local network	phone pair link control
+SETTINGS	THIS MACHINE	Settings	Every switch and preference	preferences options config units location
+ABOUT	THIS MACHINE	About	Which build you are on, and install a newer one	version update upgrade build
+CRASH	THIS MACHINE	Crash console	What went wrong, and when — kept on this machine	fault error exception stack trace log diagnostics bug broken

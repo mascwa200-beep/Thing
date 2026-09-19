@@ -13704,11 +13704,16 @@ that workflow, a path not in the list) was cancelled after
 `git diff --stat 92dbf7ad HEAD -- app/ core/ gradle/ settings.gradle.kts build.gradle.kts` came
 back empty, proving the APK byte-identical.
 
-**Open / steerable:** the desktop's settings half of that recorded gap needs nothing — its Settings
+~~**Open / steerable:** the desktop's settings half of that recorded gap needs nothing — its Settings
 is a single screen with no sections, and "units"/"location" already reach it through its own search
-terms. The phone-side items from the last arc stand unchanged (control-level vocabulary,
-`settings?sec=`). **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
-notification-mail.
+terms.~~ ⚠️ **WRONG, and wrong in the way that matters: it reasoned from the two words that happen
+to be there instead of measuring the screen.** That Settings has **seven** sections and nineteen
+controls, and **all nineteen plus six of the seven sections could be reached by no word of their
+own name** — `location` does not even reach the section it names, *"WHERE YOU ARE"*. Closed by the
+D3 section at the end of this file. The phone-side items from the last arc stand unchanged
+(control-level vocabulary — since closed too, see *"Every Settings row can be found by typing its
+own name"* — and `settings?sec=`). **Task #20 (retire IMAP) is still HELD** pending the owner's
+Pixel confirmation of notification-mail.
 
 ⚠️ **Owner-verify on Windows — this container has no GL context, so nothing here is render-proven.**
 Type "weather" into SEARCH: a **GO HERE** block should appear above the guides with the WEATHER
@@ -13806,3 +13811,135 @@ five SECURITY sections through the category keywords. Neither is this change's.
 `finnhub` or `nasa` → a `Settings · API keys` row. `allergies` or `medications` → the medical card.
 `python` or `anchor` → Storage & about. Then the control: `weather` must still lead with WEATHER and
 `sos` with SOS.
+
+### THE DESKTOP'S SETTINGS CAN BE FOUND BY WHAT IT CONTROLS (this session, PR #469)
+
+PR #468 merged as **`ca2a0a02`** (squash, the repo norm) and the dev branch was re-synced with
+`git merge --no-ff`. ⚠️ **LCARS #2192 on main was cancelled** after
+`git diff --stat 37769e1e origin/main -- app/ core/ gradle/ settings.gradle.kts build.gradle.kts
+.github/` came back **empty**: main's buildable tree is byte-identical to the branch tip LCARS
+#2191 had just built and published, so #2192 would have republished the same APK under a new
+versionCode and cost the owner a **662 MB** download for nothing. Desktop, nutrition and sky
+correctly did not fire — #468 touched none of their paths. **Zero subagent and zero workflow spend
+this whole session**, per the standing plan-usage constraint, which overrides the ultracode
+directive as it has for every arc since.
+
+Then the next arc, found by **checking a claim in this file rather than trusting it**.
+
+**⚠️ THE CLAIM WAS MINE, IT WAS WRONG, AND IT WAS WRONG IN THE MOST INSTRUCTIVE WAY: it reasoned
+from the two words that happened to be there instead of measuring the screen.** It said the
+desktop's Settings "needs nothing — its Settings is a single screen with no sections, and
+`units`/`location` already reach it through its own search terms". That screen has **seven**
+sections and nineteen controls, and measured with a self-checked extractor:
+
+| | before |
+|---|---|
+| controls reachable by no word of their own name | **19 of 19** |
+| sections reachable by no word of their own name | **6 of 7** — only UNITS |
+
+So somebody hunting the Fahrenheit switch, the country code, the GitHub token, the EIA key or the
+screensaver got nothing, from the command bar and from SEARCH's GO HERE block alike, since both
+read the same `DeskEntry`. ⚠️ And `location` does not even reach the section it names, which is
+called *"WHERE YOU ARE"* — the word is in the terms, the section uses different English.
+
+The fix is **one `searchTerms` list**: no new row, no new type, no new emission path. 33 of 33
+control and section words now reach Settings.
+
+#### ⚠️ Nothing taken is a word another screen owns, and that discipline is the whole design
+
+`long watch` is ANOMALIES' verbatim, `watch` and `channels` are LIVE's, `library` is LIBRARY's,
+`build`/`update` are ABOUT's, `download` is PACKS', **`launch` is OBSERVATORY's**, `fault` is
+CRASH's, `where` is MAP's. Settings holds the *switch* for several of those and the screen that
+shows the result is still the better answer: someone typing "long watch" wants to see it, not to
+turn it off.
+
+Measured over the **283 words a screen says about itself**, running the shipped `GuideSearch` and
+`DeviceSearch` over the real `Directory.kt` (`scratchpad/deskfind/rank.sh`, the phone arc's recipe):
+**0 screens lose the top spot, 0 are evicted, and not one of twelve contested words moves.**
+
+⚠️ **MY OWN EXPECTATION WAS WRONG WHERE THE CODE WAS RIGHT, ~23rd in this arc-series, and only a
+control run showed it.** The probe reported `watch` going to Anomalies rather than Live and I read
+it as a regression; it goes there **before** this change too, because ANOMALIES' own `long watch`
+term tokenises to `long` and `watch`. A pre-existing ambiguity between two screens, not something a
+diff can cause. The harness scores **both** corpora now, so "who should own this word" (my opinion)
+cannot be mistaken for "did this change move it" (the measurement). **Score both sides whenever the
+assertion encodes a judgement.**
+
+#### The gate runs the shipped search rather than a copy of its rules
+
+`GuideSearch.wordMatch` is `internal`, and `internal` is scoped to a Gradle module — so
+`SettingsFindabilityTest` cannot call it and **must not restate it**: a mirrored stem rule would
+drift from the ranker silently and the gate would then be measuring itself. It asks
+`DesktopSearchIndex.screenRecords()` and `DeviceSearch.search()` the same question the application
+asks, so "findable" means findable there by construction, capping and all.
+
+⚠️ **The property is per-SECTION, not per-control, and one label settles it.** *"Look for a newer
+build on launch"* has exactly one distinctive word and OBSERVATORY owns it, so a rule demanding
+every control be individually typeable would **force this entry to steal it**. Four labels are
+pinned by name with a reason each, in the shape `LiveChannelsTest` uses — assert the exceptions, so
+a NEW unreachable control fails and these do not. The other three are action buttons inside a
+section that is itself reachable.
+
+#### ⚠️ Two of the gate's own guards came back asleep, both mechanism #3
+
+*The fixture never reached the branch* — and the right response was to investigate each, not to
+delete it and not to patch around it.
+
+- **Blanking comments.** The screen contains **zero** commented-out controls (measured), so
+  perturbing it changed nothing. An earlier assertion that `"Boot sequence"` — quoted in the
+  paragraph explaining why there is no APPEARANCE section — never becomes a label **could not
+  fail**, since it is not inside a control call and no extractor would have picked it up either
+  way. The guard is prophylactic and now says so; its behaviour is pinned against a fixture that
+  does reach it, **with a control run** proving the unblanked extractor really does pick the
+  commented labels up.
+- **Skipping declarations.** Investigating showed it **cannot fire at all**: `label: String = "x"`
+  has `: String` between the name and the `=`, so the named-argument pattern misses it, and the
+  positional one needs a quote as the very first token. Both label rules already exclude
+  declarations. Kept as a second lock, on the `PassThrottle`/`MilkyWay` precedent, because the
+  first is *incidental* — loosen either pattern to catch some new call shape and a declaration is
+  caught with it, silently, as a control nobody can type. The comment says exactly that rather than
+  claiming more, and the assertion states the property without claiming which rule enforces it.
+
+⚠️ My own fixture for the declaration case was **also** mechanism #3: I wrote
+`label: String = "Declared default"` expecting the label pattern to catch it, which is precisely
+what it cannot do. Recorded rather than quietly fixed, because the shape repeats.
+
+#### A real defect in a local gate, found by it reporting this very test as broken
+
+⚠️ **A Kotlin raw string is closed by the LAST three quotes of a run**, so
+`Regex("""label\s*=\s*"([^"]*)"""")` ends in a **four**-quote run. `tools/kotlin_missing_return.py`
+stopped at the first `"""`, leaving one quote outside the literal, which opened a phantom string
+that swallowed the function's `return` and reported a perfectly good function as never returning.
+**Third time this repository has found a lexer here that did not know one more Kotlin string form**
+(the import gate's char-literal blind spot, then its escaped-identifier one, now this).
+
+Negative-tested **both ways**: the false positive clears, and a genuinely missing return **in a file
+containing the same four-quote run** still fails — which is what proves the fix is not blindness.
+Measured across all **1,069** Kotlin files: **1 finding before, 0 after, zero new.**
+
+#### Verification
+
+`:desktop:build` green at **293 tests** (288 + 5), genuinely executed here. **Five rules
+negative-tested** against a baseline asserted green first, each perturbation asserted to have
+matched the source, the tree restored under a shell `trap … EXIT` and byte-compared. ⚠️ The decisive
+one: restoring the old five search terms fails the gate and names **exactly the six sections** the
+Python measurement found — two independent implementations agreeing, which is the strongest
+evidence this kind of guard can produce.
+
+⚠️ **A gate-result read honestly rather than inferred:** `--rerun-tasks -q` prints nothing on
+success, which is indistinguishable from a run that never happened, so every result here came from
+parsing the JUnit XML and listing the test names.
+
+#### ⚠️ A CI-cost assumption of mine that was wrong, checked before acting on it
+
+I was about to add `scratchpad/**` to `android-build.yml`'s `paths-ignore` to stop verification
+residue costing a 662 MB republish. **It is already there** (line 81, with its own comment). What
+fires the build on this push is `tools/kotlin_missing_return.py`, and a blanket `tools/**` ignore
+would be **wrong**: `tools/food/build_food_db.py` and `tools/sky/check_packaged.py` genuinely drive
+that build (lines 413, 520, 771). One build is the honest cost of touching a shared tool.
+
+**Open / steerable:** the phone-side `settings?sec=` deep link stands unchanged (five interaction
+surfaces, not shippable blind). `SettingsSection.key` still has zero reads despite a KDoc claiming
+otherwise — 26 constructor call sites plus the `sectionVocab()` regex, recorded rather than bundled
+into a verified PR. **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation
+of notification-mail.

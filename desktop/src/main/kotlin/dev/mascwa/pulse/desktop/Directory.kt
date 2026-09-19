@@ -111,8 +111,42 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
     DeskGroup("THIS MACHINE", { it.muted }, listOf(
         DeskEntry(Screen.REMOTE, "Remote", "Pair with your phone and control it over the local network",
             listOf("phone", "pair", "link", "control")),
+        // ⚠️ Measured before these were added: **all nineteen controls on that screen, and six of
+        // its seven sections, could be reached by NO word of their own name.** Only UNITS was
+        // findable, through `units`. So someone hunting the Fahrenheit switch, the country code,
+        // the GitHub token, the EIA key or the screensaver got nothing — from the command bar and
+        // from SEARCH's GO HERE block alike, since both read this list. Grouped by the section
+        // that owns them, which is the only thing that keeps the list maintainable as the screen
+        // grows.
+        //
+        // ⚠️ **Nothing here is a word another screen already owns, and that discipline is the
+        // whole design.** `long watch` is ANOMALIES' verbatim, `watch` and `channels` are LIVE's,
+        // `library` is LIBRARY's, `build`/`update` are ABOUT's, `download` is PACKS', `launch` is
+        // OBSERVATORY's, `fault` is CRASH's, `where` is MAP's. Settings holds the SWITCH for
+        // several of those and the screen that shows the result is still the better answer:
+        // someone typing "long watch" wants to see it, not to turn it off. Measured over the 283
+        // words a screen says about itself — 0 screens lose the top spot, 0 are evicted from the
+        // slate, and not one of twelve contested words moves. `scratchpad/deskfind/rank.sh`.
         DeskEntry(Screen.SETTINGS, "Settings", "Every switch and preference",
-            listOf("preferences", "options", "config", "units", "location")),
+            listOf(
+                "preferences", "options", "config",
+                // WHERE YOU ARE
+                "location", "latitude", "longitude", "place",
+                // UNITS. Both spellings on purpose: the labels say one and an American types the
+                // other, and neither is a prefix of the other, so the stem rule cannot bridge them.
+                "units", "fahrenheit", "celsius", "miles", "feet",
+                "kilometres", "kilometers", "metres", "meters", "clock", "hour",
+                // YOUR COUNTRY
+                "country", "code", "iso",
+                // DATA & REFRESH
+                "refresh", "interval",
+                // THE LONG WATCH — `recording`, never `record` or `long watch`, which are ANOMALIES'.
+                "recording",
+                // LIBRARY & UPDATES
+                "token", "github", "key", "api", "eia", "automatic", "community", "reports",
+                // STANDBY DISPLAY
+                "standby", "screensaver", "wallpaper", "lock",
+            )),
         DeskEntry(Screen.ABOUT, "About", "Which build you are on, and install a newer one",
             listOf("version", "update", "upgrade", "build")),
         DeskEntry(Screen.CRASH, "Crash console", "What went wrong, and when — kept on this machine",
