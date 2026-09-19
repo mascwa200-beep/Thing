@@ -92,18 +92,27 @@ object DeviceSearchIndex {
                     body = (listOf(f.pitch) + terms[f.key].orEmpty()).joinToString(" "),
                 )
             }
-        // Every Settings CATEGORY is findable by name ("notifications", "storage") and opens
-        // Settings AT that category — a FEATURE id IS a route by convention, and openApp carries
-        // the argument through. This is the settings?cat= route argument's first producer: it
-        // shipped with zero callers (this repo's recorded computed-and-never-used class).
-        val settingsCats = dev.mascwa.pulse.feature.settings.SettingsCategory.entries.map { cat ->
-            DeviceSearch.of(
-                id = "${dev.mascwa.pulse.navigation.Routes.SETTINGS}?cat=${cat.name.lowercase()}",
-                kind = RecordKind.FEATURE,
-                title = "Settings · ${cat.title}",
-                body = "${cat.blurb} ${cat.keywords}",
-            )
-        }
-        return features + settingsCats
+        // Every place inside Settings — each CATEGORY by name ("notifications", "storage"), and
+        // each SECTION within one, which is where the vocabulary actually lives. A section's
+        // keywords used to be a literal passed to a LOCAL function inside the Settings composable,
+        // so nothing outside that screen could read them: 52 words a person would plausibly type —
+        // "sponsorblock", "anydesk", "iptv", "gmail", "stooq" — reached no Settings destination
+        // from here at all. The row's title names the section so the page it opens can be scanned
+        // for it; several sections share one destination, deliberately.
+        //
+        // ⚠️ RecordKind.SETTING, not FEATURE, and measured rather than reasoned about: a Settings
+        // row's body is a keyword list, so it repeats its own title and scores a title hit AND a
+        // body hit where a real screen scores only the title hit — fields sum, with no length
+        // normalisation anywhere in the scorer. As FEATUREs these rows outranked the screens they
+        // describe and pushed two off the slate entirely for "device". The separate kind gives
+        // them their own budget; SettingsSections.row() removes the double count. Both were needed.
+        //
+        // ⚠️ The rows are built THERE, not here, so the body rule has one home. This used to
+        // assemble the category rows inline, which is how they missed the filter the sections got.
+        val settings = dev.mascwa.pulse.feature.settings.SettingsSections.searchRecords()
+            .map { (route, title, body) ->
+                DeviceSearch.of(id = route, kind = RecordKind.SETTING, title = title, body = body)
+            }
+        return features + settings
     }
 }
