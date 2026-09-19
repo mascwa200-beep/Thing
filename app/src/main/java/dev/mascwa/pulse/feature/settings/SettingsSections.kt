@@ -28,7 +28,19 @@ import dev.mascwa.pulse.navigation.Routes
  * one surface that already worked in order to fix the two that did not.
  */
 data class SettingsSection(
-    /** Stable, unique, lowercase. Used by the coverage gate and for reading a diff — never shown. */
+    /**
+     * Stable, unique, lowercase. Never shown.
+     *
+     * ⚠️ **Nothing reads this, and the claim that used to stand here — "used by the coverage gate"
+     * — was false.** `SettingsSectionCoverageTest` identifies a section by its Kotlin `val`
+     * identifier, which it extracts from the source text (`tableKeys()`); it never touches this
+     * field. Measured: all 26 values are exactly `valName.lowercase()`, so the field is redundancy
+     * that can silently drift from the identifier it duplicates.
+     *
+     * Kept for now rather than deleted, because removing it touches 26 constructor call sites and
+     * belongs in a change of its own — but recorded here honestly, so nobody reasons from the old
+     * sentence and believes a gate is watching this.
+     */
     val key: String,
     val category: SettingsCategory,
     /**
