@@ -224,6 +224,18 @@ object DeviceSearch {
      * The body goes in `summary` because that is the field [GuideSearch] searches for prose; a note
      * has no headings and its "category" is what kind of thing it is, which is what the reader wants
      * to see beside it anyway.
+     *
+     * @param terms extra words to match on that are **never drawn** — the synonyms somebody types
+     *   when they call a thing by another name ("planes" for the radar, "aurora" for space weather).
+     *   ⚠️ These belong here and NOT in [body], for two measured reasons. A result row renders the
+     *   summary, so a synonym list put there is printed as though it were the description: the
+     *   phone's own SOS row read *"Call, strobe and alarm for help emergency help 911 rescue
+     *   distress"*, and `DeviceSearchTool` handed the same string to the model as that screen's
+     *   description. And [GuideSearch] weights a heading at 5 against a summary's 2, so synonyms in
+     *   the body are worth less than half what they should be — moving the phone's 31 term lists
+     *   across improved **108** synonym queries, left 62 unchanged and made **none** worse.
+     *   ⚠️ Last in the parameter list on purpose: `atMs` is passed positionally at several call
+     *   sites, so inserting anything before it would silently re-bind those arguments.
      */
     fun of(
         id: String,
@@ -231,12 +243,14 @@ object DeviceSearch {
         title: String,
         body: String = "",
         atMs: Long = 0L,
+        terms: List<String> = emptyList(),
     ): Record = Record(
         entry = GuideSearch.Entry(
             id = id,
             title = title.ifBlank { body.take(TITLE_FALLBACK_CHARS) },
             category = kind.label,
             summary = body,
+            headings = terms,
         ),
         kind = kind,
         atMs = atMs,

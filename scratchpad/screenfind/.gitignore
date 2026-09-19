@@ -1,0 +1,6 @@
+# Regenerated from the real tree by run.sh on every run, deliberately — a harness reading a
+# checked-in snapshot can go stale against the source it claims to measure.
+*.tsv
+Routes.kt
+Stubs.kt
+out/
