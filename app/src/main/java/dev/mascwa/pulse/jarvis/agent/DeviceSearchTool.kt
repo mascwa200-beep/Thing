@@ -5,8 +5,8 @@ import dev.mascwa.pulse.data.search.DeviceSearchIndex
 import dev.mascwa.pulse.di.AppContainer
 
 /**
- * One search across everything on this device — guides, notes, diary, memory, tasks, profile and
- * findings — in a single call.
+ * One search across everything on this device, in a single call — the guides, what the user wrote,
+ * what the assistant has learned, **and the app's own screens and settings**.
  *
  * The pieces were each reachable already: `library` for the guides, `note` and `diary` for what the
  * user wrote, `recall` for the memory stream, `task`, `profile`, `finding`. But "what do I know
@@ -17,14 +17,32 @@ import dev.mascwa.pulse.di.AppContainer
  * full text of what it finds; this returns a ranked map of where the answer lives, so the right
  * follow-up is a targeted read rather than a second search.
  *
+ * ## Why the corpus list is spelled out, and gated
+ *
+ * ⚠️ **This description named seven kinds while the index emitted ten**, and the three it left out
+ * were screens, settings and ingested documents — two of which were added in the same session that
+ * found this. [usage] is the model's whole basis for choosing a tool, so a corpus it does not
+ * mention is a corpus the model has no reason to look in: *"where do I turn on sponsor skipping"* is
+ * answerable from here and would never have been routed here.
+ *
+ * That is the owner's own twice-repeated complaint — "I can't find it" — one layer up, and it is the
+ * two-independent-statements shape this repository keeps correcting: `DeviceSearchIndex` grew, and
+ * nothing made this sentence grow with it. [AgentToolSurfaceTest] is what makes them move together.
+ *
+ * The grouped output needs no such fix and never had this problem: it is built from
+ * [DeviceSearch.byKind], so each kind heads its own block and the model sees the split that
+ * `SearchScreen` had to be taught. Only the prose was stale.
+ *
  * Read-only, offline, no permission.
  */
 class DeviceSearchTool(private val container: AppContainer) : JarvisTool {
     override val name = "search"
     override val usage =
         "search <query> — search EVERYTHING on this device at once (guides, notes, diary, memory, " +
-            "tasks, profile, findings), ranked, offline. Use it when you don't know which store holds " +
-            "the answer; then read the specific one with `library read`, `note`, `diary` or `recall`"
+            "tasks, profile, findings, ingested documents, and the app's own screens and settings), " +
+            "ranked, offline. Use it whenever you don't know where the answer lives — including " +
+            "\"where do I turn on X\", which finds the settings row. Then read the specific one with " +
+            "`library read`, `note`, `diary` or `recall`, or go there with `open`"
 
     override suspend fun run(arg: String): String {
         val query = arg.trim()
@@ -53,7 +71,12 @@ class DeviceSearchTool(private val container: AppContainer) : JarvisTool {
                     }
                 }
             }
-            append("\n\nRead a guide with `library read <id>`. Cite whatever you use by name.")
+            // ⚠️ Names `open` as well as `library read`, because the corpus now holds places as well
+            // as readings and a SCREEN or SETTING row's id IS its route — that is the invariant
+            // `RecordKind.destination` carries. Telling the model only how to read would leave the
+            // two kinds it most needs to ACT on looking like something to quote.
+            append("\n\nRead a guide with `library read <id>`. A Feature or Setting row's id is its ")
+            append("route — go there with `open`. Cite whatever you use by name.")
         }
     }
 

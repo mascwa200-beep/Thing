@@ -260,6 +260,15 @@ fi
 #
 # ⚠️ A NEW FILE has no baseline at all, so this bites hardest there: HEAD cannot be checked out for
 # a file that does not exist in it, and the two compilations therefore hold different file sets.
+#
+# ⚠️ `app/src/test` is on NEITHER path, so a gate that uses the shared `SourceGate` helper reports
+# `unresolved reference 'SourceGate'` and `'testing'`, plus the inference fallout of an error-typed
+# call — `not enough information to infer type argument`, a bare `it`, a member on the result. Five
+# gates now read source through it, so this recurs. The decisive control is the general one: copy a
+# shipping, CI-green gate to a NEW path so it has no baseline either, and watch it report the same
+# set (`AmbientActionCoverageTest` does). Better still, just run the file — an app-module gate with
+# no Android import compiles and runs under kotlinc + JUnit in under a minute, which is positive
+# evidence where this is only the absence of a complaint.
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
 # ⚠️ JUnit is here because this gate is routinely handed `src/test` files alongside the source they
 # cover, and without it EVERY test file reports `unresolved reference 'junit'` plus one line per

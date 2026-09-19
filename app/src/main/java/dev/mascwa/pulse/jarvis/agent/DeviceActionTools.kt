@@ -143,9 +143,29 @@ class SettingsTool(private val context: Context) : JarvisTool {
         if (openSettingsPanel(context, arg)) "Opening settings." else "Couldn't open settings."
 }
 
+/**
+ * Open a web link or an app deep-link.
+ *
+ * ⚠️ **Named `open_url` rather than `open`, and that is a bug fix rather than a preference.** This
+ * tool was called `open`, and so is [OpenScreenTool] — two registered tools, one name. Dispatch is
+ * `tools.firstOrNull { it.name == call.name }` and the native path is `tools.distinctBy { it.name }`,
+ * so both resolve to whichever is registered first. That is [OpenScreenTool] (`AppContainer` builds
+ * it ~50 lines earlier), which meant this tool was constructed on every launch and **unreachable by
+ * any path** — the assistant simply could not open a link, and answered "No screen called
+ * https://…" when asked to.
+ *
+ * Nothing caught it. `distinctBy` was written for a different case, and says so: "an authored tool
+ * could collide with a built-in". It absorbed a collision between two BUILT-INS in silence, which is
+ * the truncation-reads-as-covered shape. [dev.mascwa.pulse.jarvis.agent.AgentToolSurfaceTest] is the
+ * gate now — one collision across 56 names was all there was, and that is the point of pinning it.
+ *
+ * [OpenScreenTool] keeps the bare `open`: it is the commoner act by far, and leaving the working
+ * tool's name alone means this fix cannot regress it.
+ */
 class OpenLinkTool(private val context: Context) : JarvisTool {
-    override val name = "open"
-    override val usage = "open <url> — open a link or app deep-link"
+    override val name = "open_url"
+    override val usage = "open_url <url> — open a web link or app deep-link in the browser " +
+        "(for one of the app's OWN screens use `open` instead)"
     override suspend fun run(arg: String): String {
         if (arg.isBlank()) return "Give me a URL to open."
         openUrl(context, arg.trim())
