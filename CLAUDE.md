@@ -5318,6 +5318,60 @@ and is not yet its own installer of record, so the honest description is one tap
 none after. Fault reports need a token that can WRITE contents; with a read-only one the ABOUT card
 says so rather than printing a status code.
 
+### A NINTH BOARD ROW WOULD HAVE BEEN UNDROPPABLE BY SILENCE (this session cont.)
+
+Found by asking the two gates from the arc above — *is every member of this closed set produced,
+and does the set's own rule hold?* — of the one surface where it had never been asked: **the board**,
+the owner's single notification. **Zero subagent and zero workflow spend**, as with every arc since
+the credit directive.
+
+`trimToFive`'s own comment named the failure in prose: *"Anything not in this list can never be
+dropped, so a new kind missing from it would silently displace a real row on a busy board."* Nothing
+asserted it. **Every test in `UnifiedBriefTest` builds a fixture of NAMED kinds**, so all 49 would
+have stayed green while a ninth kind became permanently undroppable and outranked AGENDA — cutting
+a meeting in ten minutes instead. That needs exactly **one** new kind, not four.
+
+`DROPPABLE` moves from a local `val` to `internal` so the gate has an honest denominator — the move
+`Oracle.RULES` already made for the same reason — and the new test enumerates `BriefRowKind.entries`
+against it, pinning the two exceptions on merit: ALERT is the row the board exists to carry, and
+ADVISORY is gated at `Urgency.IMPORTANT` before it is ever offered. It also asserts the arithmetic
+that makes the contract satisfiable at all: once the undroppable kinds alone exceed the slot count,
+`trimToFive` returns a list too long and the renderer's `take(5)` cuts the rest in silence.
+
+⚠️ **I WROTE A SECOND TEST AND THE NEGATIVE TEST SHOWED IT WAS REDUNDANT, so it is not here.** It
+asserted the shed order against a literal list. Perturbing it revealed an **existing** test already
+covering that pair behaviourally — and measuring then showed the rest could not matter: `compose`
+has exactly **one add-site per kind, each guarded**, so a board maxes at eight rows, and from eight,
+shedding LESSON, HEALTH and MARKETS reaches `MAX_ROWS` and returns. **NEWS, WEATHER and AGENDA
+therefore cannot be shed while only two kinds are undroppable.** So a literal assertion on their
+order pins something that cannot happen, and all three *reachable* rungs are already covered by
+`aStudyRowIsTheFirstThingShedWhenTheBoardIsBusy`, `theHealthRowIsShedBeforeAnyFactAboutTheWorld` and
+`aLessonIsShedBeforeTheHealthRow` — which test what a reader sees rather than what the list says.
+The finding is recorded on `DROPPABLE` instead, including what changes the day a third undroppable
+kind lands. **A negative test earning its keep by deleting the test it was testing is the outcome
+worth copying.**
+
+#### ⚠️ The enum sweep: 86 enums, ZERO findings — and a bug in the sweep itself
+
+The general form of this defect class, run across the tree so nobody repeats it. Two methodology
+errors first, both of which produced confident wrong answers:
+
+1. **"Referenced nowhere OUTSIDE its declaring file" is the wrong question for an enum.**
+   `Oracle.kt` declares `InsightKind` *and* holds all 26 rules that construct it, so every
+   legitimate use read as dead — reporting 6 enums. This file already records the lesson in another
+   disguise (*"a dead-code sweep is only useful if it counts in-file callers"*).
+2. ⚠️ **A shared grep alternation lets one enum name eat another's reference.** With `Body` also in
+   the alternation, `Body.Sex.MALE` matched **`Body.S`** and was consumed, so `Sex.MALE` was reported
+   dead while sitting in a `when` on screen. **Any `Outer.Enum.MEMBER` can be masked this way.** The
+   fix is an exact per-member literal search that nothing can consume, plus a **control asserting a
+   known-live member is NOT reported** — which is what caught it.
+
+With both fixed: **86 enums, 4 with unnamed members, all four benign** — `Span.entries.forEach`
+renders a user-facing picker, `Nutrient` is indexed through `BY_ID`/`BY_OFF`, and the two astrology
+enums come from angle lookups. **Enums in this codebase are routinely iterated rather than named, so
+this shape has poor signal and is not worth a standing gate** — at four findings and four false
+positives it is exactly the report people learn to skim.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
