@@ -574,19 +574,30 @@ data class AppSettings(
      *  (privately — a 4-hex hash prefix, never the video id) and then jumps playback on its own,
      *  both of which are behaviours to opt into rather than discover. */
     val sponsorSkip: Boolean = false,
-    /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
-     *  cursor over the standing interests + the device subject so it rotates what it investigates. */
+    /** When the Computer last ran an autonomous curiosity/research pass, and a round-robin cursor over
+     *  the standing interests + the device subject so it rotates what it investigates.
+     *
+     *  ⚠️ These three stamps are read by `RefreshWorker` through `PassThrottle.due`. They were written
+     *  and read by NOTHING until that wiring existed — and this KDoc said "(throttle)" throughout, which
+     *  is why it went unnoticed for so long. A stamp nobody reads does not pace anything; if a future
+     *  change drops a read, the claim here becomes false again, so check the worker before trusting it. */
     val lastCuriosityMs: Long = 0,
     val curiosityIndex: Int = 0,
-    /** When the Mnemosyne reflection pass last ran (throttle). */
+    /** How far the Mnemosyne reflection pass has already reflected. ⚠️ A BOOKMARK, not a throttle — the
+     *  engine reads it as the `since` bound on what to synthesise, so there is no suppression timer and
+     *  none is wanted; running again with nothing new to read is a genuine no-op. */
     val lastReflectionMs: Long = 0,
     /** Periodically anchor the blackbox audit ledger head to a public RFC-3161 TSA (opt-in; sends only a
-     *  hash). [lastLedgerAnchorMs] throttles it (~daily). The manual "Anchor now" button is always available. */
+     *  hash). [lastLedgerAnchorMs] rate-limits the outbound calls to at most one a day — it stamps the
+     *  ATTEMPT, so which head was successfully anchored is `anchoredHead()`, not this. The manual
+     *  "Anchor now" button is always available and is not gated by it. */
     val autoAnchorLedger: Boolean = false,
     val lastLedgerAnchorMs: Long = 0,
-    /** Dedupe for the hardware-attestation audit producer: the last recorded posture signature (record
-     *  only when it CHANGES — a posture change is a real security event; identical verdicts are noise) and
-     *  when the probe last ran (so the worker doesn't re-attest on every tick). */
+    /** Dedupe and pacing for the hardware-attestation audit producer: the last recorded posture signature
+     *  (record only when it CHANGES — a posture change is a real security event; identical verdicts are
+     *  noise) and when the probe last ran. ⚠️ The second one bounds how often a StrongBox keypair is
+     *  minted. Every field of the signature is fixed at boot, so a second probe in one boot session
+     *  cannot find anything the first missed. */
     val lastAttestationSig: String = "",
     val lastAttestationCheckMs: Long = 0,
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
