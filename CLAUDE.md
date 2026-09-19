@@ -14284,3 +14284,38 @@ paragraph as evidence of anything.
 its corpus as *"Find a page, or a study card, by what you need"*, which is now an understatement
 rather than a false claim — changing it would alter what words reach device search, so it wants the
 same ranking sweep the D3 arc ran rather than a blind edit.
+
+#### The same question asked of every desktop view model (`abe9d206`)
+
+Having found `SearchViewModel.refresh()` with no caller by *reading*, the honest next move was to ask
+it of all of them. `StudyViewModel.refresh()` is the second instance, and the sharper one, because
+what it computes is **dated**: `today()` is a daily lesson, `dueCount()` and `refresher()` are
+time-relative, and `syllabus()`/`suggestedGoals()` read `library.index()` live. A console left open
+overnight — which is the premise of the long watch — showed yesterday's lesson to anyone who came
+back without having answered a card, and a pack installed on PACKS never reached the syllabus.
+
+⚠️ **THE SWEEP THAT FOUND IT FAILED ITS OWN SELF-CHECK FIRST, and that is the transferable part.**
+The obvious version greps for `\brefresh()` and asks whether every hit is inside the declaring file.
+It reported the tree clean — and reported the tree clean **against the pre-fix state too**, where
+the defect provably existed. Structurally incapable: about fourteen classes have a `refresh()`, so
+the grep returns all 138 calls and **a receiver cannot be resolved from text** — `vm.refresh()` on a
+RadarViewModel is indistinguishable from one on a SearchViewModel.
+
+What works, and only because the set is bounded: `ScreenHost` maps each `Screen` to exactly one
+composable taking exactly one view model, so the (view model, screen) pairing is **enumerable rather
+than inferred**. That sweep self-checks against `CrashScreen` — known to call refresh — before
+reporting anything, and named two candidates, both then judged on merit:
+
+- **NEWS — not a defect.** It has its own currency mechanism, a visibility-driven five-minute loop.
+  ⚠️ My first grep looked for `setVisible` where the real name is `setOnScreen`, and so reported the
+  visibility signal missing when `NewsScreen` feeds it from a `DisposableEffect`. Its `refresh()` is
+  a dead public function with no false claim on screen: recorded, not churned.
+- **STUDY — the defect above.**
+
+**No test covers the fix, and saying so beats implying otherwise:** it is a Compose effect and the
+desktop has no UI test harness. What is checkable is that `refresh()` is safe to re-run, and that is
+argued from the code — it already runs after every answer, and it `copy`s without touching `ask`.
+
+⚠️ **A general gate for this class is NOT cheaply automatable and that is recorded rather than
+faked.** It needs receiver-type resolution, which no grep has. The per-platform bounded version
+above is the practical shape if it is ever wanted as a standing gate.
