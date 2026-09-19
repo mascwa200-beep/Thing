@@ -391,17 +391,39 @@ object UnifiedBriefComposer {
      * unchanged by knowing it a refresh later. ALERT and ADVISORY are never dropped: one is the
      * reason the board is interrupting and the other is the reason it earned the extra line.
      */
+    /**
+     * The kinds [trimToFive] may shed, **ordered by what goes FIRST**.
+     *
+     * HEALTH goes second, just after LESSON, and the reason is decay rather than importance: a
+     * calorie count is equally true an hour later, where a headline, a forecast and an appointment
+     * all stop being true.
+     *
+     * ⚠️ **Anything absent from this list can never be dropped**, so a new kind missing from it
+     * would silently displace a real row on a busy board — the layout takes the first five and says
+     * nothing about the rest. That was a comment until [UnifiedBriefTest] could read the list:
+     * `internal` rather than a local `val` purely so the gate has an honest denominator, which is
+     * the same move `Oracle.RULES` made for the same reason. A test enumerating `entries` against
+     * this now forces whoever adds a ninth kind to decide, rather than inheriting undroppability by
+     * omission — and every existing test would have passed, because they each build a fixture of
+     * named kinds rather than all of them.
+     *
+     * ⚠️ **Only the first three rungs are reachable today, and the tail is future-proofing.**
+     * Measured rather than assumed: [compose] has exactly one add-site per kind, each guarded, so a
+     * board maxes out at eight rows — and from eight, shedding LESSON, HEALTH and MARKETS reaches
+     * [MAX_ROWS] and returns. NEWS, WEATHER and AGENDA therefore cannot be shed while there are two
+     * undroppable kinds, which is why no behavioural test exercises their relative order and a
+     * literal assertion on it would pin something that cannot happen. The three that ARE reachable
+     * are each covered behaviourally in [UnifiedBriefTest], which is the better test: it asserts
+     * what a reader sees rather than what this list says. Add a third undroppable kind and the tail
+     * goes live — at which point it wants a behavioural test, not a copy of this line.
+     */
+    internal val DROPPABLE = listOf(
+        BriefRowKind.LESSON, BriefRowKind.HEALTH, BriefRowKind.MARKETS, BriefRowKind.NEWS,
+        BriefRowKind.WEATHER, BriefRowKind.AGENDA,
+    )
+
     private fun trimToFive(rows: MutableList<BriefRow>) {
-        // ⚠️ Ordered by what is shed FIRST. HEALTH goes second, just after LESSON, and the reason
-        // is decay rather than importance: a calorie count is equally true an hour later, where a
-        // headline, a forecast and an appointment all stop being true. Anything not in this list can
-        // never be dropped, so a new kind missing from it would silently displace a real row on a
-        // busy board -- the layout takes the first five and says nothing about the rest.
-        val droppable = listOf(
-            BriefRowKind.LESSON, BriefRowKind.HEALTH, BriefRowKind.MARKETS, BriefRowKind.NEWS,
-            BriefRowKind.WEATHER, BriefRowKind.AGENDA,
-        )
-        for (kind in droppable) {
+        for (kind in DROPPABLE) {
             if (rows.size <= MAX_ROWS) return
             rows.removeAll { it.kind == kind }
         }

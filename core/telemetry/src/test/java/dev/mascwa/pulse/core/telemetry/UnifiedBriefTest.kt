@@ -556,4 +556,36 @@ class UnifiedBriefTest {
         assertEquals(110, text.length)
         assertTrue(text.endsWith("…"))
     }
+
+    /**
+     * Every kind is either sheddable or deliberately pinned, and a ninth inherits neither by silence.
+     *
+     * ⚠️ **Every other test here builds a fixture of NAMED kinds, so none of them can see this.** Add
+     * a kind, forget [UnifiedBriefComposer.DROPPABLE], and the whole file stays green while that kind
+     * becomes permanently undroppable — outranking AGENDA on a busy board, so a meeting in ten
+     * minutes is the row that gets cut. The failure needs exactly one new kind, not four.
+     *
+     * The two pinned here are pinned on merit rather than convenience. ALERT is the row the board
+     * exists to carry. ADVISORY is the Oracle's one reading, gated at `Urgency.IMPORTANT` before it
+     * is ever offered — so by the time it reaches a row it has already earned the space.
+     */
+    @Test fun everyRowKindIsEitherSheddableOrDeliberatelyPinned() {
+        val undroppable = BriefRowKind.entries.toSet() - UnifiedBriefComposer.DROPPABLE.toSet()
+        assertEquals(
+            "a BriefRowKind is neither in DROPPABLE nor pinned here, so it has become undroppable " +
+                "by omission — on a full board it will now displace a row that matters more. Decide: " +
+                "give it a place in DROPPABLE's shed order, or pin it here with the reason",
+            setOf(BriefRowKind.ALERT, BriefRowKind.ADVISORY),
+            undroppable,
+        )
+        // ⚠️ The arithmetic that makes trimToFive's contract satisfiable at all: it can only shed
+        // droppable kinds, so once the undroppable ones alone exceed the slot count it returns a
+        // list too long and the renderer's take(5) cuts the rest in silence.
+        assertTrue(
+            "more kinds are undroppable ($undroppable) than the layout has slots, so trimToFive " +
+                "cannot honour its own contract and the overflow is dropped without a word",
+            undroppable.size <= 5,
+        )
+    }
+
 }
