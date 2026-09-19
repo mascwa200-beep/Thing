@@ -1,16 +1,23 @@
 package dev.mascwa.pulse.feature.recon
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Recon
 import dev.mascwa.pulse.core.telemetry.Recon.ReconCollection
 import dev.mascwa.pulse.data.recon.ReconEngine
 import dev.mascwa.pulse.di.AppContainer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Drives TROVE — the reconnaissance dossier.
@@ -69,6 +76,27 @@ class ReconViewModel(container: AppContainer) : ViewModel() {
     /** The whole dossier as it stands, in reading order — for the exported report ([Recon.reportText]). */
     fun collectionsInOrder(): List<ReconCollection> =
         ORDER.mapNotNull { _state.value.done[it] }
+
+    /**
+     * Write the dossier to a file the user picked (SAF). Offline — nothing crosses the network; the
+     * report is only ever the sections already gathered on screen. Off the main thread, and defensive:
+     * a write that fails costs nothing but the file.
+     *
+     * The header timestamp is device-locale (it is a heading a person reads, not a parsed field), while
+     * the body's numbers were formatted Locale.US by the engine.
+     */
+    fun export(context: Context, uri: Uri) {
+        val cols = collectionsInOrder()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+                    val text = Recon.reportText(cols, "TROVE — this device's dossier · $stamp")
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
+                }
+            }
+        }
+    }
 
     companion object {
         /** The dossier's reading order: the two invasive collections first, then the device, you, the world. */
