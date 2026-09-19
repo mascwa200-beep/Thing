@@ -14441,3 +14441,114 @@ sites plus the `sectionVocab()` regex; its false KDoc is already corrected); the
 eleven residue settings fields (an owner call on the overlay); the phone's own study deck is
 deliberately not indexed, with the reasoning recorded above. **Task #20 (retire IMAP) is still HELD**
 pending the owner's Pixel confirmation of notification-mail.
+
+### A TOOL THAT COULD NEVER RUN, AND A CORPUS THE MODEL WAS NOT TOLD ABOUT (this session, PR #472)
+
+PR #471 merged as **`4a70e8e8`** (squash, the repo norm); the dev branch re-synced with
+`git merge --no-ff` so the tip committer stays ours. ⚠️ **Four redundant main builds cancelled** —
+LCARS #2202, Desktop #330, Nutrition #166, Sky #50 — after `git diff --stat 9ec37519 origin/main`
+came back **`CLAUDE.md | 122 +`, and nothing else**: main's buildable tree is byte-identical to what
+LCARS #2201 had already built and published to `latest`, so all four would have republished the same
+artifacts under new versionCodes for **~1.3 GB** of the owner's auto-download. Sixth instance; the
+check is one command and it is worth running every time.
+
+Then, hunting rather than working a list. **Zero subagent and zero workflow spend**, per the standing
+usage constraint, which overrides the ultracode directive as it has for every arc since.
+
+#### The find: two registered tools were both called `open`
+
+`OpenScreenTool` opens one of the app's own screens; `OpenLinkTool` opens a URL. Both declare
+`override val name = "open"`, both are in `AppContainer.agentTools`, and dispatch is
+`tools.firstOrNull { it.name.equals(call.name, ignoreCase = true) }`. `OpenScreenTool` is the
+**first entry of that list** (`:1110`) and `OpenLinkTool` the thirteenth (`:1161`) — read, not
+inferred — so `OpenLinkTool` was **constructed on every launch and unreachable by any path.** Ask the
+assistant to open a URL and it answers *"No screen called https://… . The screens are: …"*.
+
+⚠️ **The near-miss is the instructive part, and it is a shape worth recognising.** The native path is
+`tools.distinctBy { it.name.lowercase() }`, so the function schema stayed well-formed — the OpenAI
+tools API rejects duplicate names, and the serious failure was already averted. But that line's own
+comment says what it was written for: *"an authored tool could collide with a built-in"*. It absorbed
+a collision between two **built-ins** in silence. **A guard doing its job for the wrong reason reads
+exactly like no problem at all** — the truncation-reads-as-covered shape, one layer further in than
+usual.
+
+Measured before deciding it deserved a gate: **one collision across 56 declared tool names.** Narrow
+and real. `OpenLinkTool` becomes `open_url`; `OpenScreenTool` keeps the bare `open`, because it is
+the commoner act by far and leaving the working tool's name alone means the fix cannot regress it.
+
+#### And the search tool named seven kinds while the index emitted ten
+
+`DeviceSearchIndex` produces `FEATURE`, `GUIDE`, `NOTE`, `DIARY`, `TASK`, `PROFILE`, `FINDING`,
+`MEMORY`, `KNOWLEDGE` and `SETTING`. `DeviceSearchTool.usage` said *"guides, notes, diary, memory,
+tasks, profile, findings"*. The three missing were **screens, settings and ingested documents** — and
+settings and documents were both added in the very session that found this.
+
+⚠️ A tool's `usage` is the model's **whole basis for choosing it**, so *"where do I turn on sponsor
+skipping"* has been answerable from the device index since #466 and the model has had no reason to
+look there. That is the owner's twice-repeated *"I can't find it"*, one layer up from the screen it
+was first reported on, and it is the two-independent-statements shape again: the index grew and
+nothing made the sentence grow with it.
+
+⚠️ **The grouped OUTPUT never had this problem and needs no fix — checked rather than assumed,
+because the two look alike.** It is built from `DeviceSearch.byKind`, so each kind heads its own
+block and the model already sees the split `SearchScreen` had to be taught in #471. Only the prose
+was stale. The closing line now names `open` as well as `library read`, because a Feature or Setting
+row's id **is** its route (the `RecordKind.destination` invariant); telling the model only how to
+*read* would leave the two kinds it most needs to **act** on looking like something to quote.
+
+#### The gate, and the one design decision in it
+
+`AgentToolSurfaceTest` — four properties: no two tools share a name; every kind the index emits is
+named in the usage; the map does not promise a kind the index stopped emitting; and `STUDY`'s
+deliberate absence stays a decision rather than a drift.
+
+⚠️ **The kind-to-word map is the thing a new kind forces someone to update, and that IS the design.**
+Demanding the literal `RecordKind.label` would force the sentence to say *"Feature"* where
+*"screens"* is the honest English for a model to read — the label is UI copy for a section heading,
+this is prose for a prompt. They are allowed to differ; a kind with **no word at all** is not. So
+adding a kind fails on the missing map entry, and whoever adds it has to decide what to call it.
+
+#### Verification
+
+4 tests green locally, **run from the module directory** because Gradle resolves a test's relative
+paths from there. **Five rules negative-tested** against a baseline asserted green first, each
+perturbation asserted to have matched the source, the restore under a shell `trap … EXIT` and
+byte-compared. All five awake.
+
+⚠️ **The decisive case is the REAL defect rather than a synthetic one.** Restoring `name = "open"`
+fails exactly one test and names it: *"two tools share a name, so only the first one registered can
+ever run and the other is dead: [open in [DeviceActionTools.kt, DeviceActionTools.kt]]"*. Compare a
+synthetic perturbation, which proves the assertion runs and not that it catches anything that has
+ever actually happened.
+
+⚠️ **And case 2 proves the comment-stripping as a side effect, which is worth copying.** Cutting
+three kinds out of the usage string reports `KNOWLEDGE` and `FEATURE` missing **while the class's own
+KDoc says "screens" and "ingested documents" three lines above the assertion** — so the gate is
+demonstrably reading the thing and not the documentation of it. `CredentialCoverageTest` records
+being negative-tested against exactly that failure; here it falls out of a perturbation written for
+something else.
+
+⚠️ **My own neg harness died on its quoting before it ran once**: an apostrophe inside a
+double-quoted shell string, and a regex full of parens inside a `case` body. **A harness that cannot
+parse itself proves nothing.** The perturbation strings live in python heredocs now — put them there
+from the start.
+
+⚠️ **The resolve gate's four complaints were PROVEN its documented cascade, not shrugged at.**
+`app/src/test` is on neither of its classpaths, so `SourceGate` does not resolve there and the
+inference fallout follows (`not enough information to infer type argument`, a bare `it`, a member on
+the result). The decisive control is the general one recorded earlier in this file: copy a shipping,
+CI-green gate to a **NEW** path so it has no baseline either — `AmbientActionCoverageTest` reports
+the same set. **That caveat is now written into `tools/android_resolve_check.sh`**, since five gates
+read source through `SourceGate` and this will recur. Note also the far stronger positive evidence
+available here: an app-module gate with no Android import **compiles and runs** under kotlinc + JUnit
+in under a minute, which beats the absence of a complaint.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles a tool registry and never calls one. Ask the Computer
+to **open a link** and check it opens rather than hunting for a screen by that name; then ask *"where
+do I turn on sponsor skipping"* and check it **searches** rather than guessing.
+
+**Open / steerable, unchanged:** deleting `SettingsSection.key` (zero reads, 26 constructor call
+sites plus the `sectionVocab()` regex); the phone-side `settings?sec=` deep link (five interaction
+surfaces, not shippable blind); `ScanlineOverlay` and the eleven residue settings fields (an owner
+call on the overlay); the phone's own study deck deliberately not indexed. **Task #20 (retire IMAP)
+is still HELD** pending the owner's Pixel confirmation of notification-mail.
