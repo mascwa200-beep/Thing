@@ -99,7 +99,7 @@ fun main() {
             var dec = -85
             while (dec <= 85) {
                 val v = SkyProjection.equatorialVector(ra.toDouble(), dec.toDouble())
-                Ephemeris.precessVectorToJ2000(v, ms)
+                Ephemeris.ofDateVectorToJ2000(v, ms)
                 val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
                 val w = SkyProjection.equatorialVector(j[0], j[1])
                 worstVec = maxOf(
@@ -119,7 +119,7 @@ fun main() {
     for (ms in epochs.take(1)) {
         for (poleZ in doubleArrayOf(1.0, -1.0)) {
             val v = doubleArrayOf(0.0, 0.0, poleZ)
-            Ephemeris.precessVectorToJ2000(v, ms)
+            Ephemeris.ofDateVectorToJ2000(v, ms)
             println("  pole z=%+.0f -> (%.9f, %.9f, %.9f)".format(poleZ, v[0], v[1], v[2]))
             for (anyRa in doubleArrayOf(0.0, 90.0, 217.0)) {
                 val j = Ephemeris.meanOfDateToJ2000(anyRa, 90.0 * poleZ, ms)

@@ -141,12 +141,45 @@ object Ephemeris {
      */
     fun julianYear(epochMs: Long): Double = 2000.0 + (julianDate(epochMs) - J2000) / 365.25
 
-    /** Greenwich mean sidereal time in degrees. */
+    /**
+     * Greenwich MEAN sidereal time in degrees — the hour angle of the mean equinox of date.
+     *
+     * ⚠️ Still needed on its own: `SatellitePasses` works in the TEME frame, which is DEFINED on
+     * GMST, and `Astrology` reckons its house cusps from mean sidereal time by convention (the
+     * difference is under a second of time on a cusp read to the minute). Everything that
+     * measures an hour angle from a true-equinox right ascension wants [gastDeg] — `Terminator`
+     * included, which was left here at first as "only a day/night wash" and moved when its own
+     * test held it to a millionth of a degree against [toHorizontal].
+     */
     fun gmstDeg(jd: Double): Double {
         val t = centuries(jd)
         val theta = 280.46061837 + 360.98564736629 * (jd - J2000) +
             0.000387933 * t * t - t * t * t / 38_710_000.0
         return norm360(theta)
+    }
+
+    /**
+     * Greenwich APPARENT sidereal time in degrees: [gmstDeg] plus the equation of the equinoxes,
+     * `Δψ · cos ε`.
+     *
+     * ⚠️ **This is the sidereal time every hour angle in this file has to use, and until S4 none
+     * did.** The Sun, the Moon, every planet and (now) every star are published in the TRUE equinox
+     * of date, and an hour angle is the sidereal time minus the right ascension — so the two must
+     * be measured from the same equinox. GMST is measured from the MEAN one. The gap is the
+     * equation of the equinoxes, up to about 1.2 seconds of time, and it was the ~20″ every planet's
+     * altitude and azimuth carried against DE421 after the VSOP87 rewrite had taken the RA/Dec to
+     * under 2″: the positions were right and the clock they were hung on was 15″ of hour angle wrong.
+     *
+     * [jd] is on the UT scale, exactly as [gmstDeg] takes it; the nutation inside is evaluated at
+     * the TT instant, which is what it is a function of. The obliquity is the MEAN one, as the
+     * IAU 1994 definition has it. The "complementary terms" of that definition (≤3 mas) are not
+     * carried — they are two orders of magnitude below anything else on this path.
+     */
+    fun gastDeg(jd: Double): Double {
+        val t = centuries(jd + DELTA_T_SECONDS / 86_400.0)
+        val nut = Nutation.arcsec(t)
+        val epsMean = obliquityDeg(t) * DEG
+        return norm360(gmstDeg(jd) + nut[0] * cos(epsMean) / 3600.0)
     }
 
     // ---- the Sun ---------------------------------------------------------------------------
@@ -230,8 +263,13 @@ object Ephemeris {
     }
 
     /**
-     * Nutation in longitude, to first order in the Moon's ascending node — Meeus ch. 22's own
-     * shortcut, worth about half an arcsecond against the full 63-term series.
+     * Nutation in longitude, Δψ — the IAU 2000B series through [Nutation].
+     *
+     * ⚠️ **Until S4 this was Meeus ch. 22's one-term shortcut, `−0.00478° · sin Ω`, good to about
+     * half an arcsecond — and that half-arcsecond was measurable.** When the VSOP87 planets were
+     * held against DE421 all seven carried the same ~1.5″ residual in RA/Dec, which is what a
+     * shared frame error looks like; the full series removes it. The two paragraphs below are
+     * older and are kept because they are a measurement, not a description.
      *
      * ⚠️ **This exists as a function because it was written twice and applied once, and that cost
      * 38 seconds on every eclipse in the catalogue.** The Sun's apparent longitude carried it; the
@@ -252,12 +290,10 @@ object Ephemeris {
      * already declines to report contact times. Not proportionate, and said here rather than left
      * for somebody to rediscover.
      */
-    private fun nutationLongitudeDeg(t: Double): Double =
-        -0.00478 * sin((125.04 - 1934.136 * t) * DEG)
+    private fun nutationLongitudeDeg(t: Double): Double = Nutation.deltaPsiDeg(t)
 
-    /** Nutation in obliquity, the same shortcut and for the same reason. */
-    private fun nutationObliquityDeg(t: Double): Double =
-        0.00256 * cos((125.04 - 1934.136 * t) * DEG)
+    /** Nutation in obliquity, Δε, from the same series. */
+    private fun nutationObliquityDeg(t: Double): Double = Nutation.deltaEpsilonDeg(t)
 
     /** The true obliquity of the ecliptic — mean, plus the nutation in it. */
     private fun trueObliquityDeg(t: Double): Double = obliquityDeg(t) + nutationObliquityDeg(t)
@@ -303,9 +339,24 @@ object Ephemeris {
      */
     const val LIGHT_AU_PER_DAY = 299_792.458 * 86_400.0 / AU_KM
 
-    /** The Sun's altitude and azimuth for an observer. */
+    /**
+     * The Sun's altitude and azimuth for an observer — TOPOCENTRIC, through [topocentric], as
+     * [moonPosition] has been since the VSOP87 rewrite.
+     *
+     * ⚠️ The Sun's parallax is 8.8 arcseconds and it was being left off: this went straight from
+     * [sunEquatorial] to [toHorizontal], so the drawn Sun sat 8.8"·cos(altitude) from where a
+     * telescope finds it while every star beside it was within an arcsecond. Found by the
+     * Stellarium-gap probe, which read 9.1" and 9.6" on the Sun against 1.1" on the stars once
+     * the S4 star chain was in — the one body left with a residual an order of magnitude above
+     * the rest. The parallax step needs a distance, and [sunEquatorial] has carried a real one
+     * since S3, so this is the same one-line call the Moon makes.
+     *
+     * Nothing that reads only whether the Sun is up (meteor-shower twilight, satellite
+     * illumination, the occultation card) can see 8.8"; the terminator is a GEOCENTRIC construct
+     * by definition and compares against [toHorizontal] of [sunEquatorial] directly.
+     */
     fun sunPosition(latDeg: Double, lonDeg: Double, epochMs: Long): Horizontal =
-        toHorizontal(sunEquatorial(epochMs), latDeg, lonDeg, epochMs)
+        toHorizontal(topocentric(sunEquatorial(epochMs), latDeg, lonDeg, epochMs), latDeg, lonDeg, epochMs)
 
     // ---- the Moon --------------------------------------------------------------------------
 
@@ -519,9 +570,15 @@ object Ephemeris {
 
     // ---- shared maths -------------------------------------------------------------------------
 
-    /** Equatorial to the observer's horizon. Azimuth is degrees clockwise from true north. */
+    /**
+     * Equatorial to the observer's horizon. Azimuth is degrees clockwise from true north.
+     *
+     * ⚠️ On APPARENT sidereal time, [gastDeg]. Every position handed in here is in the true
+     * equinox of date, and an hour angle measured from the mean equinox is 15″ wrong on average
+     * for it — see [gastDeg] for the measurement that found it.
+     */
     fun toHorizontal(eq: Equatorial, latDeg: Double, lonDeg: Double, epochMs: Long): Horizontal {
-        val lst = gmstDeg(julianDate(epochMs)) + lonDeg
+        val lst = gastDeg(julianDate(epochMs)) + lonDeg
         val h = norm360(lst - eq.rightAscensionDeg) * DEG
         val lat = latDeg * DEG
         val dec = eq.declinationDeg * DEG
@@ -557,7 +614,8 @@ object Ephemeris {
         lonDeg: Double,
         epochMs: Long,
     ): Equatorial {
-        val lst = gmstDeg(julianDate(epochMs)) + lonDeg
+        // The same sidereal time as toHorizontal, or the pair stops being an exact inverse.
+        val lst = gastDeg(julianDate(epochMs)) + lonDeg
         val lat = latDeg * DEG
         val alt = horizontal.altitudeDeg.coerceIn(-90.0, 90.0) * DEG
         // toHorizontal adds 180° on the way out, so take it off on the way in.
@@ -612,12 +670,12 @@ object Ephemeris {
      * rather than the first-order Meeus ch. 23 formulas that once lived here — one rotation shared
      * with the Sun and the planets, so a star and the body beside it cannot sit in frames apart.
      *
-     * Checked against Skyfield with JPL DE421 for five stars at five epochs from 2000 to 2044,
-     * measured while the nutation was still the one-term shortcut of [nutationLongitudeDeg]:
-     * **worst 1.6 arcseconds**, against 15 with precession alone. Most of that residual IS the
-     * shortcut, and the full series re-measures it. Proper motion is deliberately absent — for the
-     * brightest stars it is under a fifth of an arcsecond a year, so a century of it is smaller
-     * than this residual, and the catalogue does not carry it anyway.
+     * Checked against Skyfield with JPL DE421 for five stars at five epochs from 2000 to 2044 while
+     * the nutation was still the one-term shortcut: **worst 1.6 arcseconds**, against 15 with
+     * precession alone. With the IAU 2000B series and aberration on top ([apparentStarOfDate])
+     * the same comparison is **0.13″** over fifty rows — `ApparentPlaceTest`. Proper motion is
+     * deliberately absent — for the brightest stars it is under a fifth of an arcsecond a year, and
+     * the catalogue does not carry it anyway.
      */
     fun precessFromJ2000(raJ2000Deg: Double, decJ2000Deg: Double, epochMs: Long): Equatorial {
         // Mean equinox to true, so this sits in the same frame as sunEquatorial and moonEquatorial —
@@ -771,9 +829,11 @@ object Ephemeris {
      * read as a slightly worse nutation.
      */
     private fun nutateRotate(raDeg: Double, decDeg: Double, t: Double, forward: Boolean): DoubleArray {
-        val dPsi = nutationLongitudeDeg(t) * DEG
+        // One evaluation of the series for both angles: they share the seventy-seven arguments.
+        val nut = Nutation.arcsec(t)
+        val dPsi = nut[0] / 3600.0 * DEG
         val epsMean = obliquityDeg(t) * DEG
-        val epsTrue = epsMean + nutationObliquityDeg(t) * DEG
+        val epsTrue = epsMean + nut[1] / 3600.0 * DEG
         val fromEps = if (forward) epsMean else epsTrue
         val toEps = if (forward) epsTrue else epsMean
         val turn = if (forward) dPsi else -dPsi
@@ -799,7 +859,13 @@ object Ephemeris {
     }
 
     /**
-     * [meanOfDateToJ2000] for a direction already held as a unit vector, rotated in place.
+     * [trueOfDateToJ2000] for a direction already held as a unit vector, rotated in place.
+     *
+     * ⚠️ The TRUE equinox of date, since S4. Every horizon direction the star map converts into
+     * the catalogue's frame comes through [toEquatorial], which is on apparent sidereal time and so
+     * answers in the true equinox; carrying that vector back to J2000 through the MEAN pair would
+     * leave the nutation (up to 17″) in it, and the chart's forward vector and its stars would sit
+     * in frames that far apart. Was `ofDateVectorToJ2000` over the mean pair.
      *
      * A convenience over the pair above rather than a second rotation, so the two can never drift.
      * Its callers hold vectors because that is what a projection consumes — converting out to
@@ -812,16 +878,128 @@ object Ephemeris {
      * rather than zero. Measured rather than assumed, because a pole is exactly where a star map is
      * pointed when somebody lies on their back.
      */
-    fun precessVectorToJ2000(v: DoubleArray, epochMs: Long) {
+    fun ofDateVectorToJ2000(v: DoubleArray, epochMs: Long) {
         val dec = asin(v[2].coerceIn(-1.0, 1.0)) / DEG
         val ra = atan2(v[1], v[0]) / DEG
-        val j = meanOfDateToJ2000(ra, dec, epochMs)
+        val j = trueOfDateToJ2000(ra, dec, epochMs)
         val d = j[1] * DEG
         val a = j[0] * DEG
         val cd = cos(d)
         v[0] = cd * cos(a)
         v[1] = cd * sin(a)
         v[2] = sin(d)
+    }
+
+    // ---- apparent places for the stars ---------------------------------------------------------
+
+    /**
+     * The annual-aberration displacement `β = v/c` of the Earth, as a unit-free J2000 EQUATORIAL
+     * vector written into [out] — about 1e-4, i.e. 20.5″, pointing along the Earth's motion.
+     *
+     * ⚠️ **The same velocity [aberrate] uses for the planets, rotated once.** [Vsop87.earthVelocityAuPerDay]
+     * answers in the J2000 ecliptic, which is the frame the planets are corrected in; a catalogue
+     * star is a J2000 EQUATORIAL vector, so β is turned by ε₀ here, once per frame, and every star
+     * then takes it as a three-term addition. One velocity, two frames, no second theory.
+     */
+    fun aberrationJ2000Equatorial(epochMs: Long, out: DoubleArray = DoubleArray(3)): DoubleArray {
+        val v = DoubleArray(3)
+        Vsop87.earthVelocityAuPerDay(julianDateTT(epochMs), v)
+        val eps0 = obliquityDeg(0.0) * DEG
+        val c = cos(eps0)
+        val s = sin(eps0)
+        out[0] = v[0] / LIGHT_AU_PER_DAY
+        out[1] = (v[1] * c - v[2] * s) / LIGHT_AU_PER_DAY
+        out[2] = (v[1] * s + v[2] * c) / LIGHT_AU_PER_DAY
+        return out
+    }
+
+    /**
+     * Annual aberration applied in place to a J2000 equatorial unit direction: `v ← (v + β)/|v + β|`.
+     * The light from every star arrives from slightly ahead of where the star is, because the
+     * observer is moving; this is the ONLY implementation, shared by the chart's per-star path and
+     * [apparentStarOfDate], so the two cannot drift.
+     */
+    fun aberrateEquatorial(v: DoubleArray, beta: DoubleArray) {
+        val x = v[0] + beta[0]
+        val y = v[1] + beta[1]
+        val z = v[2] + beta[2]
+        val n = kotlin.math.sqrt(x * x + y * y + z * z)
+        v[0] = x / n
+        v[1] = y / n
+        v[2] = z / n
+    }
+
+    /**
+     * The inverse of [aberrateEquatorial] to first order — `v ← (v − β)/|v − β|`, residual of
+     * order β², a hundredth of a milliarcsecond. What a tap goes through on its way from the drawn
+     * sky back to the catalogue.
+     */
+    fun unaberrateEquatorial(v: DoubleArray, beta: DoubleArray) {
+        val x = v[0] - beta[0]
+        val y = v[1] - beta[1]
+        val z = v[2] - beta[2]
+        val n = kotlin.math.sqrt(x * x + y * y + z * z)
+        v[0] = x / n
+        v[1] = y / n
+        v[2] = z / n
+    }
+
+    /**
+     * A catalogue star's APPARENT place — aberrated, then carried to the true equator and equinox
+     * of date — as `[rightAscensionDeg, declinationDeg]`. What Skyfield calls
+     * `apparent().radec(epoch='date')`, minus the gravitational light deflection (≤4 mas away
+     * from the Sun's limb, not carried).
+     *
+     * ⚠️ **This is the chart's arithmetic in scalar form, and it exists so a test and the
+     * Stellarium-gap probe can call it.** `SkyFrame` does the same thing per star as vectors —
+     * [aberrateEquatorial] against the frame's β, then a basis built from [ofDateVectorToJ2000]
+     * directions — and a probe that paraphrased that path would measure the paraphrase.
+     * Proper motion is deliberately absent, as it is from the bundled catalogue.
+     */
+    fun apparentStarOfDate(raJ2000Deg: Double, decJ2000Deg: Double, epochMs: Long): DoubleArray {
+        val d = decJ2000Deg * DEG
+        val a = raJ2000Deg * DEG
+        val v = doubleArrayOf(cos(d) * cos(a), cos(d) * sin(a), sin(d))
+        aberrateEquatorial(v, aberrationJ2000Equatorial(epochMs))
+        val dec = asin(v[2].coerceIn(-1.0, 1.0)) / DEG
+        val ra = norm360(atan2(v[1], v[0]) / DEG)
+        return j2000ToTrueOfDate(ra, dec, epochMs)
+    }
+
+    /**
+     * [apparentStarOfDate] as an [Equatorial], which is what an occultation target's position
+     * function hands back — the shape [precessFromJ2000] has, with the aberration that one lacks.
+     *
+     * ⚠️ **An occultation needs the star ABERRATED and the Moon NOT, and that is physics rather
+     * than an inconsistency.** Measured with Skyfield/DE421: the Moon's apparent place is within
+     * 0.7 arcseconds of its GEOMETRIC place at every instant tried — the light-time displacement
+     * (the Moon moved during the 1.3 s the light took) and the stellar aberration (the observer
+     * moved) are equal and opposite up to the Moon's own orbital velocity, which is 0.7". A star
+     * has no light-time term, so its apparent place carries the whole 20.5". [moonEquatorial] is
+     * geometric plus nutation and is therefore already the apparent Moon to 0.7"; a star handed
+     * to `Occultations` through [precessFromJ2000] instead of this sat up to 20" from where the
+     * Moon actually covers it — along the ecliptic, mostly, so it showed as a contact time forty
+     * seconds out rather than as a wrong yes-or-no. `distanceKm` is zero: a star is at infinity.
+     */
+    fun apparentStarEquatorial(raJ2000Deg: Double, decJ2000Deg: Double, epochMs: Long): Equatorial {
+        val ofDate = apparentStarOfDate(raJ2000Deg, decJ2000Deg, epochMs)
+        return Equatorial(ofDate[0], ofDate[1], distanceKm = 0.0)
+    }
+
+    /**
+     * [apparentStarOfDate] taken on to the observer's horizon through [toHorizontal] — the TRUE
+     * altitude, before refraction, on apparent sidereal time. A star is at infinity, so there is no
+     * parallax step; `distanceKm` is zero.
+     */
+    fun apparentStarHorizontal(
+        raJ2000Deg: Double,
+        decJ2000Deg: Double,
+        latDeg: Double,
+        lonDeg: Double,
+        epochMs: Long,
+    ): Horizontal {
+        val ofDate = apparentStarOfDate(raJ2000Deg, decJ2000Deg, epochMs)
+        return toHorizontal(Equatorial(ofDate[0], ofDate[1], 0.0), latDeg, lonDeg, epochMs)
     }
 
     /**
@@ -882,7 +1060,9 @@ object Ephemeris {
         val rhoSin = 0.99664719 * sin(u)
         val rhoCos = cos(u)
 
-        val lst = (gmstDeg(julianDate(epochMs)) + lonDeg) * DEG
+        // Apparent sidereal time: the body is in the true equinox, so the observer's position on
+        // the same equator has to be turned by the same angle.
+        val lst = (gastDeg(julianDate(epochMs)) + lonDeg) * DEG
         // Observer, in Earth radii, in the same equatorial frame the body is in.
         val ox = rhoCos * cos(lst)
         val oy = rhoCos * sin(lst)

@@ -907,6 +907,11 @@ class SkyMapViewModel(
             // the whole screen at the narrowest.
             val eq = SkyFrame.catalogueOf(trueAltitudeDeg(alt), az, here.latitude, here.longitude, at)
             val t = SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
+            // ⚠️ The stars are DRAWN aberrated — `SkyFrame.project` adds β to every catalogue
+            // direction — so the touched direction has β taken off before it meets the catalogue,
+            // exactly as the refraction was taken off above. Twenty arcseconds: a fifth of the tap
+            // tolerance at the narrowest field, and the same twenty at every field.
+            Ephemeris.unaberrateEquatorial(t, Ephemeris.aberrationJ2000Equatorial(at))
             // ⚠️ A dot product against a precomputed cosine, NOT an angle. The file's own warning
             // about `acos` near 1.0 is about RECOVERING an angle, where the significant figures are
             // lost; comparing against a threshold has no such problem — at the narrowest field the
@@ -951,9 +956,10 @@ class SkyMapViewModel(
     private fun horizonOf(layer: StarLayer, i: Int, here: SkySite, at: Long): Ephemeris.Horizontal {
         val dec = Math.toDegrees(kotlin.math.asin(layer.vz[i].coerceIn(-1.0, 1.0)))
         val ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
-        // ⚠️ The exact inverse of what [identify] used to find this star, so this is the TRUE
-        // altitude the tap was lowered to. `SkyFrame` holds both halves of that pair. The card
-        // lifts it back through [apparentAltitudeDeg] before printing, so what it reports is the
+        // ⚠️ The exact inverse of what [identify] used to find this star (catalogueOf, then β
+        // off), so this is the TRUE altitude the star is drawn at before refraction — aberration
+        // included, since `SkyFrame.horizonOf` is the same arithmetic `project` does per star. The
+        // card lifts it through [apparentAltitudeDeg] before printing, so what it reports is the
         // altitude the star is DRAWN at — the two agree only when the atmosphere is off.
         return SkyFrame.horizonOf(ra, dec, here.latitude, here.longitude, at)
     }

@@ -26,6 +26,7 @@ import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.MeteorShowers
 import dev.mascwa.pulse.core.telemetry.Occultations
+import dev.mascwa.pulse.core.telemetry.ProperMotion
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
@@ -219,7 +220,23 @@ class ObservatoryViewModel(
                     magnitude = star.magnitude,
                     positionUncertaintyDeg = Occultations.STAR_UNCERTAINTY_DEG,
                 ) { ms ->
-                    Ephemeris.precessFromJ2000(star.rightAscensionDeg, star.declinationDeg, ms)
+                    // ⚠️ Its own motion FIRST, in the catalogue's J2000 frame — without it Regulus
+                    // is 6.6" from where it is, three times the budget declared one line above —
+                    // then the APPARENT place, aberrated, rather than `precessFromJ2000`. The
+                    // Moon the search compares against is its apparent place to 0.7" (its
+                    // light-time and its aberration cancel); a star has no light-time, so its
+                    // aberration is the full 20", and leaving it off put every contact time about
+                    // forty seconds out. Both measured; the reasoning is on
+                    // `Ephemeris.apparentStarEquatorial`, and the phone's OrbitalViewModel does
+                    // exactly this.
+                    val here = DoubleArray(2)
+                    ProperMotion.carry(
+                        star.rightAscensionDeg, star.declinationDeg,
+                        star.pmRaMasPerYear, star.pmDecMasPerYear,
+                        ProperMotion.yearsSince(StarCatalogSource.EPOCH_YEAR, ms),
+                        here,
+                    )
+                    Ephemeris.apparentStarEquatorial(here[0], here[1], ms)
                 }
             }
 

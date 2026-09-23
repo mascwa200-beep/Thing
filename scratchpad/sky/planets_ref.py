@@ -8,6 +8,16 @@ sys.path.insert(0, S + '/py')
 from skyfield.api import load, wgs84
 from skyfield.magnitudelib import planetary_magnitude
 ts = load.timescale(builtin=True)
+
+
+def ts_ut1_is_utc(ms):
+    """ΔT := TT−UTC at this instant, so UT1 == UTC. The alt/az fixtures use it because the app
+    ignores DUT1 by design (as Stellarium does) and a reference carrying it — real before 2026,
+    EXTRAPOLATED to −1.35 s by 2045 — would fail a tight bar over a quantity nobody can know."""
+    t = ts.from_datetime(datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc))
+    return load.timescale(builtin=True, delta_t=float(t.delta_t) + float(t.dut1))  # = TT - UTC
+
+
 eph = load(S + '/eph/de421.bsp')
 earth = eph['earth']; sun = eph['sun']
 site = earth + wgs84.latlon(42.7875, -86.1089)
@@ -26,7 +36,8 @@ for ms in ms_list:
         astro = earth.at(t).observe(eph[key])
         app = astro.apparent()
         ra, dec, dist = app.radec(epoch='date')
-        alt, az, d2 = site.at(t).observe(eph[key]).apparent().altaz()
+        tf = ts_ut1_is_utc(ms).from_datetime(datetime.fromtimestamp(ms/1000.0, tz=timezone.utc))
+        alt, az, d2 = site.at(tf).observe(eph[key]).apparent().altaz()
         mag = float(planetary_magnitude(astro))
         # ⚠️ planetary_magnitude 'shamelessly treats the Sun as sitting at the SSB' (its own
         # comment), which is 0.005-0.01 AU wrong — a tenth of a magnitude on Mercury. magSun is

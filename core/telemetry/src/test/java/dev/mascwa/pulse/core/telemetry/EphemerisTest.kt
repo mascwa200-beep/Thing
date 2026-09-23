@@ -98,7 +98,11 @@ class EphemerisTest {
             val p = Ephemeris.sunPosition(r.lat, r.lon, r.ms)
             worst = maxOf(worst, abs(p.altitudeDeg - r.sunAlt), angleDiff(p.azimuthDeg, r.sunAz))
         }
-        assertTrue("worst Sun error was $worst deg", worst < 0.05)
+        // ⚠️ Measured 0.00051 degrees (1.8", of which 0.36" is the fixtures' own four-decimal
+        // rounding and the rest is UT1 − UTC, ignored as Stellarium ignores it) with the Sun
+        // TOPOCENTRIC; the bar was 0.05 before and could not see the 8.8" parallax that was
+        // missing, which is a fifth of the bar here. Dropping the `topocentric` step fails this.
+        assertTrue("worst Sun error was $worst deg", worst < 0.001)
     }
 
     @Test fun moonPositionMatchesJplIncludingTheParallaxCorrection() {
@@ -621,9 +625,14 @@ class EphemerisTest {
     }
 
     /**
-     * The vector form is the degree form, so a star map that holds directions as unit vectors
-     * cannot end up with a second implementation of Meeus chapter 21. Measured worst component
-     * disagreement 1.8e-15, worst departure from unit length 4.4e-16.
+     * The vector form is the degree form of the TRUE-of-date pair, so a star map that holds
+     * directions as unit vectors cannot end up with a second implementation of the rotation.
+     * Measured worst component disagreement 1.8e-15, worst departure from unit length 4.4e-16.
+     *
+     * ⚠️ Against [Ephemeris.trueOfDateToJ2000], not the mean pair, since S4: the vector form
+     * carries the nutation because every horizon direction it is handed comes off apparent
+     * sidereal time. Comparing it with the mean pair reports 4.9e-5 of a unit vector — ten
+     * arcseconds — which is the nutation being present, not a defect.
      */
     @Test fun theVectorFormAgreesWithTheDegreeFormAndStaysAUnitVector() {
         val ms = 1781481600000L
@@ -634,8 +643,8 @@ class EphemerisTest {
             var dec = -85
             while (dec <= 85) {
                 val v = SkyProjection.equatorialVector(ra.toDouble(), dec.toDouble())
-                Ephemeris.precessVectorToJ2000(v, ms)
-                val j = Ephemeris.meanOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
+                Ephemeris.ofDateVectorToJ2000(v, ms)
+                val j = Ephemeris.trueOfDateToJ2000(ra.toDouble(), dec.toDouble(), ms)
                 val w = SkyProjection.equatorialVector(j[0], j[1])
                 for (i in 0..2) worstComponent = maxOf(worstComponent, abs(v[i] - w[i]))
                 worstLength =
@@ -669,14 +678,27 @@ class EphemerisTest {
                 assertEquals(first[0], other[0], 1e-9)
                 assertEquals(first[1], other[1], 1e-9)
             }
-            // The vector form takes the same path and must agree with it.
+            // The true pair drops the right ascension at the pole for the same reason — to a
+            // looser bar, and the reason is arithmetic rather than a defect. The nutation step lands
+            // the pole 9" from the mean pole, where the recovered right ascension is amplified by
+            // 1/sin(9") ≈ 23,000, and the precession step then lands it 0.36° from the J2000 pole,
+            // amplified again by 160. The 6e-17 that `cos(90°)` leaves of the input right ascension
+            // comes through both: measured 5.9e-8° (0.2 mas) between two input right ascensions,
+            // against 1.3e-12° for the mean pair. A bar of 1e-6° (3.6 mas) is fifteen times that.
+            val firstTrue = Ephemeris.trueOfDateToJ2000(0.0, 90.0 * sign, ms)
+            for (anyRa in doubleArrayOf(90.0, 217.0, 359.9)) {
+                val other = Ephemeris.trueOfDateToJ2000(anyRa, 90.0 * sign, ms)
+                assertEquals(firstTrue[0], other[0], 1e-6)
+                assertEquals(firstTrue[1], other[1], 1e-6)
+            }
+            // The vector form takes the TRUE pair's path and must agree with it.
             val v = doubleArrayOf(0.0, 0.0, sign)
-            Ephemeris.precessVectorToJ2000(v, ms)
-            val w = SkyProjection.equatorialVector(first[0], first[1])
+            Ephemeris.ofDateVectorToJ2000(v, ms)
+            val w = SkyProjection.equatorialVector(firstTrue[0], firstTrue[1])
             for (i in 0..2) assertEquals(w[i], v[i], 1e-12)
             // And a component rounded a hair outside [-1, 1] is clamped rather than made a NaN.
             val over = doubleArrayOf(0.0, 0.0, sign * (1.0 + 1e-15))
-            Ephemeris.precessVectorToJ2000(over, ms)
+            Ephemeris.ofDateVectorToJ2000(over, ms)
             for (i in 0..2) assertTrue("component $i was ${over[i]}", over[i].isFinite())
         }
     }

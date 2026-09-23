@@ -14731,3 +14731,105 @@ anywhere in the repository.
 
 **Nothing shipped from this arc but the correction above.** The vein is clean, and saying so plainly
 beats manufacturing a gate for a failure that cannot happen.
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S1–S4 of six (this session, PR to come on `claude/loving-edison-bd65oa`)
+
+Owner: *"Without burning the usage, update and polish/streamline/fix the code within the star map
+apk to be as accurate as possible to Stellarium."* Chose (AskUserQuestion) **everything, S1–S6**;
+approved *"use ultracode without blowing out our plan usage data"*. **Zero subagent and zero
+workflow spend across all four slices** — every measurement is local kotlinc + JUnit, Skyfield +
+DE421 in the session scratchpad (`$S/py`, `$S/eph/de421.bsp`), or CI. Plan:
+`robust-baking-dewdrop.md`; each slice its own CI-green commit: **S1 `9b4905ce`** (the clock runs —
+the drawn instant was frozen at composition, 0.25°/min of sidereal drift), **S2 `53e0360d`**
+(refraction behind an ATMOSPHERE switch, 34.5′ at the horizon), **S3 `3a6671d9`** (VSOP87 planets,
+all seven, the Sun from the same theory), **S4** (this commit: apparent star places).
+
+**The measurement that is the arc, the 500-direction gap probe against Skyfield apparent alt/az at
+the owner's site** (`scratchpad/sky/gap_ref.py` + `StellariumGapProbe.kt`, seeded, so every slice
+scores the same sky):
+
+| | S1 (before) | S2 | S4 |
+|---|---|---|---|
+| stars, all above horizon | median 64–884″ by band, worst 1701″ | median 15.8″ worst 25.9″ | **median 1.1″ worst 1.6″** |
+| Moon | 98.8″ | 12.9″ | 1.1–2.1″ |
+| Sun | 223.8″ | 24.1″ | 1.5–1.7″ |
+
+What remains on everything is UT1 − UTC, ignored as Stellarium ignores it (~1″ today).
+
+**S4 in one line:** IAU 2000B nutation (generated table, `tools/sky/build_nutation.py`, held to a
+microarcsecond against Skyfield's own evaluation), apparent sidereal time (`gastDeg`) under every
+hour angle, the exact true-of-date pair everywhere, and annual aberration applied FIRST in
+`SkyFrame.project` and taken back off a tap — plus three things found by measuring on the way.
+
+⚠️ **THE MOON IS NOT ABERRATED AND THE STAR IS, AND `Occultations.kt` HAD IT BACKWARDS IN WRITING.**
+Its KDoc argued aberration "displaces every body by up to 20.5″ in the SAME direction, so in a
+separation between two bodies it very largely cancels". Measured with Skyfield at five instants: the
+Moon's apparent place is within **0.7″ of its GEOMETRIC place** — its light-time displacement and its
+stellar aberration cancel up to its own orbital velocity — so `moonEquatorial` (geometric + nutation)
+is already the apparent Moon, while a star has no light-time term and carries the whole 20.5″. The
+error lay along the ecliptic, the Moon's own track, so it read as **contact times forty seconds
+out** rather than a wrong yes/no, and the test's comment credited it to "the Moon's own error".
+Both apps' occultation target lambdas now use `Ephemeris.apparentStarEquatorial`; contacts 38 s →
+8 s, closest approach 85 s → 2–9 s; bars 60/90/150 s → 15/15/30 s. **An argument about a
+separation cancelling is only as good as whether both bodies really move the same way — measure it.**
+
+⚠️ **THE SUN WAS 8.8″ OFF, AND THE PROBE IS WHAT FOUND IT.** With the star chain in, every body sat
+at ~1″ except the Sun at 9″ — the one an order of magnitude above the rest. `sunPosition` went from
+`sunEquatorial` straight to `toHorizontal`, never through `topocentric`, while `moonPosition` has
+since S3; the Sun's parallax is 8.8″·cos(alt). One line, the Moon's own call. **A probe over a
+whole population is worth more than any per-body test: the outlier names itself.**
+
+⚠️ **A TEST TOLERANCE TIGHT ENOUGH TO SEE A FRAME IS WHAT CATCHES A FRAME MISMATCH.** The plan left
+`Terminator` on mean sidereal time as "only a day/night wash". Its subsolar longitude is an APPARENT
+right ascension minus a sidereal time, and `TerminatorTest` holds it to 1e-6° against `toHorizontal`
+— the moment that moved to GAST, the test reported the equation of the equinoxes. Moved. Two
+derivations of one Sun must agree, whatever either is for.
+
+⚠️ **ΔT stayed a constant, ON MEASUREMENT, and the plan item saying otherwise is struck.** Skyfield's
+`delta_t` is 69.133 s in 2026, 70.535 in 2045; the constant 69.184 is within 0.05 s today and 1.35 s
+in 2045 — 0.7″ of Moon. What kept the 2045 alt/az rows 20″ off was Skyfield's **extrapolated DUT1**
+(−1.35 s by 2045, −27 s by 2100), which the app ignores by design. So every tight alt/az reference is
+built on a per-row timescale with `delta_t + dut1` for TT − UT1 (UT1 == UTC). ⚠️ **TT − UTC is
+`delta_t + dut1`, PLUS** — the sign was wrong twice before `check_dut1_fixed` printed 0.000000. And
+S3's trap hit again: `ts.utc(1970,1,1,0,0, ms/1000)` is not a UTC instant; use `ts.from_datetime`.
+
+⚠️ **Adapting `SkyFrameRefractionTest` to always-on aberration had two traps.** "A star truly on the
+horizon" must mean one whose ARRIVING direction is on the horizon (`catalogueUnit` takes β off, so
+`project` puts it back — they compose to (v/c)², 0.002″); and a drawn direction must be read back
+GEOMETRICALLY, never through `SkyFrame.horizonOf`, which now aberrates and would apply β twice.
+
+⚠️ **The pole ill-conditioning compounds through the nutation rotation.** The true-of-date
+round-trip at the pole depends on the input RA at 5.9e-8° (1/sin(9″) then 1/sin(0.36°)) where the
+mean pair sat at 1.3e-12°. Not a defect; `EphemerisTest` pins it at 1e-6 with the arithmetic.
+
+⚠️ **`tools/cross_module_internal_check.py` matched a qualified name as a SUBSTRING** — the internal
+`Ephemeris.aberrate` was reported reached from the two files calling the public
+`aberrateEquatorial`. Word-bounded now, negative-tested both ways (a planted real crossing is
+reported; the two call sites are not). Recorded as hole 3 in its docstring.
+
+⚠️ **A negative-test harness that perturbs files IN PLACE cannot share the tree with anything.**
+`neg_s4.sh` backs up four files and restores under a trap; an edit to any of them while it runs is
+clobbered by the restore, and any concurrent kotlinc run compiles a perturbed core. Run it alone,
+in the background via the Bash tool, and do nothing that compiles until it reports.
+
+**Bars tightened to what is measured:** `PlanetCalcTest` RA/Dec 4.5″ → 3″ (worst 2.49″ Neptune; the
+five naked-eye planets under 0.7″ once the nutation shortcut went), alt/az 30″ → 3″; Sun 0.05° →
+0.001°; `Occultations.PLANET_UNCERTAINTY_DEG` 5″ → 3″; `ApparentPlaceTest` new: RA/Dec of date
+0.5″ (measured 0.129″), alt/az 1″ (0.31″). **Thirteen rules negative-tested** (`neg_s4.sh`), all
+awake on the first run.
+
+⚠️ **Recorded, not fixed: comets carry light-time but no stellar aberration** (`Comets.kt:174`), ~20″
+on the COMETS list. `CometsTest`'s fixtures are ASTROMETRIC (the solver agrees to 0.009″ with no
+aberration, so they cannot be apparent), and the reference script that made them is not in the
+scratchpad — fixing it means regenerating 957-comet fixtures with `.apparent()`. Out of S4's scope.
+
+⚠️ **Owner-verify on the Pixel — and be honest about what is visible.** Twenty arcseconds is a pixel
+at the widest field and forty at the quarter-degree floor, so S4 shows only at the deepest zoom: a
+bright star's identify card should name the altitude the dot is drawn at, and a tap at the floor
+should land on the star it is on. The Moon and Sun should sit where a telescope finds them. S1–S3
+are the visible slices: the stars stay under the phone over ten minutes, a rising Moon sits a
+diameter higher, Uranus and Neptune are drawn.
+
+**Open: S5** (sky brightness + extinction behind the same ATMOSPHERE switch; invariant: night is
+byte-for-byte today) and **S6** (any date/time 1900–2100, grids/meridian/galactic equator, constellation
+names, a fuller identify card, GROUND). Then the draft PR → `main` and the branch re-sync.

@@ -8,8 +8,8 @@ package dev.mascwa.pulse.core.telemetry
  * ⚠️ The star half is EXACTLY what `SkyFrame.horizonOf` does — the true-of-date pair on the way
  * back from the catalogue — with `SkyFrame` itself not compiled here because it lives in
  * `:core:sky`. Keep this in step with that function or the measurement measures a paraphrase.
- * Before S4 the pair was `j2000ToMeanOfDate` + `toHorizontal` on GMST; after S4 it is the
- * true-of-date pair + aberration, and the probe follows.
+ * Before S4 the pair was `j2000ToMeanOfDate` + `toHorizontal` on GMST; since S4 it is
+ * `Ephemeris.apparentStarHorizontal` — the true-of-date pair, aberration and GAST — one call.
  */
 fun main() {
     val lat = 42.7875
@@ -43,8 +43,10 @@ fun main() {
     }
 }
 
-/** Mirror of SkyFrame.horizonOf. */
-private fun starHorizon(raDeg: Double, decDeg: Double, lat: Double, lon: Double, ms: Long): Ephemeris.Horizontal {
-    val d = Ephemeris.j2000ToMeanOfDate(raDeg, decDeg, ms)
-    return Ephemeris.toHorizontal(Ephemeris.Equatorial(d[0], d[1], 0.0), lat, lon, ms)
-}
+/**
+ * Since S4 this IS the shared core function: aberration, the true-of-date pair, apparent sidereal
+ * time — the same arithmetic SkyFrame.project + horizonOf do per star, in scalar form, so the probe
+ * cannot measure a paraphrase.
+ */
+private fun starHorizon(raDeg: Double, decDeg: Double, lat: Double, lon: Double, ms: Long): Ephemeris.Horizontal =
+    Ephemeris.apparentStarHorizontal(raDeg, decDeg, lat, lon, ms)

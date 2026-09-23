@@ -369,14 +369,21 @@ class OrbitalViewModel(
                         //
                         // The order is not interchangeable: proper motion is stated in the
                         // catalogue's own J2000 frame, so it has to be applied there, and
-                        // `precessFromJ2000` takes a J2000 position by contract.
+                        // `apparentStarEquatorial` takes a J2000 position by contract.
+                        //
+                        // ⚠️ The APPARENT place — aberrated — and not `precessFromJ2000`. The Moon
+                        // the search compares against is geometric-plus-nutation, which is its
+                        // apparent place to 0.7" (its light-time and aberration cancel); a star
+                        // has no light-time and its aberration is the full 20", so leaving it
+                        // off put every contact time about forty seconds out. Measured; the
+                        // reasoning is on `Ephemeris.apparentStarEquatorial`.
                         ProperMotion.carry(
                             s.rightAscensionDeg, s.declinationDeg,
                             s.pmRaMasPerYear, s.pmDecMasPerYear,
                             ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, ms),
                             here,
                         )
-                        Ephemeris.precessFromJ2000(here[0], here[1], ms)
+                        Ephemeris.apparentStarEquatorial(here[0], here[1], ms)
                     }
                 }
 

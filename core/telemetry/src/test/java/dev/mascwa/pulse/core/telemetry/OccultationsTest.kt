@@ -24,11 +24,16 @@ import kotlin.math.abs
  * spanning both hemispheres and the near-Arctic. Times are the real closest approach from that site;
  * disappearance and reappearance are where the separation crosses the Moon's own apparent radius.
  *
- * ⚠️ Skyfield's positions are APPARENT — they carry aberration, which this ephemeris does not. That
- * displaces both bodies by up to 20.5 arcseconds in the same direction, so it very largely cancels
- * in a separation between them; what is left is inside the seven arcseconds the Moon already
- * carries. The tolerances below are set from what was actually measured rather than from that
- * argument, which is what makes the argument checkable.
+ * ⚠️ Skyfield's positions are APPARENT, and so is the star target here — [star] hands the search
+ * [Ephemeris.apparentStarEquatorial]. An earlier version of this note argued the aberration could be
+ * left off both bodies because it "displaces both by up to 20.5 arcseconds in the same direction, so
+ * it very largely cancels in a separation". Measured, that is wrong: the Moon's apparent place is
+ * within 0.7" of its GEOMETRIC place (its light-time and its aberration cancel up to its own orbital
+ * velocity), so [Ephemeris.moonEquatorial] is already apparent, while a star's aberration is the
+ * whole 20.5". Leaving it off the star cost 85 s on a closest approach and 38 s on a contact, and the
+ * argument survived because those read as "the Moon's own error". With the star aberrated the same
+ * figures are 9 s and 8 s. The tolerances below are set from what was actually measured rather than
+ * from any argument, which is what made the argument checkable.
  */
 class OccultationsTest {
 
@@ -43,8 +48,9 @@ class OccultationsTest {
     )
 
     /**
-     * A star as a target: its place precessed to the instant asked for, so it lands in the same
-     * frame as the Moon. Two arcseconds of uncertainty, which is what that was measured at.
+     * A star as a target: its APPARENT place at the instant asked for — aberrated, then carried
+     * to the true equinox of date — so it lands where the Moon actually covers it. Two arcseconds
+     * of uncertainty, the budget `Occultations.STAR_UNCERTAINTY_DEG` states.
      */
     private fun star(name: String): Occultations.Target {
         val (ra, dec) = catalogue.getValue(name)
@@ -53,7 +59,7 @@ class OccultationsTest {
             kind = Occultations.Kind.STAR,
             magnitude = 1.0,
             positionUncertaintyDeg = 2.0 / 3600.0,
-            positionAt = { ms -> Ephemeris.precessFromJ2000(ra, dec, ms) },
+            positionAt = { ms -> Ephemeris.apparentStarEquatorial(ra, dec, ms) },
         )
     }
 
@@ -117,7 +123,9 @@ class OccultationsTest {
         for ((name, iso, sep) in cases) {
             val e = eventNear(name, iso)
             val offSec = abs(e.greatestEpochMs - at(iso)) / 1000
-            assertTrue("$name greatest was $offSec s from DE421", offSec < 90)
+            // Measured 2, 9 and 6 seconds (Regulus, Alcyone, Antares) with the star aberrated;
+            // up to 85 before, which was the star's aberration lying along the Moon's track.
+            assertTrue("$name greatest was $offSec s from DE421", offSec < 15)
             assertEquals("$name geocentric separation", sep, e.separationDeg, 0.004)
         }
     }
@@ -147,16 +155,18 @@ class OccultationsTest {
                 assertEquals("$name at ${s.site}: Sun altitude", s.sunAltDeg, l.sunAltitudeDeg, 0.15)
             }
         }
-        // Measured: 0.0010 degrees (3.6 arcseconds) and 85 seconds. The bars sit just above,
-        // because a tolerance far above what the code achieves is not a guard.
+        // Measured: 0.00052 degrees (1.9 arcseconds) and 19 seconds, with the star aberrated —
+        // 3.6" and 85 s before, most of which was the star's missing aberration lying along the
+        // Moon's own track. The bars sit just above, because a tolerance far above what the code
+        // achieves is not a guard.
         //
         // ⚠️ The TIME is looser than the separation by more than the separation error explains, and
         // that is real rather than sloppy: at a shallow miss the closest approach is a flat minimum,
         // so the separation is pinned and the instant it happens is not. At Sydney's 1.8-degree miss
         // of Alcyone the curve is almost level for minutes either side. Where it matters — a real
-        // occultation — the contacts below are good to under a minute.
-        assertTrue("worst local separation error was $worstSep deg", worstSep < 0.002)
-        assertTrue("worst local timing error was $worstTime s", worstTime < 150)
+        // occultation — the contacts below are good to fifteen seconds.
+        assertTrue("worst local separation error was $worstSep deg", worstSep < 0.001)
+        assertTrue("worst local timing error was $worstTime s", worstTime < 30)
     }
 
     /**
@@ -166,7 +176,7 @@ class OccultationsTest {
      * occultation. That is the whole reason the two files answer this question differently.
      */
     @Test
-    fun disappearanceAndReappearanceLandWithinAMinuteOfJpl() {
+    fun disappearanceAndReappearanceLandWithinFifteenSecondsOfJpl() {
         var worst = 0L
         var checked = 0
         for ((name, iso, sites) in listOf(
@@ -197,9 +207,10 @@ class OccultationsTest {
             }
         }
         assertTrue("at least one occultation must have had contacts to check", checked >= 5)
-        // Measured: 38 seconds, against about fifteen predicted from the Moon's own 7.4
-        // arcseconds at half an arcsecond a second. The rest is the aberration this does not apply.
-        assertTrue("worst contact error was $worst s", worst < 60)
+        // Measured: 8 seconds, inside the fifteen the Moon's own 7.4 arcseconds predicts at half
+        // an arcsecond a second — and that prediction is the bar. It was 38 s before the star was
+        // aberrated; the 23 s the Moon could not account for was the star's 20", along its track.
+        assertTrue("worst contact error was $worst s", worst < 15)
     }
 
     /**
@@ -218,7 +229,7 @@ class OccultationsTest {
 
         fun asTarget(uncertaintyDeg: Double) = Occultations.Target(
             "Regulus", Occultations.Kind.STAR, 1.35, uncertaintyDeg,
-        ) { ms -> Ephemeris.precessFromJ2000(ra, dec, ms) }
+        ) { ms -> Ephemeris.apparentStarEquatorial(ra, dec, ms) }
 
         val t = at(iso)
         val sharp = Occultations.upcoming(t - 86_400_000L, t + 86_400_000L, listOf(asTarget(2.0 / 3600.0)))

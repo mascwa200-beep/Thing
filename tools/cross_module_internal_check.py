@@ -38,6 +38,14 @@ closed here.** They cost no CI round only because the crossing they hid was noti
 Both were negative-tested: with the companion put back to `internal`, this reports both crossings;
 against the tree as it stands it reports none, so the widening adds no noise.
 
+⚠️ **A third hole, the opposite way round — a FALSE POSITIVE — found the day `:core:sky` started
+calling `Ephemeris.aberrateEquatorial`.** The match was a plain substring, so the internal
+`Ephemeris.aberrate` was reported reached from two files whose call is the public
+`Ephemeris.aberrateEquatorial`. A qualified name is only reached when the identifier ENDS there, so
+both the grep pre-filter and the confirming check now require a non-identifier character (or the end
+of the line) after the member. Negative-tested both ways: a planted real crossing of `aberrate` is
+still reported, and the two `aberrateEquatorial` call sites no longer are.
+
 Usage:
     python3 tools/cross_module_internal_check.py          # every module against every other
     python3 tools/cross_module_internal_check.py --root X # run against a copy of the tree
@@ -123,7 +131,9 @@ def main():
         targets = [os.path.join(root, m, "src") for m in mods if m != module]
         if not targets:
             continue
-        rx = "|".join(re.escape(p) for p, _ in pairs)
+        # ⚠️ The member must END at the qualified name: `Owner.member` inside `Owner.memberWider`
+        # is a different, possibly public, member (hole 3 in the docstring).
+        rx = "(" + "|".join(re.escape(p) for p, _ in pairs) + ")([^A-Za-z0-9_]|$)"
         got = subprocess.run(
             ["grep", "-rn", "--include=*.kt", "-E", rx] + targets,
             capture_output=True, text=True,
@@ -136,7 +146,7 @@ def main():
             if body.startswith("*") or body.startswith("//") or body.startswith("/*"):
                 continue
             for pat, decl in where.items():
-                if pat in body:
+                if re.search(re.escape(pat) + r"(?![A-Za-z0-9_])", body):
                     findings.append((line.split(":")[0], line, pat, decl))
                     break
 

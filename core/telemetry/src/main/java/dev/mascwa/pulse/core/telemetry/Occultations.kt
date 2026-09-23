@@ -35,13 +35,23 @@ import kotlin.math.asin
  * disappearance takes a couple of minutes from first bite to gone. The times here are for the
  * planet's CENTRE, and [describe] says so rather than implying a clean instant.
  *
- * ## What it will not do
+ * ## Aberration: on the star, and NOT on the Moon — the caller's job, and the physics of it
  *
- * ⚠️ Aberration is not applied to anything. Annual aberration displaces every body by up to 20.5
- * arcseconds in the SAME direction — it is a function of the Earth's velocity, not of the target —
- * so in a separation between two bodies it very largely cancels. The residual is at the level of the
- * ephemeris error the file already carries, and pretending otherwise would be false precision on top
- * of a Moon good to seven arcseconds.
+ * ⚠️ An earlier note here said aberration "is not applied to anything" because it "displaces every
+ * body by up to 20.5 arcseconds in the SAME direction … so in a separation between two bodies it
+ * very largely cancels". **That is wrong for the Moon, and measured wrong** (Skyfield/DE421, five
+ * instants): the Moon's apparent place sits within **0.7"** of its GEOMETRIC place, because the
+ * light-time displacement and the stellar aberration cancel up to the Moon's own orbital velocity;
+ * a star has no light-time term and its apparent place carries the whole 20.5". So
+ * [Ephemeris.moonEquatorial] — geometric plus nutation — IS the apparent Moon to 0.7", and a star
+ * position function built on [Ephemeris.precessFromJ2000] put the star up to 20" from where the
+ * Moon covers it. Along the ecliptic for the most part (the Earth's velocity lies in it, and so do
+ * the stars the Moon occults), which is why it showed as contact times forty seconds out rather than
+ * as a wrong answer to "is it occulted". A [Target]'s `positionAt` for a star must therefore return
+ * [Ephemeris.apparentStarEquatorial]; `OccultationsTest` measures the timing against DE421 either
+ * way and its bars are set from the aberrated figure.
+ *
+ * What is still not applied: gravitational light deflection (4 mas), and the Moon's own 0.7".
  */
 object Occultations {
 
@@ -202,12 +212,16 @@ object Occultations {
     /**
      * ⚠️ How well each kind of position is known, in degrees, and the two differ by ninety.
      *
-     * A star precessed out of the bundled catalogue is within 2 arcseconds of DE421, measured. A
-     * planet from the VSOP87 theory in `PlanetCalc` is within 4 arcseconds, also measured, across
-     * forty-five years (worst 3.77" on Neptune, median under 1.5") — where the low-precision
-     * method it replaced was within 3 arcMINUTES, a fifth of the Moon's radius, and could not call
-     * a planetary occultation near the limb at all. The two figures are now the same order, so
-     * [Local.grazing] is decided by the limb geometry rather than by which kind of body it is.
+     * A star carried out of the bundled catalogue to its apparent place is within 0.13 arcseconds
+     * of DE421, measured (`ApparentPlaceTest`, fifty rows); 2 arcseconds is kept here as the
+     * BUDGET rather than the measurement, because it is what the proper-motion note below asks a
+     * caller to stay inside and a graze is decided against the Moon's own 7" in any case. A
+     * planet from the VSOP87 theory in `PlanetCalc` is within 2.5 arcseconds, also measured, across
+     * forty-five years (worst 2.49" on Neptune; the five planets this file occults are all under
+     * 0.7") — where the low-precision method it replaced was within 3 arcMINUTES, a fifth of the
+     * Moon's radius, and could not call a planetary occultation near the limb at all. The two
+     * figures are now the same order, so [Local.grazing] is decided by the limb geometry rather
+     * than by which kind of body it is.
      *
      * ⚠️ **The star figure covers the PRECESSION ROTATION ONLY, and it is a budget the caller has
      * to keep rather than one this constant can enforce.** It was measured against DE421 for a
@@ -221,8 +235,12 @@ object Occultations {
      */
     const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
 
-    /** Measured 3.77" worst in `PlanetCalcTest`, so 5" — above the measurement, below the old 180". */
-    const val PLANET_UNCERTAINTY_DEG = 5.0 / 3600.0
+    /**
+     * Measured 2.49" worst in `PlanetCalcTest` (Neptune, which is not in [OCCULTABLE_PLANETS];
+     * the five that are sit under 0.7"), so 3" — above the measurement, below the 5" it was
+     * before the full nutation series, and far below the old 180".
+     */
+    const val PLANET_UNCERTAINTY_DEG = 3.0 / 3600.0
 
     /**
      * Six months, deliberately shorter than the two-year eclipse window.

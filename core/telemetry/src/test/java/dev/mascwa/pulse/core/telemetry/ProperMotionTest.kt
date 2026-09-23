@@ -218,8 +218,10 @@ class ProperMotionTest {
     @Test
     fun `an ordinary bright star breaches the occultation budget in under a decade`() {
         // ⚠️ This is the measurement that made the occultation search carry proper motion.
-        // `Occultations.STAR_UNCERTAINTY_DEG` is two arcseconds, measured for the precession
-        // rotation alone against DE421; a star's own motion is a separate error stacked on top.
+        // `Occultations.STAR_UNCERTAINTY_DEG` is two arcseconds — the BUDGET a star target
+        // carries (the apparent place itself is now measured to 0.13" against DE421, and the
+        // constant's own KDoc says which of the two it is); a star's own motion is a separate
+        // error stacked on top of whichever figure is used.
         // Regulus moves about 248 mas/yr, so it eats the whole budget in 2000 / 248 = 8.1 years,
         // and over the 26 since J2000 it is more than three times over.
         val budgetArcsec = Occultations.STAR_UNCERTAINTY_DEG * 3600.0

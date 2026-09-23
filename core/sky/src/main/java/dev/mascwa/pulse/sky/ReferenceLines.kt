@@ -57,7 +57,7 @@ object ReferenceLines {
                 } else {
                     ReferenceCircles.eclipticPoint(angle, obliquityDeg, v)
                 }
-                Ephemeris.precessVectorToJ2000(v, epochMs)
+                Ephemeris.ofDateVectorToJ2000(v, epochMs)
                 into.add(v[0], v[1], v[2])
             }
             into.endLine()

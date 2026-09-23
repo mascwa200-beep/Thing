@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.sky
 
+import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.Refraction
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
@@ -18,6 +19,13 @@ import org.junit.Test
  * ⚠️ These run on the JVM against the real `Ephemeris` and `Refraction`, so the star that is
  * "truly on the horizon" here is placed by the same conversions the map uses, not by a fixture that
  * assumes where the horizon is in the catalogue's frame.
+ *
+ * ⚠️ Since S4 [SkyFrame.project] adds annual aberration to EVERY direction before anything else,
+ * whatever the atmosphere is set to, so "a star truly on the horizon" has to mean a star whose
+ * ARRIVING direction is on the horizon: [catalogueUnit] takes β back off the geometric direction, and
+ * `project` puts it back. The two operations compose to within (v/c)², about two thousandths of an
+ * arcsecond — fifty times under the tightest bar here. And a drawn direction is read back
+ * geometrically ([drawnAltitude]), never through [SkyFrame.horizonOf], which would add β a second time.
  */
 class SkyFrameRefractionTest {
 
@@ -26,28 +34,48 @@ class SkyFrameRefractionTest {
     private val at = 1_790_128_800_000L
     private val view = SkyProjection.View(azimuthDeg = 180.0, altitudeDeg = 20.0, fovDeg = 80.0)
 
-    /** A catalogue-frame unit vector for a TRUE horizon position. */
+    /** The frame's own β for [at] — what [SkyFrame.project] adds to every direction. */
+    private val beta = Ephemeris.aberrationJ2000Equatorial(at)
+
+    /**
+     * A catalogue-frame unit vector for a star whose light ARRIVES from a TRUE horizon position:
+     * the geometric direction with β taken off, so that [SkyFrame.project]'s aberration lands it
+     * exactly there.
+     */
     private fun catalogueUnit(altDeg: Double, azDeg: Double): DoubleArray {
         val eq = SkyFrame.catalogueOf(altDeg, azDeg, lat, lon, at)
-        return SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
+        val v = SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
+        Ephemeris.unaberrateEquatorial(v, beta)
+        return v
     }
 
-    /** The horizon altitude a frame draws a screen point at, read back through its own basis. */
+    /** The same direction as [SkyFrame.project] sees it: after β, before any refraction. */
+    private fun arriving(v: DoubleArray): DoubleArray =
+        v.copyOf().also { Ephemeris.aberrateEquatorial(it, beta) }
+
+    /**
+     * The TRUE altitude of the direction a frame draws a screen point at, read back through its own
+     * basis — geometrically, because the drawn direction already carries the aberration.
+     */
     private fun drawnAltitude(frame: SkyFrame, p: SkyProjection.Screen): Double {
         val dir = DoubleArray(3)
         assertTrue(SkyProjection.unprojectUnit(p.x, p.y, frame.basis, dir))
         val dec = Math.toDegrees(asin(dir[2].coerceIn(-1.0, 1.0)))
         val ra = Math.toDegrees(atan2(dir[1], dir[0]))
-        return SkyFrame.horizonOf(ra, dec, lat, lon, at).altitudeDeg
+        val ofDate = Ephemeris.j2000ToTrueOfDate(ra, dec, at)
+        return Ephemeris.toHorizontal(
+            Ephemeris.Equatorial(ofDate[0], ofDate[1], 0.0), lat, lon, at,
+        ).altitudeDeg
     }
 
     @Test
-    fun `with the atmosphere off, project is projectUnit on the basis, bit for bit`() {
+    fun `with the atmosphere off, project is projectUnit of the aberrated direction, bit for bit`() {
         val frame = SkyFrame.of(view, lat, lon, at, refracting = false)
         for (alt in listOf(-10.0, -2.0, 0.0, 0.3, 5.0, 30.0, 60.0, 89.0)) {
             for (az in listOf(140.0, 180.0, 220.0)) {
                 val v = catalogueUnit(alt, az)
-                val direct = SkyProjection.projectUnit(v[0], v[1], v[2], frame.basis)
+                val a = arriving(v)
+                val direct = SkyProjection.projectUnit(a[0], a[1], a[2], frame.basis)
                 val via = frame.project(v[0], v[1], v[2])
                 assertEquals(direct.x, via.x, 0.0)
                 assertEquals(direct.y, via.y, 0.0)
@@ -85,7 +113,8 @@ class SkyFrameRefractionTest {
         val on = SkyFrame.of(view, lat, lon, at, refracting = true)
         for ((alt, az) in listOf(89.95 to 180.0, -5.0 to 180.0, -10.0 to 150.0)) {
             val v = catalogueUnit(alt, az)
-            val direct = SkyProjection.projectUnit(v[0], v[1], v[2], on.basis)
+            val a = arriving(v)
+            val direct = SkyProjection.projectUnit(a[0], a[1], a[2], on.basis)
             val via = on.project(v[0], v[1], v[2])
             assertEquals(direct.x, via.x, 0.0)
             assertEquals(direct.y, via.y, 0.0)
