@@ -27,11 +27,18 @@ import dev.mascwa.pulse.sky.StarLayer
 import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.ReferenceLines
 import dev.mascwa.pulse.core.telemetry.ReferenceCircles
+import dev.mascwa.pulse.sky.SkyClock
 import dev.mascwa.pulse.sky.stepAlong
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -53,6 +60,14 @@ import kotlin.math.roundToInt
  * stops while you look at it and the "now" button restores a moment that has since passed; an offset
  * of zero is live, and every other offset tracks alongside real time. It is also the honest model
  * for the question people actually ask — "what will this look like in four hours?"
+ *
+ * ⚠️ **And the instant genuinely advances, through [instant], which is the ONE derivation of what
+ * the map is drawing.** It did not: the chart held the instant in a `remember` keyed on the
+ * scrubber and the fix, the bodies were rebuilt only when the scrubber moved, and the tap read a
+ * live clock of its own — so a map left open drifted a quarter of a degree a minute from the sky
+ * over it, and after ten minutes a tap landed in a frame the drawing had left behind. See
+ * [SkyClock] for the numbers. The ticker runs only while something collects it, so a backgrounded
+ * screen costs nothing.
  */
 class SkyMapViewModel(
     private val catalog: StarCatalog,
@@ -292,6 +307,40 @@ class SkyMapViewModel(
     private val _hourOffset = MutableStateFlow(0)
     val hourOffset: StateFlow<Int> = _hourOffset.asStateFlow()
 
+    /**
+     * The instant the map is drawing, advancing every [SkyClock.TICK_MS] while the chart is on
+     * screen, and the ONLY place that instant is derived.
+     *
+     * ⚠️ **The Sun, Moon and planets are rebuilt inside the same tick**, so the eight bodies and the
+     * star frame can never disagree about what time it is — the two used to be computed from
+     * different reads of the clock, minutes apart. A rebuild is eight positions of pure arithmetic,
+     * so paying it twice a second is nothing; paying it only when the scrubber moved is what left
+     * the Moon drawn where it had been when the screen opened.
+     *
+     * ⚠️ `flatMapLatest` over the scrubber rather than reading it inside the loop, so a scrub
+     * restarts the ticker and the first thing the new inner flow does is rebuild — which is why
+     * [setHourOffset] no longer launches a rebuild of its own. `WhileSubscribed` with a short grace
+     * is what stops the ticker when the screen is backgrounded or left, without a lifecycle hook of
+     * its own: the chart collects it with lifecycle awareness and that is the whole of the wiring.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val instant: StateFlow<Long> = _hourOffset
+        .flatMapLatest { hours ->
+            flow {
+                while (true) {
+                    val at = SkyClock.instantOf(System.currentTimeMillis(), hours * HOUR_MS)
+                    rebuild(at)
+                    emit(at)
+                    delay(SkyClock.TICK_MS)
+                }
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(TICKER_GRACE_MS),
+            SkyClock.instantOf(System.currentTimeMillis(), 0L),
+        )
+
     private val _selected = MutableStateFlow<Body?>(null)
     val selected: StateFlow<Body?> = _selected.asStateFlow()
 
@@ -345,7 +394,10 @@ class SkyMapViewModel(
                 openConstellations()
                 openDeepSky()
                 openMilkyWay()
-                rebuild()
+                // ⚠️ The drawn instant, not a fresh read of the clock: the ticker is what advances
+                // it, and this call exists only so the first frame after a fix arrives has bodies
+                // in it rather than waiting up to half a second for the next tick.
+                rebuild(instant.value)
             } finally {
                 _loading.value = false
             }
@@ -724,10 +776,13 @@ class SkyMapViewModel(
         _view.value = _view.value.copy(azimuthDeg = azimuthDeg, altitudeDeg = altitudeDeg)
     }
 
+    /**
+     * Scrub the clock. The rebuild follows from [instant] restarting its ticker on the new offset,
+     * so nothing is launched here — a second rebuild path is a second clock waiting to disagree.
+     */
     fun setHourOffset(hours: Int) {
         if (hours == _hourOffset.value) return
         _hourOffset.value = hours.coerceIn(-MAX_HOURS, MAX_HOURS)
-        viewModelScope.launch { rebuild() }
     }
 
     fun clearSelection() { _selected.value = null }
@@ -774,7 +829,12 @@ class SkyMapViewModel(
             // finger touched rather than the eight thousand it might have touched. The old version
             // searched a list that had been converted to the horizon on every rebuild; that list no
             // longer holds stars, and this is both cheaper and the reason it can go.
-            val at = System.currentTimeMillis() + _hourOffset.value * 3_600_000L
+            //
+            // ⚠️ THE DRAWN instant, not the wall clock. This read `System.currentTimeMillis()`
+            // while the chart drew a `remember`ed instant from whenever the screen composed, so the
+            // two frames slid apart at a quarter of a degree a minute and a tap on a drawn star
+            // found nothing there after about ten minutes. One derivation, read by both.
+            val at = instant.value
             // ⚠️ Through the same boundary the frame is built with, so a tap resolves in exactly
             // the frame the stars are drawn in. Doing the conversion by hand here is what would put
             // the touch twenty arcminutes from the dot it landed on — invisible at a wide field and
@@ -845,16 +905,18 @@ class SkyMapViewModel(
     }
 
     /**
-     * Recompute every position for the current instant and place.
+     * Recompute every position for the given instant and the current place.
      *
      * ⚠️ Runs off the main thread, and everything it touches is pure arithmetic over a bundled file,
      * so it works with the radio off and cannot fail for want of a network. Without a location it
      * produces nothing at all rather than picking a plausible one — a sky drawn for somewhere you
      * are not is worse than an empty screen that says why.
+     *
+     * @param at the instant being drawn — handed in by [instant]'s ticker rather than read here,
+     *   so the bodies and the star frame are computed for the same moment by construction.
      */
-    private suspend fun rebuild() {
+    private suspend fun rebuild(at: Long) {
         val here = _site.value ?: return
-        val at = System.currentTimeMillis() + _hourOffset.value * 3_600_000L
 
         _bodies.value = withContext(Dispatchers.Default) {
             val out = ArrayList<Body>(8)
@@ -1005,6 +1067,16 @@ class SkyMapViewModel(
 
         /** A day either way. Further and the scrubber stops being a scrubber. */
         const val MAX_HOURS = 24
+
+        const val HOUR_MS = 3_600_000L
+
+        /**
+         * How long the ticker keeps running after the last collector goes away.
+         *
+         * A rotation tears the composition down and rebuilds it within this window, so the ticker
+         * — and the bodies it rebuilds — survive the turn rather than stopping and restarting.
+         */
+        const val TICKER_GRACE_MS = 5_000L
 
         /**
          * A tap grabs anything within this fraction of the half-field.

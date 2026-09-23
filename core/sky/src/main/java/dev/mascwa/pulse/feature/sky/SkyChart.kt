@@ -34,6 +34,7 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
 import dev.mascwa.pulse.sky.LineBatch
 import dev.mascwa.pulse.sky.MilkyWayGlow
+import dev.mascwa.pulse.sky.SkyClock
 import dev.mascwa.pulse.sky.SkyColors
 import dev.mascwa.pulse.sky.SkyFrame
 import dev.mascwa.pulse.sky.SkyLines
@@ -123,22 +124,30 @@ fun SkyChart(
 
     val site by vm.site.collectAsStateWithLifecycle()
     val linesMode by vm.linesMode.collectAsStateWithLifecycle()
-    val hours by vm.hourOffset.collectAsStateWithLifecycle()
     val deepRevision = vm.revision.collectAsStateWithLifecycle()
     // ⚠️ How faint the catalogue actually goes. Omitting it is not a default, it is a cut at the
     // naked-eye limit — see SkyMapViewModel.deepestMagnitude for what that measured.
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
 
-    // ⚠️ Held rather than read in the draw pass, so the sky does not creep while somebody pans. The
-    // instant only moves when the scrubber does, which is what the existing map has always done.
-    val at = remember(hours, site) { System.currentTimeMillis() + hours * 3_600_000L }
+    // ⚠️ **The drawn instant is the view model's ticking one, and it CREEPS — on purpose.** This
+    // used to be `remember(hours, site)`, held "so the sky does not creep while somebody pans"; the
+    // real sky creeps, at a quarter of a degree a minute, and a map that did not was drawing a sky
+    // that had left the phone behind within minutes of being opened. Collected with lifecycle
+    // awareness so the ticker stops when the screen does — see SkyMapViewModel.instant.
+    val at by vm.instant.collectAsStateWithLifecycle()
     var surface by remember { mutableStateOf(IntSize.Zero) }
 
     ReleaseTheSensorWhenNobodyIsLooking(vm)
 
     // Bring the deep catalogue up to date for wherever the view has got to. Cheap when the region
     // already held still covers the view, which is most pans — see StarField.update.
-    LaunchedEffect(view, site, at, surface, linesMode) {
+    //
+    // ⚠️ Keyed on a one-minute BUCKET of the instant rather than the instant itself: the ticker
+    // advances twice a second, and a coroutine launched per tick to be told "unchanged" twice a
+    // second is the kind of cost that never shows up anywhere but the battery. Neither load depends
+    // on the clock except through proper motion, which StarField tolerates for a tenth of a year.
+    val reloadBucket = SkyClock.reloadBucket(at)
+    LaunchedEffect(view, site, reloadBucket, surface, linesMode) {
         if (surface.width > 0 && surface.height > 0) {
             vm.refreshDeep(
                 SkyProjection.viewportOf(surface.width.toDouble(), surface.height.toDouble()), at,
