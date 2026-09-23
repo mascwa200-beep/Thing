@@ -48,6 +48,10 @@ java -cp "$KC:$STD:$TRV:$ANN:$COR" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
 
 for t in "$@"; do
   CLASS=$(basename "$t" .kt)
+  # ⚠️ The package is read off the file, not assumed: the core's tests span two packages
+  # (core.telemetry and data.orbital), and a guessed package fails with "Could not find class",
+  # which reads as a compile problem when nothing is wrong with the code.
+  PKG=$(grep -m1 -E '^package ' "$t" | sed -E 's/^package +//; s/[[:space:];]+$//')
   java -cp "$OUT:$TARGET_CP" org.junit.runner.JUnitCore \
-    "dev.mascwa.pulse.core.telemetry.$CLASS" 2>&1 | grep -v JAVA_TOOL_OPTIONS
+    "$PKG.$CLASS" 2>&1 | grep -v JAVA_TOOL_OPTIONS
 done

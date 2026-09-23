@@ -1024,7 +1024,9 @@ class SkyMapViewModel(
                 ),
             )
 
-            runCatching { PlanetCalc.planetsNow(here.latitude, here.longitude, at) }
+            // All seven: a chart whose catalogue reaches magnitude 15 has no business leaving out
+            // a magnitude-5.7 planet, which is the reason includeOuter exists.
+            runCatching { PlanetCalc.planetsNow(here.latitude, here.longitude, at, includeOuter = true) }
                 .getOrDefault(emptyList())
                 .forEach { p ->
                     out += Body(
@@ -1123,6 +1125,8 @@ class SkyMapViewModel(
             "Mars" to PlanetDisc.Body.MARS,
             "Jupiter" to PlanetDisc.Body.JUPITER,
             "Saturn" to PlanetDisc.Body.SATURN,
+            "Uranus" to PlanetDisc.Body.URANUS,
+            "Neptune" to PlanetDisc.Body.NEPTUNE,
         )
         /**
          * Sized for the bright catalogue exactly, so filling it never reallocates.

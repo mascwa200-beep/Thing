@@ -117,7 +117,7 @@ class CometsTest {
     /**
      * ⚠️ **The one that justifies not using the near-parabolic series.**
      *
-     * Schlyter's expansion — which this project's planet code follows for its own purposes, and
+     * Schlyter's expansion — which this project's planet code once followed, before VSOP87, and
      * which the obvious reading of the literature says to use for `0.98 <= e <= 1.02` — puts
      * 342P/SOHO **540 arcseconds** from where it is, and Hale-Bopp 10.5. Both are inside that
      * eccentricity range and both are years from perihelion, which is where the series stops being a

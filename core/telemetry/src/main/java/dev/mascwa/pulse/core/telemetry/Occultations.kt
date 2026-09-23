@@ -203,9 +203,11 @@ object Occultations {
      * ⚠️ How well each kind of position is known, in degrees, and the two differ by ninety.
      *
      * A star precessed out of the bundled catalogue is within 2 arcseconds of DE421, measured. A
-     * planet from the low-precision planetary theory is within 3 arcMINUTES, also measured, across
-     * fifty years — a fifth of the Moon's radius, so near the limb a planetary occultation genuinely
-     * cannot be called and [Local.grazing] says so.
+     * planet from the VSOP87 theory in `PlanetCalc` is within 4 arcseconds, also measured, across
+     * forty-five years (worst 3.77" on Neptune, median under 1.5") — where the low-precision
+     * method it replaced was within 3 arcMINUTES, a fifth of the Moon's radius, and could not call
+     * a planetary occultation near the limb at all. The two figures are now the same order, so
+     * [Local.grazing] is decided by the limb geometry rather than by which kind of body it is.
      *
      * ⚠️ **The star figure covers the PRECESSION ROTATION ONLY, and it is a budget the caller has
      * to keep rather than one this constant can enforce.** It was measured against DE421 for a
@@ -218,7 +220,9 @@ object Occultations {
      * way. `OrbitalViewModel` carries it; anything else building targets from a catalogue must too.
      */
     const val STAR_UNCERTAINTY_DEG = 2.0 / 3600.0
-    const val PLANET_UNCERTAINTY_DEG = 3.0 / 60.0
+
+    /** Measured 3.77" worst in `PlanetCalcTest`, so 5" — above the measurement, below the old 180". */
+    const val PLANET_UNCERTAINTY_DEG = 5.0 / 3600.0
 
     /**
      * Six months, deliberately shorter than the two-year eclipse window.
