@@ -26,6 +26,16 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  * what makes the cost independent of the field of view, and [MilkyWayGlow] explains at length why
  * the forward alternatives do not work here.
  *
+ * ## ⚠️ Not refracted, deliberately
+ *
+ * Every other catalogue-frame layer goes through `SkyFrame.project`, which bends it toward the
+ * zenith the way the air does. This one reads `frame.basis` directly and paints the geometric sky,
+ * because the raster is a ONE-DEGREE grid of star density, and the bend it would carry is half a
+ * degree for something truly on the horizon and a sixth of a degree five degrees up — smaller than
+ * the blur the bilinear upscale already spreads a cell over. A haze drawn half a cell higher is
+ * indistinguishable from the haze, and the arithmetic to move it would run per pixel here rather
+ * than per star.
+ *
  * ## What the glow means
  *
  * A byte in the raster is a star count per square degree, measured from the bundled catalogue.

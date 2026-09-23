@@ -1,7 +1,8 @@
 package dev.mascwa.pulse.sky
 
 /**
- * The one thing about the star map worth remembering between launches: whether it opens following.
+ * The two things about the star map worth remembering between launches: whether it opens following,
+ * and whether it draws the air.
  *
  * ⚠️ **A seam rather than a setting, because the two applications keep preferences in entirely
  * different places** — the standalone app in a three-key `SharedPreferences` file, the LCARS one in
@@ -43,4 +44,19 @@ interface SkyPreferences {
      * screen goes away without going through here, so closing the app cannot record "not following".
      */
     suspend fun setFollowByDefault(on: Boolean)
+
+    /**
+     * Whether the map draws the sky as the AIR shows it — refraction now; sky brightness and
+     * extinction ride the same switch when they arrive — rather than the geometric sky. Default ON,
+     * as Stellarium's atmosphere is.
+     *
+     * ⚠️ True is the fallback when the store cannot be read, for the same reason as
+     * [followByDefault]: the map's whole claim is to show what is overhead, and a rising Moon drawn a
+     * diameter below where the eye finds it is the wrong default to fall into silently. Must never
+     * throw.
+     */
+    suspend fun atmosphere(): Boolean
+
+    /** Remember a change of the atmosphere switch. Called only for a change the user made. */
+    suspend fun setAtmosphere(on: Boolean)
 }

@@ -128,6 +128,9 @@ fun SkyChart(
     // ⚠️ How faint the catalogue actually goes. Omitting it is not a default, it is a cut at the
     // naked-eye limit — see SkyMapViewModel.deepestMagnitude for what that measured.
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
+    // Whether the air is drawn. Collected here so a press of the chip re-runs the frame at once;
+    // the frame is built from it below and every catalogue-frame layer bends through the frame.
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
 
     // ⚠️ **The drawn instant is the view model's ticking one, and it CREEPS — on purpose.** This
     // used to be `remember(hours, site)`, held "so the sky does not creep while somebody pans"; the
@@ -227,8 +230,9 @@ fun SkyChart(
             here == null -> null
             pointing -> SkyFrame.ofPointing(
                 vm.pointForward, vm.pointUp, view.fovDeg, here.latitude, here.longitude, at,
+                refracting = atmosphere,
             )
-            else -> SkyFrame.of(view, here.latitude, here.longitude, at)
+            else -> SkyFrame.of(view, here.latitude, here.longitude, at, refracting = atmosphere)
         }
 
         // ⚠️ **First, before even the horizon.** It is unresolved starlight, so every star, every
@@ -271,8 +275,11 @@ fun SkyChart(
             if (linesMode != SkyMapViewModel.LinesMode.NONE) {
                 // ⚠️ The angle to the screen CORNER, not the half-field — culling on the half-field
                 // would throw away lines that are plainly visible at the top and bottom of a
-                // portrait phone. See SkyProjection.coneRadiusDeg.
-                val cone = Math.toRadians(SkyProjection.coneRadiusDeg(view.fovDeg, viewport))
+                // portrait phone. See SkyProjection.coneRadiusDeg. Padded by what the air can
+                // lift a run into the cone from outside it — zero with the atmosphere off.
+                val cone = Math.toRadians(
+                    SkyProjection.coneRadiusDeg(view.fovDeg, viewport) + frame.cullMarginDeg,
+                )
                 val coneCos = cos(cone)
                 val coneSin = sin(cone)
 
@@ -357,11 +364,22 @@ fun SkyChart(
         // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
         // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
-            val bv = SkyProjection.unitVector(b.azimuthDeg, b.altitudeDeg)
+            // ⚠️ Drawn at the APPARENT altitude — the same bend the stars get inside
+            // `SkyFrame.project`, applied here to the eight things that never go through that
+            // frame. The rising Moon is the case: truly half a diameter under the horizon, seen
+            // sitting on it. Bent under the SAME snapshot of the switch the frame above was built
+            // from — `atmosphere`, read once per draw pass — rather than the view model's live
+            // value, so the eight bodies and the stars cannot disagree even for the one frame
+            // after the chip is pressed; and every direction the disc renderer asks for goes
+            // through the same function below, so a limb cannot end up bent differently from its
+            // own centre.
+            val drawnAlt = vm.apparentAltitudeDeg(b.altitudeDeg, atmosphere)
+            val bv = SkyProjection.unitVector(b.azimuthDeg, drawnAlt)
             val p = SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
             if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach
             val screen = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
-            val isBelow = b.altitudeDeg < 0
+            // Against the DRAWN horizon: a body lifted over the line by the air is up, to the eye.
+            val isBelow = drawnAlt < 0
             val r = when (b.kind) {
                 SkyMapViewModel.Kind.SUN -> 9f
                 SkyMapViewModel.Kind.MOON -> 8f
@@ -376,7 +394,9 @@ fun SkyChart(
             // projection the body itself went through — which is what lets the renderer measure
             // orientations rather than assume them. See PlanetDisc.Appearance.
             val project: (PlanetDisc.SkyPoint) -> Offset? = { pt ->
-                val qv = SkyProjection.unitVector(pt.azimuthDeg, pt.altitudeDeg)
+                val qv = SkyProjection.unitVector(
+                    pt.azimuthDeg, vm.apparentAltitudeDeg(pt.altitudeDeg, atmosphere),
+                )
                 val q = SkyProjection.projectUnit(qv[0], qv[1], qv[2], horizonBasis)
                 if (q.visible) Offset(cx + (q.x * half).toFloat(), cy + (q.y * half).toFloat()) else null
             }
@@ -528,7 +548,8 @@ private fun DrawScope.drawStarLabels(
         val m = layer.magnitude[i].toDouble()
         if (!StarGlyph.labels(m, limit)) continue
         val name = vm.brightLabel(i) ?: continue
-        val p = SkyProjection.projectUnit(layer.vx[i], layer.vy[i], layer.vz[i], frame.basis)
+        // Through the frame, so the name sits beside the refracted dot and not half a degree under it.
+        val p = frame.project(layer.vx[i], layer.vy[i], layer.vz[i])
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
         val r = StarGlyph.bandRadiusDp(StarGlyph.sizeBand(m, limit)).dp.toPx()
         drawContext.canvas.nativeCanvas.drawText(

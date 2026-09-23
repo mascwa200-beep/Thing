@@ -22,9 +22,15 @@ import dev.mascwa.pulse.core.telemetry.StarNames
  *
  * ## What one frame costs
  *
- * Per star: nine multiplications and a divide to project ([SkyProjection.projectUnit]), a dot
- * product to find whether it is above the horizon ([SkyFrame.sinAltitude]), two comparisons, and two
- * writes into a bucket. Then a few dozen `drawPoints` calls for the whole sky, whatever its size.
+ * Per star: a dot product to find whether it is above the horizon ([SkyFrame.sinAltitude]), the
+ * refraction bend when the atmosphere is on — an `asin`, a table lookup and about fifteen
+ * multiplications, see [SkyFrame.project] — nine multiplications and a divide to project
+ * ([SkyProjection.projectUnit]), two comparisons, and two writes into a bucket. Then a few dozen
+ * `drawPoints` calls for the whole sky, whatever its size.
+ *
+ * ⚠️ **Every catalogue-frame projection here goes through [SkyFrame.project], never
+ * [SkyProjection.projectUnit] on the frame's basis.** That is where refraction lives, and a layer
+ * that skipped it would sit half a degree from the stars at the horizon.
  *
  * ⚠️ **The drawn count is bounded and that was measured, not hoped for.** Sweeping the real
  * catalogue across the whole zoom range at four latitudes, the number of stars that land on screen
@@ -68,17 +74,16 @@ fun collectStars(
     below: StarBatches,
 ): Int {
     var drawn = 0
-    val basis = frame.basis
     for (i in 0 until layer.count) {
         val m = layer.magnitude[i]
         if (m > limit) continue
         val x = layer.vx[i]
         val y = layer.vy[i]
         val z = layer.vz[i]
-        val p = SkyProjection.projectUnit(x, y, z, basis)
+        val p = frame.project(x, y, z)
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
         val band = StarGlyph.sizeBand(m.toDouble(), limit)
-        val target = if (frame.sinAltitude(x, y, z) >= 0.0) above else below
+        val target = if (frame.aboveHorizon(frame.sinAltitude(x, y, z))) above else below
         target.add(
             layer.colourBand[i], band,
             centreX + (p.x * halfPx).toFloat(),
@@ -144,19 +149,18 @@ fun DrawScope.drawStarGlow(
     centreY: Float,
     unmeasuredColour: Color,
 ) {
-    val basis = frame.basis
     for (i in 0 until layer.count) {
         val m = layer.magnitude[i].toDouble()
         if (!StarGlyph.glows(m, limit)) continue
         val x = layer.vx[i]
         val y = layer.vy[i]
         val z = layer.vz[i]
-        val p = SkyProjection.projectUnit(x, y, z, basis)
+        val p = frame.project(x, y, z)
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
         val core = StarGlyph.bandRadiusDp(StarGlyph.sizeBand(m, limit)).dp.toPx()
         val at = Offset(centreX + (p.x * halfPx).toFloat(), centreY + (p.y * halfPx).toFloat())
         val colour = StarNames.bandArgb(layer.colourBand[i])?.let { Color(it) } ?: unmeasuredColour
-        val dim = if (frame.sinAltitude(x, y, z) >= 0.0) 1f else SkyRenderer.BELOW_HORIZON_ALPHA
+        val dim = if (frame.aboveHorizon(frame.sinAltitude(x, y, z))) 1f else SkyRenderer.BELOW_HORIZON_ALPHA
         // A radial falloff rather than a ring: what makes a bright star look bright to the eye is
         // that its light spills, and a hard-edged bigger circle just looks like a bigger dot.
         drawCircle(
@@ -205,7 +209,6 @@ fun collectLines(
     centreY: Float,
     into: LineBatch,
 ): Int {
-    val basis = frame.basis
     val marginW = viewport.halfWidth + SkyRenderer.EDGE_MARGIN
     val marginH = viewport.halfHeight + SkyRenderer.EDGE_MARGIN
     var drawn = 0
@@ -219,7 +222,9 @@ fun collectLines(
         var lastX = 0.0
         var lastY = 0.0
         for (i in from until to) {
-            val p = SkyProjection.projectUnit(lines.vx[i], lines.vy[i], lines.vz[i], basis)
+            // ⚠️ Refracted like the stars it joins, or a figure would float half a degree off its
+            // own stars at the horizon and the ecliptic would miss the planets that follow it.
+            val p = frame.project(lines.vx[i], lines.vy[i], lines.vz[i])
             if (!p.visible) {
                 // ⚠️ A vertex behind the viewer has no finite screen position, so the run is BROKEN
                 // here rather than joined across the gap. Joining would draw a line from one edge of

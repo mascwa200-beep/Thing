@@ -1,8 +1,10 @@
 package dev.mascwa.pulse.sky
 
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.Refraction
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
+import kotlin.math.asin
 
 /**
  * Everything a frame needs to draw stars held in equatorial coordinates.
@@ -33,28 +35,40 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  * altitude because the zenith is carried into the same frame as the stars, and an angle between
  * two directions is what it always was.
  *
- * ## ⚠️ What is deliberately NOT applied, with the measured size of each
+ * ## ⚠️ Refraction is applied here, per direction, and the argument against it was wrong
+ *
+ * An earlier version of this note listed refraction as "deliberately NOT applied", on the grounds
+ * that it depends on each star's own altitude and so "breaks the two-vectors-per-frame arrangement
+ * this whole class exists for". The arrangement is intact: the two vectors are still all a frame
+ * costs to BUILD. What refraction adds is a per-star term at DRAW time — and the drawn count is
+ * bounded at about nine thousand by the zoom-adaptive magnitude cut (`SkyRenderer` measured it), so
+ * the term is a table lookup and a dozen multiplications each, about a millisecond for the busiest
+ * sky. Against that stood a **34.5-arcminute** error at the horizon, larger than the Moon, on every
+ * object, at every field. [project] applies it: [sinAltitude] is already paid for every drawn
+ * direction, [Refraction.fastBendingDeg] turns it into a bend, and [Refraction.lift] tilts the
+ * direction toward the zenith before it is projected. Everything held in this frame — the stars, the
+ * constellation figures and borders, the deep-sky objects, the two reference circles — goes through
+ * it, so nothing can detach from the stars. ⚠️ The Milky Way does not, and says why in its own file.
+ *
+ * With [refracting] false the geometry is exactly what it was, which is what the ATMOSPHERE switch
+ * turns off.
+ *
+ * ## ⚠️ What is still NOT applied, with the measured size of each
  *
  * Precession is here because it is a rotation of the whole sky, and proper motion is applied per
  * star where each layer is filled — see `ProperMotion` — because it changes only when a layer
- * reloads. Four smaller terms remain, and in every case the reason they are absent is structural
- * rather than an oversight:
+ * reloads. Three smaller terms remain:
  *
- * * **Refraction, 34.5 arcminutes at the horizon** — computed here from Bennett's formula, falling
- *   to 9.9 arcminutes at five degrees of altitude and 1.0 at forty-five. Easily the largest of the
- *   four, and the one that cannot be folded in here: it depends on each star's own altitude, so it
- *   is a different shift for every star and it breaks the two-vectors-per-frame arrangement this
- *   whole class exists for. Applying it would mean either a per-star correction every frame or a
- *   chart whose geometry silently stops being geometry. That is a decision about what the map IS,
- *   rather than a missing term.
  * * **Annual aberration, up to 20.5 arcseconds** — the constant of aberration, the Earth's own
- *   orbital velocity tilting the incoming light. A whole-sky term, so it WOULD fit this design; it
- *   is simply an order of magnitude below refraction.
- * * **Nutation, up to about 17 arcseconds of ecliptic longitude** — deliberately absent for a
- *   reason that is not size. [Ephemeris.toEquatorial] runs on Greenwich MEAN sidereal time, so the
- *   mean equinox is its self-consistent partner: the equation of the equinoxes carries the same
- *   nutation term that apparent right ascension does, and the two very largely cancel. Adding
- *   nutation on one side only would make the answer worse rather than better.
+ *   orbital velocity tilting the incoming light. A whole-sky term, so it fits this design; it is
+ *   next in line for [project], beside the refraction.
+ * * **Nutation, up to about 17 arcseconds of ecliptic longitude** — absent for a reason that is not
+ *   size. [Ephemeris.toEquatorial] runs on Greenwich MEAN sidereal time, so the mean equinox is its
+ *   self-consistent partner: the equation of the equinoxes carries the same nutation term that
+ *   apparent right ascension does, and the two very largely cancel. Adding nutation on one side only
+ *   would make the answer worse rather than better; it arrives with apparent sidereal time, as a pair.
+ *   Measured against Skyfield's apparent places, the two together leave a median of 15.8″ and a
+ *   worst of 25.9″ over five hundred directions — about twenty pixels at the quarter-degree floor.
  * * **Stellar parallax, under an arcsecond for the nearest star there is** — 0.77 arcseconds for
  *   Proxima, which is the extreme. About one pixel at the quarter-degree floor and imperceptible
  *   at every wider field, on a handful of stars out of three million. Diurnal parallax, from the
@@ -63,8 +77,8 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  *
  * ⚠️ **Parallax is a different story for the solar system, and there it is a real remaining gap
  * rather than a negligible one.** Those bodies never touch this basis — they are drawn through the
- * horizon path — so this is recorded here only because it is the fifth term somebody would look for.
- * The Moon has it: `Ephemeris.moonPosition` corrects its altitude, which is the large one at about a
+ * horizon path — so this is recorded here only because it is the term somebody would look for. The
+ * Moon has it: `Ephemeris.moonPosition` corrects its altitude, which is the large one at about a
  * degree. `Ephemeris.topocentric` exists and does it properly. But the map's planets come from
  * `PlanetCalc`, which applies none, and the horizontal parallax at closest approach is **33
  * arcseconds for Venus, 24 for Mars and 16 for Mercury** — computed from the Earth's radius over
@@ -92,6 +106,14 @@ class SkyFrame private constructor(
     val forwardX: Double,
     val forwardY: Double,
     val forwardZ: Double,
+    /**
+     * Whether [project] bends every direction the way the air does. False draws the geometric sky.
+     *
+     * ⚠️ Required at both constructors rather than defaulted, so a caller cannot build a frame that
+     * silently ignores the user's ATMOSPHERE switch — the "default that means do not do the thing"
+     * this repository has shipped twice.
+     */
+    val refracting: Boolean,
 ) {
 
     /**
@@ -101,21 +123,88 @@ class SkyFrame private constructor(
      * by definition the angle between it and the observer's horizon plane, so its sine is exactly
      * the projection onto the zenith. The map dims what is below the horizon rather than dropping it
      * — you can look at where a constellation is in daylight — so this is asked of every drawn star.
+     *
+     * ⚠️ This is the TRUE altitude, before refraction, whatever [refracting] says. Above or below the
+     * horizon is a fact about where the star is, and that is what the dimming reports; where it is
+     * DRAWN is [project]'s business.
      */
     fun sinAltitude(vx: Double, vy: Double, vz: Double): Double =
         vx * zenithX + vy * zenithY + vz * zenithZ
 
+    /**
+     * Where a catalogue-frame unit direction lands on the screen, refraction included.
+     *
+     * ⚠️ **The one projection every catalogue-frame caller must use** — stars, glow, labels, lines,
+     * deep-sky objects — so that everything drawn over the stars is bent by exactly what the stars
+     * are. A caller reaching for [SkyProjection.projectUnit] with [basis] directly draws the
+     * geometric position, and a constellation line that misses its own stars by half a degree at
+     * the horizon is precisely the defect that would produce.
+     *
+     * Cost when refracting: the dot product every caller was already paying, an `asin`, one table
+     * lookup, a square root and about fifteen multiplications, then the projection. Two fast exits
+     * bracket it — below the taper the bend is zero, and within a tenth of a degree of the zenith it
+     * is under a tenth of an arcsecond and the rotation plane is about to vanish.
+     */
+    fun project(vx: Double, vy: Double, vz: Double): SkyProjection.Screen {
+        if (!refracting) return SkyProjection.projectUnit(vx, vy, vz, basis)
+        val s = sinAltitude(vx, vy, vz)
+        if (s <= Refraction.SIN_TAPER_BOTTOM || s >= Refraction.SIN_NO_BEND) {
+            return SkyProjection.projectUnit(vx, vy, vz, basis)
+        }
+        val bend = Refraction.fastBendingDeg(Math.toDegrees(asin(s)))
+        if (bend <= 0.0) return SkyProjection.projectUnit(vx, vy, vz, basis)
+        Refraction.lift(vx, vy, vz, zenithX, zenithY, zenithZ, s, bend, lifted)
+        return SkyProjection.projectUnit(lifted[0], lifted[1], lifted[2], basis)
+    }
+
+    /**
+     * Whether a direction is drawn ABOVE the horizon line, given its [sinAltitude].
+     *
+     * ⚠️ Not `sinAlt >= 0` once the atmosphere is on. The horizon line is drawn at apparent zero,
+     * and refraction lifts a star truly half a degree under it to above the line — so the geometric
+     * test would dim that star as "not up" while drawing it over the horizon it is supposed to be
+     * under. The line moves to [Refraction.TRUE_AT_APPARENT_HORIZON_DEG], which is where the eye's
+     * horizon actually is; with the atmosphere off it is the geometric horizon, exactly as before.
+     */
+    fun aboveHorizon(sinAlt: Double): Boolean = sinAlt >= sinDrawnHorizon
+
+    private val sinDrawnHorizon: Double = if (refracting) SIN_TRUE_AT_APPARENT_HORIZON else 0.0
+
+    /**
+     * How much further out than the screen's own cone a caller must look before culling by angle.
+     *
+     * ⚠️ [project] lifts a direction TOWARD the zenith by up to [Refraction.MAX_BEND_DEG], so a run
+     * of constellation lines whose every vertex truly sits just past the bottom corner of the screen
+     * can be lifted onto it — and a cull against the bare cone would throw that run away, leaving a
+     * line that stops short of the corner exactly where the horizon is. Zero with the atmosphere
+     * off, so the geometric cull is byte-for-byte what it was.
+     */
+    val cullMarginDeg: Double = if (refracting) Refraction.MAX_BEND_DEG else 0.0
+
+    /**
+     * Scratch for [project]. A frame is built per draw pass and used from the one thread that draws,
+     * which is what makes a single reusable array safe; it is what keeps refracting nine thousand
+     * stars from allocating nine thousand triples.
+     */
+    private val lifted = DoubleArray(3)
+
     companion object {
+        private val SIN_TRUE_AT_APPARENT_HORIZON: Double =
+            kotlin.math.sin(Math.toRadians(Refraction.TRUE_AT_APPARENT_HORIZON_DEG))
+
         /**
          * Build the frame for a view, a place and an instant.
          *
          * Costs two coordinate conversions and a basis, whatever the catalogue holds.
+         *
+         * @param refracting whether [project] bends toward the zenith — the ATMOSPHERE switch.
          */
         fun of(
             view: SkyProjection.View,
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
+            refracting: Boolean,
         ): SkyFrame {
             val centre = centreOf(view, latitudeDeg, longitudeDeg, epochMs)
             val z = zenithVector(latitudeDeg, longitudeDeg, epochMs)
@@ -125,6 +214,7 @@ class SkyFrame private constructor(
                 basis = SkyProjection.basisOf(forward, z[0], z[1], z[2], view.fovDeg, view.rollDeg),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
                 forwardX = forward[0], forwardY = forward[1], forwardZ = forward[2],
+                refracting = refracting,
             )
         }
 
@@ -146,8 +236,13 @@ class SkyFrame private constructor(
          * cross product cannot vanish however the phone is held. `SkyPointingTest` asserts both
          * halves of that in this frame, not merely in the handset's.
          *
+         * ⚠️ Refraction needs nothing special here: the sensor reports where the handset truly
+         * points, and what the eye sees along that line is the refracted sky, which is what [project]
+         * draws. The zenith the bend is measured toward is the observer's, never the screen's.
+         *
          * @param forwardEnu where the camera looks, east/north/up, from `SkyPointing.forward`.
          * @param upEnu which way is up the screen, east/north/up, from `SkyPointing.screenUp`.
+         * @param refracting whether [project] bends toward the zenith — the ATMOSPHERE switch.
          */
         fun ofPointing(
             forwardEnu: DoubleArray,
@@ -156,6 +251,7 @@ class SkyFrame private constructor(
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
+            refracting: Boolean,
         ): SkyFrame {
             val forward = DoubleArray(3)
             val up = DoubleArray(3)
@@ -172,6 +268,7 @@ class SkyFrame private constructor(
                 basis = SkyProjection.basisOf(forward, up[0], up[1], up[2], fovDeg, 0.0),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
                 forwardX = forward[0], forwardY = forward[1], forwardZ = forward[2],
+                refracting = refracting,
             )
         }
 
@@ -215,6 +312,10 @@ class SkyFrame private constructor(
          * eventually disagree. Public because a tap is the fifth: hit-testing carries the touched
          * direction into the catalogue's frame and compares it against the stars there, which is one
          * conversion rather than one per star.
+         *
+         * ⚠️ Takes a TRUE altitude. A tap arrives as an apparent one — the drawn sky is refracted —
+         * and `SkyMapViewModel.identify` lowers it through [Refraction.trueOf] before coming here,
+         * so the direction compared against the catalogue is where the star IS, not where it is seen.
          */
         fun catalogueOf(
             altitudeDeg: Double,
@@ -234,7 +335,7 @@ class SkyFrame private constructor(
         }
 
         /**
-         * The way back: a catalogue position as an altitude and an azimuth.
+         * The way back: a catalogue position as a TRUE altitude and an azimuth.
          *
          * ⚠️ **The exact inverse of [catalogueOf], and it has to be.** A tap is answered by carrying
          * the touched direction into the catalogue's frame, finding the nearest star there, and then

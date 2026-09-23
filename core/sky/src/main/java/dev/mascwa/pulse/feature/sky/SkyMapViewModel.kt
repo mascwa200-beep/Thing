@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
 import dev.mascwa.pulse.core.telemetry.ProperMotion
+import dev.mascwa.pulse.core.telemetry.Refraction
 import dev.mascwa.pulse.core.telemetry.MilkyWay
 import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyPointing
@@ -308,6 +309,56 @@ class SkyMapViewModel(
     val hourOffset: StateFlow<Int> = _hourOffset.asStateFlow()
 
     /**
+     * Whether the air is in the picture — refraction now; sky brightness and extinction when they
+     * arrive ride this same switch. Read from [preferences] once in `init`, written on every change
+     * through [setAtmosphere], and never written by anything that is not the user pressing the chip.
+     *
+     * ⚠️ True until the store answers, not false: for the half a second before the preference is
+     * read the map draws the sky the way the default says it should, rather than flashing the
+     * geometric sky and then jumping every star near the horizon by half a degree.
+     */
+    private val _atmosphere = MutableStateFlow(true)
+    val atmosphere: StateFlow<Boolean> = _atmosphere.asStateFlow()
+
+    /**
+     * Whether the switch has been pressed in this process. ⚠️ Guards the stored value read in
+     * `init`: that read suspends on the preference store, and a press landing during it would be
+     * overwritten in memory while its own value went to disk — chip and disk then disagreeing until
+     * the next launch. Main thread only, like everything else that touches the switch.
+     */
+    private var atmosphereTouched = false
+
+    /** Switch the atmosphere on or off, and remember which. */
+    fun setAtmosphere(on: Boolean) {
+        atmosphereTouched = true
+        if (on == _atmosphere.value) return
+        _atmosphere.value = on
+        viewModelScope.launch { runCatching { preferences.setAtmosphere(on) } }
+    }
+
+    /**
+     * Where a TRUE altitude is drawn under the current switch.
+     *
+     * ⚠️ **The one rule for the eight things that do not go through `SkyFrame.project`** — the
+     * Sun, the Moon and the planets are held in horizon coordinates and the chart draws them here
+     * — and for the tap, which compares against them. Two places deriving "apparent" separately is
+     * how a Moon ends up drawn where the finger cannot find it.
+     *
+     * This form reads the live switch and is for the tap and the card. A draw pass takes the
+     * overload with the switch it was built from, so nothing in one frame reads it twice.
+     */
+    fun apparentAltitudeDeg(trueAltDeg: Double): Double =
+        apparentAltitudeDeg(trueAltDeg, _atmosphere.value)
+
+    /** The same rule under an explicit switch — the one a draw pass has already read once. */
+    fun apparentAltitudeDeg(trueAltDeg: Double, refracting: Boolean): Double =
+        if (refracting) Refraction.apparentOf(trueAltDeg) else trueAltDeg
+
+    /** The inverse: the TRUE altitude under a drawn one, which is what a tap has to recover. */
+    fun trueAltitudeDeg(apparentAltDeg: Double): Double =
+        if (_atmosphere.value) Refraction.trueOf(apparentAltDeg) else apparentAltDeg
+
+    /**
      * The instant the map is drawing, advancing every [SkyClock.TICK_MS] while the chart is on
      * screen, and the ONLY place that instant is derived.
      *
@@ -363,6 +414,11 @@ class SkyMapViewModel(
         // out of it. The refusal and the sensor registration are shared, which is the half that has
         // to be common.
         viewModelScope.launch {
+            // Read first, and directly into the flow: nothing to apply, and nothing to write back.
+            // Unless the chip was pressed while this read was suspended — then the press is the
+            // newer fact and is already on its way to disk.
+            val stored = runCatching { preferences.atmosphere() }.getOrDefault(true)
+            if (!atmosphereTouched) _atmosphere.value = stored
             if (runCatching { preferences.followByDefault() }.getOrDefault(true)) applyPointing(true)
         }
     }
@@ -817,10 +873,20 @@ class SkyMapViewModel(
         // The tolerance reads only the field, which both paths share, so it needs no branch.
         val toleranceDeg = SkyProjection.degreesPerUnit(v) * TAP_RADIUS_FRACTION
 
+        // ⚠️ **The tap is in the DRAWN sky, which is the refracted one.** Every altitude below is
+        // apparent until it is lowered: the eight bodies are compared where the chart draws them,
+        // and the star search lowers the touched direction to its true altitude before carrying it
+        // into the catalogue's frame — the stars are held true and drawn bent, so the finger has to
+        // be un-bent to meet them. Skipping either half puts a tap near the horizon half a degree
+        // from what it landed on, which at a narrow field is the whole screen.
         // The Sun, the Moon and the planets: eight things, still in horizon coordinates.
         var best = _bodies.value
             .asSequence()
-            .filter { SkyProjection.separationDeg(az, alt, it.azimuthDeg, it.altitudeDeg) <= toleranceDeg }
+            .filter {
+                SkyProjection.separationDeg(
+                    az, alt, it.azimuthDeg, apparentAltitudeDeg(it.altitudeDeg),
+                ) <= toleranceDeg
+            }
             .minByOrNull { it.magnitude }
 
         val here = _site.value
@@ -839,7 +905,7 @@ class SkyMapViewModel(
             // the frame the stars are drawn in. Doing the conversion by hand here is what would put
             // the touch twenty arcminutes from the dot it landed on — invisible at a wide field and
             // the whole screen at the narrowest.
-            val eq = SkyFrame.catalogueOf(alt, az, here.latitude, here.longitude, at)
+            val eq = SkyFrame.catalogueOf(trueAltitudeDeg(alt), az, here.latitude, here.longitude, at)
             val t = SkyProjection.equatorialVector(eq.rightAscensionDeg, eq.declinationDeg)
             // ⚠️ A dot product against a precomputed cosine, NOT an angle. The file's own warning
             // about `acos` near 1.0 is about RECOVERING an angle, where the significant figures are
@@ -885,8 +951,10 @@ class SkyMapViewModel(
     private fun horizonOf(layer: StarLayer, i: Int, here: SkySite, at: Long): Ephemeris.Horizontal {
         val dec = Math.toDegrees(kotlin.math.asin(layer.vz[i].coerceIn(-1.0, 1.0)))
         val ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
-        // ⚠️ The exact inverse of what [identify] used to find this star, so the altitude reported
-        // on the card is the altitude it is drawn at. `SkyFrame` holds both halves of that pair.
+        // ⚠️ The exact inverse of what [identify] used to find this star, so this is the TRUE
+        // altitude the tap was lowered to. `SkyFrame` holds both halves of that pair. The card
+        // lifts it back through [apparentAltitudeDeg] before printing, so what it reports is the
+        // altitude the star is DRAWN at — the two agree only when the atmosphere is off.
         return SkyFrame.horizonOf(ra, dec, here.latitude, here.longitude, at)
     }
 

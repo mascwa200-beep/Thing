@@ -60,6 +60,7 @@ fun StarMapScreen(vm: SkyMapViewModel, container: SkyContainer) {
     val loading by vm.loading.collectAsStateWithLifecycle()
     val missing by vm.catalogueMissing.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
 
     // ⚠️ Whether this phone has a rotation-vector sensor at all, read from the hardware rather than
     // guessed from a silent FOLLOW control: a chip that does nothing when pressed and a chip that
@@ -94,7 +95,11 @@ fun StarMapScreen(vm: SkyMapViewModel, container: SkyContainer) {
                 loading -> Notice("Placing the stars…", Modifier.align(Alignment.Center))
             }
             selected?.let { body ->
-                IdentifyCard(body, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
+                // The card describes the DRAWN sky: a body's altitude is held true, and the chart
+                // lifts it by the air before drawing, so the card lifts it the same way. Read from
+                // the collected switch so a press of the chip re-labels an open card.
+                val drawnAlt = vm.apparentAltitudeDeg(body.altitudeDeg, atmosphere)
+                IdentifyCard(body, drawnAlt, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
         Controls(view, vm, hasAttitudeSensor, onAbout = { showAbout = true })
@@ -171,6 +176,7 @@ private fun Notice(text: String, modifier: Modifier) {
 @Composable
 private fun IdentifyCard(
     body: SkyMapViewModel.Body,
+    drawnAltitudeDeg: Double,
     modifier: Modifier,
     onDismiss: () -> Unit,
 ) {
@@ -181,9 +187,9 @@ private fun IdentifyCard(
                 Text(body.detail, style = MaterialTheme.typography.bodyMedium)
             }
             Text(
-                "${body.altitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
+                "${drawnAltitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
                     "(${body.azimuthDeg.roundToInt()}°)" +
-                    if (body.altitudeDeg < 0) " · below the horizon" else "",
+                    if (drawnAltitudeDeg < 0) " · below the horizon" else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -208,6 +214,7 @@ private fun Controls(
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
     val deepNote by vm.deepNote.collectAsStateWithLifecycle()
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
 
     // ⚠️ **Only while following, and that is the whole justification.** Somebody holding the phone
     // up at the sky is not touching the screen, so the display blanks after whatever the system
@@ -316,6 +323,14 @@ private fun Controls(
                 selected = lines != SkyMapViewModel.LinesMode.NONE,
                 onClick = vm::cycleLines,
                 label = { Text(linesLabel(lines)) },
+            )
+            // The air: refraction lifts everything near the horizon by up to half a degree, and
+            // Stellarium draws it that way by default. Off is the geometric sky, for the person who
+            // wants to compare against a catalogue rather than against the window.
+            FilterChip(
+                selected = atmosphere,
+                onClick = { vm.setAtmosphere(!atmosphere) },
+                label = { Text("ATMOSPHERE") },
             )
             AssistChip(onClick = { vm.zoom(1.0 / ZOOM_STEP) }, label = { Text("−") })
             AssistChip(onClick = { vm.zoom(ZOOM_STEP) }, label = { Text("+") })

@@ -60,6 +60,7 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
     val selected by vm.selected.collectAsStateWithLifecycle()
     val missing by vm.catalogueMissing.collectAsStateWithLifecycle()
     val lines by vm.linesMode.collectAsStateWithLifecycle()
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
 
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -80,7 +81,11 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
                 loading -> Notice("Placing the stars…", c, Modifier.align(Alignment.Center))
             }
             selected?.let { body ->
-                IdentifyCard(body, c, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
+                // The card describes the DRAWN sky: a body's altitude is held true, and the chart
+                // lifts it by the air before drawing, so the card lifts it the same way. Read from
+                // the collected switch so a press of the chip re-labels an open card.
+                val drawnAlt = vm.apparentAltitudeDeg(body.altitudeDeg, atmosphere)
+                IdentifyCard(body, drawnAlt, c, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
         Controls(view, hours, lines, c, vm)
@@ -151,6 +156,7 @@ private fun Controls(
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
     val deepNote by vm.deepNote.collectAsStateWithLifecycle()
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
@@ -232,6 +238,9 @@ private fun Controls(
                 selected = lines != SkyMapViewModel.LinesMode.NONE,
                 onClick = vm::cycleLines,
             )
+            // The air: refraction lifts everything near the horizon by up to half a degree, and
+            // Stellarium draws it that way by default. Off is the geometric sky.
+            LcarsChip("ATMOSPHERE", selected = atmosphere, onClick = { vm.setAtmosphere(!atmosphere) })
             LcarsChip("−", selected = false, onClick = { vm.zoom(1.0 / ZOOM_STEP) })
             LcarsChip("+", selected = false, onClick = { vm.zoom(ZOOM_STEP) })
         }
@@ -250,6 +259,7 @@ private fun Controls(
 @Composable
 private fun IdentifyCard(
     body: SkyMapViewModel.Body,
+    drawnAltitudeDeg: Double,
     c: NightwirePalette,
     modifier: Modifier,
     onDismiss: () -> Unit,
@@ -259,9 +269,9 @@ private fun IdentifyCard(
             Text(body.label ?: "Unnamed", c.ink, ChakraPetch, 17, bold = true)
             Text(body.detail, c.ink2, ChakraPetch, 12)
             Text(
-                "${body.altitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
+                "${drawnAltitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
                     "(${body.azimuthDeg.roundToInt()}°)" +
-                    if (body.altitudeDeg < 0) " · below the horizon" else "",
+                    if (drawnAltitudeDeg < 0) " · below the horizon" else "",
                 c.muted, JetBrainsMono, 10,
             )
             LcarsButton("CLOSE", onClick = onDismiss, modifier = Modifier.padding(top = 8.dp))

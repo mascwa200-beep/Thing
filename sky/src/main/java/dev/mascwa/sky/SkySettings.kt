@@ -7,19 +7,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The four things this application has to remember, and it is genuinely only four.
+ * The five things this application has to remember, and it is genuinely only five.
  *
  * ⚠️ **Plain [SharedPreferences], and DataStore is deliberately not used.** Both of the other
  * applications keep their preferences in a DataStore, which is the right tool where there is a
  * settings object with dozens of fields, a flow somebody collects, and read-modify-write races to
- * guard against. Here there is a token, a build number and two switches, nothing observes them, and
- * DataStore would be a new dependency — `datastore-preferences` plus `datastore-core` plus its okio
- * chain — on the one module in this repository built to run on the cheapest phone that exists.
+ * guard against. Here there is a token, a build number and three switches, nothing observes them,
+ * and DataStore would be a new dependency — `datastore-preferences` plus `datastore-core` plus its
+ * okio chain — on the one module in this repository built to run on the cheapest phone that exists.
  *
  * ⚠️ **Every read is on [Dispatchers.IO], and the first one is why.** `getSharedPreferences` parses
  * the whole XML file the first time it is asked, on whatever thread asks. That is exactly the
  * main-thread decode this repository swept twenty-two stores to remove, and it would be silly to
- * reintroduce it here for a file with four keys in it. The dispatcher is chosen HERE rather than at
+ * reintroduce it here for a file with five keys in it. The dispatcher is chosen HERE rather than at
  * the call site, so a caller cannot forget.
  *
  * ⚠️ **The token is stored in plain text, and the ABOUT surface says so.** The LCARS application
@@ -29,13 +29,14 @@ import kotlinx.coroutines.withContext
  * desktop companion takes.
  *
  * ⚠️ **Every reader passes its own fallback rather than sharing one.** A failure to open the
- * preferences file is not the same answer for all four: no token, no pending install — but
- * `autoSendReports` and `followByDefault` both fall back to TRUE, because turning fault reporting
- * off, or hiding the map's whole pointing mode, on the one phone whose preferences will not open is
- * the opposite of what is wanted in each case.
+ * preferences file is not the same answer for all five: no token, no pending install — but
+ * `autoSendReports`, `followByDefault` and `atmosphere` all fall back to TRUE, because turning fault
+ * reporting off, hiding the map's whole pointing mode, or drawing a Moon a diameter below where the
+ * eye finds it, on the one phone whose preferences will not open, is the opposite of what is wanted
+ * in each case.
  *
  * Implements [SkyPreferences] directly rather than through an adapter: the seam asks for exactly the
- * two methods below, and this is already the class that owns them.
+ * four methods below, and this is already the class that owns them.
  */
 class SkySettings(context: Context) : SkyPreferences {
 
@@ -103,10 +104,18 @@ class SkySettings(context: Context) : SkyPreferences {
     override suspend fun setFollowByDefault(value: Boolean) = write { it.putBoolean(KEY_FOLLOW, value) }
 
     /**
+     * Whether the map draws the air — refraction, and the sky brightness that follows it. Default
+     * ON, as Stellarium's is, and TRUE on a read failure for the reason the class note gives.
+     */
+    override suspend fun atmosphere(): Boolean = read(true) { it.getBoolean(KEY_ATMOSPHERE, true) }
+
+    override suspend fun setAtmosphere(on: Boolean) = write { it.putBoolean(KEY_ATMOSPHERE, on) }
+
+    /**
      * ⚠️ **`commit()`, not `apply()`, and the pending marker is the reason.** That value is written
      * immediately before `PackageInstaller.commit()`, which usually tears this process down — and
      * `apply()` only promises the write eventually, through a queue this path does not go through. A
-     * lost marker is the loop it exists to prevent. The other three keys are written rarely enough
+     * lost marker is the loop it exists to prevent. The other four keys are written rarely enough
      * that a synchronous write on an IO thread costs nothing worth measuring.
      */
     private suspend fun write(block: (SharedPreferences.Editor) -> Unit) {
@@ -126,5 +135,6 @@ class SkySettings(context: Context) : SkyPreferences {
         const val KEY_PENDING = "pending_install"
         const val KEY_AUTO_SEND = "auto_send_reports"
         const val KEY_FOLLOW = "follow_by_default"
+        const val KEY_ATMOSPHERE = "atmosphere"
     }
 }
