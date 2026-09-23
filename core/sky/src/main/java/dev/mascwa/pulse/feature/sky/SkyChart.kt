@@ -15,8 +15,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -29,6 +31,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeepSky
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
+import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
@@ -206,7 +209,17 @@ fun SkyChart(
                 }
             },
     ) {
-        drawRect(colors.space)
+        // ⚠️ **The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
+        // on** — the one switch every part of the air rides. Without it (or without a Sun, before
+        // the first rebuild) the Sun is taken to be at the bottom of astronomical twilight, where
+        // every term in SkyBrightness is the identity: the dark background, the map's own cut bit
+        // for bit, the full Milky Way, no glow. That is what makes a chart with the switch off,
+        // or at night, byte-for-byte the chart before the sky had a brightness.
+        val sun = if (atmosphere) bodies.firstOrNull { it.kind == SkyMapViewModel.Kind.SUN } else null
+        val skyAlt = sun?.altitudeDeg ?: SkyBrightness.NIGHT_SUN_ALT_DEG
+        val skyFactor = SkyBrightness.skyFactor(skyAlt).toFloat()
+        val dimming = SkyBrightness.dimmingMag(skyAlt)
+        drawRect(if (skyFactor > 0f) lerp(colors.space, DAY_SKY, skyFactor) else colors.space)
         val half = size.minDimension / 2f
         val cx = size.width / 2f
         val cy = size.height / 2f
@@ -235,32 +248,47 @@ fun SkyChart(
             else -> SkyFrame.of(view, here.latitude, here.longitude, at, refracting = atmosphere)
         }
 
+        // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters,
+        // the eight solar-system bodies and the twilight glow — and it is the frame the stars above
+        // were built from whenever the handset is aiming.** All of them used to go through
+        // `basisOf(view)`, whose altitude is clamped to [SkyProjection.MAX_ALTITUDE_DEG], while the
+        // stars came from the vectors; the measurement is in `SkyMapViewModel.pointedHorizonBasis`,
+        // and the short of it is a fixed 0.4° that is invisible at a wide field and wider than the
+        // whole screen at the narrowest. `pointedHorizonBasis` is null when the handset is not
+        // aiming, and then the view's own basis is right — the point is that only ONE of the two is
+        // ever in play. Built before the Milky Way so the glow can be drawn under it.
+        val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
+        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
+
+        // The warm band around a Sun near the horizon — under the Milky Way, which is under
+        // everything, though the two never meet: the glow starts where the Milky Way has already
+        // faded out. Nothing is drawn at night (see drawTwilightGlow).
+        if (sun != null) drawTwilightGlow(sun, horizonBasis, view, atmosphere, vm, half, cx, cy)
+
         // ⚠️ **First, before even the horizon.** It is unresolved starlight, so every star, every
         // galaxy and every constellation line on this map is in front of it — and so is the chrome.
         // Drawn last it would be a haze OVER the sky instead of the sky's own background.
         if (frame != null) {
             vm.milkyWay?.let {
-                drawMilkyWay(it, frame, view, milkyWay, colors.starlight, vm.budget.milkyWaySamples)
+                drawMilkyWay(
+                    it, frame, view, milkyWay, colors.starlight, vm.budget.milkyWaySamples,
+                    // Gone by the end of nautical twilight; exactly 1 on a dark sky.
+                    opacityScale = SkyBrightness.milkyWayFactor(skyAlt),
+                )
             }
         }
 
-        // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters and
-        // the eight solar-system bodies — and it is the frame the stars above were built from
-        // whenever the handset is aiming.** All three used to go through `basisOf(view)`, whose
-        // altitude is clamped to [SkyProjection.MAX_ALTITUDE_DEG], while the stars came from the
-        // vectors; the measurement is in `SkyMapViewModel.pointedHorizonBasis`, and the short of it
-        // is a fixed 0.4° that is invisible at a wide field and wider than the whole screen at the
-        // narrowest. `pointedHorizonBasis` is null when the handset is not aiming, and then the
-        // view's own basis is right — the point is that only ONE of the two is ever in play.
-        val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
-        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
         drawHorizon(
             horizonBasis,
             if (pointedBasis != null) SkyPointing.azimuthOf(vm.pointForward) else view.azimuthDeg,
             colors, half, cx, cy, viewport, cardinalPaint,
         )
 
-        val limit = SkyProjection.magnitudeLimit(view.fovDeg, deepest)
+        // The map's own cut less what the brightening sky steals — the map's own cut, bit for bit,
+        // on a dark sky. See SkyBrightness.dimmingMag for what each twilight leaves.
+        val limit = SkyBrightness.limitingMagnitude(
+            SkyProjection.magnitudeLimit(view.fovDeg, deepest), skyAlt,
+        )
         if (frame != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
             // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
@@ -326,7 +354,9 @@ fun SkyChart(
                 deepSkyPaint.color = colors.label.toArgb()
                 deepSkyPaint.textSize = 9f * density
                 drawDeepSky(
-                    deepSkyLayer, frame, viewport, DeepSky.magnitudeLimit(view.fovDeg),
+                    deepSkyLayer, frame, viewport,
+                    // Its own cut, under the same sky: a galaxy is the first thing twilight takes.
+                    SkyBrightness.limitingMagnitude(DeepSky.magnitudeLimit(view.fovDeg), skyAlt),
                     view.fovDeg, half, cx, cy, colors.deepSky, vm.budget.deepSkyShapePx,
                 ) { lx, ly, name ->
                     drawContext.canvas.nativeCanvas.drawText(
@@ -364,6 +394,13 @@ fun SkyChart(
         // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
         // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
+            // ⚠️ A planet the daylight has swallowed is not drawn — the same cut the stars get —
+            // and ONLY while the sky is actually bright. On a dark sky the dimming is exactly zero
+            // and this never fires, so Neptune at 7.8 is drawn at a wide field exactly as it always
+            // was; the Sun and the Moon are never cut, because they are what a daytime sky shows.
+            if (b.kind == SkyMapViewModel.Kind.PLANET && dimming > 0.0 && b.magnitude > limit) {
+                return@forEach
+            }
             // ⚠️ Drawn at the APPARENT altitude — the same bend the stars get inside
             // `SkyFrame.project`, applied here to the eight things that never go through that
             // frame. The rising Moon is the case: truly half a diameter under the horizon, seen
@@ -545,9 +582,13 @@ private fun DrawScope.drawStarLabels(
     paint.color = colour.toArgb()
     paint.textSize = 9f * density
     for (i in 0 until layer.count) {
-        val m = layer.magnitude[i].toDouble()
-        if (!StarGlyph.labels(m, limit)) continue
+        val m0 = layer.magnitude[i].toDouble()
+        if (!StarGlyph.labels(m0, limit)) continue
         val name = vm.brightLabel(i) ?: continue
+        // Extincted like the dot it names, or a star the air has dimmed to a speck would keep the
+        // label its catalogue brightness earned. Exactly the catalogue magnitude with the air off.
+        val m = m0 + frame.extinctionMag(frame.sinAltitude(layer.vx[i], layer.vy[i], layer.vz[i]))
+        if (!StarGlyph.labels(m, limit)) continue
         // Through the frame, so the name sits beside the refracted dot and not half a degree under it.
         val p = frame.project(layer.vx[i], layer.vy[i], layer.vz[i])
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
@@ -686,3 +727,66 @@ private const val ECLIPTIC_ALPHA = 0.26f
  * half of what a sky map is for — and dimming is how the map says so.
  */
 private const val BELOW_HORIZON_BODY_ALPHA = 0.3f
+
+/**
+ * The daytime sky, and the band around a setting Sun.
+ *
+ * ⚠️ **Chart constants rather than [SkyColors] roles, deliberately.** That class carries what an
+ * APPLICATION decides — which ink the ecliptic is, whether the planets match the figures. The colour
+ * of a clear sky at noon is not a palette choice; it is the thing being drawn, and both applications
+ * draw the same one. The day they want different skies, these two become roles and every construction
+ * of [SkyColors] gains two arguments — a compile error, not a drift.
+ *
+ * ⚠️ The hues are the owner's to tune from a screenshot; what a test holds is that they are never
+ * blended in at all with the Sun eighteen degrees down, so a wrong blue can only spoil a daytime chart.
+ */
+private val DAY_SKY = Color(0xFF4A8FD6)
+private val TWILIGHT_GLOW = Color(0xFFF0A050)
+
+/** The glow at its strongest, just after sunset. */
+private const val GLOW_ALPHA = 0.55
+
+/**
+ * The warm radial band around a Sun within a few degrees of the horizon.
+ *
+ * Centred on where the Sun is DRAWN — under the same bend the body pass applies, so at sunset, which
+ * is exactly when it is drawn, the glow sits on the disc and not half a degree under it — and sized
+ * in degrees of sky ([SkyBrightness.GLOW_RADIUS_DEG]) so it is a fixed patch of sky at any zoom,
+ * capped at a few screens so a quarter-degree field does not ask for a gradient a hundred thousand
+ * pixels across. Nothing at all with the Sun twelve degrees down or lower, which is what keeps a
+ * night chart untouched.
+ */
+private fun DrawScope.drawTwilightGlow(
+    sun: SkyMapViewModel.Body,
+    basis: SkyProjection.Basis,
+    view: SkyProjection.View,
+    refracting: Boolean,
+    vm: SkyMapViewModel,
+    half: Float,
+    cx: Float,
+    cy: Float,
+) {
+    val strength = SkyBrightness.glowStrength(sun.altitudeDeg)
+    if (strength <= 0.0) return
+    val v = SkyProjection.unitVector(sun.azimuthDeg, vm.apparentAltitudeDeg(sun.altitudeDeg, refracting))
+    val p = SkyProjection.projectUnit(v[0], v[1], v[2], basis)
+    // Behind the viewer: nothing of a 40° glow can reach the screen from there.
+    if (!p.visible) return
+    val centre = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
+    val radius = (SkyBrightness.GLOW_RADIUS_DEG / SkyProjection.degreesPerUnit(view) * half)
+        .toFloat()
+        .coerceAtMost(size.maxDimension * 4f)
+    if (radius <= 0f) return
+    val ink = TWILIGHT_GLOW.copy(alpha = (GLOW_ALPHA * strength).toFloat())
+    drawCircle(
+        brush = Brush.radialGradient(
+            0f to ink,
+            0.4f to ink.copy(alpha = ink.alpha * 0.45f),
+            1f to Color.Transparent,
+            center = centre,
+            radius = radius,
+        ),
+        radius = radius,
+        center = centre,
+    )
+}

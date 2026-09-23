@@ -2,6 +2,7 @@ package dev.mascwa.pulse.sky
 
 import dev.mascwa.pulse.core.telemetry.Ephemeris
 import dev.mascwa.pulse.core.telemetry.Refraction
+import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import kotlin.math.asin
@@ -205,6 +206,28 @@ class SkyFrame private constructor(
      * off, so the geometric cull is byte-for-byte what it was.
      */
     val cullMarginDeg: Double = if (refracting) Refraction.MAX_BEND_DEG else 0.0
+
+    /**
+     * How many magnitudes the air takes from a star at this [sinAltitude] — through
+     * [SkyBrightness.fastExtinctionMag], the per-star table. Zero with the atmosphere off, so a
+     * caller's `m + extinctionMag(s)` is the catalogue magnitude to the bit; and zero below the
+     * drawn horizon, where the map dims by alpha instead and [SkyBrightness] explains why.
+     *
+     * ⚠️ On the GEOMETRIC direction, like [aboveHorizon] and for the same reason: twenty arcseconds
+     * of aberration is nothing against a dimming that changes over degrees, and asking for the
+     * aberrated sine would cost every star a second dot product.
+     */
+    fun extinctionMag(sinAlt: Double): Double =
+        if (!refracting || sinAlt < sinDrawnHorizon) 0.0 else SkyBrightness.fastExtinctionMag(sinAlt)
+
+    /**
+     * The fraction of light the air passes at this [sinAltitude], `10^(−0.4 m)` for the
+     * [extinctionMag] — 1 with the atmosphere off, and 1 below the drawn horizon. The Milky Way
+     * pass multiplies its opacity by this per pixel, so the glow fades toward the horizon as the
+     * stars it is made of do.
+     */
+    fun transmission(sinAlt: Double): Double =
+        if (!refracting || sinAlt < sinDrawnHorizon) 1.0 else SkyBrightness.fastTransmission(sinAlt)
 
     /**
      * Scratch for [project]. A frame is built per draw pass and used from the one thread that draws,

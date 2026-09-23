@@ -14833,3 +14833,94 @@ diameter higher, Uranus and Neptune are drawn.
 **Open: S5** (sky brightness + extinction behind the same ATMOSPHERE switch; invariant: night is
 byte-for-byte today) and **S6** (any date/time 1900–2100, grids/meridian/galactic equator, constellation
 names, a fuller identify card, GROUND). Then the draft PR → `main` and the branch re-sync.
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S5, the atmosphere's other two halves (this session, same branch)
+
+S5 of the six-slice plan above, its own CI-green commit. **Zero subagent and zero workflow spend**, as
+with S1–S4 — local kotlinc + JUnit, one `curl` of Stellarium's own source, and CI.
+
+With the atmosphere on, the map drew a black sky at noon with Vega on it at full brightness, and a
+first-magnitude star on the horizon as big and bright as one overhead. S2 was where the air MOVES
+things; this is where it hides them, and Stellarium draws both by default. Two pure functions of one
+variable each, in `core:telemetry/SkyBrightness.kt`: **sky brightness is a function of the SUN's
+altitude alone** (piecewise-linear ramps through the three twilights: a background factor, a Milky Way
+factor, a glow bump around the Sun, and a dimming in magnitudes taken off the map's own cut — 3.5 at
+the end of civil twilight, −0.5 at sunrise, −4.0 in full day, which is Venus and nothing else), and
+**extinction is a function of the STAR's altitude alone** (Rozenberg airmass × k, at the APPARENT
+altitude, zero below the DRAWN horizon). `SkyFrame` gains `extinctionMag`/`transmission`; the renderer
+applies the loss before both the cut and the size band; the Milky Way pass multiplies each sample by
+the transmission at its own direction and by the twilight factor; `SkyChart` tints the background,
+draws a warm radial band where the Sun is DRAWN, and gates a faint planet only while the sky is
+actually bright.
+
+⚠️ **THE CLAIM I HAD WRITTEN INTO THE COMMIT MESSAGE, THE KDOC AND THE TEST WAS WRONG, and one
+`curl` of Stellarium's source is what showed it.** All three said `k = 0.2, Stellarium's default`.
+`StelSkyDrawer.cpp:111` reads `landscape/atmospheric_extinction_coefficient` with a default of
+**0.13**; the `Extinction` header beside it carries a stale `(default 0.20)` in a comment, and a
+recollection reproduces the comment, not the code. **Read the line that reads the config, never the
+header that describes it.** The same fetch corrected a second claim: Stellarium's drawing path takes
+**Young's 1994 airmass on the GEOMETRIC altitude** (`Extinction::forward` → `airmass(…, false)`),
+not Rozenberg on the apparent one — while its own header says refraction-first-then-Rozenberg "seems
+better". Measured with the shipped Bennett inverse, the two agree to 1% above a degree and 4% on the
+drawn horizon (40 against 38.5): one airmass in two variables. Kept Rozenberg at the apparent
+altitude, moved k to 0.13, and **re-printed every figure that depended on k from the shipped
+function before pinning it** (horizon loss 7.8 → 5.07, the four pinned extinctions, the table
+bounds, two thresholds in `SkyFrameExtinctionTest`). The whole harness was re-run at the new value.
+
+⚠️ **And the first KDoc's own figures were already inconsistent with the test one file over** —
+"1.1 magnitudes at ten degrees, 2 at five, 5.2 at one" were `k·X` while the "7.8 on the horizon"
+beside them was `k·(X − 1)`; the test pinned 0.918 at ten degrees from the shipped function. Numbers
+in a KDoc written from memory sit beside numbers in a test printed by the code, and only the second
+kind is evidence. Roughly the twenty-fourth appearance of this habit in the arc-series.
+
+**Decisions worth keeping:**
+- **Night is byte-for-byte what it was, held on the raw bits.** Sun ≤ −18° ⇒ every ramp is the
+  identity and `limitingMagnitude` returns the cut bit for bit (four limits × five altitudes);
+  atmosphere off ⇒ `extinctionMag = 0.0`, `transmission = 1.0`, so `m0 + 0.0` and `o * 1.0 * 1.0`
+  are exact. A wrong constant can therefore only change a twilight/daytime chart or a star within a
+  few degrees of the horizon with the air on — which is why the constants can be the owner's to tune.
+- **The extinction step sits exactly on the batch boundary** (`Refraction.TRUE_AT_APPARENT_HORIZON_DEG`,
+  the line `aboveHorizon` splits on), where a brightness discontinuity already exists by design. Below
+  it the map dims by alpha on purpose; Stellarium ground-off makes the same cut two degrees down
+  (`extinction_mode_below_horizon = zero`).
+- **Tables over the SINE of altitude** — the dot product every star already pays, no `asin`; 4,096
+  entries agree with the exact forms to 3.8e-5 mag / 6.5e-7 (bars 1e-4 / 1e-6). Coarse in degrees
+  at the zenith and fine at the horizon, which is where the curvature is.
+- **The early `if (m0 > limit) continue` keeps the night path cost-identical** — extinction only ever
+  dims, so a star cut by its catalogue magnitude is cut by its extincted one.
+- **The dimming is the same loss at every field**, so a telescope-narrow field in daylight keeps its
+  zoom's own depth, as a telescope does.
+- **A planet is hidden only while `dimming > 0.0`** — Neptune at 7.8 still draws at a wide field at
+  night; the Sun and Moon are never cut.
+- **The twilight glow is drawn where the Sun is DRAWN** (through `apparentAltitudeDeg` and the same
+  basis as the body pass), because sunset is exactly when it is drawn.
+- **The Milky Way is faded and extincted but NOT refracted** — a 1° raster is blurrier than the 0.5°
+  it would move.
+- **Day/twilight colours are chart constants, not `SkyColors` roles**: the colour of a clear sky at
+  noon is the thing being drawn, not a palette choice, and both applications draw the same one.
+
+**Verification, all local:** `:core:telemetry:test` 2,816 green through Gradle; `SkyFrameExtinctionTest`
+3/3 + `SkyFrameRefractionTest` 6/6 under kotlinc + JUnit against the whole core; `:core:sky`
+frontend clean against the real platform + Compose 1.7.6 + lifecycle 2.8.7 (216 files); `:desktop:build`
+295 green (a shared core changed); the gate chain clean. **Ten load-bearing rules negative-tested**
+(`scratchpad/sky/neg_s5.sh`), each against a baseline asserted green first, each perturbation asserted
+to have matched the source exactly once, every restore byte-compared — all ten awake at k = 0.2, and
+all ten again at k = 0.13 with the re-pinned expectations.
+
+⚠️ **Three small operational notes.** `/tmp/skytest.sh` takes only the `:core:sky` files a test
+needs — `SkyProjection`/`SkyPointing` are `:core:telemetry` and passing them prints
+`error: source file or directory not found` with no verdict, which a `grep` for `OK (` reads as
+silence. `list_workflow_runs` returns the full commit message per run (four copies of a long one);
+poll with `list_workflow_jobs` and a run id. And the `:sky` module's package is `dev.mascwa.sky`,
+not `dev.mascwa.pulse.sky`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one.** With the atmosphere on
+at midday: a blue sky, the Sun, the Moon and Venus and nothing else. Around sunset: a warm band low
+in the west, the Milky Way gone before the stars, the stars arriving as the sky darkens. At night: a
+first-magnitude star setting should fade over its last two degrees, and with the atmosphere OFF the
+chart must be byte-for-byte what it was before. The ramp constants and `EXTINCTION_MAG_PER_AIRMASS`
+are the owner's to tune from a screenshot (Stellarium's own header puts a humid lakeshore nearer
+0.35 than 0.13).
+
+**Open: S6** (any date/time 1900–2100, grids/meridian/galactic equator, constellation names, a
+fuller identify card, GROUND). Then the draft PR → `main` and the branch re-sync.

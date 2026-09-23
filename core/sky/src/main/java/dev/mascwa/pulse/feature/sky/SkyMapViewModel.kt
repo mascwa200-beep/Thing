@@ -309,8 +309,8 @@ class SkyMapViewModel(
     val hourOffset: StateFlow<Int> = _hourOffset.asStateFlow()
 
     /**
-     * Whether the air is in the picture — refraction now; sky brightness and extinction when they
-     * arrive ride this same switch. Read from [preferences] once in `init`, written on every change
+     * Whether the air is in the picture — refraction, the sky's brightness and the extinction, all
+     * on this one switch. Read from [preferences] once in `init`, written on every change
      * through [setAtmosphere], and never written by anything that is not the user pressing the chip.
      *
      * ⚠️ True until the store answers, not false: for the half a second before the preference is

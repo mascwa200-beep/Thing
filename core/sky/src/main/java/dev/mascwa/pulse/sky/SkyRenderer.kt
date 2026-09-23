@@ -23,8 +23,9 @@ import dev.mascwa.pulse.core.telemetry.StarNames
  * ## What one frame costs
  *
  * Per star: a dot product to find whether it is above the horizon ([SkyFrame.sinAltitude]), the
- * refraction bend when the atmosphere is on — an `asin`, a table lookup and about fifteen
- * multiplications, see [SkyFrame.project] — nine multiplications and a divide to project
+ * air's extinction when the atmosphere is on — one table lookup on that same sine, see
+ * [SkyFrame.extinctionMag] — the refraction bend, likewise — an `asin`, a table lookup and about
+ * fifteen multiplications, see [SkyFrame.project] — nine multiplications and a divide to project
  * ([SkyProjection.projectUnit]), two comparisons, and two writes into a bucket. Then a few dozen
  * `drawPoints` calls for the whole sky, whatever its size.
  *
@@ -75,15 +76,25 @@ fun collectStars(
 ): Int {
     var drawn = 0
     for (i in 0 until layer.count) {
-        val m = layer.magnitude[i]
-        if (m > limit) continue
+        val m0 = layer.magnitude[i]
+        // ⚠️ The catalogue magnitude first, before any dot product: the air only ever DIMS, so a
+        // star already past the cut cannot come back through it, and this is the test that throws
+        // most of a deep layer away.
+        if (m0 > limit) continue
         val x = layer.vx[i]
         val y = layer.vy[i]
         val z = layer.vz[i]
+        val s = frame.sinAltitude(x, y, z)
+        // ⚠️ What the air takes at this altitude, before the cut AND the size band — a first-
+        // magnitude star a degree up is drawn as the fifth-magnitude speck it looks like, and a
+        // hair lower it is not drawn at all. Zero with the atmosphere off, so `m` is the catalogue
+        // magnitude to the bit. See SkyFrame.extinctionMag.
+        val m = m0 + frame.extinctionMag(s)
+        if (m > limit) continue
         val p = frame.project(x, y, z)
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
-        val band = StarGlyph.sizeBand(m.toDouble(), limit)
-        val target = if (frame.aboveHorizon(frame.sinAltitude(x, y, z))) above else below
+        val band = StarGlyph.sizeBand(m, limit)
+        val target = if (frame.aboveHorizon(s)) above else below
         target.add(
             layer.colourBand[i], band,
             centreX + (p.x * halfPx).toFloat(),
@@ -150,17 +161,22 @@ fun DrawScope.drawStarGlow(
     unmeasuredColour: Color,
 ) {
     for (i in 0 until layer.count) {
-        val m = layer.magnitude[i].toDouble()
-        if (!StarGlyph.glows(m, limit)) continue
+        val m0 = layer.magnitude[i].toDouble()
+        if (!StarGlyph.glows(m0, limit)) continue
         val x = layer.vx[i]
         val y = layer.vy[i]
         val z = layer.vz[i]
+        val s = frame.sinAltitude(x, y, z)
+        // Extincted like the disc it sits on, or a setting star would keep its halo after losing
+        // its size. Zero with the atmosphere off, as in collectStars.
+        val m = m0 + frame.extinctionMag(s)
+        if (!StarGlyph.glows(m, limit)) continue
         val p = frame.project(x, y, z)
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
         val core = StarGlyph.bandRadiusDp(StarGlyph.sizeBand(m, limit)).dp.toPx()
         val at = Offset(centreX + (p.x * halfPx).toFloat(), centreY + (p.y * halfPx).toFloat())
         val colour = StarNames.bandArgb(layer.colourBand[i])?.let { Color(it) } ?: unmeasuredColour
-        val dim = if (frame.aboveHorizon(frame.sinAltitude(x, y, z))) 1f else SkyRenderer.BELOW_HORIZON_ALPHA
+        val dim = if (frame.aboveHorizon(s)) 1f else SkyRenderer.BELOW_HORIZON_ALPHA
         // A radial falloff rather than a ring: what makes a bright star look bright to the eye is
         // that its light spills, and a hard-edged bigger circle just looks like a bigger dot.
         drawCircle(
