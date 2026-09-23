@@ -9,18 +9,27 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +47,9 @@ import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.feature.sky.SkyChart
 import dev.mascwa.pulse.feature.sky.SkyMapViewModel
+import dev.mascwa.pulse.sky.SkyCardText
+import dev.mascwa.pulse.sky.SkyClock
+import java.util.TimeZone
 import kotlin.math.roundToInt
 
 /**
@@ -99,7 +111,13 @@ fun StarMapScreen(vm: SkyMapViewModel, container: SkyContainer) {
                 // lifts it by the air before drawing, so the card lifts it the same way. Read from
                 // the collected switch so a press of the chip re-labels an open card.
                 val drawnAlt = vm.apparentAltitudeDeg(body.altitudeDeg, atmosphere)
-                IdentifyCard(body, drawnAlt, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
+                // The wording is the view model's, shared with the LCARS card; remembered because
+                // the bodies flow re-emits twice a second and the lines only change on a new tap
+                // or once the tap's rise-and-set enrichment lands.
+                val lines = remember(body, drawnAlt) {
+                    vm.cardLines(body, drawnAlt, TimeZone.getDefault())
+                }
+                IdentifyCard(body, lines, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
         Controls(view, vm, hasAttitudeSensor, onAbout = { showAbout = true })
@@ -173,26 +191,36 @@ private fun Notice(text: String, modifier: Modifier) {
     }
 }
 
+/**
+ * What was tapped, and everything the map knows about it.
+ *
+ * @param lines the view model's [SkyMapViewModel.cardLines] — what it is, where it is drawn, its
+ *   coordinates in both frames, its distance and size, and when it rises and sets today. The first
+ *   is the body's own description when it has one, and is set a size larger for that reason; the
+ *   rest are figures, read in the caption style.
+ */
 @Composable
 private fun IdentifyCard(
     body: SkyMapViewModel.Body,
-    drawnAltitudeDeg: Double,
+    lines: List<String>,
     modifier: Modifier,
     onDismiss: () -> Unit,
 ) {
     Card(modifier.fillMaxWidth().padding(12.dp)) {
         Column(Modifier.padding(16.dp)) {
             Text(body.label ?: "Unnamed", style = MaterialTheme.typography.titleMedium)
-            if (body.detail.isNotBlank()) {
-                Text(body.detail, style = MaterialTheme.typography.bodyMedium)
+            val described = body.detail.isNotBlank()
+            lines.forEachIndexed { i, line ->
+                if (i == 0 && described) {
+                    Text(line, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Text(
+                        line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Text(
-                "${drawnAltitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
-                    "(${body.azimuthDeg.roundToInt()}°)" +
-                    if (drawnAltitudeDeg < 0) " · below the horizon" else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 4.dp)) {
                 Text("CLOSE")
             }
@@ -207,14 +235,31 @@ private fun Controls(
     hasAttitudeSensor: Boolean,
     onAbout: () -> Unit,
 ) {
-    val hours by vm.hourOffset.collectAsStateWithLifecycle()
+    val offset by vm.offsetMs.collectAsStateWithLifecycle()
+    val at by vm.instant.collectAsStateWithLifecycle()
     val lines by vm.linesMode.collectAsStateWithLifecycle()
+    val grid by vm.gridMode.collectAsStateWithLifecycle()
+    val ground by vm.ground.collectAsStateWithLifecycle()
     val pointing by vm.pointing.collectAsStateWithLifecycle()
     val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
     val deepNote by vm.deepNote.collectAsStateWithLifecycle()
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
     val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
+    // The phone's zone, read each composition rather than remembered: it is a single call, and a
+    // zone changed in the system settings while this screen is open should be honoured on the next
+    // frame rather than on the next launch.
+    val zone = TimeZone.getDefault()
+
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        DateTimeDialog(
+            initial = at,
+            zone = zone,
+            onPick = { vm.setInstant(it); picking = false },
+            onDismiss = { picking = false },
+        )
+    }
 
     // ⚠️ **Only while following, and that is the whole justification.** Somebody holding the phone
     // up at the sky is not touching the screen, so the display blanks after whatever the system
@@ -228,9 +273,13 @@ private fun Controls(
     }
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        // ⚠️ WHEN is the absolute local date-time once scrubbed, not only the offset: the offset says
+        // how far you have moved and the date says what the picture is OF, and after a few presses
+        // of +1D the second is the one you have lost track of.
         Text(
-            "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
-                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · ${whenLabel(hours)}",
+            "Looking ${SkyCardText.cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
+                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · " +
+                SkyClock.whenLabel(at, offset, zone),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -324,6 +373,14 @@ private fun Controls(
                 onClick = vm::cycleLines,
                 label = { Text(linesLabel(lines)) },
             )
+            // The grids answer a different question from the figures — what the sky is measured
+            // against rather than what it is made of — so they are a second control, not two more
+            // stops on the lines one.
+            FilterChip(
+                selected = grid != SkyMapViewModel.GridMode.NONE,
+                onClick = vm::cycleGrid,
+                label = { Text(gridLabel(grid)) },
+            )
             // The air: refraction lifts everything near the horizon by up to half a degree, and
             // Stellarium draws it that way by default. Off is the geometric sky, for the person who
             // wants to compare against a catalogue rather than against the window.
@@ -332,6 +389,13 @@ private fun Controls(
                 onClick = { vm.setAtmosphere(!atmosphere) },
                 label = { Text("ATMOSPHERE") },
             )
+            // The ground: an opaque fill over the sky under your feet. Off by default, because this
+            // map's own habit is to draw that sky dimmed rather than hide it.
+            FilterChip(
+                selected = ground,
+                onClick = { vm.setGround(!ground) },
+                label = { Text("GROUND") },
+            )
             AssistChip(onClick = { vm.zoom(1.0 / ZOOM_STEP) }, label = { Text("−") })
             AssistChip(onClick = { vm.zoom(ZOOM_STEP) }, label = { Text("+") })
             // ⚠️ Last in the row on purpose. This is a scrolling strip and the chips before it are
@@ -339,14 +403,103 @@ private fun Controls(
             // in the life of an install, so it takes the position that has to be scrolled to.
             AssistChip(onClick = onAbout, label = { Text("ABOUT") })
         }
+        // ⚠️ Four to a row, not eight to one: at 360 dp a slot is 79 dp, and eight would be 40 —
+        // narrower than "−10M" in this typeface once the button's own padding is taken off, so the
+        // labels would clip. The backward steps share a row with NOW and the forward ones with the
+        // picker, which keeps each row reading in one direction.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TimeButton("−1D", Modifier.weight(1f)) { vm.nudgeOffset(-SkyClock.DAY_MS) }
+            TimeButton("−1H", Modifier.weight(1f)) { vm.nudgeOffset(-SkyClock.HOUR_MS) }
+            TimeButton("−10M", Modifier.weight(1f)) { vm.nudgeOffset(-10 * SkyClock.MINUTE_MS) }
+            TimeButton("NOW", Modifier.weight(1f)) { vm.resetOffset() }
+        }
         Row(
             Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            TextButton({ vm.setHourOffset(hours - 1) }, Modifier.weight(1f)) { Text("−1H") }
-            TextButton({ vm.setHourOffset(0) }, Modifier.weight(1f)) { Text("NOW") }
-            TextButton({ vm.setHourOffset(hours + 1) }, Modifier.weight(1f)) { Text("+1H") }
-            TextButton({ vm.setHourOffset(hours + 6) }, Modifier.weight(1f)) { Text("+6H") }
+            TimeButton("+10M", Modifier.weight(1f)) { vm.nudgeOffset(10 * SkyClock.MINUTE_MS) }
+            TimeButton("+1H", Modifier.weight(1f)) { vm.nudgeOffset(SkyClock.HOUR_MS) }
+            TimeButton("+1D", Modifier.weight(1f)) { vm.nudgeOffset(SkyClock.DAY_MS) }
+            TimeButton("DATE", Modifier.weight(1f)) { picking = true }
+        }
+    }
+}
+
+/** One of the eight time controls: a text button with its padding pulled in so four fit a row. */
+@Composable
+private fun TimeButton(text: String, modifier: Modifier, onClick: () -> Unit) {
+    TextButton(onClick, modifier, contentPadding = PaddingValues(horizontal = 4.dp)) { Text(text) }
+}
+
+/**
+ * Pick a date, then a time, in this phone's zone.
+ *
+ * Two steps because Material has a date picker and a time picker and no combined one; the date
+ * comes first because it is the half more likely to be what somebody came here to change. Both
+ * pickers open on the instant the map is already drawing, so a person who only wants to move the
+ * time does not first have to find today.
+ *
+ * ⚠️ The date picker's answer is UTC midnight of the chosen calendar day — see
+ * [SkyClock.pickerDateOf] — so it is read back through [SkyClock.pickerFields] and joined to the
+ * time in [zone] by [SkyClock.localInstant], never added to.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateTimeDialog(
+    initial: Long,
+    zone: TimeZone,
+    onPick: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val fields = remember(initial) { SkyClock.localFields(initial, zone) }
+    val dateState = rememberDatePickerState(
+        initialSelectedDateMillis = SkyClock.pickerDateOf(initial, zone),
+        yearRange = SkyClock.MIN_YEAR..SkyClock.MAX_YEAR,
+    )
+    val timeState = rememberTimePickerState(
+        initialHour = fields[3],
+        initialMinute = fields[4],
+        is24Hour = true,
+    )
+    var choosingTime by remember { mutableStateOf(false) }
+
+    if (!choosingTime) {
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(
+                    onClick = { choosingTime = true },
+                    enabled = dateState.selectedDateMillis != null,
+                ) { Text("NEXT · TIME") }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } },
+        ) {
+            DatePicker(state = dateState)
+        }
+    } else {
+        BasicAlertDialog(onDismissRequest = onDismiss) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
+                Column(Modifier.padding(24.dp)) {
+                    Text("Time", style = MaterialTheme.typography.labelLarge)
+                    TimePicker(state = timeState, modifier = Modifier.padding(top = 16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { choosingTime = false }) { Text("BACK") }
+                        TextButton(onClick = {
+                            dateState.selectedDateMillis?.let { day ->
+                                val d = SkyClock.pickerFields(day)
+                                onPick(
+                                    SkyClock.localInstant(
+                                        d[0], d[1], d[2], timeState.hour, timeState.minute, zone,
+                                    ),
+                                )
+                            }
+                        }) { Text("DRAW") }
+                    }
+                }
+            }
         }
     }
 }
@@ -367,18 +520,12 @@ private fun linesLabel(mode: SkyMapViewModel.LinesMode): String = when (mode) {
     SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS -> "+ BORDERS"
 }
 
-private fun whenLabel(hours: Int): String = when {
-    hours == 0 -> "now"
-    hours > 0 -> "+${hours}h"
-    else -> "${hours}h"
-}
-
-private val CARDINALS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
-
-private fun cardinal(azimuthDeg: Double): String {
-    var d = azimuthDeg % 360.0
-    if (d < 0) d += 360.0
-    return CARDINALS[((d + 22.5) / 45.0).toInt() % 8]
+/** What the grid control says — the grid that IS drawn, by the coordinates it is ruled in. */
+private fun gridLabel(mode: SkyMapViewModel.GridMode): String = when (mode) {
+    SkyMapViewModel.GridMode.NONE -> "NO GRID"
+    SkyMapViewModel.GridMode.EQUATORIAL -> "RA/DEC GRID"
+    SkyMapViewModel.GridMode.HORIZON -> "ALT/AZ GRID"
+    SkyMapViewModel.GridMode.BOTH -> "BOTH GRIDS"
 }
 
 private const val ZOOM_STEP = 1.4

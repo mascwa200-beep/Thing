@@ -14922,5 +14922,81 @@ chart must be byte-for-byte what it was before. The ramp constants and `EXTINCTI
 are the owner's to tune from a screenshot (Stellarium's own header puts a humid lakeshore nearer
 0.35 than 0.13).
 
-**Open: S6** (any date/time 1900–2100, grids/meridian/galactic equator, constellation names, a
-fuller identify card, GROUND). Then the draft PR → `main` and the branch re-sync.
+**S6 shipped — the next section.**
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S6, the things Stellarium shows (this session)
+
+The arc's last slice, and the one that is features rather than arithmetic: any date, two grids,
+constellation names, a fuller identify card, a ground. Both applications through the shared
+`:core:sky`. **Zero subagent and zero workflow spend**, as with S1–S5 — the owner allowed ultracode
+and asked not to burn the plan, and local kotlinc + JUnit, `javap` and CI were enough.
+
+**Shipped:** `offsetMs` replaces whole hours (seven steps + DATE: a two-step Material 3 picker in
+`:sky`, a typed `LcarsField` on LCARS through `SkyClock.parseLocal`), bounded 1900–2100; the
+readout shows the absolute LOCAL date-time when scrubbed. `SkyGrids` — equatorial grid of date +
+galactic equator in the catalogue frame, azimuthal grid + meridian in the horizon frame, labels
+every 2h/30°, a GRID chip NONE → EQUATORIAL → HORIZON → BOTH. Constellation names at figure
+centroids. `SkyMapViewModel.cardLines` through the pure `SkyCardText`: RA/Dec J2000 and of date,
+distance and size, rise/transit/set today. `GroundShape` + a GROUND chip (default OFF).
+
+**Decisions and traps worth keeping:**
+- ⚠️ **Material's `DatePickerState.selectedDateMillis` is UTC MIDNIGHT of the picked day**, not an
+  instant in any zone. Seeding it with the drawn instant opens the picker on the wrong day for
+  everyone east of Greenwich in the evening. `SkyClock.pickerDateOf`/`pickerFields` convert; the
+  test holds London (still the 23rd at 23:15) and Auckland (already the 24th) a day apart, both
+  values from python `zoneinfo`.
+- ⚠️ **Inline value-class parameters mangle a function's JVM name**, so `javap | grep "TimePicker("`
+  finds nothing: the real names are `TimePicker-mT9BvqQ`, `DatePickerDialog-GmEhDVc`,
+  `rememberDatePickerState-EU0dCGE`. Grep with `[-(]`. The `/tmp/m3x` extraction holds
+  `BasicAlertDialog` and the content-only `AlertDialog` but NOT the buttoned
+  `AndroidAlertDialog_androidKt`, so the time step is `BasicAlertDialog` + `Surface`.
+- ⚠️ **`tools/android_compile_check.sh` gained `-t <jvm-target>`, and the reason is a trap for anyone
+  using `-m`.** The compiled cores are built at 17 and kotlinc defaults to 1.8, so an `inline fun`
+  in a core (`Constellations.walkEdge`) reports "cannot inline bytecode built with JVM target 17"
+  on a tree CI compiles clean. `scratchpad/sky/compile_sky_app.sh` type-checks the WHOLE `:sky`
+  application against real Material 3 1.3.1 / Compose 1.7.6 / activity / lifecycle / okhttp — 50
+  files, frontend clean; negative-tested with a planted `vm.cycleGridd` (caught at the line) and a
+  control without `-t` that reproduces the two inline errors.
+- ⚠️ **`frameBucket` floor-divides, and the test now says why:** 1900–1969 is INSIDE the span this
+  map draws, those instants are negative, and truncation toward zero puts the millisecond before a
+  pre-1970 midnight in the midnight's own bucket — the equator and grid would rebuild a day late
+  for seventy years of the range. Fixture 1950-01-01T00:00Z = −631152000000 → bucket −7305.
+- **The ground is one exact circle, not a mesh.** Every circle on the sphere is a circle on the
+  stereographic plane, so the horizon is a circle (or a half-plane past a 2000-unit circumradius,
+  where the sagitta is under a sixth of a pixel); a triangle fan would have anti-aliased seams.
+  Which side is the ground is decided by **projecting the nadir** — inside looking down, outside
+  looking up — and by the zenith inverted when the nadir sits at the antipode. A screen-y rule of
+  thumb is right in one case and wrong in the other; a 300-view × 20-direction sweep pins it.
+- **Rise/set is enriched at TAP time, off main, behind a generation guard** — never in `rebuild()`,
+  which runs twice a second and would pay ~150 VSOP87 evaluations per planet each tick.
+- **The frame furniture is rebuilt on a day-bucket change** on `Dispatchers.Default` into fresh
+  `SkyLines` swapped on main, the bucket recorded BEFORE the build so a concurrent `rebuild()` from
+  `load()` cannot double-build; the bright stars are re-carried on
+  `StarField.PROPER_MOTION_TOLERANCE_YEARS`, now public so the two star layers share one tolerance.
+- **Four time buttons to a row, measured:** at 360 dp a slot is 79 dp, eight would be 40 — narrower
+  than "−10M" at 11sp mono once `LcarsButton`'s 32 dp of padding comes off. Backward steps share a
+  row with NOW, forward ones with DATE.
+- ⚠️ **I overwrote the S1 `SkyClockTest.kt` with a `Write`** ("has been updated successfully" was
+  the tell) and recovered the four old tests from `git show HEAD:…`. Read a test file before
+  writing one of the same name.
+
+**Verification:** 27 pure-core tests run locally (SkyClock 11, GroundShape 4, SkyCardText 5,
+SkyGrids 7); **nine load-bearing rules negative-tested** (`scratchpad/sky/neg_s6.sh`, one case per
+invocation, baseline asserted green first, anchor matched exactly once, restore under the shell's
+EXIT trap and byte-compared) — bounds, frame-bucket floor, local day start, picker UTC-midnight,
+nadir side, zenith side, seconds carry, grid of date, galactic sign — **all nine awake**, each
+failing exactly the tests that name it. `:core:sky` frontend clean over 219 files. The LCARS
+screen's twelve resolve-gate complaints are the documented cascade, proven not shrugged at: the
+nine view-model members compile in the `:sky` app, `raise` is a palette field with 42 callers, and
+`it`/`mutableStateOf` cascade from `LcarsField` being off that gate's classpath.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one.** Press DATE and land
+on a typed day (the picker should open on TODAY, not yesterday or tomorrow); cycle GRID through
+its four states; switch GROUND on and check the sky below the horizon is genuinely covered and
+the horizon line still shows; tap a planet and read the card's rise/set line against a real
+almanac in your zone; scrub +1D a few times and check the readout says the date, not just the
+offset.
+
+**Open:** the draft PR → `main` and the branch re-sync; the arc's standing open items — comets
+lack stellar aberration (~20″), identify can name a star not drawn, DSOs are not extincted near
+the horizon.

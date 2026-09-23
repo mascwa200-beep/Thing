@@ -28,8 +28,11 @@ import dev.mascwa.pulse.sky.StarLayer
 import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.ReferenceLines
 import dev.mascwa.pulse.core.telemetry.ReferenceCircles
+import dev.mascwa.pulse.sky.SkyCardText
 import dev.mascwa.pulse.sky.SkyClock
+import dev.mascwa.pulse.sky.SkyGrids
 import dev.mascwa.pulse.sky.stepAlong
+import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -183,27 +186,158 @@ class SkyMapViewModel(
         private set
 
     /**
-     * The celestial equator and the ecliptic, built once and never rebuilt.
+     * The celestial equator, the ecliptic, the equatorial grid and the numbers on it — the
+     * furniture that is OF A DATE, rebuilt whenever the drawn date crosses a day boundary.
      *
      * ⚠️ **Unlike [constellations] these depend on no asset and on no location**, so they are ready
-     * before anything is loaded and survive a catalogue that fails to open. They are also fixed in
-     * the equatorial frame, so scrubbing the clock moves them exactly as it moves the stars — which
-     * is to say, not at all in this frame, and entirely in the drawn one.
+     * before anything is loaded and survive a catalogue that fails to open. They are fixed in the
+     * equatorial frame, so scrubbing the clock moves them exactly as it moves the stars — not at all
+     * in this frame, and entirely in the drawn one.
      *
-     * ⚠️ The obliquity AND the epoch these are the circles of are read ONCE, at construction, and
-     * that is deliberate rather than lazy. The obliquity drifts about 0.013 degrees a century;
-     * precession, which carries them into the catalogue's frame, moves them about half an arcminute
-     * a year — so across the day this map's time control offers the change is a seventh of an
-     * arcsecond, smaller than any pixel on any screen. Rebuilding per scrub would be arithmetic
-     * spent to move nothing.
+     * ⚠️ **They USED to be built once, at construction, and the note here argued that was right:
+     * across the day the old scrubber offered, precession moves them a seventh of an arcsecond.**
+     * True, and no longer the case: the time control now reaches two centuries, across which the
+     * equinox moves nearly three degrees, and an equatorial grid three degrees off its own equator
+     * is exactly the wrong picture. So [refreshFrame] rebuilds them when [SkyClock.frameBucket]
+     * changes — a day, chosen because the drift across one is far under a pixel and the rebuild
+     * across one is ~5,800 rotations, which is nothing once a day and would be something twice a
+     * second. Built into NEW containers off the main thread and swapped in whole, so the draw pass
+     * never reads a half-filled line; `var` with a private setter is what makes the swap possible.
      */
-    val equatorLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
-    val eclipticLine = SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
+    var equatorLine: SkyLines = referenceLines()
+        private set
+    var eclipticLine: SkyLines = referenceLines()
+        private set
+    var equatorialGrid: SkyLines = SkyLines(SkyGrids.GRID_VERTICES, SkyGrids.GRID_RUNS)
+        private set
+    var equatorialLabels: List<SkyGrids.Label> = emptyList()
+        private set
+
+    /**
+     * The galactic equator, the azimuth/altitude grid, the meridian and the numbers on the horizon
+     * grid — built once, because nothing about them depends on the date: the first is fixed on the
+     * J2000 sky and the other three are fixed to the observer.
+     */
+    val galacticEquator = SkyLines(SkyGrids.CIRCLE_VERTICES, SkyGrids.CIRCLE_RUNS)
+    val horizonGrid = SkyLines(SkyGrids.GRID_VERTICES, SkyGrids.GRID_RUNS)
+    val meridian = SkyLines(SkyGrids.CIRCLE_VERTICES, SkyGrids.CIRCLE_RUNS)
+    val horizonLabels: List<SkyGrids.Label> = SkyGrids.horizonLabels()
+
+    /** Which day bucket the equatorial furniture was last built for. */
+    private var frameBucket = Long.MIN_VALUE
+
+    /** How many years past the bright catalogue's epoch its positions are currently carried to. */
+    private var carriedYears = Double.NaN
 
     init {
+        // ⚠️ Synchronously, so the very first frame has an equator and an ecliptic in it — the
+        // date-driven rebuild below is for when the date MOVES, and the first frame's date is now.
         val built = System.currentTimeMillis()
-        ReferenceLines.fill(equatorLine, null, built)
-        ReferenceLines.fill(eclipticLine, Ephemeris.trueObliquityDeg(built), built)
+        buildFrameLines(built, equatorLine, eclipticLine, equatorialGrid).also { equatorialLabels = it }
+        frameBucket = SkyClock.frameBucket(built)
+        SkyGrids.fillGalacticEquator(galacticEquator)
+        SkyGrids.fillHorizon(horizonGrid)
+        SkyGrids.fillMeridian(meridian)
+    }
+
+    private fun referenceLines() =
+        SkyLines(ReferenceCircles.ARCS * ReferenceCircles.PER_ARC, ReferenceCircles.ARCS)
+
+    /** Fill the three date-bound line sets for [at] and return the grid's labels. Pure; any thread. */
+    private fun buildFrameLines(
+        at: Long,
+        equator: SkyLines,
+        ecliptic: SkyLines,
+        grid: SkyLines,
+    ): List<SkyGrids.Label> {
+        ReferenceLines.fill(equator, null, at)
+        ReferenceLines.fill(ecliptic, Ephemeris.trueObliquityDeg(at), at)
+        SkyGrids.fillEquatorial(grid, at)
+        return SkyGrids.equatorialLabels(at)
+    }
+
+    /**
+     * Rebuild whatever the drawn DATE invalidates, if it has moved into a new day since last time.
+     *
+     * Two things: the equatorial furniture above, and the bright catalogue's proper motion. The
+     * bright layer was carried from J2000 to the moment the screen opened and never again, which is
+     * exact across a day and eleven arcminutes wrong for Barnard's Star across the century the time
+     * control now offers — the same tolerance [StarField] applies to the deep catalogue, applied at
+     * last to the bright one, so the two copies of each shared star keep moving together.
+     *
+     * ⚠️ Called from the ticker on the main thread, and the frame sets are swapped in there — the
+     * draw pass is on the same thread, so the swap is atomic with respect to it. The bucket is
+     * recorded BEFORE the build, so a second ticker instant arriving while the build is off-thread
+     * does not start a second one. The re-carry itself runs in place on the main thread: eight
+     * thousand small rotations, about a millisecond, once every thirty-odd days of scrubbing.
+     */
+    private suspend fun refreshFrame(at: Long) {
+        val bucket = SkyClock.frameBucket(at)
+        if (bucket == frameBucket) return
+        frameBucket = bucket
+        val equator = referenceLines()
+        val ecliptic = referenceLines()
+        val grid = SkyLines(SkyGrids.GRID_VERTICES, SkyGrids.GRID_RUNS)
+        val labels = withContext(Dispatchers.Default) { buildFrameLines(at, equator, ecliptic, grid) }
+        equatorLine = equator
+        eclipticLine = ecliptic
+        equatorialGrid = grid
+        equatorialLabels = labels
+        val years = ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, at)
+        if (brightRows.isNotEmpty() && kotlin.math.abs(years - carriedYears) > StarField.PROPER_MOTION_TOLERANCE_YEARS) {
+            carryBrightStars(years)
+        }
+        _revision.value++
+    }
+
+    /**
+     * What is drawn over the sky as a coordinate grid, and its own control.
+     *
+     * Separate from [LinesMode] because the two answer different questions — what the sky IS made
+     * of, and what it is MEASURED against — and a person reading Orion's figure does not want the
+     * grid, while a person reading a declination does not want the figures in the way.
+     */
+    enum class GridMode {
+        /** No grid. */
+        NONE,
+
+        /** Hour circles and parallels of date, with the galactic equator — the grid the sky turns about. */
+        EQUATORIAL,
+
+        /** Azimuth lines, altitude circles and the meridian — the grid an instrument reads. */
+        HORIZON,
+
+        /** Both at once. */
+        BOTH,
+        ;
+
+        val next: GridMode get() = entries[(ordinal + 1) % entries.size]
+
+        val equatorial: Boolean get() = this == EQUATORIAL || this == BOTH
+        val horizon: Boolean get() = this == HORIZON || this == BOTH
+    }
+
+    private val _gridMode = MutableStateFlow(GridMode.NONE)
+    val gridMode: StateFlow<GridMode> = _gridMode.asStateFlow()
+
+    /** Move to the next grid. */
+    fun cycleGrid() {
+        _gridMode.value = _gridMode.value.next
+    }
+
+    /**
+     * Whether the ground is drawn — an opaque fill over everything below the horizon.
+     *
+     * ⚠️ Off by default and not remembered, deliberately. This map's own design draws the sky under
+     * your feet dimmed, because knowing Jupiter is beneath you rather than absent is half of what a
+     * sky map is for; the ground is the Stellarium habit for the person who wants the view from the
+     * window, and it is a view rather than a setting.
+     */
+    private val _ground = MutableStateFlow(false)
+    val ground: StateFlow<Boolean> = _ground.asStateFlow()
+
+    fun setGround(on: Boolean) {
+        _ground.value = on
     }
 
     /**
@@ -285,6 +419,26 @@ class SkyMapViewModel(
          * magnification this or any other telescope will ever reach.
          */
         val look: PlanetDisc.Appearance? = null,
+        /**
+         * For the identify card: where this is on the celestial sphere, in J2000 and in the true
+         * equinox of the drawn date, and how far away it is. Null where unknown — a body has both
+         * frames and a distance; a star has both frames and no distance, because it is at infinity.
+         *
+         * ⚠️ Geocentric for the eight bodies, as an almanac prints them, while [azimuthDeg] and
+         * [altitudeDeg] are topocentric — which is what the eye and the chart use. For the Moon the
+         * two differ by up to a degree, and that is the parallax, not a mistake.
+         */
+        val raJ2000Deg: Double? = null,
+        val decJ2000Deg: Double? = null,
+        val raDateDeg: Double? = null,
+        val decDateDeg: Double? = null,
+        val distanceKm: Double? = null,
+        /**
+         * Today's rise, highest point and set — filled in by [identify] for the one thing tapped,
+         * never by [rebuild] for all of them: a planet's needs a hundred and fifty evaluations of
+         * VSOP87, which is nothing once on a tap and everything twice a second.
+         */
+        val riseSet: Ephemeris.RiseSet? = null,
     )
 
     enum class Kind { STAR, SUN, MOON, PLANET }
@@ -304,9 +458,16 @@ class SkyMapViewModel(
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    /** Hours from now. Zero is live. */
-    private val _hourOffset = MutableStateFlow(0)
-    val hourOffset: StateFlow<Int> = _hourOffset.asStateFlow()
+    /**
+     * How far from now the map is drawing, in milliseconds. Zero is live.
+     *
+     * ⚠️ Was whole hours, a day either way. It is any instant between [SkyClock.MIN_YEAR] and
+     * [SkyClock.MAX_YEAR] now, held as an offset for the reason the class note gives, and bounded
+     * by [SkyClock.boundedOffset] so the arithmetic under the map is never asked about a date it
+     * was not validated for.
+     */
+    private val _offsetMs = MutableStateFlow(0L)
+    val offsetMs: StateFlow<Long> = _offsetMs.asStateFlow()
 
     /**
      * Whether the air is in the picture — refraction, the sky's brightness and the extinction, all
@@ -370,16 +531,16 @@ class SkyMapViewModel(
      *
      * ⚠️ `flatMapLatest` over the scrubber rather than reading it inside the loop, so a scrub
      * restarts the ticker and the first thing the new inner flow does is rebuild — which is why
-     * [setHourOffset] no longer launches a rebuild of its own. `WhileSubscribed` with a short grace
+     * [setOffsetMs] no longer launches a rebuild of its own. `WhileSubscribed` with a short grace
      * is what stops the ticker when the screen is backgrounded or left, without a lifecycle hook of
      * its own: the chart collects it with lifecycle awareness and that is the whole of the wiring.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val instant: StateFlow<Long> = _hourOffset
-        .flatMapLatest { hours ->
+    val instant: StateFlow<Long> = _offsetMs
+        .flatMapLatest { offset ->
             flow {
                 while (true) {
-                    val at = SkyClock.instantOf(System.currentTimeMillis(), hours * HOUR_MS)
+                    val at = SkyClock.instantOf(System.currentTimeMillis(), offset)
                     rebuild(at)
                     emit(at)
                     delay(SkyClock.TICK_MS)
@@ -476,26 +637,46 @@ class SkyMapViewModel(
         // this catalogue's magnitude limit, so they are the same stars drawn twice, and moving one
         // copy alone would put 1,339 of those pairs more than four pixels apart at the narrowest
         // field — the worst by 226. Measured over the real bundle, not estimated.
-        val years = ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, System.currentTimeMillis())
+        //
+        // ⚠️ To the DRAWN instant, not the wall clock: the two agree when the screen opens live, and
+        // only the drawn one is right when it opens with a date already scrubbed.
+        val years = ProperMotion.yearsSince(StarCatalog.EPOCH_YEAR, instant.value)
         withContext(Dispatchers.Default) {
-            brightStars.clear()
             brightStars.ensure(rows.size)
-            val moved = DoubleArray(2)
-            rows.forEach { s ->
-                ProperMotion.carry(
-                    s.rightAscensionDeg, s.declinationDeg,
-                    s.pmRaMasPerYear, s.pmDecMasPerYear, years, moved,
-                )
-                brightStars.add(
-                    moved[0], moved[1], s.magnitude.toFloat(),
-                    // ⚠️ B−V, because that is what THIS catalogue measured. The deep one measured
-                    // Gaia's bp_rp, and the two scales do not share a zero point — see
-                    // StarNames.colourArgbFromBpRp. Each source keeps its own measurement.
-                    StarNames.bandFromBv(s.colourIndex),
-                )
-            }
+            fillBrightLayer(rows, years)
         }
         brightRows = rows
+        carriedYears = years
+    }
+
+    /**
+     * Re-carry the bright catalogue to a different date, in place — see [refreshFrame].
+     *
+     * On the main thread by design: the draw pass reads these arrays on the same thread, so a
+     * refill here cannot be seen half done, where a refill on another thread could. About a
+     * millisecond for eight thousand stars, once every thirty-odd days of scrubbing.
+     */
+    private fun carryBrightStars(years: Double) {
+        fillBrightLayer(brightRows, years)
+        carriedYears = years
+    }
+
+    private fun fillBrightLayer(rows: List<StarCatalog.Star>, years: Double) {
+        brightStars.clear()
+        val moved = DoubleArray(2)
+        rows.forEach { s ->
+            ProperMotion.carry(
+                s.rightAscensionDeg, s.declinationDeg,
+                s.pmRaMasPerYear, s.pmDecMasPerYear, years, moved,
+            )
+            brightStars.add(
+                moved[0], moved[1], s.magnitude.toFloat(),
+                // ⚠️ B−V, because that is what THIS catalogue measured. The deep one measured
+                // Gaia's bp_rp, and the two scales do not share a zero point — see
+                // StarNames.colourArgbFromBpRp. Each source keeps its own measurement.
+                StarNames.bandFromBv(s.colourIndex),
+            )
+        }
     }
 
     private suspend fun openDeepCatalogue() {
@@ -833,13 +1014,24 @@ class SkyMapViewModel(
     }
 
     /**
-     * Scrub the clock. The rebuild follows from [instant] restarting its ticker on the new offset,
-     * so nothing is launched here — a second rebuild path is a second clock waiting to disagree.
+     * Scrub the clock to an offset from now. The rebuild follows from [instant] restarting its
+     * ticker on the new offset, so nothing is launched here — a second rebuild path is a second
+     * clock waiting to disagree. Bounded to the span the arithmetic is validated over.
      */
-    fun setHourOffset(hours: Int) {
-        if (hours == _hourOffset.value) return
-        _hourOffset.value = hours.coerceIn(-MAX_HOURS, MAX_HOURS)
+    fun setOffsetMs(offsetMs: Long) {
+        val bounded = SkyClock.boundedOffset(System.currentTimeMillis(), offsetMs)
+        if (bounded == _offsetMs.value) return
+        _offsetMs.value = bounded
     }
+
+    /** Move the clock by a step — the six buttons. */
+    fun nudgeOffset(deltaMs: Long) = setOffsetMs(_offsetMs.value + deltaMs)
+
+    /** Draw a particular instant — the date picker. Held as the offset that reaches it from now. */
+    fun setInstant(epochMs: Long) = setOffsetMs(epochMs - System.currentTimeMillis())
+
+    /** Back to live. */
+    fun resetOffset() = setOffsetMs(0L)
 
     fun clearSelection() { _selected.value = null }
 
@@ -924,18 +1116,91 @@ class SkyMapViewModel(
             val deepBody = deep?.let { i ->
                 val layer = deepField!!.layer
                 val h = horizonOf(layer, i, here, at)
+                val radec = layerRaDec(layer, i)
                 Body(
                     h.azimuthDeg, h.altitudeDeg, layer.magnitude[i].toDouble(),
                     label = "Unnamed star", kind = Kind.STAR,
                     detail = "No catalogued name · magnitude " +
                         "%.2f".format(java.util.Locale.US, layer.magnitude[i]),
+                    raJ2000Deg = radec[0], decJ2000Deg = radec[1],
                 )
             }
             // Brighter wins, as it always has: two things within a fingertip are both "what you
             // meant", and the one you can actually see is the answer.
             best = listOfNotNull(best, starBody, deepBody).minByOrNull { it.magnitude }
         }
-        _selected.value = best
+        val chosen = best
+        if (chosen == null || here == null) {
+            _selected.value = chosen
+            return
+        }
+        // ⚠️ The card's slow lines — today's rise and set, and a star's place of date — are worked
+        // out OFF the main thread and published together with the body, rather than the body first
+        // and the lines a moment later: a card whose bottom half appears after its top half reads as
+        // a card that is still loading. A planet's rise and set is a hundred and fifty VSOP87
+        // evaluations, which is a visible stall on the main thread and nothing on another. The
+        // generation guard is what stops a slow enrichment for one tap landing on the card of a
+        // newer one.
+        val generation = ++identifyGeneration
+        val at = instant.value
+        viewModelScope.launch {
+            val enriched = withContext(Dispatchers.Default) { runCatching { enrich(chosen, here, at) }.getOrDefault(chosen) }
+            if (generation == identifyGeneration) _selected.value = enriched
+        }
+    }
+
+    /** Bumped per tap so an enrichment for an earlier tap cannot overwrite a later card. */
+    private var identifyGeneration = 0
+
+    /**
+     * The card's slow facts for one body: its place of date (a star) and today's rise, highest
+     * point and set. "Today" is the LOCAL calendar day holding the drawn instant, in the handset's
+     * zone — the day the person is looking at, which at 1 a.m. is not the UTC day.
+     */
+    private fun enrich(body: Body, here: SkySite, at: Long): Body {
+        val day = SkyClock.localDayStart(at, TimeZone.getDefault())
+        val lat = here.latitude
+        val lon = here.longitude
+        return when (body.kind) {
+            Kind.SUN -> body.copy(riseSet = Ephemeris.riseSet(lat, lon, day))
+            Kind.MOON -> body.copy(riseSet = Ephemeris.moonRiseSet(lat, lon, day))
+            Kind.PLANET -> {
+                val name = body.label ?: return body
+                val outer = name in OUTER_PLANETS
+                // The planet's own geocentric place at each sample, from the same theory that drew
+                // it; if a sample cannot name it (it cannot, but the list is a list) the body's
+                // current place stands in, which would make the rise and set those of a fixed star.
+                val fallback = Ephemeris.Equatorial(
+                    body.raDateDeg ?: return body, body.decDateDeg ?: return body,
+                    body.distanceKm ?: 0.0,
+                )
+                body.copy(
+                    riseSet = Ephemeris.riseSet(
+                        lat, lon, day, STAR_RISE_ALT_DEG,
+                        body = { t ->
+                            PlanetCalc.planetsNow(lat, lon, t, includeOuter = outer)
+                                .firstOrNull { it.name == name }
+                                ?.let { Ephemeris.Equatorial(it.rightAscensionDeg, it.declinationDeg, it.distanceAu * PlanetDisc.AU_KM) }
+                                ?: fallback
+                        },
+                        stepMinutes = PLANET_RISE_STEP_MINUTES,
+                    ),
+                )
+            }
+            Kind.STAR -> {
+                val ra = body.raJ2000Deg ?: return body
+                val dec = body.decJ2000Deg ?: return body
+                // Apparent place of date — precession, nutation and aberration, the whole of what
+                // SkyFrame.project applies — which over a day is constant to well under an
+                // arcsecond, so one evaluation serves the whole rise/set sweep.
+                val ofDate = Ephemeris.apparentStarEquatorial(ra, dec, at)
+                body.copy(
+                    raDateDeg = ofDate.rightAscensionDeg,
+                    decDateDeg = ofDate.declinationDeg,
+                    riseSet = Ephemeris.riseSet(lat, lon, day, STAR_RISE_ALT_DEG, body = { ofDate }),
+                )
+            }
+        }
     }
 
     /** The brightest star in the layer within the tolerance, or null. */
@@ -953,20 +1218,30 @@ class SkyMapViewModel(
         return if (best >= 0) best else null
     }
 
-    private fun horizonOf(layer: StarLayer, i: Int, here: SkySite, at: Long): Ephemeris.Horizontal {
+    /** A layer entry's J2000 right ascension and declination, back out of its unit vector. */
+    private fun layerRaDec(layer: StarLayer, i: Int): DoubleArray {
         val dec = Math.toDegrees(kotlin.math.asin(layer.vz[i].coerceIn(-1.0, 1.0)))
-        val ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
+        var ra = Math.toDegrees(kotlin.math.atan2(layer.vy[i], layer.vx[i]))
+        if (ra < 0.0) ra += 360.0
+        return doubleArrayOf(ra, dec)
+    }
+
+    private fun horizonOf(layer: StarLayer, i: Int, here: SkySite, at: Long): Ephemeris.Horizontal {
+        val radec = layerRaDec(layer, i)
         // ⚠️ The exact inverse of what [identify] used to find this star (catalogueOf, then β
         // off), so this is the TRUE altitude the star is drawn at before refraction — aberration
         // included, since `SkyFrame.horizonOf` is the same arithmetic `project` does per star. The
         // card lifts it through [apparentAltitudeDeg] before printing, so what it reports is the
         // altitude the star is DRAWN at — the two agree only when the atmosphere is off.
-        return SkyFrame.horizonOf(ra, dec, here.latitude, here.longitude, at)
+        return SkyFrame.horizonOf(radec[0], radec[1], here.latitude, here.longitude, at)
     }
 
     private fun namedStar(i: Int, here: SkySite, at: Long): Body? {
         val row = brightRows.getOrNull(i) ?: return null
         val h = horizonOf(brightStars, i, here, at)
+        // ⚠️ From the LAYER, not the catalogue row: the layer holds the position carried by proper
+        // motion to the drawn date, which is where the star is; the row is where it was in 2000.
+        val radec = layerRaDec(brightStars, i)
         return Body(
             azimuthDeg = h.azimuthDeg,
             altitudeDeg = h.altitudeDeg,
@@ -975,6 +1250,8 @@ class SkyMapViewModel(
             kind = Kind.STAR,
             colourIndex = row.colourIndex,
             detail = starDetail(row),
+            raJ2000Deg = radec[0],
+            decJ2000Deg = radec[1],
         )
     }
 
@@ -990,6 +1267,9 @@ class SkyMapViewModel(
      *   so the bodies and the star frame are computed for the same moment by construction.
      */
     private suspend fun rebuild(at: Long) {
+        // The date-bound furniture first, and before the site check: the equator and the grids
+        // need no observer, and a map with no fix yet still draws them.
+        refreshFrame(at)
         val here = _site.value ?: return
 
         _bodies.value = withContext(Dispatchers.Default) {
@@ -999,6 +1279,7 @@ class SkyMapViewModel(
             val sunEq = Ephemeris.sunEquatorial(at)
 
             val sun = Ephemeris.sunPosition(here.latitude, here.longitude, at)
+            val sunJ2000 = Ephemeris.trueOfDateToJ2000(sunEq.rightAscensionDeg, sunEq.declinationDeg, at)
             out += Body(
                 sun.azimuthDeg, sun.altitudeDeg, -26.7, "Sun", Kind.SUN, detail = "The Sun",
                 look = PlanetDisc.Appearance(
@@ -1007,10 +1288,14 @@ class SkyMapViewModel(
                     ),
                     limbDarkened = true,
                 ),
+                raJ2000Deg = sunJ2000[0], decJ2000Deg = sunJ2000[1],
+                raDateDeg = sunEq.rightAscensionDeg, decDateDeg = sunEq.declinationDeg,
+                distanceKm = sun.distanceKm,
             )
 
             val moon = Ephemeris.moonPosition(here.latitude, here.longitude, at)
             val moonEq = Ephemeris.moonEquatorial(at)
+            val moonJ2000 = Ephemeris.trueOfDateToJ2000(moonEq.rightAscensionDeg, moonEq.declinationDeg, at)
             val phase = Ephemeris.moonPhase(at)
             out += Body(
                 moon.azimuthDeg, moon.altitudeDeg, -12.0, "Moon", Kind.MOON,
@@ -1028,6 +1313,10 @@ class SkyMapViewModel(
                         ),
                     ),
                 ),
+                raJ2000Deg = moonJ2000[0], decJ2000Deg = moonJ2000[1],
+                raDateDeg = moonEq.rightAscensionDeg, decDateDeg = moonEq.declinationDeg,
+                // Topocentric — the distance from where you stand, which is what the disc is sized by.
+                distanceKm = moon.distanceKm,
             )
 
             // All seven: a chart whose catalogue reaches magnitude 15 has no business leaving out
@@ -1035,10 +1324,15 @@ class SkyMapViewModel(
             runCatching { PlanetCalc.planetsNow(here.latitude, here.longitude, at, includeOuter = true) }
                 .getOrDefault(emptyList())
                 .forEach { p ->
+                    val j2000 = Ephemeris.trueOfDateToJ2000(p.rightAscensionDeg, p.declinationDeg, at)
                     out += Body(
                         p.azimuthDeg, p.altitudeDeg, p.magnitude, p.name, Kind.PLANET,
                         detail = "${p.name} · magnitude ${"%.1f".format(java.util.Locale.US, p.magnitude)}",
                         look = planetLook(p, sunEq, at),
+                        raJ2000Deg = j2000[0], decJ2000Deg = j2000[1],
+                        raDateDeg = p.rightAscensionDeg, decDateDeg = p.declinationDeg,
+                        // Zero means "not stated" — see planetLook — and the card then says nothing.
+                        distanceKm = if (p.distanceAu > 0.0) p.distanceAu * PlanetDisc.AU_KM else null,
                     )
                 }
             out
@@ -1117,6 +1411,33 @@ class SkyMapViewModel(
         return name + where + mag
     }
 
+    /**
+     * The identify card's lines under the title, in the order they are read: what it is, where it
+     * is drawn, where it is on the sphere in both frames, how far and how big, and when it rises
+     * and sets today. Absent facts leave no line — a star has no distance, a body no constellation.
+     *
+     * ⚠️ On the view model rather than in either screen, because it is the one place both cards'
+     * wording is decided; the words themselves come from [SkyCardText], which is pure and tested.
+     *
+     * @param drawnAltitudeDeg the altitude the chart DREW it at — apparent under the atmosphere —
+     *   which the caller has already lifted through [apparentAltitudeDeg]. The card describes the
+     *   picture, not the geometry.
+     */
+    fun cardLines(body: Body, drawnAltitudeDeg: Double, zone: TimeZone): List<String> {
+        val out = ArrayList<String>(6)
+        if (body.detail.isNotBlank()) out += body.detail
+        out += SkyCardText.whereLine(body.azimuthDeg, drawnAltitudeDeg)
+        val raJ = body.raJ2000Deg
+        val decJ = body.decJ2000Deg
+        if (raJ != null && decJ != null) out += SkyCardText.coordinateLine("J2000", raJ, decJ)
+        val raD = body.raDateDeg
+        val decD = body.decDateDeg
+        if (raD != null && decD != null) out += SkyCardText.coordinateLine("Of date", raD, decD)
+        SkyCardText.distanceLine(body.distanceKm, body.look?.diameterDeg)?.let { out += it }
+        SkyCardText.riseSetLine(body.riseSet, zone)?.let { out += it }
+        return out
+    }
+
     private companion object {
         /**
          * PlanetCalc names to the bodies this map can draw as a disc.
@@ -1143,10 +1464,27 @@ class SkyMapViewModel(
          */
         const val BRIGHT_CAPACITY = 8_704
 
-        /** A day either way. Further and the scrubber stops being a scrubber. */
-        const val MAX_HOURS = 24
+        /**
+         * The altitude a star or planet is taken to rise and set at: its centre 34 arcminutes
+         * BELOW the geometric horizon, which is where refraction lifts it onto the drawn one. The
+         * Sun's own figure ([Ephemeris.Altitudes.SUNRISE]) adds its semi-diameter, because sunrise
+         * is the upper limb; a star has no limb and a planet's is too small to matter.
+         */
+        const val STAR_RISE_ALT_DEG = -0.5667
 
-        const val HOUR_MS = 3_600_000L
+        /**
+         * The planets [PlanetCalc] only computes on request, so a rise/set lambda for one of them
+         * asks for the seven and not the five.
+         */
+        val OUTER_PLANETS = setOf("Uranus", "Neptune")
+
+        /**
+         * How finely a planet's day is sampled for rise and set. Ten minutes rather than the
+         * default five, because each sample is a full VSOP87 evaluation of every planet and a
+         * planet's altitude changes by a quarter of a degree in ten minutes — the bisection then
+         * refines the crossing to the second either way.
+         */
+        const val PLANET_RISE_STEP_MINUTES = 10
 
         /**
          * How long the ticker keeps running after the last collector goes away.

@@ -74,4 +74,29 @@ data class SkyColors(
     val north: Color,
     /** How each kind of galaxy, cluster and nebula is drawn. */
     val deepSky: DeepSkyColors,
+    /**
+     * The coordinate grids — hour circles and parallels, azimuth lines and altitude circles — and
+     * the numbers written on them, and the meridian a shade brighter than the rest.
+     *
+     * ⚠️ One ink for both grids, deliberately: which grid is showing is told by its SHAPE (one
+     * turns with the sky, one stands still against the horizon) and by the chip that switched it on,
+     * and two greys a shade apart would read as one line drawn twice where they cross.
+     */
+    val grid: Color,
+    /**
+     * The galactic equator — the spine of the Milky Way, drawn as a line so the band's centre can be
+     * read even where the glow is too faint to show it.
+     */
+    val galactic: Color,
+    /** The constellation names, written at the centre of each figure. */
+    val constellationName: Color,
+    /**
+     * The ground: an opaque fill over everything below the horizon when the GROUND control is on.
+     *
+     * ⚠️ Opaque, and drawn over the stars and the bodies, because that is what a ground is. The
+     * map's default is to draw the sky under your feet dimmed rather than to hide it, and this is
+     * the one control that overrides that — so the colour wants to read as earth, not as a darker
+     * sky, or the two states are hard to tell apart on a dark screen.
+     */
+    val ground: Color,
 )

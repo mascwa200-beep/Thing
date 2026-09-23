@@ -72,9 +72,16 @@ libs=()
 plugins=()
 modules=()
 module_cp=""
+target=()
 while [ $# -gt 0 ]; do
   case "$1" in
     -l) libs+=("$2"); shift 2 ;;
+    # ⚠️ The JVM target, needed the moment `-m` is in play. kotlinc defaults to 1.8, and every module
+    # in this repository is built at 17 — so an `inline fun` in a compiled core cannot be inlined
+    # into what this gate compiles: "cannot inline bytecode built with JVM target 17 into bytecode
+    # that is being built with JVM target 1.8", on a tree CI compiles clean. Pass `-t 17` beside
+    # `-m`; the error is the compiler describing this flag's absence, not a defect in the source.
+    -t) target=(-jvm-target "$2"); shift 2 ;;
     # ⚠️ @Serializable classes only gain a synthetic `serializer()` when the kotlinx-serialization
     # compiler plugin runs. Without -s, every `.serializer()` in a store reports "unresolved
     # reference" and a dozen inference failures cascade off it — which reads exactly like a real
@@ -198,7 +205,8 @@ COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$
 TARGET_CP="$ANDROID_JAR:$G/kotlin-stdlib-2.0.21.jar:$COR:$SER:$SERJ:$JSOUP$extra$module_cp"
 
 out=$(java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
-      -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)
+      -nowarn -d "$(mktemp -d)" -cp "$TARGET_CP" ${target[@]+"${target[@]}"} \
+      ${plugins[@]+"${plugins[@]}"} "$@" 2>&1)
 
 errors=$(grep -E '^([^:]+\.kt):[0-9]+:[0-9]+: error:' <<<"$out")
 

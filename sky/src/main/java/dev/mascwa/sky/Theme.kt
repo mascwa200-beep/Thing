@@ -95,5 +95,17 @@ fun skyColours(): SkyColors = remember {
             dark = Color(0xFF3A4457),
             other = Color(0xFF8896AC),
         ),
+        // The grids: dimmer than the borders, because a grid is ruled over the whole sky and a
+        // border is drawn once — the same alpha on both would make the grid the loudest thing on
+        // the screen.
+        grid = Color(0xFF3C4658),
+        // The galactic equator, a shade apart from the asterisms it crosses.
+        galactic = Color(0xFFB08CD8),
+        // Constellation names in the secondary ink, so they read as captions on the figures rather
+        // than competing with the star names beside them.
+        constellationName = Color(0xFF8FA7C4),
+        // ⚠️ A dark green-black, not a darker sky: the ground has to be told from the dimmed
+        // below-horizon sky it replaces, and on an OLED screen two near-blacks are the same black.
+        ground = Color(0xFF0C1A10),
     )
 }

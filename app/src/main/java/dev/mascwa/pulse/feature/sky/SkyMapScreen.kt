@@ -11,11 +11,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,14 +26,18 @@ import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.sky.DeepSkyColors
+import dev.mascwa.pulse.sky.SkyCardText
+import dev.mascwa.pulse.sky.SkyClock
 import dev.mascwa.pulse.sky.SkyColors
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
+import java.util.TimeZone
 import kotlin.math.roundToInt
 
 /**
@@ -56,7 +63,7 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
     val bodies by vm.bodies.collectAsStateWithLifecycle()
     val site by vm.site.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
-    val hours by vm.hourOffset.collectAsStateWithLifecycle()
+    val offset by vm.offsetMs.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val missing by vm.catalogueMissing.collectAsStateWithLifecycle()
     val lines by vm.linesMode.collectAsStateWithLifecycle()
@@ -85,10 +92,16 @@ private fun SkyMapBody(vm: SkyMapViewModel, modifier: Modifier = Modifier) {
                 // lifts it by the air before drawing, so the card lifts it the same way. Read from
                 // the collected switch so a press of the chip re-labels an open card.
                 val drawnAlt = vm.apparentAltitudeDeg(body.altitudeDeg, atmosphere)
-                IdentifyCard(body, drawnAlt, c, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
+                // The wording is the view model's, shared with the standalone map's card; remembered
+                // because the bodies flow re-emits twice a second and the lines only change on a
+                // new tap or once the tap's rise-and-set enrichment lands.
+                val lines = remember(body, drawnAlt) {
+                    vm.cardLines(body, drawnAlt, TimeZone.getDefault())
+                }
+                IdentifyCard(body, lines, c, Modifier.align(Alignment.BottomCenter), vm::clearSelection)
             }
         }
-        Controls(view, hours, lines, c, vm)
+        Controls(view, offset, lines, c, vm)
     }
 }
 
@@ -138,6 +151,12 @@ private fun skyColours(c: NightwirePalette): SkyColors = remember(c) {
             dark = c.faint, // the dimmest ink in the palette, for the place with less light in it
             other = c.muted,
         ),
+        grid = c.faint, // ruled over the whole sky, so the dimmest ink there is
+        galactic = c.violet,
+        constellationName = c.ink2,
+        // The panel colour, which is the one dark this palette has that is not the void: the ground
+        // has to be told from the dimmed sky it covers, and on an OLED two near-blacks are one black.
+        ground = c.raise,
     )
 }
 
@@ -146,21 +165,49 @@ private fun skyColours(c: NightwirePalette): SkyColors = remember(c) {
 @Composable
 private fun Controls(
     view: SkyProjection.View,
-    hours: Int,
+    offset: Long,
     lines: SkyMapViewModel.LinesMode,
     c: NightwirePalette,
     vm: SkyMapViewModel,
 ) {
+    val at by vm.instant.collectAsStateWithLifecycle()
+    val grid by vm.gridMode.collectAsStateWithLifecycle()
+    val ground by vm.ground.collectAsStateWithLifecycle()
     val pointing by vm.pointing.collectAsStateWithLifecycle()
     val needsCalibration by vm.needsCalibration.collectAsStateWithLifecycle()
     val trim by vm.trimDeg.collectAsStateWithLifecycle()
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
     val deepNote by vm.deepNote.collectAsStateWithLifecycle()
     val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
+    // The phone's zone, read each composition rather than remembered: a single call, and a zone
+    // changed in the system settings while this screen is open is honoured on the next frame.
+    val zone = TimeZone.getDefault()
+
+    // The typed date. This console has no Material picker, so the same thing the standalone map
+    // does with two dialogs is a field here: DATE opens it seeded with the instant being drawn,
+    // DRAW (or the keyboard's action key) parses it in the phone's zone, and a line that is not a
+    // date the map can draw is refused with the reason rather than rolled into the nearest one.
+    var editing by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
+    var rejected by remember { mutableStateOf(false) }
+    fun apply() {
+        val t = SkyClock.parseLocal(typed, zone)
+        if (t == null) {
+            rejected = true
+        } else {
+            vm.setInstant(t)
+            editing = false
+        }
+    }
+
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        // ⚠️ WHEN is the absolute local date-time once scrubbed, not only the offset: the offset
+        // says how far you have moved and the date says what the picture is OF, and after a few
+        // presses of +1D the second is the one you have lost track of.
         Text(
-            "Looking ${cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
-                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · ${whenLabel(hours)}",
+            "Looking ${SkyCardText.cardinal(view.azimuthDeg)} · ${view.altitudeDeg.roundToInt()}° up · " +
+                "${SkyProjection.formatFieldWidth(view.fovDeg)} across · " +
+                SkyClock.whenLabel(at, offset, zone),
             c.ink2, JetBrainsMono, 10,
         )
         // ⚠️ **This screen never showed the catalogue's own note at all** — the standalone app has
@@ -238,28 +285,90 @@ private fun Controls(
                 selected = lines != SkyMapViewModel.LinesMode.NONE,
                 onClick = vm::cycleLines,
             )
+            // The grids answer a different question from the figures — what the sky is measured
+            // against rather than what it is made of — so they are a second control.
+            LcarsChip(gridLabel(grid), selected = grid != SkyMapViewModel.GridMode.NONE, onClick = vm::cycleGrid)
             // The air: refraction lifts everything near the horizon by up to half a degree, and
             // Stellarium draws it that way by default. Off is the geometric sky.
             LcarsChip("ATMOSPHERE", selected = atmosphere, onClick = { vm.setAtmosphere(!atmosphere) })
+            // The ground: an opaque fill over the sky under your feet. Off by default, because this
+            // map's own habit is to draw that sky dimmed rather than hide it.
+            LcarsChip("GROUND", selected = ground, onClick = { vm.setGround(!ground) })
             LcarsChip("−", selected = false, onClick = { vm.zoom(1.0 / ZOOM_STEP) })
             LcarsChip("+", selected = false, onClick = { vm.zoom(ZOOM_STEP) })
         }
+        // ⚠️ Four to a row, not eight to one: at 360 dp a slot is 79 dp and eight would be 40 —
+        // narrower than "−10M" at this typeface once the button's own 32 dp of padding is taken
+        // off, so the labels would ellipsise to a dash. The backward steps share a row with NOW and
+        // the forward ones with DATE, which keeps each row reading in one direction.
         Row(
-            Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            LcarsButton("−1H", onClick = { vm.setHourOffset(hours - 1) }, modifier = Modifier.weight(1f))
-            LcarsButton("NOW", onClick = { vm.setHourOffset(0) }, modifier = Modifier.weight(1f))
-            LcarsButton("+1H", onClick = { vm.setHourOffset(hours + 1) }, modifier = Modifier.weight(1f))
-            LcarsButton("+6H", onClick = { vm.setHourOffset(hours + 6) }, modifier = Modifier.weight(1f))
+            LcarsButton("−1D", onClick = { vm.nudgeOffset(-SkyClock.DAY_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton("−1H", onClick = { vm.nudgeOffset(-SkyClock.HOUR_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton("−10M", onClick = { vm.nudgeOffset(-10 * SkyClock.MINUTE_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton("NOW", onClick = vm::resetOffset, modifier = Modifier.weight(1f))
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = if (editing) 6.dp else 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            LcarsButton("+10M", onClick = { vm.nudgeOffset(10 * SkyClock.MINUTE_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton("+1H", onClick = { vm.nudgeOffset(SkyClock.HOUR_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton("+1D", onClick = { vm.nudgeOffset(SkyClock.DAY_MS) }, modifier = Modifier.weight(1f))
+            LcarsButton(
+                "DATE",
+                onClick = {
+                    // Seeded with the drawn instant on OPENING, never re-seeded while open: the
+                    // clock ticks twice a second and a field that rewrote itself under the cursor
+                    // could not be typed into.
+                    if (!editing) typed = SkyClock.formatEntry(at, zone)
+                    rejected = false
+                    editing = !editing
+                },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (editing) {
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LcarsField(
+                    value = typed,
+                    onValueChange = { typed = it; rejected = false },
+                    modifier = Modifier.weight(1f),
+                    placeholder = "YYYY-MM-DD HH:MM",
+                    imeAction = ImeAction.Go,
+                    onImeAction = { apply() },
+                )
+                LcarsButton("DRAW", onClick = { apply() })
+            }
+            if (rejected) {
+                Text(
+                    "Not a date this map can draw (${SkyClock.MIN_YEAR}–${SkyClock.MAX_YEAR}, " +
+                        "as YYYY-MM-DD HH:MM)",
+                    c.amber, JetBrainsMono, 10,
+                )
+            }
         }
     }
 }
 
+/**
+ * What was tapped, and everything the map knows about it.
+ *
+ * @param lines the view model's [SkyMapViewModel.cardLines] — what it is, where it is drawn, its
+ *   coordinates in both frames, its distance and size, and when it rises and sets today. The first
+ *   is the body's own description when it has one and keeps the display face; the rest are figures
+ *   and take the monospaced caption, so a column of coordinates lines up.
+ */
 @Composable
 private fun IdentifyCard(
     body: SkyMapViewModel.Body,
-    drawnAltitudeDeg: Double,
+    lines: List<String>,
     c: NightwirePalette,
     modifier: Modifier,
     onDismiss: () -> Unit,
@@ -267,13 +376,14 @@ private fun IdentifyCard(
     LcarsFrame(modifier.fillMaxWidth().padding(12.dp)) {
         Column {
             Text(body.label ?: "Unnamed", c.ink, ChakraPetch, 17, bold = true)
-            Text(body.detail, c.ink2, ChakraPetch, 12)
-            Text(
-                "${drawnAltitudeDeg.roundToInt()}° up · ${cardinal(body.azimuthDeg)} " +
-                    "(${body.azimuthDeg.roundToInt()}°)" +
-                    if (drawnAltitudeDeg < 0) " · below the horizon" else "",
-                c.muted, JetBrainsMono, 10,
-            )
+            val described = body.detail.isNotBlank()
+            lines.forEachIndexed { i, line ->
+                if (i == 0 && described) {
+                    Text(line, c.ink2, ChakraPetch, 12)
+                } else {
+                    Text(line, c.muted, JetBrainsMono, 10)
+                }
+            }
             LcarsButton("CLOSE", onClick = onDismiss, modifier = Modifier.padding(top = 8.dp))
         }
     }
@@ -313,18 +423,12 @@ private fun linesLabel(mode: SkyMapViewModel.LinesMode): String = when (mode) {
     SkyMapViewModel.LinesMode.FIGURES_AND_BORDERS -> "+ BORDERS"
 }
 
-private fun whenLabel(hours: Int): String = when {
-    hours == 0 -> "now"
-    hours > 0 -> "+${hours}h"
-    else -> "${hours}h"
-}
-
-private val CARDINALS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
-
-private fun cardinal(azimuthDeg: Double): String {
-    var d = azimuthDeg % 360.0
-    if (d < 0) d += 360.0
-    return CARDINALS[((d + 22.5) / 45.0).toInt() % 8]
+/** What the grid control says — the grid that IS drawn, by the coordinates it is ruled in. */
+private fun gridLabel(mode: SkyMapViewModel.GridMode): String = when (mode) {
+    SkyMapViewModel.GridMode.NONE -> "NO GRID"
+    SkyMapViewModel.GridMode.EQUATORIAL -> "RA/DEC GRID"
+    SkyMapViewModel.GridMode.HORIZON -> "ALT/AZ GRID"
+    SkyMapViewModel.GridMode.BOTH -> "BOTH GRIDS"
 }
 
 private const val ZOOM_STEP = 1.4
