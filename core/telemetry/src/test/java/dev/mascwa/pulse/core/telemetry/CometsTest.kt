@@ -17,6 +17,15 @@ import kotlin.math.abs
  * handled by a series expansion, a sungrazer with a perihelion distance of five hundredths of an AU,
  * and all three known interstellar objects, whose orbits are unbound and one of which is the most
  * hyperbolic thing ever measured in the solar system.
+ *
+ * ⚠️ **Each fixture carries TWO places, and the difference between them is the point.** `ra`/`dec`
+ * is Skyfield's `.apparent()` — light-time, annual aberration and deflection, in the true equinox
+ * of date — which is what the solver now produces. `astroRa`/`astroDec` is the ASTROMETRIC place
+ * the fixtures held before, which the solver reproduced to a hundredth of an arcsecond for as long
+ * as it omitted aberration: an apparent-place bar against astrometric truth is exactly what let a
+ * fifteen-arcsecond omission pass a solver measured to 0.009″. Both come from
+ * `scratchpad/sky/comets_ref.py`, whose astrometric column reproduces the old fixtures to the last
+ * digit — that agreement is what makes its apparent column trustworthy.
  */
 class CometsTest {
 
@@ -31,8 +40,12 @@ class CometsTest {
         val w: Double,
         val node: Double,
         val i: Double,
+        /** Apparent place, true equinox of date — what the solver must land on. */
         val ra: Double,
         val dec: Double,
+        /** Astrometric place, same frame — what it must NOT land on any more. */
+        val astroRa: Double,
+        val astroDec: Double,
         val delta: Double,
     ) {
         val elements get() = Comets.Elements(name, q, e, jd, w, node, i)
@@ -41,30 +54,39 @@ class CometsTest {
     private val fixtures = listOf(
         Fix("1P/Halley", 0.571114, 0.96802, 2474039.6476,
             112.1962, 59.296, 162.1871,
+            124.92535810191579, 3.164456411133322,
             124.92977054178874, 3.16251749030594, 35.84032869882962),
         Fix("2P/Encke", 0.338624, 0.847311, 2461446.7281,
             187.2865, 334.0194, 11.3479,
+            22.77798601508996, 20.000481281073895,
             22.774054477731074, 19.999777179755615, 1.6656421533489985),
         Fix("C/1995 O1 (Hale-Bopp)", 0.924542, 0.994899, 2450536.5341,
             130.7191, 281.798, 89.7393,
+            333.15702965311755, -85.39344204220963,
             333.09206164225964, -85.39319751702222, 50.830020347766194),
         Fix("342P/SOHO", 0.05175, 0.982976, 2461444.2817,
             27.7057, 73.2548, 11.6741,
+            273.48522951049506, -32.58328254543779,
             273.4825244595203, -32.58251359116838, 2.260016436000787),
         Fix("C/2023 A3 (Tsuchinshan-ATLAS)", 0.391359, 1.000177, 2460581.3196,
             308.5764, 21.6641, 139.101,
+            266.6555310681774, 17.829657857297143,
             266.6537420647352, 17.826144455225478, 8.047115668797638),
         Fix("1I/`Oumuamua", 0.25524, 1.199252, 2458005.9886,
             241.6845, 24.5997, 122.6778,
+            359.4317675336675, 25.027593394243166,
             359.42640244499415, 25.026512506578353, 53.24746748255029),
         Fix("2I/Borisov", 1.997724, 3.345952, 2458826.5572,
             209.2911, 307.8024, 44.2624,
+            269.7134613676471, -54.10764303119779,
             269.7101103171968, -54.10494320146918, 47.73216026951152),
         Fix("3I/ATLAS", 1.356507, 6.139884, 2460977.9825,
             128.0055, 322.1535, 175.1129,
+            108.89323437075875, 19.373521548935575,
             108.89689279468831, 19.372847286547234, 11.414340852863445),
         Fix("C/2020 P4-C (SOHO)", 0.089005, 1.013174, 2459066.6372,
             115.7125, 165.5622, 37.2249,
+            95.10142440348078, -11.96227691256375,
             95.10389055290347, -11.965292966292777, 23.662348363894157),
     )
 
@@ -74,6 +96,35 @@ class CometsTest {
         return Ephemeris.angularSeparationDeg(
             s!!.equatorial.rightAscensionDeg, s.equatorial.declinationDeg, f.ra, f.dec,
         ) * 3600.0
+    }
+
+    /**
+     * ⚠️ **The guard for the step this file shipped without.** Annual aberration moves every
+     * fixture between 8.7 and 18.8 arcseconds from its astrometric place (measured: the smallest is
+     * 342P/SOHO, whose direction happens to lie nearest the Earth's velocity; the largest
+     * Hale-Bopp), and the bar on the apparent place is at most 8.4″ (Encke, the nearest) and one
+     * arcsecond for most. So a solver that lands within the bar of the apparent place is at least
+     * seven arcseconds from the astrometric one for EVERY fixture — and this asserts that distance
+     * directly rather than trusting the bar to imply it, because the bar's own margin is what hid
+     * the omission for a whole arc. Removing `Ephemeris.aberrate` from `positionOf` fails all nine.
+     */
+    @Test
+    fun `every fixture is aberrated away from its astrometric place`() {
+        for (f in fixtures) {
+            val s = Comets.positionOf(f.elements, epochMs)!!
+            val fromAstrometric = Ephemeris.angularSeparationDeg(
+                s.equatorial.rightAscensionDeg, s.equatorial.declinationDeg, f.astroRa, f.astroDec,
+            ) * 3600.0
+            assertTrue(
+                "${f.name} sits $fromAstrometric arcseconds from its ASTROMETRIC place — " +
+                    "aberration has not been applied",
+                fromAstrometric > 7.0,
+            )
+            // And the move is the size aberration is, never more: the whole astrometric→apparent
+            // distance the reference measured is under 19″, so anything past 21″ is a frame error
+            // wearing aberration's clothes.
+            assertTrue("${f.name} moved $fromAstrometric arcseconds", fromAstrometric < 21.0)
+        }
     }
 
     /**

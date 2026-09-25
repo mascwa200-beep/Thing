@@ -9,6 +9,7 @@ import dev.mascwa.pulse.core.telemetry.Refraction
 import dev.mascwa.pulse.core.telemetry.MilkyWay
 import dev.mascwa.pulse.core.telemetry.SkyBudget
 import dev.mascwa.pulse.core.telemetry.SkyPointing
+import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarNames
 import dev.mascwa.pulse.data.orbital.PlanetCalc
@@ -23,6 +24,7 @@ import dev.mascwa.pulse.sky.SkySite
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.SkyFrame
+import dev.mascwa.pulse.sky.StarHitTest
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
 import dev.mascwa.pulse.sky.SkyLines
@@ -1109,8 +1111,21 @@ class SkyMapViewModel(
             // lost; comparing against a threshold has no such problem — at the narrowest field the
             // error works out at a fraction of a microarcsecond.
             val cosTolerance = kotlin.math.cos(Math.toRadians(toleranceDeg))
-            val star = nearestStar(brightStars, t, cosTolerance)
-            val deep = deepField?.layer?.let { nearestStar(it, t, cosTolerance) }
+            // ⚠️ **Only among the stars the chart is DRAWING.** The layers are far deeper than the
+            // screen — the deep file reaches magnitude 15 where a fifteen-degree field draws to
+            // about 8.5, and at midday the chart draws nothing fainter than Venus — so a search
+            // over the whole layer named stars nobody could see, in confident detail, under an
+            // empty patch of sky. The frame and the limit are the SAME derivations the draw pass
+            // uses ([frameFor], [drawnStarLimit]), so the tap and the picture cannot disagree
+            // about what is there.
+            val frame = frameFor(v, here, at, _pointing.value, _atmosphere.value)
+            val limit = drawnStarLimit(
+                v.fovDeg, _deepest.value, skySunAltitudeDeg(skySun(_bodies.value, _atmosphere.value)),
+            )
+            val star = StarHitTest.nearestDrawnStar(brightStars, t, cosTolerance, frame, limit)
+            val deep = deepField?.layer?.let {
+                StarHitTest.nearestDrawnStar(it, t, cosTolerance, frame, limit)
+            }
 
             val starBody = star?.let { i -> namedStar(i, here, at) }
             val deepBody = deep?.let { i ->
@@ -1203,20 +1218,62 @@ class SkyMapViewModel(
         }
     }
 
-    /** The brightest star in the layer within the tolerance, or null. */
-    private fun nearestStar(layer: StarLayer, target: DoubleArray, cosTolerance: Double): Int? {
-        var best = -1
-        var bestMagnitude = Float.MAX_VALUE
-        for (i in 0 until layer.count) {
-            val dot = target[0] * layer.vx[i] + target[1] * layer.vy[i] + target[2] * layer.vz[i]
-            if (dot < cosTolerance) continue
-            if (layer.magnitude[i] < bestMagnitude) {
-                bestMagnitude = layer.magnitude[i]
-                best = i
-            }
-        }
-        return if (best >= 0) best else null
+    /**
+     * The frame the chart draws with — and the frame a tap is resolved in, which is why it is
+     * built here and not at either call site.
+     *
+     * ⚠️ Two ways to build one frame, and the pointed one is not merely [SkyFrame.of] with a roll.
+     * `of` crosses the look direction with the observer's ZENITH, which is the zero vector when the
+     * two coincide — aim the handset straight up and the map would draw nothing. [SkyFrame.ofPointing]
+     * crosses it with the screen's own up, which is perpendicular by construction.
+     *
+     * @param pointing whether the handset is aiming — the caller's SNAPSHOT of it (the draw pass
+     *   reads a collected state, [identify] reads the flow), so a frame is built for the mode the
+     *   caller is actually in rather than whichever one the flow holds a moment later.
+     * @param refracting the ATMOSPHERE switch, likewise the caller's snapshot.
+     */
+    fun frameFor(
+        view: SkyProjection.View,
+        here: SkySite,
+        at: Long,
+        pointing: Boolean,
+        refracting: Boolean,
+    ): SkyFrame = if (pointing) {
+        SkyFrame.ofPointing(
+            pointForward, pointUp, view.fovDeg, here.latitude, here.longitude, at,
+            refracting = refracting,
+        )
+    } else {
+        SkyFrame.of(view, here.latitude, here.longitude, at, refracting = refracting)
     }
+
+    /**
+     * The Sun that brightens the sky, or null — null with the atmosphere off, or before the first
+     * rebuild has placed one.
+     *
+     * ⚠️ **Only with the atmosphere on**: it is the one switch every part of the air rides. Without
+     * it the Sun is taken to be at the bottom of astronomical twilight, where every term in
+     * `SkyBrightness` is the identity — the dark background, the map's own cut bit for bit, the full
+     * Milky Way, no glow. That is what makes a chart with the switch off, or at night, byte-for-byte
+     * the chart before the sky had a brightness.
+     */
+    fun skySun(bodies: List<Body>, atmosphere: Boolean): Body? =
+        if (atmosphere) bodies.firstOrNull { it.kind == Kind.SUN } else null
+
+    /** The altitude the sky's brightness is judged by: the Sun's TRUE altitude, else night. */
+    fun skySunAltitudeDeg(skySun: Body?): Double =
+        skySun?.altitudeDeg ?: SkyBrightness.NIGHT_SUN_ALT_DEG
+
+    /**
+     * The magnitude the chart cuts the stars at for this field, this depth and this sky — the map's
+     * own zoom-adaptive cut less what the brightening sky steals; the cut bit for bit on a dark sky.
+     *
+     * ⚠️ **One derivation, read by the draw pass and by [identify].** Two copies would agree today
+     * and be free to stop agreeing later, and the failure is the quiet kind: a tap naming a star a
+     * hair fainter than the picture draws, or refusing one a hair brighter.
+     */
+    fun drawnStarLimit(fovDeg: Double, deepest: Double, skySunAltDeg: Double): Double =
+        SkyBrightness.limitingMagnitude(SkyProjection.magnitudeLimit(fovDeg, deepest), skySunAltDeg)
 
     /** A layer entry's J2000 right ascension and declination, back out of its unit vector. */
     private fun layerRaDec(layer: StarLayer, i: Int): DoubleArray {

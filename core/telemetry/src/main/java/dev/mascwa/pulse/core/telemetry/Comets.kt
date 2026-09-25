@@ -118,7 +118,17 @@ object Comets {
     /** Where a comet is and how it is doing, for one instant. */
     data class Sighting(
         val designation: String,
-        /** Apparent place, equinox of date, with [Ephemeris.Equatorial.distanceKm] geocentric. */
+        /**
+         * Apparent place — light-time, annual aberration, precession and nutation applied — in the
+         * true equinox of date, with [Ephemeris.Equatorial.distanceKm] geocentric. The frame every
+         * planet is published in, through the same three calls `PlanetCalc` makes.
+         *
+         * ⚠️ This field said "apparent" for as long as the aberration step was missing, which is
+         * how a ~15-arcsecond error survived a solver measured to a hundredth of one: the word was
+         * a claim about the frame and the tests held the arithmetic to a different frame. The
+         * fixtures are apparent now, and `CometsTest` pins the distance from the astrometric place
+         * as well as the closeness to the apparent one.
+         */
         val equatorial: Ephemeris.Equatorial,
         /** Distance from the Sun. */
         val heliocentricAu: Double,
@@ -163,15 +173,21 @@ object Comets {
         }
         if (!delta.isFinite() || delta <= 0.0) return null
 
-        // J2000 ecliptic -> J2000 equatorial, then forward to the equinox of date so this sits in
-        // the same frame as every other body in this app.
-        val eps = Ephemeris.obliquityJ2000Deg * Math.PI / 180.0
-        val xq = geo[0]
-        val yq = geo[1] * cos(eps) - geo[2] * sin(eps)
-        val zq = geo[1] * sin(eps) + geo[2] * cos(eps)
-        val raJ2000 = atan2(yq, xq) * 180.0 / Math.PI
-        val decJ2000 = asin((zq / delta).coerceIn(-1.0, 1.0)) * 180.0 / Math.PI
-        val ofDate = Ephemeris.precessFromJ2000(raJ2000, decJ2000, epochMs)
+        // Direction, then aberration, then the frame — the same three steps, through the same
+        // three functions, that every planet takes in PlanetCalc, so a comet and Jupiter cannot be
+        // published in different frames.
+        //
+        // ⚠️ **Annual aberration is the step this file shipped without, and it was worth 8.7 to
+        // 18.8 arcseconds on every one of the test fixtures** — measured, not estimated, by
+        // regenerating each fixture from Skyfield's `.apparent()` beside its astrometric place
+        // (scratchpad/sky/comets_ref.py). Light-time says where the comet WAS; aberration says
+        // which way the light ARRIVES on a moving Earth, up to 20.5 arcseconds, and the two are
+        // different corrections that happen to be the same size. `Sighting.equatorial` claimed to
+        // be an apparent place before this line existed, and was not.
+        val dir = doubleArrayOf(geo[0] / delta, geo[1] / delta, geo[2] / delta)
+        Ephemeris.aberrate(dir, jd)
+        val eqJ2000 = Ephemeris.eclipticJ2000ToEquatorialDeg(dir)
+        val ofDate = Ephemeris.precessFromJ2000(eqJ2000[0], eqJ2000[1], epochMs)
 
         val r = comet[3]
         val sun = Ephemeris.sunEquatorial(epochMs)

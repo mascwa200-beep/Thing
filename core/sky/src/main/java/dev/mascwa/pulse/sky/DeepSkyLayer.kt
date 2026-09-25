@@ -58,7 +58,16 @@ class DeepSkyLayer(val entries: List<DeepSky.Entry>) {
      * been invisible, since both copies would look right and could only disagree about the edge the
      * size clause exists for. [DeepSky.visibleAt] takes the primitives so the delegation costs
      * nothing: no boxing, and NaN carries "not measured" across.
+     *
+     * @param extinctionMag what the air takes at the object's altitude — [SkyFrame.extinctionMag],
+     *   added to the catalogue magnitude before the cut exactly as `collectStars` adds it to a
+     *   star's, so a galaxy dimmed past the cut is not drawn any more than a star is. Zero with the
+     *   atmosphere off, so the cut is asked the catalogue magnitude to the bit. ⚠️ An UNMEASURED
+     *   magnitude is NaN and `NaN + anything` is NaN, so the size clause and the narrow-field clause
+     *   are untouched by the air: those objects are drawn for how big they are, not how bright.
      */
-    fun visible(i: Int, limit: Double, fovDeg: Double): Boolean =
-        DeepSky.visibleAt(magnitude[i].toDouble(), majorArcmin[i].toDouble(), limit, fovDeg)
+    fun visible(i: Int, limit: Double, fovDeg: Double, extinctionMag: Double = 0.0): Boolean =
+        DeepSky.visibleAt(
+            magnitude[i].toDouble() + extinctionMag, majorArcmin[i].toDouble(), limit, fovDeg,
+        )
 }

@@ -14822,6 +14822,9 @@ awake on the first run.
 on the COMETS list. `CometsTest`'s fixtures are ASTROMETRIC (the solver agrees to 0.009″ with no
 aberration, so they cannot be apparent), and the reference script that made them is not in the
 scratchpad — fixing it means regenerating 957-comet fixtures with `.apparent()`. Out of S4's scope.
+⚠️ **SUPERSEDED — closed by S7a (see "S7 — THE THREE THE ARC LEFT" at the end of this file).** And
+the "957-comet fixtures" here was wrong: the fixtures are **nine** inline comets in `CometsTest`; 957 is
+the whole-catalogue accuracy sweep. `scratchpad/sky/comets_ref.py` regenerates the nine, apparent.
 
 ⚠️ **Owner-verify on the Pixel — and be honest about what is visible.** Twenty arcseconds is a pixel
 at the widest field and forty at the quarter-degree floor, so S4 shows only at the deepest zoom: a
@@ -14999,4 +15002,70 @@ offset.
 
 **Open:** the draft PR → `main` and the branch re-sync; the arc's standing open items — comets
 lack stellar aberration (~20″), identify can name a star not drawn, DSOs are not extincted near
-the horizon.
+the horizon. ⚠️ **All closed since**: PR #474 squash-merged as `f05479f8`, the dev branch re-synced
+(`a360aae1`), and the three items are S7 — the next section.
+
+### S7 — THE THREE THE ARC LEFT: comets aberrated, a tap names only what is drawn, the deep sky fades with the stars (this session)
+
+PR #474 (S1–S6) was squash-merged as `f05479f8` on the owner's word, the dev branch re-synced with
+`--no-ff` (`a360aae1`), and the four redundant `main` builds cancelled after `git diff --stat` proved
+the tree byte-identical to what the branch had already published (the seventh instance). Then the
+three items the arc recorded as open. **Zero subagent spend on the code**, per the standing plan-usage
+constraint; the owner's *"use ultracode"* was spent on one adversarial review of the diff before the
+push (below), which is the one place it earns its keep on a slice this size.
+
+- **S7a — the comet solver applied light-time, precession and nutation and NOT annual aberration**,
+  while `Sighting.equatorial`'s KDoc said "apparent place". ⚠️ **Measured before fixing, by
+  regenerating the nine inline `CometsTest` fixtures** (`scratchpad/sky/comets_ref.py` — its
+  astrometric column reproduces the committed values **to the last digit**, which is what makes its
+  apparent column trustworthy): the omission is **8.7 to 18.8 arcseconds per fixture** (342P/SOHO
+  8.66, Encke 13.5, Halley 17.3, Hale-Bopp 18.8), and Skyfield's `.apparent()` differs from
+  aberration-alone by ≤ 0.011″ (deflection), so the app's aberration-only path lands inside the
+  bar. The solver now takes the same three steps through the same three functions as `PlanetCalc`
+  (direction → `Ephemeris.aberrate` → `precessFromJ2000`). The fixtures carry BOTH places and a new
+  test asserts each solved position is **7–21″ from its ASTROMETRIC place** — the bar on the apparent
+  place (`max(1, 14/Δ)`) has enough margin that the omitted step hid inside it for a whole arc, which
+  is exactly what happened. ⚠️ **Correction to this file:** the S4 note said fixing it meant
+  "regenerating 957-comet fixtures"; the fixtures are **nine**, and 957 is the whole-catalogue
+  accuracy sweep. The desktop observatory calls the same solver and gets it for free (`:desktop:build`
+  green).
+- **S7b — `identify` searched the whole star layer and named stars nobody could see.** The layer is
+  far deeper than the screen (a 15° field draws to ~8.5 from a file reaching 15; at midday the chart
+  draws nothing fainter than Venus), so a tap on empty sky produced a confident card about a dot
+  that was not there. `core/sky/.../sky/StarHitTest.kt` — pure, tested in `core/sky/src/test` —
+  applies `collectStars`' two cuts to the candidates within the fingertip and ranks by the **DRAWN**
+  magnitude (at the horizon the air reorders a pair; a test pins it). ⚠️ The frame and the limit the
+  tap uses are now the view model's (`frameFor`, `skySun`, `skySunAltitudeDeg`, `drawnStarLimit`) and
+  `SkyChart` reads the same four, so the tap and the picture cannot disagree.
+- **S7c — the stars faded over their last degrees (S5) while the deep sky beside them kept its
+  zenith brightness.** `drawDeepSky` adds `SkyFrame.extinctionMag` before the cull (a new
+  `extinctionMag` parameter on `DeepSkyLayer.visible`, so the rule stays in one place) and multiplies
+  the alpha by `SkyFrame.transmission`. Both are the identity with the atmosphere off; an UNMEASURED
+  magnitude is NaN and NaN + anything is NaN, so the size clause is untouched — the Hyades are drawn
+  for how big they are, and a test holds that.
+
+**Verification, all local:** CometsTest 14/14 (whole core), StarHitTestTest 4/4 and DeepSkyLayerTest
+2/2 under kotlinc + JUnit, the gate chain clean, the whole of `:core:sky` (220 files) frontend-clean
+against the real platform + Compose 1.7.6, `:desktop:build` green. **Five rules negative-tested**
+(`scratchpad/sky/neg_s7.sh`, one per invocation, baseline asserted green, anchor matched exactly once,
+restore byte-compared) — all awake.
+
+⚠️ **One came back ASLEEP first, and it was the perturbation, not the guard — mechanism #2 in its
+purest form.** `nearestDrawnStar` cuts on the catalogue magnitude and then on the extincted one; the
+first is an EARLY-OUT the second subsumes (`m ≥ m0`, so `m0 > limit ⇒ m > limit`), so deleting it
+alone removes no property and the suite stays green. The case now removes both cuts and fails the two
+tests that hold the limit; the early-out's own comment says what it buys (a dot product) and that it
+is not the rule. **Before calling a guard asleep, ask whether the line you removed was load-bearing
+or merely first.**
+
+⚠️ **Owner-verify on the Pixel** — CI compiles a canvas and never draws one: tap empty sky at a narrow
+field (no star should be named); tap anything at midday with the atmosphere on (only the Sun, Moon
+and Venus can answer); with the atmosphere on, a galaxy near the horizon should now be as dim as the
+stars around it and vanish with them. The COMETS tab moves by ~15″, which is invisible; the desktop's
+does the same.
+
+**Open, unchanged:** the deep-sky **hit test** — `identify` does not name galaxies at all (bodies and
+stars only), so S7b's rule has nothing to apply to there; whether a tap should name a drawn DSO is a
+feature, not a defect, and the same `visible(i, limit, fov, extinction)` is the rule to use if it is
+built. **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
+notification-mail.

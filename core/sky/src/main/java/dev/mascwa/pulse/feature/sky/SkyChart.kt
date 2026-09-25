@@ -225,14 +225,11 @@ fun SkyChart(
                 }
             },
     ) {
-        // ⚠️ **The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
-        // on** — the one switch every part of the air rides. Without it (or without a Sun, before
-        // the first rebuild) the Sun is taken to be at the bottom of astronomical twilight, where
-        // every term in SkyBrightness is the identity: the dark background, the map's own cut bit
-        // for bit, the full Milky Way, no glow. That is what makes a chart with the switch off,
-        // or at night, byte-for-byte the chart before the sky had a brightness.
-        val sun = if (atmosphere) bodies.firstOrNull { it.kind == SkyMapViewModel.Kind.SUN } else null
-        val skyAlt = sun?.altitudeDeg ?: SkyBrightness.NIGHT_SUN_ALT_DEG
+        // ⚠️ The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
+        // on — derived by the view model ([SkyMapViewModel.skySun] says why), because a tap has
+        // to be judged under the same sky the picture is drawn under.
+        val sun = vm.skySun(bodies, atmosphere)
+        val skyAlt = vm.skySunAltitudeDeg(sun)
         val skyFactor = SkyBrightness.skyFactor(skyAlt).toFloat()
         val dimming = SkyBrightness.dimmingMag(skyAlt)
         drawRect(if (skyFactor > 0f) lerp(colors.space, DAY_SKY, skyFactor) else colors.space)
@@ -251,18 +248,10 @@ fun SkyChart(
         // SkyFrame. Hoisting it is what avoids a second `SkyFrame.of` for the glow — the two would
         // agree today and be free to stop agreeing later.
         val here = site
-        // ⚠️ Two ways to build one frame, and the pointed one is not merely `of` with a roll. `of`
-        // crosses the look direction with the observer's ZENITH, which is the zero vector when the
-        // two coincide — aim the handset straight up and the map would draw nothing. `ofPointing`
-        // crosses it with the screen's own up, which is perpendicular by construction.
-        val frame = when {
-            here == null -> null
-            pointing -> SkyFrame.ofPointing(
-                vm.pointForward, vm.pointUp, view.fovDeg, here.latitude, here.longitude, at,
-                refracting = atmosphere,
-            )
-            else -> SkyFrame.of(view, here.latitude, here.longitude, at, refracting = atmosphere)
-        }
+        // ⚠️ Built by the view model, not here: a tap is resolved in the SAME frame the stars are
+        // drawn in, and [SkyMapViewModel.frameFor] is where it says why the pointed frame is not
+        // merely `of` with a roll.
+        val frame = here?.let { vm.frameFor(view, it, at, pointing, atmosphere) }
 
         // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters,
         // the eight solar-system bodies and the twilight glow — and it is the frame the stars above
@@ -308,9 +297,9 @@ fun SkyChart(
 
         // The map's own cut less what the brightening sky steals — the map's own cut, bit for bit,
         // on a dark sky. See SkyBrightness.dimmingMag for what each twilight leaves.
-        val limit = SkyBrightness.limitingMagnitude(
-            SkyProjection.magnitudeLimit(view.fovDeg, deepest), skyAlt,
-        )
+        // ⚠️ The view model's derivation, which [SkyMapViewModel.identify] reads too: a tap is
+        // judged against the number the picture was drawn with, never a copy of it.
+        val limit = vm.drawnStarLimit(view.fovDeg, deepest, skyAlt)
         if (frame != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
             // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
