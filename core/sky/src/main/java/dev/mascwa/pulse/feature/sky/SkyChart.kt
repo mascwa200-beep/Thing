@@ -39,6 +39,7 @@ import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
+import dev.mascwa.pulse.sky.BodyHitTest
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.GroundShape
 import dev.mascwa.pulse.sky.LineBatch
@@ -221,18 +222,19 @@ fun SkyChart(
                     vm.identify(
                         ((offset.x - size.width / 2f) / half).toDouble(),
                         ((offset.y - size.height / 2f) / half).toDouble(),
+                        // The surface the picture was drawn on — the same `viewportOf` the draw
+                        // pass builds below — so a star past its edge is as absent to the tap as
+                        // it was to the draw.
+                        SkyProjection.viewportOf(size.width.toDouble(), size.height.toDouble()),
                     )
                 }
             },
     ) {
-        // ⚠️ **The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
-        // on** — the one switch every part of the air rides. Without it (or without a Sun, before
-        // the first rebuild) the Sun is taken to be at the bottom of astronomical twilight, where
-        // every term in SkyBrightness is the identity: the dark background, the map's own cut bit
-        // for bit, the full Milky Way, no glow. That is what makes a chart with the switch off,
-        // or at night, byte-for-byte the chart before the sky had a brightness.
-        val sun = if (atmosphere) bodies.firstOrNull { it.kind == SkyMapViewModel.Kind.SUN } else null
-        val skyAlt = sun?.altitudeDeg ?: SkyBrightness.NIGHT_SUN_ALT_DEG
+        // ⚠️ The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
+        // on — derived by the view model ([SkyMapViewModel.skySun] says why), because a tap has
+        // to be judged under the same sky the picture is drawn under.
+        val sun = vm.skySun(bodies, atmosphere)
+        val skyAlt = vm.skySunAltitudeDeg(sun)
         val skyFactor = SkyBrightness.skyFactor(skyAlt).toFloat()
         val dimming = SkyBrightness.dimmingMag(skyAlt)
         drawRect(if (skyFactor > 0f) lerp(colors.space, DAY_SKY, skyFactor) else colors.space)
@@ -251,18 +253,10 @@ fun SkyChart(
         // SkyFrame. Hoisting it is what avoids a second `SkyFrame.of` for the glow — the two would
         // agree today and be free to stop agreeing later.
         val here = site
-        // ⚠️ Two ways to build one frame, and the pointed one is not merely `of` with a roll. `of`
-        // crosses the look direction with the observer's ZENITH, which is the zero vector when the
-        // two coincide — aim the handset straight up and the map would draw nothing. `ofPointing`
-        // crosses it with the screen's own up, which is perpendicular by construction.
-        val frame = when {
-            here == null -> null
-            pointing -> SkyFrame.ofPointing(
-                vm.pointForward, vm.pointUp, view.fovDeg, here.latitude, here.longitude, at,
-                refracting = atmosphere,
-            )
-            else -> SkyFrame.of(view, here.latitude, here.longitude, at, refracting = atmosphere)
-        }
+        // ⚠️ Built by the view model, not here: a tap is resolved in the SAME frame the stars are
+        // drawn in, and [SkyMapViewModel.frameFor] is where it says why the pointed frame is not
+        // merely `of` with a roll.
+        val frame = here?.let { vm.frameFor(view, it, at, pointing, atmosphere) }
 
         // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters,
         // the eight solar-system bodies and the twilight glow — and it is the frame the stars above
@@ -274,7 +268,9 @@ fun SkyChart(
         // aiming, and then the view's own basis is right — the point is that only ONE of the two is
         // ever in play. Built before the Milky Way so the glow can be drawn under it.
         val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
-        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
+        // The view model's derivation, which [SkyMapViewModel.identify] reads too: a body is
+        // hit-tested through the projection it was drawn through.
+        val horizonBasis = vm.horizonBasisFor(view, pointedBasis)
         // Where the middle of the screen looks, in the horizon frame — the cap-test direction for
         // the horizon grid and the probe direction for the ground. The pointed vectors when aiming,
         // for the reason `pointedHorizonBasis` gives; the view's own direction otherwise, clamped
@@ -308,9 +304,9 @@ fun SkyChart(
 
         // The map's own cut less what the brightening sky steals — the map's own cut, bit for bit,
         // on a dark sky. See SkyBrightness.dimmingMag for what each twilight leaves.
-        val limit = SkyBrightness.limitingMagnitude(
-            SkyProjection.magnitudeLimit(view.fovDeg, deepest), skyAlt,
-        )
+        // ⚠️ The view model's derivation, which [SkyMapViewModel.identify] reads too: a tap is
+        // judged against the number the picture was drawn with, never a copy of it.
+        val limit = vm.drawnStarLimit(view.fovDeg, deepest, skyAlt)
         if (frame != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
             // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
@@ -459,13 +455,6 @@ fun SkyChart(
         // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
         // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
-            // ⚠️ A planet the daylight has swallowed is not drawn — the same cut the stars get —
-            // and ONLY while the sky is actually bright. On a dark sky the dimming is exactly zero
-            // and this never fires, so Neptune at 7.8 is drawn at a wide field exactly as it always
-            // was; the Sun and the Moon are never cut, because they are what a daytime sky shows.
-            if (b.kind == SkyMapViewModel.Kind.PLANET && dimming > 0.0 && b.magnitude > limit) {
-                return@forEach
-            }
             // ⚠️ Drawn at the APPARENT altitude — the same bend the stars get inside
             // `SkyFrame.project`, applied here to the eight things that never go through that
             // frame. The rising Moon is the case: truly half a diameter under the horizon, seen
@@ -476,6 +465,19 @@ fun SkyChart(
             // through the same function below, so a limb cannot end up bent differently from its
             // own centre.
             val drawnAlt = vm.apparentAltitudeDeg(b.altitudeDeg, atmosphere)
+            // ⚠️ Whether it is drawn AT ALL is ONE rule, shared with the tap — see BodyHitTest. A
+            // planet the daylight has swallowed is not drawn (the same cut the stars get, and ONLY
+            // while the sky is actually bright: on a dark sky the dimming is exactly zero, so
+            // Neptune at 7.8 is drawn at a wide field exactly as it always was; the Sun and the
+            // Moon are never cut, because they are what a daytime sky shows), and nor is a body
+            // under the GROUND — skipped here rather than drawn and painted over, which is the same
+            // picture and the same answer `identify` gives.
+            if (!BodyHitTest.drawn(
+                    b.kind == SkyMapViewModel.Kind.PLANET, b.magnitude, drawnAlt, ground, dimming, limit,
+                )
+            ) {
+                return@forEach
+            }
             val bv = SkyProjection.unitVector(b.azimuthDeg, drawnAlt)
             val p = SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
             if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach

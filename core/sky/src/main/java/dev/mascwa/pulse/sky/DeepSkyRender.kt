@@ -93,23 +93,37 @@ fun DrawScope.drawDeepSky(
     val markerStroke = MARKER_STROKE_DP.dp.toPx()
     var drawn = 0
     for (i in 0 until layer.count) {
+        // ⚠️ The catalogue magnitude first, as the star pass does: the air only ever DIMS, so an
+        // object already past the cut cannot come back through it, and this is the test that throws
+        // most of the catalogue away before a dot product is paid for it.
         if (!layer.visible(i, limit, fovDeg)) continue
+        val vx = layer.vx[i]
+        val vy = layer.vy[i]
+        val vz = layer.vz[i]
+        val s = frame.sinAltitude(vx, vy, vz)
+        // ⚠️ **What the air takes at this altitude, applied to a galaxy exactly as `collectStars`
+        // applies it to a star — before the cut, and again as a transmission on what is drawn.**
+        // Until this line the stars faded over their last few degrees while the deep sky beside
+        // them kept its zenith brightness, so a horizon showed Andromeda at full strength above
+        // stars the same air had already taken. Both terms are the identity with the atmosphere
+        // off (SkyFrame.extinctionMag is 0.0, transmission 1.0), so a chart with the switch off is
+        // byte-for-byte what it was; and both are zero-cost below the drawn horizon, where the map
+        // dims by alpha instead.
+        val extinction = frame.extinctionMag(s)
+        if (extinction != 0.0 && !layer.visible(i, limit, fovDeg, extinction)) continue
         // ⚠️ The POSITION goes through the frame, so a galaxy is bent with the stars around it. The
         // orientation below still reads the bare basis: the bend is a shift, not a rotation, and an
         // ellipse's position angle a fraction of a degree from the horizon is not worth a second
         // projection.
-        val p = frame.project(layer.vx[i], layer.vy[i], layer.vz[i])
+        val p = frame.project(vx, vy, vz)
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
 
         val e = layer.entries[i]
         val x = centreX + (p.x * halfPx).toFloat()
         val y = centreY + (p.y * halfPx).toFloat()
         val colour = colours.of(e.kind)
-        val dim = if (frame.aboveHorizon(frame.sinAltitude(layer.vx[i], layer.vy[i], layer.vz[i]))) {
-            1f
-        } else {
-            SkyRenderer.BELOW_HORIZON_ALPHA
-        }
+        val dim = (if (frame.aboveHorizon(s)) 1f else SkyRenderer.BELOW_HORIZON_ALPHA) *
+            frame.transmission(s).toFloat()
 
         val major = e.majorAxisArcmin
         val shape = if (major == null) {
@@ -131,7 +145,11 @@ fun DrawScope.drawDeepSky(
                 style = Stroke(width = markerStroke),
             )
         }
-        if (DeepSky.labels(e, limit)) onLabel(x, y, e.label)
+        // ⚠️ Extincted like the marker it names — the star label pass re-checks its headroom
+        // against `m0 + extinction` for the same reason — or a galaxy the air has dimmed to a
+        // marker at half a percent alpha keeps a full-strength name beside nothing visible.
+        // Exactly the catalogue rule with the air off. See DeepSkyLayer.labelled.
+        if (layer.labelled(i, limit, extinction)) onLabel(x, y, e.label)
         drawn++
     }
     return drawn
