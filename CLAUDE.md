@@ -15116,3 +15116,35 @@ frontend clean. **Ten rules negative-tested** (`scratchpad/sky/neg_s7.sh`, one p
 ⚠️ **Owner-verify on the Pixel, added to the list above:** GROUND on, tap the ground where a bright
 star sets — nothing should be named; atmosphere on at noon, tap where Neptune is — nothing; a galaxy
 setting with the atmosphere on should lose its name a few degrees before it loses its marker.
+
+#### S7 merged — PR #475 → `main` as `066eb392` (this session)
+
+The owner's word arrived as "Is okay" (twice) and "Merge PR #475 now" through the picker. Executed
+in the plan's order: tasks #55–#57 completed; the draft flipped ready; squash-merged with
+`expectedHeadSha` pinned to `1efb601b`; `git diff --stat 1efb601b origin/main` came back **EMPTY**,
+so the four `main` runs it fired (LCARS #2217, Sky #62, Nutrition #176, Desktop) were cancelled on
+that proof — the eighth instance, ~1.1 GB of the phone's auto-download for byte-identical apps under
+new version codes; the dev branch re-synced with `git merge --no-ff` (`effea410`, committer ours,
+tree identical to main, and the push fired nothing). **The Stellarium-accuracy arc (S1–S7) is
+entirely on `main`.** Owner-verify items for S7 are the four listed just above.
+
+⚠️ **The squash commit's message is 159,091 bytes, and that is why `list_workflow_runs` now blows
+the tool's token limit for `main`.** GitHub's repository default for a squash is *"title + commit
+details"*, which concatenates the full message of every one of the branch's 68 commits (the API
+serves `head_commit.message` truncated to ~65 KB, times one per run listed). The result the harness
+saves to disk IS parseable — `python3` + `json.load` over the path the error names gives
+`id | name | head_sha | status` per run in one line, which is how the four run ids above were got
+without reading a 271 KB payload. A `perPage: 1` listing filtered to `status: queued`/`in_progress`
+comes back tiny when nothing is running, which is the cheap "did that push fire anything" check.
+Passing `commit_message` (the PR body) to `merge_pull_request` would keep main's log readable;
+that is an owner call, since earlier large squashes may carry the same shape — check with
+`git log -1 --format=%B <sha> | wc -c` before assuming either way.
+
+⚠️ **A timestamp taken before a blocking question is stale by the whole wait.** This hand-off's
+plan carried "05:03Z / 05:05Z" stamps for steps that GitHub's own events put at **12:31:52Z**
+(`ready_for_review`) and **12:32:01Z** (`merged`). Not a clock fault: the transcript's `date -u`
+readings run 04:07 → 04:51 → 05:03 → 12:50 with nothing between, and the gap is the
+`AskUserQuestion` wait — the picker answer arrived about seven and a half hours after the question
+was posed, and the stamp came from the reading taken before asking. I first recorded the
+discrepancy as "unexplained"; it was my own stale reading. **Re-read the clock after any call that
+blocks on the owner, and prefer the event's own timestamp when one exists.**
