@@ -42,6 +42,49 @@ class ConstellationField(private val data: Constellations.Data) {
     var stepDeg: Double = Double.NaN
         private set
 
+    /**
+     * The 88 constellation names, in the order of [data]'s figures, and where each one is written.
+     *
+     * A name goes at the figure's centroid — the normalised sum of the unit vectors of the stars its
+     * lines join, each star counted once however many lines meet at it. That is where a printed atlas
+     * puts the name, and it is a J2000 direction like every vertex here, so the chart projects it
+     * through [SkyFrame] and the name rides with the figure through refraction and aberration.
+     *
+     * ⚠️ Built ONCE, in the constructor, and not in [update]: the centroid does not depend on how
+     * finely the lines are cut, and rebuilding eighty-eight names on every zoom would be work spent on
+     * a number that cannot change. `nameX`/`nameY`/`nameZ` are valid over `0 until names.size`.
+     */
+    val names: List<String> = data.figures.map { it.name }
+    val nameX: DoubleArray = DoubleArray(names.size)
+    val nameY: DoubleArray = DoubleArray(names.size)
+    val nameZ: DoubleArray = DoubleArray(names.size)
+
+    init {
+        data.figures.forEachIndexed { index, figure ->
+            var sx = 0.0
+            var sy = 0.0
+            var sz = 0.0
+            val seen = HashSet<Int>()
+            for (line in figure.lines) {
+                for (star in line) {
+                    if (!seen.add(star)) continue
+                    val u = SkyProjection.equatorialVector(data.starRaDeg[star], data.starDecDeg[star])
+                    sx += u[0]; sy += u[1]; sz += u[2]
+                }
+            }
+            val n = kotlin.math.sqrt(sx * sx + sy * sy + sz * sz)
+            // A figure whose stars cancel out has no centroid; the first star is a better answer
+            // than a division by zero, and no real figure comes near it (the widest is ~60°).
+            if (n < 1e-9) {
+                val first = figure.lines.first().first()
+                val u = SkyProjection.equatorialVector(data.starRaDeg[first], data.starDecDeg[first])
+                nameX[index] = u[0]; nameY[index] = u[1]; nameZ[index] = u[2]
+            } else {
+                nameX[index] = sx / n; nameY[index] = sy / n; nameZ[index] = sz / n
+            }
+        }
+    }
+
     /** What [update] did, so a caller can tell a busy frame from an idle one. */
     enum class Outcome { UNCHANGED, REBUILT }
 

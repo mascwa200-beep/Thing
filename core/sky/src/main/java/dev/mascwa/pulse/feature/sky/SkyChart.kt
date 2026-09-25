@@ -15,8 +15,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -29,16 +35,22 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeepSky
 import dev.mascwa.pulse.core.telemetry.PlanetDisc
+import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
+import dev.mascwa.pulse.sky.ConstellationField
+import dev.mascwa.pulse.sky.GroundShape
 import dev.mascwa.pulse.sky.LineBatch
 import dev.mascwa.pulse.sky.MilkyWayGlow
+import dev.mascwa.pulse.sky.SkyClock
 import dev.mascwa.pulse.sky.SkyColors
 import dev.mascwa.pulse.sky.SkyFrame
+import dev.mascwa.pulse.sky.SkyGrids
 import dev.mascwa.pulse.sky.SkyLines
 import dev.mascwa.pulse.sky.SkyRenderer
 import dev.mascwa.pulse.sky.StarBatches
+import dev.mascwa.pulse.sky.collectHorizonLines
 import dev.mascwa.pulse.sky.collectLines
 import dev.mascwa.pulse.sky.collectStars
 import dev.mascwa.pulse.sky.drawDeepSky
@@ -120,25 +132,44 @@ fun SkyChart(
     val deepSkyPaint = remember {
         Paint().apply { isAntiAlias = true; textAlign = Paint.Align.LEFT; textSkewX = -0.22f }
     }
+    // The grid's numbers sit ON their lines, so they are centred; a constellation's name sits at
+    // the middle of its figure, spaced out a little so it reads as a name and not as a star label.
+    val gridPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
+    val namePaint = remember {
+        Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; letterSpacing = 0.08f }
+    }
 
     val site by vm.site.collectAsStateWithLifecycle()
     val linesMode by vm.linesMode.collectAsStateWithLifecycle()
-    val hours by vm.hourOffset.collectAsStateWithLifecycle()
+    val gridMode by vm.gridMode.collectAsStateWithLifecycle()
+    val ground by vm.ground.collectAsStateWithLifecycle()
     val deepRevision = vm.revision.collectAsStateWithLifecycle()
     // ⚠️ How faint the catalogue actually goes. Omitting it is not a default, it is a cut at the
     // naked-eye limit — see SkyMapViewModel.deepestMagnitude for what that measured.
     val deepest by vm.deepestMagnitude.collectAsStateWithLifecycle()
+    // Whether the air is drawn. Collected here so a press of the chip re-runs the frame at once;
+    // the frame is built from it below and every catalogue-frame layer bends through the frame.
+    val atmosphere by vm.atmosphere.collectAsStateWithLifecycle()
 
-    // ⚠️ Held rather than read in the draw pass, so the sky does not creep while somebody pans. The
-    // instant only moves when the scrubber does, which is what the existing map has always done.
-    val at = remember(hours, site) { System.currentTimeMillis() + hours * 3_600_000L }
+    // ⚠️ **The drawn instant is the view model's ticking one, and it CREEPS — on purpose.** This
+    // used to be `remember(hours, site)`, held "so the sky does not creep while somebody pans"; the
+    // real sky creeps, at a quarter of a degree a minute, and a map that did not was drawing a sky
+    // that had left the phone behind within minutes of being opened. Collected with lifecycle
+    // awareness so the ticker stops when the screen does — see SkyMapViewModel.instant.
+    val at by vm.instant.collectAsStateWithLifecycle()
     var surface by remember { mutableStateOf(IntSize.Zero) }
 
     ReleaseTheSensorWhenNobodyIsLooking(vm)
 
     // Bring the deep catalogue up to date for wherever the view has got to. Cheap when the region
     // already held still covers the view, which is most pans — see StarField.update.
-    LaunchedEffect(view, site, at, surface, linesMode) {
+    //
+    // ⚠️ Keyed on a one-minute BUCKET of the instant rather than the instant itself: the ticker
+    // advances twice a second, and a coroutine launched per tick to be told "unchanged" twice a
+    // second is the kind of cost that never shows up anywhere but the battery. Neither load depends
+    // on the clock except through proper motion, which StarField tolerates for a tenth of a year.
+    val reloadBucket = SkyClock.reloadBucket(at)
+    LaunchedEffect(view, site, reloadBucket, surface, linesMode) {
         if (surface.width > 0 && surface.height > 0) {
             vm.refreshDeep(
                 SkyProjection.viewportOf(surface.width.toDouble(), surface.height.toDouble()), at,
@@ -194,7 +225,17 @@ fun SkyChart(
                 }
             },
     ) {
-        drawRect(colors.space)
+        // ⚠️ **The Sun's TRUE altitude decides how bright the sky is, and only with the atmosphere
+        // on** — the one switch every part of the air rides. Without it (or without a Sun, before
+        // the first rebuild) the Sun is taken to be at the bottom of astronomical twilight, where
+        // every term in SkyBrightness is the identity: the dark background, the map's own cut bit
+        // for bit, the full Milky Way, no glow. That is what makes a chart with the switch off,
+        // or at night, byte-for-byte the chart before the sky had a brightness.
+        val sun = if (atmosphere) bodies.firstOrNull { it.kind == SkyMapViewModel.Kind.SUN } else null
+        val skyAlt = sun?.altitudeDeg ?: SkyBrightness.NIGHT_SUN_ALT_DEG
+        val skyFactor = SkyBrightness.skyFactor(skyAlt).toFloat()
+        val dimming = SkyBrightness.dimmingMag(skyAlt)
+        drawRect(if (skyFactor > 0f) lerp(colors.space, DAY_SKY, skyFactor) else colors.space)
         val half = size.minDimension / 2f
         val cx = size.width / 2f
         val cy = size.height / 2f
@@ -218,36 +259,58 @@ fun SkyChart(
             here == null -> null
             pointing -> SkyFrame.ofPointing(
                 vm.pointForward, vm.pointUp, view.fovDeg, here.latitude, here.longitude, at,
+                refracting = atmosphere,
             )
-            else -> SkyFrame.of(view, here.latitude, here.longitude, at)
+            else -> SkyFrame.of(view, here.latitude, here.longitude, at, refracting = atmosphere)
         }
+
+        // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters,
+        // the eight solar-system bodies and the twilight glow — and it is the frame the stars above
+        // were built from whenever the handset is aiming.** All of them used to go through
+        // `basisOf(view)`, whose altitude is clamped to [SkyProjection.MAX_ALTITUDE_DEG], while the
+        // stars came from the vectors; the measurement is in `SkyMapViewModel.pointedHorizonBasis`,
+        // and the short of it is a fixed 0.4° that is invisible at a wide field and wider than the
+        // whole screen at the narrowest. `pointedHorizonBasis` is null when the handset is not
+        // aiming, and then the view's own basis is right — the point is that only ONE of the two is
+        // ever in play. Built before the Milky Way so the glow can be drawn under it.
+        val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
+        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
+        // Where the middle of the screen looks, in the horizon frame — the cap-test direction for
+        // the horizon grid and the probe direction for the ground. The pointed vectors when aiming,
+        // for the reason `pointedHorizonBasis` gives; the view's own direction otherwise, clamped
+        // exactly as `basisOf` clamps it so the two describe one frame.
+        val horizonForward = if (pointedBasis != null) {
+            vm.pointForward
+        } else {
+            SkyProjection.unitVector(
+                view.azimuthDeg,
+                view.altitudeDeg.coerceIn(-SkyProjection.MAX_ALTITUDE_DEG, SkyProjection.MAX_ALTITUDE_DEG),
+            )
+        }
+
+        // The warm band around a Sun near the horizon — under the Milky Way, which is under
+        // everything, though the two never meet: the glow starts where the Milky Way has already
+        // faded out. Nothing is drawn at night (see drawTwilightGlow).
+        if (sun != null) drawTwilightGlow(sun, horizonBasis, view, atmosphere, vm, half, cx, cy)
 
         // ⚠️ **First, before even the horizon.** It is unresolved starlight, so every star, every
         // galaxy and every constellation line on this map is in front of it — and so is the chrome.
         // Drawn last it would be a haze OVER the sky instead of the sky's own background.
         if (frame != null) {
             vm.milkyWay?.let {
-                drawMilkyWay(it, frame, view, milkyWay, colors.starlight, vm.budget.milkyWaySamples)
+                drawMilkyWay(
+                    it, frame, view, milkyWay, colors.starlight, vm.budget.milkyWaySamples,
+                    // Gone by the end of nautical twilight; exactly 1 on a dark sky.
+                    opacityScale = SkyBrightness.milkyWayFactor(skyAlt),
+                )
             }
         }
 
-        // ⚠️ **ONE basis for everything held in horizon coordinates — the line, the four letters and
-        // the eight solar-system bodies — and it is the frame the stars above were built from
-        // whenever the handset is aiming.** All three used to go through `basisOf(view)`, whose
-        // altitude is clamped to [SkyProjection.MAX_ALTITUDE_DEG], while the stars came from the
-        // vectors; the measurement is in `SkyMapViewModel.pointedHorizonBasis`, and the short of it
-        // is a fixed 0.4° that is invisible at a wide field and wider than the whole screen at the
-        // narrowest. `pointedHorizonBasis` is null when the handset is not aiming, and then the
-        // view's own basis is right — the point is that only ONE of the two is ever in play.
-        val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
-        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
-        drawHorizon(
-            horizonBasis,
-            if (pointedBasis != null) SkyPointing.azimuthOf(vm.pointForward) else view.azimuthDeg,
-            colors, half, cx, cy, viewport, cardinalPaint,
+        // The map's own cut less what the brightening sky steals — the map's own cut, bit for bit,
+        // on a dark sky. See SkyBrightness.dimmingMag for what each twilight leaves.
+        val limit = SkyBrightness.limitingMagnitude(
+            SkyProjection.magnitudeLimit(view.fovDeg, deepest), skyAlt,
         )
-
-        val limit = SkyProjection.magnitudeLimit(view.fovDeg, deepest)
         if (frame != null) {
             // ⚠️ **Read HERE, in the draw pass, and that is the entire point of the counter.** The
             // star layers are mutable arrays — deliberately, so a frame allocates nothing — which
@@ -256,17 +319,58 @@ fun SkyChart(
             // rather than on whatever pan happens next.
             deepRevision.value
 
+            // ⚠️ The angle to the screen CORNER, not the half-field — culling on the half-field
+            // would throw away lines that are plainly visible at the top and bottom of a portrait
+            // phone. See SkyProjection.coneRadiusDeg. Padded by what the air can lift a run into
+            // the cone from outside it — zero with the atmosphere off. One cone for every line set
+            // in the frame, the grids included: the horizon grid is not refracted, so the padding
+            // is merely generous there, which is the safe direction for a cull.
+            val cone = Math.toRadians(
+                SkyProjection.coneRadiusDeg(view.fovDeg, viewport) + frame.cullMarginDeg,
+            )
+            val coneCos = cos(cone)
+            val coneSin = sin(cone)
+
+            // ⚠️ The grids go under everything else that is drawn over the sky, because they are
+            // the paper the picture is drawn on. The equatorial grid rides the star frame — it is
+            // held as J2000 vectors of the date's hour circles and is refracted and aberrated like a
+            // star, so a grid crossing sits on the star it should. The horizon grid does NOT: it is
+            // projected straight through the horizon basis, because ten degrees of altitude is the
+            // ten-degree line an instrument reads and not where a star at ten degrees appears.
+            if (gridMode.equatorial) {
+                drawSkyLineSet(
+                    vm.equatorialGrid, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, colors.grid, GRID_WIDTH_DP, GRID_ALPHA,
+                )
+                drawSkyLineSet(
+                    vm.galacticEquator, frame, viewport, coneCos, coneSin, half, cx, cy,
+                    lineBatch, linePaint, colors.galactic, REFERENCE_WIDTH_DP, GALACTIC_ALPHA,
+                )
+                drawFrameLabels(vm.equatorialLabels, frame, viewport, half, cx, cy, gridPaint, colors.grid)
+            }
+            if (gridMode.horizon) {
+                val f = horizonForward
+                lineBatch.reset()
+                collectHorizonLines(
+                    vm.horizonGrid, horizonBasis, f[0], f[1], f[2], viewport, coneCos, coneSin,
+                    half, cx, cy, SkyRenderer.EDGE_MARGIN, lineBatch,
+                )
+                drawLineBatch(lineBatch, linePaint, colors.grid, GRID_WIDTH_DP.dp.toPx(), GRID_ALPHA)
+                // The meridian a shade brighter than the grid it belongs to: it is the line a
+                // transit happens on, and the one line of that grid worth reading without the rest.
+                lineBatch.reset()
+                collectHorizonLines(
+                    vm.meridian, horizonBasis, f[0], f[1], f[2], viewport, coneCos, coneSin,
+                    half, cx, cy, SkyRenderer.EDGE_MARGIN, lineBatch,
+                )
+                drawLineBatch(lineBatch, linePaint, colors.grid, MERIDIAN_WIDTH_DP.dp.toPx(), MERIDIAN_ALPHA)
+                drawHorizonLabels(vm.horizonLabels, horizonBasis, viewport, half, cx, cy, gridPaint, colors.grid)
+            }
+
             // ⚠️ Under the stars, on purpose. A constellation line is a note about the stars, so a
             // line drawn over one puts a stroke through the thing it is pointing at.
             val shapes = vm.constellations
             if (linesMode != SkyMapViewModel.LinesMode.NONE) {
-                // ⚠️ The angle to the screen CORNER, not the half-field — culling on the half-field
-                // would throw away lines that are plainly visible at the top and bottom of a
-                // portrait phone. See SkyProjection.coneRadiusDeg.
-                val cone = Math.toRadians(SkyProjection.coneRadiusDeg(view.fovDeg, viewport))
-                val coneCos = cos(cone)
-                val coneSin = sin(cone)
-
                 // ⚠️ The two reference circles are drawn OUTSIDE the `shapes != null` guard, because
                 // they depend on no asset at all — they are two lines of trigonometry. Putting them
                 // inside would mean a failed constellation file silently took the ecliptic with it,
@@ -295,6 +399,10 @@ fun SkyChart(
                         shapes.figures, frame, viewport, coneCos, coneSin, half, cx, cy,
                         lineBatch, linePaint, colors.figure, FIGURE_WIDTH_DP, FIGURE_ALPHA,
                     )
+                    // The name at the middle of each figure, with the figures and only with them:
+                    // a name floating over a sky with no lines in it is a claim with nothing to
+                    // point at.
+                    drawConstellationNames(shapes, frame, viewport, half, cx, cy, namePaint, colors.constellationName)
                 }
             }
 
@@ -310,7 +418,9 @@ fun SkyChart(
                 deepSkyPaint.color = colors.label.toArgb()
                 deepSkyPaint.textSize = 9f * density
                 drawDeepSky(
-                    deepSkyLayer, frame, viewport, DeepSky.magnitudeLimit(view.fovDeg),
+                    deepSkyLayer, frame, viewport,
+                    // Its own cut, under the same sky: a galaxy is the first thing twilight takes.
+                    SkyBrightness.limitingMagnitude(DeepSky.magnitudeLimit(view.fovDeg), skyAlt),
                     view.fovDeg, half, cx, cy, colors.deepSky, vm.budget.deepSkyShapePx,
                 ) { lx, ly, name ->
                     drawContext.canvas.nativeCanvas.drawText(
@@ -327,8 +437,9 @@ fun SkyChart(
 
             // ⚠️ Below the horizon FIRST, so a star that is up is never painted over by one that is
             // not. Both catalogues share the two bucket sets, so this is a few dozen calls for the
-            // whole sky however many stars it holds — see SkyRenderer.
-            drawStarBatches(below, starPaint, colors.starlight, SkyRenderer.BELOW_HORIZON_ALPHA)
+            // whole sky however many stars it holds — see SkyRenderer. With the ground on they are
+            // about to be painted over anyway, so they are not painted at all.
+            if (!ground) drawStarBatches(below, starPaint, colors.starlight, SkyRenderer.BELOW_HORIZON_ALPHA)
             drawStarBatches(above, starPaint, colors.starlight)
 
             drawStarGlow(vm.brightStars, frame, viewport, limit, half, cx, cy, colors.starlight)
@@ -348,11 +459,29 @@ fun SkyChart(
         // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
         // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
-            val bv = SkyProjection.unitVector(b.azimuthDeg, b.altitudeDeg)
+            // ⚠️ A planet the daylight has swallowed is not drawn — the same cut the stars get —
+            // and ONLY while the sky is actually bright. On a dark sky the dimming is exactly zero
+            // and this never fires, so Neptune at 7.8 is drawn at a wide field exactly as it always
+            // was; the Sun and the Moon are never cut, because they are what a daytime sky shows.
+            if (b.kind == SkyMapViewModel.Kind.PLANET && dimming > 0.0 && b.magnitude > limit) {
+                return@forEach
+            }
+            // ⚠️ Drawn at the APPARENT altitude — the same bend the stars get inside
+            // `SkyFrame.project`, applied here to the eight things that never go through that
+            // frame. The rising Moon is the case: truly half a diameter under the horizon, seen
+            // sitting on it. Bent under the SAME snapshot of the switch the frame above was built
+            // from — `atmosphere`, read once per draw pass — rather than the view model's live
+            // value, so the eight bodies and the stars cannot disagree even for the one frame
+            // after the chip is pressed; and every direction the disc renderer asks for goes
+            // through the same function below, so a limb cannot end up bent differently from its
+            // own centre.
+            val drawnAlt = vm.apparentAltitudeDeg(b.altitudeDeg, atmosphere)
+            val bv = SkyProjection.unitVector(b.azimuthDeg, drawnAlt)
             val p = SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
             if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach
             val screen = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
-            val isBelow = b.altitudeDeg < 0
+            // Against the DRAWN horizon: a body lifted over the line by the air is up, to the eye.
+            val isBelow = drawnAlt < 0
             val r = when (b.kind) {
                 SkyMapViewModel.Kind.SUN -> 9f
                 SkyMapViewModel.Kind.MOON -> 8f
@@ -367,7 +496,9 @@ fun SkyChart(
             // projection the body itself went through — which is what lets the renderer measure
             // orientations rather than assume them. See PlanetDisc.Appearance.
             val project: (PlanetDisc.SkyPoint) -> Offset? = { pt ->
-                val qv = SkyProjection.unitVector(pt.azimuthDeg, pt.altitudeDeg)
+                val qv = SkyProjection.unitVector(
+                    pt.azimuthDeg, vm.apparentAltitudeDeg(pt.altitudeDeg, atmosphere),
+                )
                 val q = SkyProjection.projectUnit(qv[0], qv[1], qv[2], horizonBasis)
                 if (q.visible) Offset(cx + (q.x * half).toFloat(), cy + (q.y * half).toFloat()) else null
             }
@@ -397,6 +528,152 @@ fun SkyChart(
                 )
             }
         }
+
+        // ⚠️ The ground goes over the stars AND the bodies, because that is what a ground is — a
+        // planet under your feet is hidden by it, exactly as it is by the real one. Then the horizon
+        // line and the four letters over that, so the edge of the ground is drawn as a line rather
+        // than left as the anti-aliased edge of a fill. With the ground off nothing changes about
+        // the picture except that the horizon is now drawn last: a 1.5 dp line over a handful of
+        // stars at the horizon, where before those stars were over it.
+        if (ground) {
+            val f = horizonForward
+            drawGround(GroundShape.of(horizonBasis, f[0], f[1], f[2]), half, cx, cy, colors.ground)
+        }
+        drawHorizon(
+            horizonBasis,
+            if (pointedBasis != null) SkyPointing.azimuthOf(vm.pointForward) else view.azimuthDeg,
+            colors, half, cx, cy, viewport, cardinalPaint,
+        )
+    }
+}
+
+/**
+ * The region below the horizon, filled — see [GroundShape] for why it is one exact circle or one
+ * half-plane rather than a mesh.
+ *
+ * The circle case is drawn either as a disc or as everything BUT a disc, with a clip: the second is
+ * the common one (looking anywhere above the horizon), and a clip is the only way to fill "outside
+ * a circle" without a polygon that has to reach the screen corners. The half-plane is a quadrilateral
+ * reaching four screens past the edge in every direction, which the canvas clips.
+ */
+private fun DrawScope.drawGround(
+    shape: GroundShape.Shape,
+    half: Float,
+    cx: Float,
+    cy: Float,
+    colour: Color,
+) {
+    when (shape) {
+        is GroundShape.Shape.Disc -> {
+            val centre = Offset(cx + (shape.cx * half).toFloat(), cy + (shape.cy * half).toFloat())
+            val r = (shape.radius * half).toFloat()
+            if (shape.groundInside) {
+                drawCircle(colour, r, centre)
+            } else {
+                val sky = Path().apply { addOval(Rect(centre, r)) }
+                clipPath(sky, ClipOp.Difference) { drawRect(colour) }
+            }
+        }
+        is GroundShape.Shape.HalfPlane -> {
+            val big = size.maxDimension * 4f
+            val px = cx + (shape.px * half).toFloat()
+            val py = cy + (shape.py * half).toFloat()
+            val tx = shape.tx.toFloat() * big
+            val ty = shape.ty.toFloat() * big
+            val dx = shape.dx.toFloat() * big
+            val dy = shape.dy.toFloat() * big
+            val earth = Path().apply {
+                moveTo(px - tx, py - ty)
+                lineTo(px + tx, py + ty)
+                lineTo(px + tx + dx, py + ty + dy)
+                lineTo(px - tx + dx, py - ty + dy)
+                close()
+            }
+            drawPath(earth, colour)
+        }
+        GroundShape.Shape.None -> Unit
+    }
+}
+
+/** The equatorial grid's numbers: J2000 directions, drawn through the star frame like the grid. */
+private fun DrawScope.drawFrameLabels(
+    labels: List<SkyGrids.Label>,
+    frame: SkyFrame,
+    viewport: SkyProjection.Viewport,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    paint: Paint,
+    colour: Color,
+) {
+    paint.color = colour.copy(alpha = GRID_LABEL_ALPHA).toArgb()
+    paint.textSize = 9f * density
+    for (label in labels) {
+        val p = frame.project(label.x, label.y, label.z)
+        if (!p.onScreen(viewport)) continue
+        drawContext.canvas.nativeCanvas.drawText(
+            label.text,
+            centreX + (p.x * halfPx).toFloat(),
+            centreY + (p.y * halfPx).toFloat() - 3f * density,
+            paint,
+        )
+    }
+}
+
+/** The horizon grid's numbers: horizon-frame directions, drawn through the horizon basis like the grid. */
+private fun DrawScope.drawHorizonLabels(
+    labels: List<SkyGrids.Label>,
+    basis: SkyProjection.Basis,
+    viewport: SkyProjection.Viewport,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    paint: Paint,
+    colour: Color,
+) {
+    paint.color = colour.copy(alpha = GRID_LABEL_ALPHA).toArgb()
+    paint.textSize = 9f * density
+    for (label in labels) {
+        val p = SkyProjection.projectUnit(label.x, label.y, label.z, basis)
+        if (!p.onScreen(viewport)) continue
+        drawContext.canvas.nativeCanvas.drawText(
+            label.text,
+            centreX + (p.x * halfPx).toFloat(),
+            centreY + (p.y * halfPx).toFloat() - 3f * density,
+            paint,
+        )
+    }
+}
+
+/**
+ * Each constellation's name at the centroid of its figure — see [ConstellationField.names] for
+ * where that is and why it is built once.
+ *
+ * Through the star frame, so the name rides with its figure through refraction and aberration. Only
+ * the names whose centroid is on screen are drawn; at a narrow field that is at most one or two,
+ * which is exactly the "where am I" a zoomed-in view wants, and at the widest it is a few dozen.
+ */
+private fun DrawScope.drawConstellationNames(
+    shapes: ConstellationField,
+    frame: SkyFrame,
+    viewport: SkyProjection.Viewport,
+    halfPx: Float,
+    centreX: Float,
+    centreY: Float,
+    paint: Paint,
+    colour: Color,
+) {
+    paint.color = colour.copy(alpha = NAME_ALPHA).toArgb()
+    paint.textSize = 11f * density
+    for (i in shapes.names.indices) {
+        val p = frame.project(shapes.nameX[i], shapes.nameY[i], shapes.nameZ[i])
+        if (!p.onScreen(viewport)) continue
+        drawContext.canvas.nativeCanvas.drawText(
+            shapes.names[i],
+            centreX + (p.x * halfPx).toFloat(),
+            centreY + (p.y * halfPx).toFloat() + 4f * density,
+            paint,
+        )
     }
 }
 
@@ -516,10 +793,15 @@ private fun DrawScope.drawStarLabels(
     paint.color = colour.toArgb()
     paint.textSize = 9f * density
     for (i in 0 until layer.count) {
-        val m = layer.magnitude[i].toDouble()
-        if (!StarGlyph.labels(m, limit)) continue
+        val m0 = layer.magnitude[i].toDouble()
+        if (!StarGlyph.labels(m0, limit)) continue
         val name = vm.brightLabel(i) ?: continue
-        val p = SkyProjection.projectUnit(layer.vx[i], layer.vy[i], layer.vz[i], frame.basis)
+        // Extincted like the dot it names, or a star the air has dimmed to a speck would keep the
+        // label its catalogue brightness earned. Exactly the catalogue magnitude with the air off.
+        val m = m0 + frame.extinctionMag(frame.sinAltitude(layer.vx[i], layer.vy[i], layer.vz[i]))
+        if (!StarGlyph.labels(m, limit)) continue
+        // Through the frame, so the name sits beside the refracted dot and not half a degree under it.
+        val p = frame.project(layer.vx[i], layer.vy[i], layer.vz[i])
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
         val r = StarGlyph.bandRadiusDp(StarGlyph.sizeBand(m, limit)).dp.toPx()
         drawContext.canvas.nativeCanvas.drawText(
@@ -649,6 +931,22 @@ private const val EQUATOR_ALPHA = 0.18f
 private const val ECLIPTIC_ALPHA = 0.26f
 
 /**
+ * The grids: the faintest lines on the map, because there are three hundred of them and they are
+ * the paper, not the picture. The meridian is picked out a shade; the galactic equator sits at the
+ * ecliptic's weight, since like the ecliptic it says where to look for something. The numbers on
+ * the grids are fainter than the star labels for the same reason the lines are.
+ */
+private const val GRID_WIDTH_DP = 0.7f
+private const val GRID_ALPHA = 0.14f
+private const val MERIDIAN_WIDTH_DP = 0.9f
+private const val MERIDIAN_ALPHA = 0.30f
+private const val GALACTIC_ALPHA = 0.28f
+private const val GRID_LABEL_ALPHA = 0.55f
+
+/** Constellation names: legible, and under the star labels they sit among. */
+private const val NAME_ALPHA = 0.72f
+
+/**
  * How faint a Sun, Moon or planet goes once it has set.
  *
  * The same 0.3 the fixed markers always used. It is kept rather than removed because a body below
@@ -656,3 +954,66 @@ private const val ECLIPTIC_ALPHA = 0.26f
  * half of what a sky map is for — and dimming is how the map says so.
  */
 private const val BELOW_HORIZON_BODY_ALPHA = 0.3f
+
+/**
+ * The daytime sky, and the band around a setting Sun.
+ *
+ * ⚠️ **Chart constants rather than [SkyColors] roles, deliberately.** That class carries what an
+ * APPLICATION decides — which ink the ecliptic is, whether the planets match the figures. The colour
+ * of a clear sky at noon is not a palette choice; it is the thing being drawn, and both applications
+ * draw the same one. The day they want different skies, these two become roles and every construction
+ * of [SkyColors] gains two arguments — a compile error, not a drift.
+ *
+ * ⚠️ The hues are the owner's to tune from a screenshot; what a test holds is that they are never
+ * blended in at all with the Sun eighteen degrees down, so a wrong blue can only spoil a daytime chart.
+ */
+private val DAY_SKY = Color(0xFF4A8FD6)
+private val TWILIGHT_GLOW = Color(0xFFF0A050)
+
+/** The glow at its strongest, just after sunset. */
+private const val GLOW_ALPHA = 0.55
+
+/**
+ * The warm radial band around a Sun within a few degrees of the horizon.
+ *
+ * Centred on where the Sun is DRAWN — under the same bend the body pass applies, so at sunset, which
+ * is exactly when it is drawn, the glow sits on the disc and not half a degree under it — and sized
+ * in degrees of sky ([SkyBrightness.GLOW_RADIUS_DEG]) so it is a fixed patch of sky at any zoom,
+ * capped at a few screens so a quarter-degree field does not ask for a gradient a hundred thousand
+ * pixels across. Nothing at all with the Sun twelve degrees down or lower, which is what keeps a
+ * night chart untouched.
+ */
+private fun DrawScope.drawTwilightGlow(
+    sun: SkyMapViewModel.Body,
+    basis: SkyProjection.Basis,
+    view: SkyProjection.View,
+    refracting: Boolean,
+    vm: SkyMapViewModel,
+    half: Float,
+    cx: Float,
+    cy: Float,
+) {
+    val strength = SkyBrightness.glowStrength(sun.altitudeDeg)
+    if (strength <= 0.0) return
+    val v = SkyProjection.unitVector(sun.azimuthDeg, vm.apparentAltitudeDeg(sun.altitudeDeg, refracting))
+    val p = SkyProjection.projectUnit(v[0], v[1], v[2], basis)
+    // Behind the viewer: nothing of a 40° glow can reach the screen from there.
+    if (!p.visible) return
+    val centre = Offset(cx + (p.x * half).toFloat(), cy + (p.y * half).toFloat())
+    val radius = (SkyBrightness.GLOW_RADIUS_DEG / SkyProjection.degreesPerUnit(view) * half)
+        .toFloat()
+        .coerceAtMost(size.maxDimension * 4f)
+    if (radius <= 0f) return
+    val ink = TWILIGHT_GLOW.copy(alpha = (GLOW_ALPHA * strength).toFloat())
+    drawCircle(
+        brush = Brush.radialGradient(
+            0f to ink,
+            0.4f to ink.copy(alpha = ink.alpha * 0.45f),
+            1f to Color.Transparent,
+            center = centre,
+            radius = radius,
+        ),
+        radius = radius,
+        center = centre,
+    )
+}

@@ -43,8 +43,14 @@ object PlanetDisc {
     /** One astronomical unit, IAU 2012 definition — exact by convention. */
     const val AU_KM = 149_597_870.7
 
-    /** The bodies this map draws as more than a point. */
-    enum class Body { SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN }
+    /**
+     * The bodies this map draws as more than a point.
+     *
+     * ⚠️ Uranus and Neptune are here so their discs can be SIZED — 3.7" and 2.3" at opposition,
+     * which is four pixels at the quarter-degree floor on a phone — not because anything orients
+     * them: no rings, no moons and no visible flattening are drawn for either.
+     */
+    enum class Body { SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE }
 
     /**
      * Equatorial radius in kilometres.
@@ -62,6 +68,8 @@ object PlanetDisc {
         Body.MARS -> 3396.2
         Body.JUPITER -> 71_492.0
         Body.SATURN -> 60_268.0
+        Body.URANUS -> 25_559.0
+        Body.NEPTUNE -> 24_764.0
     }
 
     /** Polar radius in kilometres — equal to the equatorial one except for Mars and the giants. */
@@ -69,6 +77,8 @@ object PlanetDisc {
         Body.MARS -> 3376.2
         Body.JUPITER -> 66_854.0
         Body.SATURN -> 54_364.0
+        Body.URANUS -> 24_973.0
+        Body.NEPTUNE -> 24_341.0
         else -> equatorialRadiusKm(body)
     }
 
@@ -168,6 +178,17 @@ object PlanetDisc {
     /** Jupiter's north pole, same source. Its equator is where the Galilean moons run. */
     const val JUPITER_POLE_RA_DEG = 268.057
     const val JUPITER_POLE_DEC_DEG = 64.495
+
+    /**
+     * Uranus's north pole, same source — the one that lies nearly in its orbital plane.
+     *
+     * Not drawn by anything here (Uranus is a dot at every field this map reaches); it exists
+     * because its magnitude depends on how far the planet is tipped toward the Sun and the Earth,
+     * and `PlanetCalc` reads the pole from the same place Saturn's is kept rather than from a
+     * second copy.
+     */
+    const val URANUS_POLE_RA_DEG = 257.311
+    const val URANUS_POLE_DEC_DEG = -15.175
 
     /**
      * The position angle, degrees east of celestial north, of one sky direction seen from another.

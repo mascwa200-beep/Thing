@@ -4,7 +4,7 @@ import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.sky.SkyPreferences
 
 /**
- * This application's answer to the star map's one remembered preference.
+ * This application's answer to the star map's two remembered preferences.
  *
  * ⚠️ **An adapter over the whole settings blob rather than a store of its own**, which is the
  * opposite of what the standalone app does and right for the same reason its choice is right there:
@@ -23,5 +23,11 @@ class SkyPrefs(private val settings: SettingsRepository) : SkyPreferences {
 
     override suspend fun setFollowByDefault(on: Boolean) {
         settings.update { it.copy(skyFollowByDefault = on) }
+    }
+
+    override suspend fun atmosphere(): Boolean = settings.current().skyAtmosphere
+
+    override suspend fun setAtmosphere(on: Boolean) {
+        settings.update { it.copy(skyAtmosphere = on) }
     }
 }

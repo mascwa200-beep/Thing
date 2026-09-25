@@ -47,6 +47,19 @@ class StarCatalogSource {
         val bayer: String,
         val flamsteed: String,
         val constellation: String,
+        /**
+         * The PROJECTED right-ascension motion, `cos(dec) * d(ra)/dt`, in milliarcseconds a year —
+         * the file's own eighth column, as the catalogue states it, so `ProperMotion.carry` takes
+         * it without a conversion. Zero for the four entries with none recorded, and zero is also
+         * what an older asset with only seven columns yields.
+         *
+         * ⚠️ Read for the occultation search, which cannot do without it: over the 26 years since
+         * J2000 it is **6.6 arcseconds for Regulus and 5.3 for Aldebaran**, three times the two
+         * arcseconds a star target carries as its budget. The chart itself does not use it — at
+         * the field it draws, a star is a dot several arcminutes wide.
+         */
+        val pmRaMasPerYear: Double = 0.0,
+        val pmDecMasPerYear: Double = 0.0,
     ) {
         /** "Sirius", "α Canis Majoris", "61 Cygni", or null for a star with no designation. */
         val name: String? get() = StarNames.label(bayer, flamsteed, constellation)
@@ -98,7 +111,11 @@ class StarCatalogSource {
                 val ra = f[0].toDoubleOrNull() ?: return@mapNotNull null
                 val dec = f[1].toDoubleOrNull() ?: return@mapNotNull null
                 val mag = f[2].toDoubleOrNull() ?: return@mapNotNull null
-                Star(ra, dec, mag, f[3].toDoubleOrNull(), f[4], f[5], f[6])
+                Star(
+                    ra, dec, mag, f[3].toDoubleOrNull(), f[4], f[5], f[6],
+                    pmRaMasPerYear = f.getOrNull(7)?.toDoubleOrNull() ?: 0.0,
+                    pmDecMasPerYear = f.getOrNull(8)?.toDoubleOrNull() ?: 0.0,
+                )
             }.toList()
         }
     }.getOrDefault(emptyList())
@@ -112,5 +129,17 @@ class StarCatalogSource {
          * on a string typed twice.
          */
         const val RESOURCE = "/sky/stars.tsv"
+
+        /**
+         * The epoch of every position in the file, as a Julian year, which is what a proper-motion
+         * carry is measured from: the file's second header line says J2000 and
+         * `tools/sky/build_star_catalog.py` is what put it there.
+         *
+         * ⚠️ The phone's `StarCatalog` carries the same constant for the same asset. It is
+         * restated here rather than shared because that class lives in an Android library this
+         * module does not depend on; the two are held together by the one file they both
+         * describe, and a rebuilt asset changes both or neither.
+         */
+        const val EPOCH_YEAR = 2000.0
     }
 }

@@ -51,7 +51,12 @@ class TerminatorTest {
                 var lon = -180.0
                 while (lon < 180.0) {
                     val mine = Terminator.sunAltitudeDeg(lat, lon, t)
-                    val theirs = Ephemeris.sunPosition(lat, lon, t).altitudeDeg
+                    // ⚠️ The GEOCENTRIC altitude, on purpose. The terminator is where the Sun's
+                    // centre sits on the horizon as seen from the Earth's centre — the subsolar
+                    // point it is built from has no observer in it — while `sunPosition` has been
+                    // topocentric since S4, 8.8" lower at the horizon than this. A millionth of a
+                    // degree is the bar here, and 8.8" is 0.0024.
+                    val theirs = Ephemeris.toHorizontal(Ephemeris.sunEquatorial(t), lat, lon, t).altitudeDeg
                     assertEquals(
                         "altitude disagreement at ($lat, $lon)", theirs, mine, 1e-6,
                     )

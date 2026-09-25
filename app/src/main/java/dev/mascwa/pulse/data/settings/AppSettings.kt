@@ -539,6 +539,13 @@ data class AppSettings(
      * Written by `SkyMapViewModel` through `SkyPreferences`, so both applications obey one rule.
      */
     val skyFollowByDefault: Boolean = true,
+    /**
+     * Whether the sky map draws the sky as the air shows it — refraction, and the sky brightness
+     * that follows it — rather than the geometric sky. Default ON, as Stellarium's atmosphere is.
+     * Written by `SkyMapViewModel` through `SkyPreferences`, so both applications obey one rule.
+     * Defaulted, so a settings blob written before it existed still decodes.
+     */
+    val skyAtmosphere: Boolean = true,
     /** On launch AND on every foreground return, auto-download a GREEN (CI-passed) update newer than
      *  the running build and launch the installer for the user's one-tap confirm. A sideloaded app
      *  can't install fully silently (no device-owner), so the single Android "Update" tap is the floor;

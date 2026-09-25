@@ -94,14 +94,18 @@ fun DrawScope.drawDeepSky(
     var drawn = 0
     for (i in 0 until layer.count) {
         if (!layer.visible(i, limit, fovDeg)) continue
-        val p = SkyProjection.projectUnit(layer.vx[i], layer.vy[i], layer.vz[i], basis)
+        // ⚠️ The POSITION goes through the frame, so a galaxy is bent with the stars around it. The
+        // orientation below still reads the bare basis: the bend is a shift, not a rotation, and an
+        // ellipse's position angle a fraction of a degree from the horizon is not worth a second
+        // projection.
+        val p = frame.project(layer.vx[i], layer.vy[i], layer.vz[i])
         if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) continue
 
         val e = layer.entries[i]
         val x = centreX + (p.x * halfPx).toFloat()
         val y = centreY + (p.y * halfPx).toFloat()
         val colour = colours.of(e.kind)
-        val dim = if (frame.sinAltitude(layer.vx[i], layer.vy[i], layer.vz[i]) >= 0.0) {
+        val dim = if (frame.aboveHorizon(frame.sinAltitude(layer.vx[i], layer.vy[i], layer.vz[i]))) {
             1f
         } else {
             SkyRenderer.BELOW_HORIZON_ALPHA

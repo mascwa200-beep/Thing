@@ -29,15 +29,23 @@ object Terminator {
      * The point the Sun is directly above.
      *
      * Its latitude is the Sun's declination — that is what declination means — and its longitude is
-     * wherever local apparent noon currently is, which is Greenwich sidereal time reckoned against
-     * the Sun's right ascension.
+     * wherever local apparent noon currently is, which is Greenwich APPARENT sidereal time reckoned
+     * against the Sun's right ascension.
+     *
+     * ⚠️ Apparent, because the right ascension beside it is apparent: [Ephemeris.sunEquatorial] is
+     * in the TRUE equinox of date, and Greenwich MEAN sidereal time against it leaves the equation
+     * of the equinoxes — up to 1.2 s of time, 17" of longitude — in every subsolar point. The
+     * mismatch was invisible while [Ephemeris.toHorizontal] made the same one; that moved to
+     * [Ephemeris.gastDeg] in S4, and `TerminatorTest`, which holds this to a millionth of a degree
+     * against it, is what noticed. Nothing on a day/night wash can see 17", but two derivations of
+     * one Sun must agree.
      */
     fun subSolarPoint(epochMs: Long): SubSolar {
         val sun = Ephemeris.sunEquatorial(epochMs)
-        val gmst = Ephemeris.gmstDeg(Ephemeris.julianDate(epochMs))
+        val gast = Ephemeris.gastDeg(Ephemeris.julianDate(epochMs))
         return SubSolar(
             latitudeDeg = sun.declinationDeg,
-            longitudeDeg = Geodesy.normalizeLongitude(sun.rightAscensionDeg - gmst),
+            longitudeDeg = Geodesy.normalizeLongitude(sun.rightAscensionDeg - gast),
         )
     }
 

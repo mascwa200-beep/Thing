@@ -1,8 +1,11 @@
 package dev.mascwa.pulse.sky
 
 import dev.mascwa.pulse.core.telemetry.Ephemeris
+import dev.mascwa.pulse.core.telemetry.Refraction
+import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
+import kotlin.math.asin
 
 /**
  * Everything a frame needs to draw stars held in equatorial coordinates.
@@ -33,47 +36,68 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  * altitude because the zenith is carried into the same frame as the stars, and an angle between
  * two directions is what it always was.
  *
- * ## ⚠️ What is deliberately NOT applied, with the measured size of each
+ * ## ⚠️ Refraction is applied here, per direction, and the argument against it was wrong
+ *
+ * An earlier version of this note listed refraction as "deliberately NOT applied", on the grounds
+ * that it depends on each star's own altitude and so "breaks the two-vectors-per-frame arrangement
+ * this whole class exists for". The arrangement is intact: the two vectors are still all a frame
+ * costs to BUILD. What refraction adds is a per-star term at DRAW time — and the drawn count is
+ * bounded at about nine thousand by the zoom-adaptive magnitude cut (`SkyRenderer` measured it), so
+ * the term is a table lookup and a dozen multiplications each, about a millisecond for the busiest
+ * sky. Against that stood a **34.5-arcminute** error at the horizon, larger than the Moon, on every
+ * object, at every field. [project] applies it: [sinAltitude] is already paid for every drawn
+ * direction, [Refraction.fastBendingDeg] turns it into a bend, and [Refraction.lift] tilts the
+ * direction toward the zenith before it is projected. Everything held in this frame — the stars, the
+ * constellation figures and borders, the deep-sky objects, the two reference circles — goes through
+ * it, so nothing can detach from the stars. ⚠️ The Milky Way does not, and says why in its own file.
+ *
+ * With [refracting] false the geometry is exactly what it was, which is what the ATMOSPHERE switch
+ * turns off.
+ *
+ * ## Aberration and nutation are applied here too, and what remains is measured
  *
  * Precession is here because it is a rotation of the whole sky, and proper motion is applied per
  * star where each layer is filled — see `ProperMotion` — because it changes only when a layer
- * reloads. Four smaller terms remain, and in every case the reason they are absent is structural
- * rather than an oversight:
+ * reloads. Since S4 the two whole-sky terms that were listed here as missing are in:
  *
- * * **Refraction, 34.5 arcminutes at the horizon** — computed here from Bennett's formula, falling
- *   to 9.9 arcminutes at five degrees of altitude and 1.0 at forty-five. Easily the largest of the
- *   four, and the one that cannot be folded in here: it depends on each star's own altitude, so it
- *   is a different shift for every star and it breaks the two-vectors-per-frame arrangement this
- *   whole class exists for. Applying it would mean either a per-star correction every frame or a
- *   chart whose geometry silently stops being geometry. That is a decision about what the map IS,
- *   rather than a missing term.
- * * **Annual aberration, up to 20.5 arcseconds** — the constant of aberration, the Earth's own
- *   orbital velocity tilting the incoming light. A whole-sky term, so it WOULD fit this design; it
- *   is simply an order of magnitude below refraction.
- * * **Nutation, up to about 17 arcseconds of ecliptic longitude** — deliberately absent for a
- *   reason that is not size. [Ephemeris.toEquatorial] runs on Greenwich MEAN sidereal time, so the
- *   mean equinox is its self-consistent partner: the equation of the equinoxes carries the same
- *   nutation term that apparent right ascension does, and the two very largely cancel. Adding
- *   nutation on one side only would make the answer worse rather than better.
+ * * **Annual aberration, up to 20.5 arcseconds** — the Earth's own orbital velocity tilting the
+ *   incoming light. [project] adds the frame's β (one J2000 equatorial vector per frame, from
+ *   [Ephemeris.aberrationJ2000Equatorial]) to every direction BEFORE anything else, through
+ *   [Ephemeris.aberrateEquatorial], the one implementation; `SkyMapViewModel.identify` takes it back
+ *   off a tap. ⚠️ Not behind the ATMOSPHERE switch: it is where the light actually comes from, and
+ *   Stellarium applies it whatever the atmosphere is set to.
+ * * **Nutation, up to about 17 arcseconds of ecliptic longitude** — arrives as the pair it always
+ *   had to. An earlier note here argued that adding nutation while [Ephemeris.toEquatorial] ran on
+ *   MEAN sidereal time "would make the answer worse rather than better", and that was right: the
+ *   equation of the equinoxes carries the same term. Both landed together — [Ephemeris.toEquatorial]
+ *   is on [Ephemeris.gastDeg] now, so every observer direction is in the TRUE equinox of date and is
+ *   carried to J2000 by [Ephemeris.trueOfDateToJ2000] ([catalogueOf], [Ephemeris.ofDateVectorToJ2000]).
+ *   Measured (`ApparentPlaceTest`, fifty catalogue stars over 2000–2045 against Skyfield/DE421):
+ *   RA/Dec of date worst **0.13″**, altitude/azimuth worst **0.31″** with UT1 taken as UTC. Before,
+ *   over five hundred directions: median 15.8″, worst 25.9″.
+ *
+ * What is still not applied, with the measured size of each:
+ *
+ * * **DUT1 (UT1 − UTC), up to 0.9 s of time = 13″ of rotation** — ignored, as Stellarium ignores
+ *   it. The IERS publishes it after the fact and nobody can predict it far ahead; against a
+ *   real-UT1 reference it is the whole of the residual (3.2″ median over 2000–2026 in those same
+ *   fifty rows, rising to 20″ by 2045 where Skyfield extrapolates it).
  * * **Stellar parallax, under an arcsecond for the nearest star there is** — 0.77 arcseconds for
  *   Proxima, which is the extreme. About one pixel at the quarter-degree floor and imperceptible
  *   at every wider field, on a handful of stars out of three million. Diurnal parallax, from the
  *   Earth's own radius rather than its orbit, is smaller again by five orders of magnitude.
  *   Genuinely not worth a per-star term.
+ * * **Gravitational light deflection**, 4 mas at right angles to the Sun and only larger at its
+ *   limb, where nothing is drawn.
  *
- * ⚠️ **Parallax is a different story for the solar system, and there it is a real remaining gap
- * rather than a negligible one.** Those bodies never touch this basis — they are drawn through the
- * horizon path — so this is recorded here only because it is the fifth term somebody would look for.
- * The Moon has it: `Ephemeris.moonPosition` corrects its altitude, which is the large one at about a
- * degree. `Ephemeris.topocentric` exists and does it properly. But the map's planets come from
- * `PlanetCalc`, which applies none, and the horizontal parallax at closest approach is **33
- * arcseconds for Venus, 24 for Mars and 16 for Mercury** — computed from the Earth's radius over
- * their minimum geocentric distance, so about forty pixels at the quarter-degree field. Larger than
- * aberration and nutation together.
+ * ⚠️ The solar-system bodies never touch this basis — they are drawn through the horizon path,
+ * where `PlanetCalc` and `Ephemeris` apply their own light-time, aberration, nutation and
+ * parallax (an earlier note here recorded parallax — 33″ on Venus — as the planets' largest
+ * remaining gap, and it was, until the VSOP87 rewrite).
  *
- * For scale throughout: at the quarter-degree field one pixel is about 0.8 arcseconds, so
- * aberration and nutation are visible there and nowhere else, while refraction is visible near the
- * horizon at every field.
+ * For scale throughout: at the quarter-degree field one pixel is about 0.8 arcseconds, so the
+ * residuals above are invisible at every field, while refraction is visible near the horizon at
+ * every field.
  */
 class SkyFrame private constructor(
     /** The projection basis, in the stars' own equatorial frame. */
@@ -92,6 +116,21 @@ class SkyFrame private constructor(
     val forwardX: Double,
     val forwardY: Double,
     val forwardZ: Double,
+    /**
+     * Whether [project] bends every direction the way the air does. False draws the geometric sky.
+     *
+     * ⚠️ Required at both constructors rather than defaulted, so a caller cannot build a frame that
+     * silently ignores the user's ATMOSPHERE switch — the "default that means do not do the thing"
+     * this repository has shipped twice.
+     */
+    val refracting: Boolean,
+    /**
+     * Annual aberration, `β = v/c`, as a J2000 equatorial vector for the frame's instant — the
+     * Earth's motion over the speed of light, about 1e-4, from [Ephemeris.aberrationJ2000Equatorial].
+     * [project] adds it to every direction. Held as an array because [Ephemeris.aberrateEquatorial]
+     * takes one, and there is exactly one implementation of that addition.
+     */
+    private val beta: DoubleArray,
 ) {
 
     /**
@@ -101,21 +140,122 @@ class SkyFrame private constructor(
      * by definition the angle between it and the observer's horizon plane, so its sine is exactly
      * the projection onto the zenith. The map dims what is below the horizon rather than dropping it
      * — you can look at where a constellation is in daylight — so this is asked of every drawn star.
+     *
+     * ⚠️ This is the TRUE altitude, before refraction, whatever [refracting] says. Above or below the
+     * horizon is a fact about where the star is, and that is what the dimming reports; where it is
+     * DRAWN is [project]'s business.
      */
     fun sinAltitude(vx: Double, vy: Double, vz: Double): Double =
         vx * zenithX + vy * zenithY + vz * zenithZ
 
+    /**
+     * Where a catalogue-frame unit direction lands on the screen, refraction included.
+     *
+     * ⚠️ **The one projection every catalogue-frame caller must use** — stars, glow, labels, lines,
+     * deep-sky objects — so that everything drawn over the stars is bent by exactly what the stars
+     * are. A caller reaching for [SkyProjection.projectUnit] with [basis] directly draws the
+     * geometric position, and a constellation line that misses its own stars by half a degree at
+     * the horizon is precisely the defect that would produce.
+     *
+     * Cost when refracting: the dot product every caller was already paying, an `asin`, one table
+     * lookup, a square root and about fifteen multiplications, then the projection. Two fast exits
+     * bracket it — below the taper the bend is zero, and within a tenth of a degree of the zenith it
+     * is under a tenth of an arcsecond and the rotation plane is about to vanish.
+     */
+    fun project(vx: Double, vy: Double, vz: Double): SkyProjection.Screen {
+        // ⚠️ Aberration first, and always: the light arrives from v + β, and everything after this
+        // line — the altitude the air bends, the projection — is about the ARRIVING direction.
+        // Refraction is about the atmosphere and can be switched off; this is about the observer
+        // moving and cannot.
+        val a = aberrated
+        a[0] = vx
+        a[1] = vy
+        a[2] = vz
+        Ephemeris.aberrateEquatorial(a, beta)
+        if (!refracting) return SkyProjection.projectUnit(a[0], a[1], a[2], basis)
+        val s = sinAltitude(a[0], a[1], a[2])
+        if (s <= Refraction.SIN_TAPER_BOTTOM || s >= Refraction.SIN_NO_BEND) {
+            return SkyProjection.projectUnit(a[0], a[1], a[2], basis)
+        }
+        val bend = Refraction.fastBendingDeg(Math.toDegrees(asin(s)))
+        if (bend <= 0.0) return SkyProjection.projectUnit(a[0], a[1], a[2], basis)
+        Refraction.lift(a[0], a[1], a[2], zenithX, zenithY, zenithZ, s, bend, lifted)
+        return SkyProjection.projectUnit(lifted[0], lifted[1], lifted[2], basis)
+    }
+
+    /**
+     * Whether a direction is drawn ABOVE the horizon line, given its [sinAltitude].
+     *
+     * ⚠️ Not `sinAlt >= 0` once the atmosphere is on. The horizon line is drawn at apparent zero,
+     * and refraction lifts a star truly half a degree under it to above the line — so the geometric
+     * test would dim that star as "not up" while drawing it over the horizon it is supposed to be
+     * under. The line moves to [Refraction.TRUE_AT_APPARENT_HORIZON_DEG], which is where the eye's
+     * horizon actually is; with the atmosphere off it is the geometric horizon, exactly as before.
+     */
+    fun aboveHorizon(sinAlt: Double): Boolean = sinAlt >= sinDrawnHorizon
+
+    private val sinDrawnHorizon: Double = if (refracting) SIN_TRUE_AT_APPARENT_HORIZON else 0.0
+
+    /**
+     * How much further out than the screen's own cone a caller must look before culling by angle.
+     *
+     * ⚠️ [project] lifts a direction TOWARD the zenith by up to [Refraction.MAX_BEND_DEG], so a run
+     * of constellation lines whose every vertex truly sits just past the bottom corner of the screen
+     * can be lifted onto it — and a cull against the bare cone would throw that run away, leaving a
+     * line that stops short of the corner exactly where the horizon is. Zero with the atmosphere
+     * off, so the geometric cull is byte-for-byte what it was.
+     */
+    val cullMarginDeg: Double = if (refracting) Refraction.MAX_BEND_DEG else 0.0
+
+    /**
+     * How many magnitudes the air takes from a star at this [sinAltitude] — through
+     * [SkyBrightness.fastExtinctionMag], the per-star table. Zero with the atmosphere off, so a
+     * caller's `m + extinctionMag(s)` is the catalogue magnitude to the bit; and zero below the
+     * drawn horizon, where the map dims by alpha instead and [SkyBrightness] explains why.
+     *
+     * ⚠️ On the GEOMETRIC direction, like [aboveHorizon] and for the same reason: twenty arcseconds
+     * of aberration is nothing against a dimming that changes over degrees, and asking for the
+     * aberrated sine would cost every star a second dot product.
+     */
+    fun extinctionMag(sinAlt: Double): Double =
+        if (!refracting || sinAlt < sinDrawnHorizon) 0.0 else SkyBrightness.fastExtinctionMag(sinAlt)
+
+    /**
+     * The fraction of light the air passes at this [sinAltitude], `10^(−0.4 m)` for the
+     * [extinctionMag] — 1 with the atmosphere off, and 1 below the drawn horizon. The Milky Way
+     * pass multiplies its opacity by this per pixel, so the glow fades toward the horizon as the
+     * stars it is made of do.
+     */
+    fun transmission(sinAlt: Double): Double =
+        if (!refracting || sinAlt < sinDrawnHorizon) 1.0 else SkyBrightness.fastTransmission(sinAlt)
+
+    /**
+     * Scratch for [project]. A frame is built per draw pass and used from the one thread that draws,
+     * which is what makes a single reusable array safe; it is what keeps refracting nine thousand
+     * stars from allocating nine thousand triples.
+     */
+    private val lifted = DoubleArray(3)
+
+    /** Scratch for [project]'s aberration step, for the same reason as [lifted]. */
+    private val aberrated = DoubleArray(3)
+
     companion object {
+        private val SIN_TRUE_AT_APPARENT_HORIZON: Double =
+            kotlin.math.sin(Math.toRadians(Refraction.TRUE_AT_APPARENT_HORIZON_DEG))
+
         /**
          * Build the frame for a view, a place and an instant.
          *
          * Costs two coordinate conversions and a basis, whatever the catalogue holds.
+         *
+         * @param refracting whether [project] bends toward the zenith — the ATMOSPHERE switch.
          */
         fun of(
             view: SkyProjection.View,
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
+            refracting: Boolean,
         ): SkyFrame {
             val centre = centreOf(view, latitudeDeg, longitudeDeg, epochMs)
             val z = zenithVector(latitudeDeg, longitudeDeg, epochMs)
@@ -125,6 +265,8 @@ class SkyFrame private constructor(
                 basis = SkyProjection.basisOf(forward, z[0], z[1], z[2], view.fovDeg, view.rollDeg),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
                 forwardX = forward[0], forwardY = forward[1], forwardZ = forward[2],
+                refracting = refracting,
+                beta = Ephemeris.aberrationJ2000Equatorial(epochMs),
             )
         }
 
@@ -146,8 +288,13 @@ class SkyFrame private constructor(
          * cross product cannot vanish however the phone is held. `SkyPointingTest` asserts both
          * halves of that in this frame, not merely in the handset's.
          *
+         * ⚠️ Refraction needs nothing special here: the sensor reports where the handset truly
+         * points, and what the eye sees along that line is the refracted sky, which is what [project]
+         * draws. The zenith the bend is measured toward is the observer's, never the screen's.
+         *
          * @param forwardEnu where the camera looks, east/north/up, from `SkyPointing.forward`.
          * @param upEnu which way is up the screen, east/north/up, from `SkyPointing.screenUp`.
+         * @param refracting whether [project] bends toward the zenith — the ATMOSPHERE switch.
          */
         fun ofPointing(
             forwardEnu: DoubleArray,
@@ -156,6 +303,7 @@ class SkyFrame private constructor(
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
+            refracting: Boolean,
         ): SkyFrame {
             val forward = DoubleArray(3)
             val up = DoubleArray(3)
@@ -165,13 +313,15 @@ class SkyFrame private constructor(
             // tests assert that the zenith's declination IS the observer's latitude, which is a
             // true statement about that frame and would become an arbitrary rotated number here.
             // The frame change is this class's job, and this is where it happens for both vectors.
-            Ephemeris.precessVectorToJ2000(forward, epochMs)
-            Ephemeris.precessVectorToJ2000(up, epochMs)
+            Ephemeris.ofDateVectorToJ2000(forward, epochMs)
+            Ephemeris.ofDateVectorToJ2000(up, epochMs)
             val z = zenithVector(latitudeDeg, longitudeDeg, epochMs)
             return SkyFrame(
                 basis = SkyProjection.basisOf(forward, up[0], up[1], up[2], fovDeg, 0.0),
                 zenithX = z[0], zenithY = z[1], zenithZ = z[2],
                 forwardX = forward[0], forwardY = forward[1], forwardZ = forward[2],
+                refracting = refracting,
+                beta = Ephemeris.aberrationJ2000Equatorial(epochMs),
             )
         }
 
@@ -215,6 +365,17 @@ class SkyFrame private constructor(
          * eventually disagree. Public because a tap is the fifth: hit-testing carries the touched
          * direction into the catalogue's frame and compares it against the stars there, which is one
          * conversion rather than one per star.
+         *
+         * ⚠️ Takes a TRUE altitude. A tap arrives as an apparent one — the drawn sky is refracted —
+         * and `SkyMapViewModel.identify` lowers it through [Refraction.trueOf] before coming here,
+         * so the direction compared against the catalogue is where the star IS, not where it is seen.
+         *
+         * ⚠️ **Geometric, not aberrated, on purpose.** The three callers want three different things
+         * of that. A tap has to have β taken off as well, because the stars are DRAWN with it on —
+         * `identify` does that on the vector this returns. The view centre must NOT: the basis it
+         * seeds is what [project] adds β to afterwards, and a centre with β already removed would
+         * put the aberration in twice. And the zenith is the observer's, a fact about where they
+         * stand and nothing to do with where light comes from.
          */
         fun catalogueOf(
             altitudeDeg: Double,
@@ -223,26 +384,32 @@ class SkyFrame private constructor(
             longitudeDeg: Double,
             epochMs: Long,
         ): Ephemeris.Equatorial {
+            // Apparent sidereal time inside, so this answers in the TRUE equinox of date and the
+            // rotation to J2000 has to be the true pair to match — see the class KDoc.
             val eq = Ephemeris.toEquatorial(
                 Ephemeris.Horizontal(altitudeDeg, azimuthDeg, 0.0),
                 latitudeDeg, longitudeDeg, epochMs,
             )
-            val j = Ephemeris.meanOfDateToJ2000(
+            val j = Ephemeris.trueOfDateToJ2000(
                 eq.rightAscensionDeg, eq.declinationDeg, epochMs,
             )
             return Ephemeris.Equatorial(j[0], j[1], 0.0)
         }
 
         /**
-         * The way back: a catalogue position as an altitude and an azimuth.
+         * The way back: a catalogue position as the TRUE altitude and azimuth it is DRAWN at —
+         * aberrated, carried to the true equinox of date, on apparent sidereal time — before the
+         * refraction, which the caller adds for display.
          *
-         * ⚠️ **The exact inverse of [catalogueOf], and it has to be.** A tap is answered by carrying
-         * the touched direction into the catalogue's frame, finding the nearest star there, and then
-         * reading that star back out to say how high it is — so a pair that were merely nearly
-         * inverse would report a star at an altitude it is not drawn at, by however much they
-         * disagreed. [Ephemeris.meanOfDateToJ2000] and [Ephemeris.j2000ToMeanOfDate] are the exact
-         * pair, and its warning records the trap: negating the epoch instead comes back within
-         * 0.7 arcseconds, which is close enough to look right.
+         * ⚠️ **The exact inverse of the tap's path, and it has to be.** A tap is answered by
+         * carrying the touched direction into the catalogue's frame ([catalogueOf], then β taken
+         * off), finding the nearest star there, and then reading that star back out through this to
+         * say how high it is — so a pair that were merely nearly inverse would report a star at an
+         * altitude it is not drawn at, by however much they disagreed. [Ephemeris.apparentStarHorizontal]
+         * is the same arithmetic [project] does per star, in scalar form — one definition, so the
+         * card and the dot cannot disagree — and [Ephemeris.trueOfDateToJ2000]/[Ephemeris.j2000ToTrueOfDate]
+         * inside it are the exact pair (its warning records the trap: negating the epoch instead
+         * comes back within 0.7 arcseconds, which is close enough to look right).
          */
         fun horizonOf(
             rightAscensionDeg: Double,
@@ -250,12 +417,10 @@ class SkyFrame private constructor(
             latitudeDeg: Double,
             longitudeDeg: Double,
             epochMs: Long,
-        ): Ephemeris.Horizontal {
-            val d = Ephemeris.j2000ToMeanOfDate(rightAscensionDeg, declinationDeg, epochMs)
-            return Ephemeris.toHorizontal(
-                Ephemeris.Equatorial(d[0], d[1], 0.0), latitudeDeg, longitudeDeg, epochMs,
+        ): Ephemeris.Horizontal =
+            Ephemeris.apparentStarHorizontal(
+                rightAscensionDeg, declinationDeg, latitudeDeg, longitudeDeg, epochMs,
             )
-        }
 
         /**
          * Straight up, as a catalogue-frame unit vector.

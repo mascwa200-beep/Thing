@@ -26,6 +26,23 @@ import dev.mascwa.pulse.core.telemetry.SkyProjection
  * what makes the cost independent of the field of view, and [MilkyWayGlow] explains at length why
  * the forward alternatives do not work here.
  *
+ * ## ⚠️ Not refracted, deliberately — but extincted, and faded by twilight
+ *
+ * Every other catalogue-frame layer goes through `SkyFrame.project`, which bends it toward the
+ * zenith the way the air does. This one reads `frame.basis` directly and paints the geometric sky,
+ * because the raster is a ONE-DEGREE grid of star density, and the bend it would carry is half a
+ * degree for something truly on the horizon and a sixth of a degree five degrees up — smaller than
+ * the blur the bilinear upscale already spreads a cell over. A haze drawn half a cell higher is
+ * indistinguishable from the haze, and the arithmetic to move it would run per pixel here rather
+ * than per star.
+ *
+ * What the air TAKES is a different matter from where it moves things: the glow is made of the
+ * same starlight the stars are, so it fades toward the horizon by the same
+ * [SkyFrame.transmission] — one table lookup per sample, on the sine of altitude the sample's
+ * direction already gives — and it fades out altogether through astronomical twilight
+ * ([opacityScale], from `SkyBrightness.milkyWayFactor`). Both are exactly 1 with the atmosphere
+ * off or the Sun well down, so the dark-sky glow is the picture it always was.
+ *
  * ## What the glow means
  *
  * A byte in the raster is a star count per square degree, measured from the bundled catalogue.
@@ -46,7 +63,13 @@ fun DrawScope.drawMilkyWay(
      * bilinear upscale creases and the cheaper setting would be the worse picture.
      */
     maxSamples: Int = MilkyWayGlow.MAX_SAMPLES,
+    /**
+     * What to multiply every sample's opacity by — the twilight fade, 1 on a dark sky. Defaulted
+     * to 1 so a caller that has no Sun to ask about draws the night glow unchanged.
+     */
+    opacityScale: Double = 1.0,
 ) {
+    if (opacityScale <= 0.0) return
     if (size.width <= 0f || size.height <= 0f) return
     val minor = minOf(size.width, size.height)
     if (minor <= 0f) return
@@ -83,7 +106,12 @@ fun DrawScope.drawMilkyWay(
             0
         } else {
             MilkyWay.galacticOfVector(dir[0], dir[1], dir[2], gal)
-            MilkyWayGlow.argb(rgb, MilkyWay.opacity(MilkyWay.sample(cells, peak, gal[0], gal[1])))
+            // The air's share at this direction's altitude — exactly 1 with the atmosphere off.
+            val air = frame.transmission(frame.sinAltitude(dir[0], dir[1], dir[2]))
+            MilkyWayGlow.argb(
+                rgb,
+                MilkyWay.opacity(MilkyWay.sample(cells, peak, gal[0], gal[1])) * opacityScale * air,
+            )
         }
     } ?: return
 

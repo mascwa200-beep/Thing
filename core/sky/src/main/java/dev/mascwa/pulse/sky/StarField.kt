@@ -169,7 +169,7 @@ class StarField(private val reader: StarCatalogReader) {
         layer.published(from.count)
     }
 
-    private companion object {
+    companion object {
         /**
          * Sized for the widest zoom's held count rather than grown into it.
          *
@@ -178,7 +178,7 @@ class StarField(private val reader: StarCatalogReader) {
          * the arrays being thrown away are about to be overwritten anyway, which is why
          * [StarLayer.ensure] does not copy them.
          */
-        const val INITIAL = 16_384
+        private const val INITIAL = 16_384
 
         /**
          * How far the drawn date may move before the held positions are carried again.
@@ -186,6 +186,10 @@ class StarField(private val reader: StarCatalogReader) {
          * A tenth of a year. The fastest-moving star known covers ten arcseconds a year, so this is
          * a fraction of an arcsecond on the worst case in the sky and imperceptible on everything
          * else — while still meaning that scrubbing the chart to a different century reloads.
+         *
+         * ⚠️ Public because the BRIGHT catalogue is carried on the same tolerance by
+         * `SkyMapViewModel.refreshFrame` — the two hold the same stars twice, and one tolerance for
+         * both is what keeps each pair moving together.
          */
         const val PROPER_MOTION_TOLERANCE_YEARS = 0.1
     }

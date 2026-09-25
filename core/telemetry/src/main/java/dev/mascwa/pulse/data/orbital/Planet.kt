@@ -3,12 +3,12 @@ package dev.mascwa.pulse.data.orbital
 import kotlinx.serialization.Serializable
 
 /**
- * One naked-eye planet as [PlanetCalc] computed it.
+ * One planet as [PlanetCalc] computed it — the naked-eye five by default, all seven on request.
  *
  * ⚠️ **Here rather than beside the orbital DTOs it was written among, and the move is what let the
- * star map exist without the network.** `PlanetCalc` is a few hundred lines of Schlyter arithmetic
- * with no dependency beyond `kotlin.math`, and this is what it returns — so the two belong in the
- * pure module together. While the pair sat in `:core:feeds` the only way for `:core:sky` to draw a
+ * star map exist without the network.** `PlanetCalc` is planetary-theory arithmetic with no
+ * dependency beyond the pure module's own cores, and this is what it returns — so the two belong
+ * in the pure module together. While the pair sat in `:core:feeds` the only way for `:core:sky` to draw a
  * planet was to depend on the HTTP client and twenty-two repositories, which is the opposite of
  * what a bundled, offline star chart is for.
  *

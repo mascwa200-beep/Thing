@@ -12345,6 +12345,12 @@ because those paths are fragile; this one exists because its consumer is silent.
 systematically asks "does every `assets.open(...)` reach the APK", and deriving that list from the
 source is the obvious shape if it is ever worth doing.
 
+⚠️ **SUPERSEDED — that list was derived and the gap is materially closed. See "EVERY ASSET READER,
+AGAINST EVERY PACKAGING GATE" at the end of this file.** The paragraph above is a correct dated
+record of what was known when it was written; it is flagged because it names an open task that a
+future session would otherwise spend an arc on, and the measured answer is that the gates already
+track the failure mode exactly.
+
 ### THE WIDGET REACHES THE MOCKUP, AND EMAIL LINKS WITH NO PASSWORD (this session, PR #464)
 
 Owner: *"ensure that you … manage to get the full scope of the actual widget that was in that one
@@ -14668,3 +14674,329 @@ sites plus the `sectionVocab()` regex); the phone-side `settings?sec=` deep link
 surfaces, not shippable blind); `ScanlineOverlay` and the eleven residue settings fields (an owner
 call on the overlay); the phone's own study deck deliberately not indexed. **Task #20 (retire IMAP)
 is still HELD** pending the owner's Pixel confirmation of notification-mail.
+
+### EVERY ASSET READER, AGAINST EVERY PACKAGING GATE — the recorded gap, measured and CLEAN
+
+CLAUDE.md recorded this as open, twice: *"nothing systematically asks 'does every `assets.open(...)`
+reach the APK', and deriving that list from the source is the obvious shape if it is ever worth
+doing."* The list was derived. **Zero subagent and zero workflow spend**, per the standing usage
+constraint, which overrides the ultracode directive as it has for every arc since.
+
+**Every asset reader in the tree, and every gate over it:**
+
+| reader | asset | asset's module | gated in |
+|---|---|---|---|
+| `SkyCatalogSource` · `ConstellationSource` · `DeepSkySource` · `MilkyWaySource` · `StarCatalog` | `sky/*` | **:core:sky** | android ✅ · sky ✅ (+ Stored + depth, via `tools/sky/check_packaged.py`) |
+| `FoodRepository` | `food/seed.tsv` | **:core:health** | android ✅ · nutrition ✅ |
+| `FoodDatabase` | `food/food.db` | **:core:health** (built in CI) | android ✅ · nutrition ✅ *(asserts ABSENT — it downloads a pack)* |
+| `OuiTable` | `recon/oui.tsv` | app | android ✅ |
+| `WaterRepository` | `water/stations.tsv` | app | android ✅ |
+| `SurvivalContentRepository` | `survival/` (623 files, 92 MB) | app | ❌ android · ✅ desktop (`LibraryBundleTest`) |
+| `KnowledgeSeeder` · `AgentSelfTools` | `knowledge/` (17 files) | app | ❌ |
+| *(nothing — it is a licence file)* | `fonts/NOTICE.txt` | app | ❌ |
+
+⚠️ **THE FINDING: every LIBRARY-module asset is verified in every APK that consumes it, and that is
+the failure mode which has actually shipped a defect here.** AGP merges a library's assets into each
+consuming APK, and the merge breaking is **silent** — it compiles, packages, publishes and goes
+green. That is exactly how `:nutrition` once shipped with no `seed.tsv` (*"searching 'chicken breast'
+found nothing generic … all rendering as 'no such food'"*), and it is why `sky-build.yml`'s own
+comment says the absence "would be SILENT". All five library-module readers are now covered in both
+directions.
+
+⚠️ **The three ungated readers are all app-module, where the failure mode does not exist**: AGP
+packages `src/main/assets` by default, so losing one takes a deliberate `sourceSets` /
+`ignoreAssetsPattern` edit rather than a merge quietly stopping. **So the gate coverage tracks the
+failure mode rather than the asset list, which is better than uniform coverage would be** — and a
+gate whose failure mode does not exist is the kind people learn to skim past.
+
+⚠️ **`survival/` looks like the glaring omission and is the sharpest case FOR the rule above.** It is
+the largest asset in the app and its namesake feature — and it already carries three gates, each
+placed where something can actually break: `GuidesJsonValidationTest` (index↔shard lockstep, the
+`FULL_PAGE_BASELINE` ratchet, category allowlist), `BundledImagesTest` (orphans, decodability, the
+1280 px cap), and — the cross-boundary one — **`LibraryBundleTest` on the desktop**, because
+`desktop/build.gradle.kts` copies it with `from(rootProject.file("app/src/main/assets/survival"))`.
+A copy across module boundaries is gated; the same-module packaging beneath it is not.
+
+⚠️ **What would REOPEN this, stated so the next refactor is not silent: moving `survival/` or
+`knowledge/` into a library module.** Both assets that live in libraries today were moved there, and
+both gained a packaging gate **in the same commit as the move**, because the move is what creates
+the merge. A future carve-out of `:core:survival` needs one too — and the desktop's hard path into
+`app/src/main/assets/survival` would need moving with it.
+
+**Also confirmed while surveying, so nobody re-derives it:** `noCompress += "skycat"` is declared by
+**both** APK-building modules that bundle the catalogue (`app/build.gradle.kts:217`,
+`sky/build.gradle.kts:142`) — packaging belongs to whichever module builds the APK, and a miss would
+surface only on a device as `openFd` refusing a deflated asset. No `ignoreAssetsPattern` exists
+anywhere in the repository.
+
+**Nothing shipped from this arc but the correction above.** The vein is clean, and saying so plainly
+beats manufacturing a gate for a failure that cannot happen.
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S1–S4 of six (this session, PR to come on `claude/loving-edison-bd65oa`)
+
+Owner: *"Without burning the usage, update and polish/streamline/fix the code within the star map
+apk to be as accurate as possible to Stellarium."* Chose (AskUserQuestion) **everything, S1–S6**;
+approved *"use ultracode without blowing out our plan usage data"*. **Zero subagent and zero
+workflow spend across all four slices** — every measurement is local kotlinc + JUnit, Skyfield +
+DE421 in the session scratchpad (`$S/py`, `$S/eph/de421.bsp`), or CI. Plan:
+`robust-baking-dewdrop.md`; each slice its own CI-green commit: **S1 `9b4905ce`** (the clock runs —
+the drawn instant was frozen at composition, 0.25°/min of sidereal drift), **S2 `53e0360d`**
+(refraction behind an ATMOSPHERE switch, 34.5′ at the horizon), **S3 `3a6671d9`** (VSOP87 planets,
+all seven, the Sun from the same theory), **S4** (this commit: apparent star places).
+
+**The measurement that is the arc, the 500-direction gap probe against Skyfield apparent alt/az at
+the owner's site** (`scratchpad/sky/gap_ref.py` + `StellariumGapProbe.kt`, seeded, so every slice
+scores the same sky):
+
+| | S1 (before) | S2 | S4 |
+|---|---|---|---|
+| stars, all above horizon | median 64–884″ by band, worst 1701″ | median 15.8″ worst 25.9″ | **median 1.1″ worst 1.6″** |
+| Moon | 98.8″ | 12.9″ | 1.1–2.1″ |
+| Sun | 223.8″ | 24.1″ | 1.5–1.7″ |
+
+What remains on everything is UT1 − UTC, ignored as Stellarium ignores it (~1″ today).
+
+**S4 in one line:** IAU 2000B nutation (generated table, `tools/sky/build_nutation.py`, held to a
+microarcsecond against Skyfield's own evaluation), apparent sidereal time (`gastDeg`) under every
+hour angle, the exact true-of-date pair everywhere, and annual aberration applied FIRST in
+`SkyFrame.project` and taken back off a tap — plus three things found by measuring on the way.
+
+⚠️ **THE MOON IS NOT ABERRATED AND THE STAR IS, AND `Occultations.kt` HAD IT BACKWARDS IN WRITING.**
+Its KDoc argued aberration "displaces every body by up to 20.5″ in the SAME direction, so in a
+separation between two bodies it very largely cancels". Measured with Skyfield at five instants: the
+Moon's apparent place is within **0.7″ of its GEOMETRIC place** — its light-time displacement and its
+stellar aberration cancel up to its own orbital velocity — so `moonEquatorial` (geometric + nutation)
+is already the apparent Moon, while a star has no light-time term and carries the whole 20.5″. The
+error lay along the ecliptic, the Moon's own track, so it read as **contact times forty seconds
+out** rather than a wrong yes/no, and the test's comment credited it to "the Moon's own error".
+Both apps' occultation target lambdas now use `Ephemeris.apparentStarEquatorial`; contacts 38 s →
+8 s, closest approach 85 s → 2–9 s; bars 60/90/150 s → 15/15/30 s. **An argument about a
+separation cancelling is only as good as whether both bodies really move the same way — measure it.**
+
+⚠️ **THE SUN WAS 8.8″ OFF, AND THE PROBE IS WHAT FOUND IT.** With the star chain in, every body sat
+at ~1″ except the Sun at 9″ — the one an order of magnitude above the rest. `sunPosition` went from
+`sunEquatorial` straight to `toHorizontal`, never through `topocentric`, while `moonPosition` has
+since S3; the Sun's parallax is 8.8″·cos(alt). One line, the Moon's own call. **A probe over a
+whole population is worth more than any per-body test: the outlier names itself.**
+
+⚠️ **A TEST TOLERANCE TIGHT ENOUGH TO SEE A FRAME IS WHAT CATCHES A FRAME MISMATCH.** The plan left
+`Terminator` on mean sidereal time as "only a day/night wash". Its subsolar longitude is an APPARENT
+right ascension minus a sidereal time, and `TerminatorTest` holds it to 1e-6° against `toHorizontal`
+— the moment that moved to GAST, the test reported the equation of the equinoxes. Moved. Two
+derivations of one Sun must agree, whatever either is for.
+
+⚠️ **ΔT stayed a constant, ON MEASUREMENT, and the plan item saying otherwise is struck.** Skyfield's
+`delta_t` is 69.133 s in 2026, 70.535 in 2045; the constant 69.184 is within 0.05 s today and 1.35 s
+in 2045 — 0.7″ of Moon. What kept the 2045 alt/az rows 20″ off was Skyfield's **extrapolated DUT1**
+(−1.35 s by 2045, −27 s by 2100), which the app ignores by design. So every tight alt/az reference is
+built on a per-row timescale with `delta_t + dut1` for TT − UT1 (UT1 == UTC). ⚠️ **TT − UTC is
+`delta_t + dut1`, PLUS** — the sign was wrong twice before `check_dut1_fixed` printed 0.000000. And
+S3's trap hit again: `ts.utc(1970,1,1,0,0, ms/1000)` is not a UTC instant; use `ts.from_datetime`.
+
+⚠️ **Adapting `SkyFrameRefractionTest` to always-on aberration had two traps.** "A star truly on the
+horizon" must mean one whose ARRIVING direction is on the horizon (`catalogueUnit` takes β off, so
+`project` puts it back — they compose to (v/c)², 0.002″); and a drawn direction must be read back
+GEOMETRICALLY, never through `SkyFrame.horizonOf`, which now aberrates and would apply β twice.
+
+⚠️ **The pole ill-conditioning compounds through the nutation rotation.** The true-of-date
+round-trip at the pole depends on the input RA at 5.9e-8° (1/sin(9″) then 1/sin(0.36°)) where the
+mean pair sat at 1.3e-12°. Not a defect; `EphemerisTest` pins it at 1e-6 with the arithmetic.
+
+⚠️ **`tools/cross_module_internal_check.py` matched a qualified name as a SUBSTRING** — the internal
+`Ephemeris.aberrate` was reported reached from the two files calling the public
+`aberrateEquatorial`. Word-bounded now, negative-tested both ways (a planted real crossing is
+reported; the two call sites are not). Recorded as hole 3 in its docstring.
+
+⚠️ **A negative-test harness that perturbs files IN PLACE cannot share the tree with anything.**
+`neg_s4.sh` backs up four files and restores under a trap; an edit to any of them while it runs is
+clobbered by the restore, and any concurrent kotlinc run compiles a perturbed core. Run it alone,
+in the background via the Bash tool, and do nothing that compiles until it reports.
+
+**Bars tightened to what is measured:** `PlanetCalcTest` RA/Dec 4.5″ → 3″ (worst 2.49″ Neptune; the
+five naked-eye planets under 0.7″ once the nutation shortcut went), alt/az 30″ → 3″; Sun 0.05° →
+0.001°; `Occultations.PLANET_UNCERTAINTY_DEG` 5″ → 3″; `ApparentPlaceTest` new: RA/Dec of date
+0.5″ (measured 0.129″), alt/az 1″ (0.31″). **Thirteen rules negative-tested** (`neg_s4.sh`), all
+awake on the first run.
+
+⚠️ **Recorded, not fixed: comets carry light-time but no stellar aberration** (`Comets.kt:174`), ~20″
+on the COMETS list. `CometsTest`'s fixtures are ASTROMETRIC (the solver agrees to 0.009″ with no
+aberration, so they cannot be apparent), and the reference script that made them is not in the
+scratchpad — fixing it means regenerating 957-comet fixtures with `.apparent()`. Out of S4's scope.
+
+⚠️ **Owner-verify on the Pixel — and be honest about what is visible.** Twenty arcseconds is a pixel
+at the widest field and forty at the quarter-degree floor, so S4 shows only at the deepest zoom: a
+bright star's identify card should name the altitude the dot is drawn at, and a tap at the floor
+should land on the star it is on. The Moon and Sun should sit where a telescope finds them. S1–S3
+are the visible slices: the stars stay under the phone over ten minutes, a rising Moon sits a
+diameter higher, Uranus and Neptune are drawn.
+
+**Open: S5** (sky brightness + extinction behind the same ATMOSPHERE switch; invariant: night is
+byte-for-byte today) and **S6** (any date/time 1900–2100, grids/meridian/galactic equator, constellation
+names, a fuller identify card, GROUND). Then the draft PR → `main` and the branch re-sync.
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S5, the atmosphere's other two halves (this session, same branch)
+
+S5 of the six-slice plan above, its own CI-green commit. **Zero subagent and zero workflow spend**, as
+with S1–S4 — local kotlinc + JUnit, one `curl` of Stellarium's own source, and CI.
+
+With the atmosphere on, the map drew a black sky at noon with Vega on it at full brightness, and a
+first-magnitude star on the horizon as big and bright as one overhead. S2 was where the air MOVES
+things; this is where it hides them, and Stellarium draws both by default. Two pure functions of one
+variable each, in `core:telemetry/SkyBrightness.kt`: **sky brightness is a function of the SUN's
+altitude alone** (piecewise-linear ramps through the three twilights: a background factor, a Milky Way
+factor, a glow bump around the Sun, and a dimming in magnitudes taken off the map's own cut — 3.5 at
+the end of civil twilight, −0.5 at sunrise, −4.0 in full day, which is Venus and nothing else), and
+**extinction is a function of the STAR's altitude alone** (Rozenberg airmass × k, at the APPARENT
+altitude, zero below the DRAWN horizon). `SkyFrame` gains `extinctionMag`/`transmission`; the renderer
+applies the loss before both the cut and the size band; the Milky Way pass multiplies each sample by
+the transmission at its own direction and by the twilight factor; `SkyChart` tints the background,
+draws a warm radial band where the Sun is DRAWN, and gates a faint planet only while the sky is
+actually bright.
+
+⚠️ **THE CLAIM I HAD WRITTEN INTO THE COMMIT MESSAGE, THE KDOC AND THE TEST WAS WRONG, and one
+`curl` of Stellarium's source is what showed it.** All three said `k = 0.2, Stellarium's default`.
+`StelSkyDrawer.cpp:111` reads `landscape/atmospheric_extinction_coefficient` with a default of
+**0.13**; the `Extinction` header beside it carries a stale `(default 0.20)` in a comment, and a
+recollection reproduces the comment, not the code. **Read the line that reads the config, never the
+header that describes it.** The same fetch corrected a second claim: Stellarium's drawing path takes
+**Young's 1994 airmass on the GEOMETRIC altitude** (`Extinction::forward` → `airmass(…, false)`),
+not Rozenberg on the apparent one — while its own header says refraction-first-then-Rozenberg "seems
+better". Measured with the shipped Bennett inverse, the two agree to 1% above a degree and 4% on the
+drawn horizon (40 against 38.5): one airmass in two variables. Kept Rozenberg at the apparent
+altitude, moved k to 0.13, and **re-printed every figure that depended on k from the shipped
+function before pinning it** (horizon loss 7.8 → 5.07, the four pinned extinctions, the table
+bounds, two thresholds in `SkyFrameExtinctionTest`). The whole harness was re-run at the new value.
+
+⚠️ **And the first KDoc's own figures were already inconsistent with the test one file over** —
+"1.1 magnitudes at ten degrees, 2 at five, 5.2 at one" were `k·X` while the "7.8 on the horizon"
+beside them was `k·(X − 1)`; the test pinned 0.918 at ten degrees from the shipped function. Numbers
+in a KDoc written from memory sit beside numbers in a test printed by the code, and only the second
+kind is evidence. Roughly the twenty-fourth appearance of this habit in the arc-series.
+
+**Decisions worth keeping:**
+- **Night is byte-for-byte what it was, held on the raw bits.** Sun ≤ −18° ⇒ every ramp is the
+  identity and `limitingMagnitude` returns the cut bit for bit (four limits × five altitudes);
+  atmosphere off ⇒ `extinctionMag = 0.0`, `transmission = 1.0`, so `m0 + 0.0` and `o * 1.0 * 1.0`
+  are exact. A wrong constant can therefore only change a twilight/daytime chart or a star within a
+  few degrees of the horizon with the air on — which is why the constants can be the owner's to tune.
+- **The extinction step sits exactly on the batch boundary** (`Refraction.TRUE_AT_APPARENT_HORIZON_DEG`,
+  the line `aboveHorizon` splits on), where a brightness discontinuity already exists by design. Below
+  it the map dims by alpha on purpose; Stellarium ground-off makes the same cut two degrees down
+  (`extinction_mode_below_horizon = zero`).
+- **Tables over the SINE of altitude** — the dot product every star already pays, no `asin`; 4,096
+  entries agree with the exact forms to 3.8e-5 mag / 6.5e-7 (bars 1e-4 / 1e-6). Coarse in degrees
+  at the zenith and fine at the horizon, which is where the curvature is.
+- **The early `if (m0 > limit) continue` keeps the night path cost-identical** — extinction only ever
+  dims, so a star cut by its catalogue magnitude is cut by its extincted one.
+- **The dimming is the same loss at every field**, so a telescope-narrow field in daylight keeps its
+  zoom's own depth, as a telescope does.
+- **A planet is hidden only while `dimming > 0.0`** — Neptune at 7.8 still draws at a wide field at
+  night; the Sun and Moon are never cut.
+- **The twilight glow is drawn where the Sun is DRAWN** (through `apparentAltitudeDeg` and the same
+  basis as the body pass), because sunset is exactly when it is drawn.
+- **The Milky Way is faded and extincted but NOT refracted** — a 1° raster is blurrier than the 0.5°
+  it would move.
+- **Day/twilight colours are chart constants, not `SkyColors` roles**: the colour of a clear sky at
+  noon is the thing being drawn, not a palette choice, and both applications draw the same one.
+
+**Verification, all local:** `:core:telemetry:test` 2,816 green through Gradle; `SkyFrameExtinctionTest`
+3/3 + `SkyFrameRefractionTest` 6/6 under kotlinc + JUnit against the whole core; `:core:sky`
+frontend clean against the real platform + Compose 1.7.6 + lifecycle 2.8.7 (216 files); `:desktop:build`
+295 green (a shared core changed); the gate chain clean. **Ten load-bearing rules negative-tested**
+(`scratchpad/sky/neg_s5.sh`), each against a baseline asserted green first, each perturbation asserted
+to have matched the source exactly once, every restore byte-compared — all ten awake at k = 0.2, and
+all ten again at k = 0.13 with the re-pinned expectations.
+
+⚠️ **Three small operational notes.** `/tmp/skytest.sh` takes only the `:core:sky` files a test
+needs — `SkyProjection`/`SkyPointing` are `:core:telemetry` and passing them prints
+`error: source file or directory not found` with no verdict, which a `grep` for `OK (` reads as
+silence. `list_workflow_runs` returns the full commit message per run (four copies of a long one);
+poll with `list_workflow_jobs` and a run id. And the `:sky` module's package is `dev.mascwa.sky`,
+not `dev.mascwa.pulse.sky`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas and never draws one.** With the atmosphere on
+at midday: a blue sky, the Sun, the Moon and Venus and nothing else. Around sunset: a warm band low
+in the west, the Milky Way gone before the stars, the stars arriving as the sky darkens. At night: a
+first-magnitude star setting should fade over its last two degrees, and with the atmosphere OFF the
+chart must be byte-for-byte what it was before. The ramp constants and `EXTINCTION_MAG_PER_AIRMASS`
+are the owner's to tune from a screenshot (Stellarium's own header puts a humid lakeshore nearer
+0.35 than 0.13).
+
+**S6 shipped — the next section.**
+
+### THE STAR MAP AT STELLARIUM ACCURACY — S6, the things Stellarium shows (this session)
+
+The arc's last slice, and the one that is features rather than arithmetic: any date, two grids,
+constellation names, a fuller identify card, a ground. Both applications through the shared
+`:core:sky`. **Zero subagent and zero workflow spend**, as with S1–S5 — the owner allowed ultracode
+and asked not to burn the plan, and local kotlinc + JUnit, `javap` and CI were enough.
+
+**Shipped:** `offsetMs` replaces whole hours (seven steps + DATE: a two-step Material 3 picker in
+`:sky`, a typed `LcarsField` on LCARS through `SkyClock.parseLocal`), bounded 1900–2100; the
+readout shows the absolute LOCAL date-time when scrubbed. `SkyGrids` — equatorial grid of date +
+galactic equator in the catalogue frame, azimuthal grid + meridian in the horizon frame, labels
+every 2h/30°, a GRID chip NONE → EQUATORIAL → HORIZON → BOTH. Constellation names at figure
+centroids. `SkyMapViewModel.cardLines` through the pure `SkyCardText`: RA/Dec J2000 and of date,
+distance and size, rise/transit/set today. `GroundShape` + a GROUND chip (default OFF).
+
+**Decisions and traps worth keeping:**
+- ⚠️ **Material's `DatePickerState.selectedDateMillis` is UTC MIDNIGHT of the picked day**, not an
+  instant in any zone. Seeding it with the drawn instant opens the picker on the wrong day for
+  everyone east of Greenwich in the evening. `SkyClock.pickerDateOf`/`pickerFields` convert; the
+  test holds London (still the 23rd at 23:15) and Auckland (already the 24th) a day apart, both
+  values from python `zoneinfo`.
+- ⚠️ **Inline value-class parameters mangle a function's JVM name**, so `javap | grep "TimePicker("`
+  finds nothing: the real names are `TimePicker-mT9BvqQ`, `DatePickerDialog-GmEhDVc`,
+  `rememberDatePickerState-EU0dCGE`. Grep with `[-(]`. The `/tmp/m3x` extraction holds
+  `BasicAlertDialog` and the content-only `AlertDialog` but NOT the buttoned
+  `AndroidAlertDialog_androidKt`, so the time step is `BasicAlertDialog` + `Surface`.
+- ⚠️ **`tools/android_compile_check.sh` gained `-t <jvm-target>`, and the reason is a trap for anyone
+  using `-m`.** The compiled cores are built at 17 and kotlinc defaults to 1.8, so an `inline fun`
+  in a core (`Constellations.walkEdge`) reports "cannot inline bytecode built with JVM target 17"
+  on a tree CI compiles clean. `scratchpad/sky/compile_sky_app.sh` type-checks the WHOLE `:sky`
+  application against real Material 3 1.3.1 / Compose 1.7.6 / activity / lifecycle / okhttp — 50
+  files, frontend clean; negative-tested with a planted `vm.cycleGridd` (caught at the line) and a
+  control without `-t` that reproduces the two inline errors.
+- ⚠️ **`frameBucket` floor-divides, and the test now says why:** 1900–1969 is INSIDE the span this
+  map draws, those instants are negative, and truncation toward zero puts the millisecond before a
+  pre-1970 midnight in the midnight's own bucket — the equator and grid would rebuild a day late
+  for seventy years of the range. Fixture 1950-01-01T00:00Z = −631152000000 → bucket −7305.
+- **The ground is one exact circle, not a mesh.** Every circle on the sphere is a circle on the
+  stereographic plane, so the horizon is a circle (or a half-plane past a 2000-unit circumradius,
+  where the sagitta is under a sixth of a pixel); a triangle fan would have anti-aliased seams.
+  Which side is the ground is decided by **projecting the nadir** — inside looking down, outside
+  looking up — and by the zenith inverted when the nadir sits at the antipode. A screen-y rule of
+  thumb is right in one case and wrong in the other; a 300-view × 20-direction sweep pins it.
+- **Rise/set is enriched at TAP time, off main, behind a generation guard** — never in `rebuild()`,
+  which runs twice a second and would pay ~150 VSOP87 evaluations per planet each tick.
+- **The frame furniture is rebuilt on a day-bucket change** on `Dispatchers.Default` into fresh
+  `SkyLines` swapped on main, the bucket recorded BEFORE the build so a concurrent `rebuild()` from
+  `load()` cannot double-build; the bright stars are re-carried on
+  `StarField.PROPER_MOTION_TOLERANCE_YEARS`, now public so the two star layers share one tolerance.
+- **Four time buttons to a row, measured:** at 360 dp a slot is 79 dp, eight would be 40 — narrower
+  than "−10M" at 11sp mono once `LcarsButton`'s 32 dp of padding comes off. Backward steps share a
+  row with NOW, forward ones with DATE.
+- ⚠️ **I overwrote the S1 `SkyClockTest.kt` with a `Write`** ("has been updated successfully" was
+  the tell) and recovered the four old tests from `git show HEAD:…`. Read a test file before
+  writing one of the same name.
+
+**Verification:** 27 pure-core tests run locally (SkyClock 11, GroundShape 4, SkyCardText 5,
+SkyGrids 7); **nine load-bearing rules negative-tested** (`scratchpad/sky/neg_s6.sh`, one case per
+invocation, baseline asserted green first, anchor matched exactly once, restore under the shell's
+EXIT trap and byte-compared) — bounds, frame-bucket floor, local day start, picker UTC-midnight,
+nadir side, zenith side, seconds carry, grid of date, galactic sign — **all nine awake**, each
+failing exactly the tests that name it. `:core:sky` frontend clean over 219 files. The LCARS
+screen's twelve resolve-gate complaints are the documented cascade, proven not shrugged at: the
+nine view-model members compile in the `:sky` app, `raise` is a palette field with 42 callers, and
+`it`/`mutableStateOf` cascade from `LcarsField` being off that gate's classpath.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a canvas, it never draws one.** Press DATE and land
+on a typed day (the picker should open on TODAY, not yesterday or tomorrow); cycle GRID through
+its four states; switch GROUND on and check the sky below the horizon is genuinely covered and
+the horizon line still shows; tap a planet and read the card's rise/set line against a real
+almanac in your zone; scrub +1D a few times and check the readout says the date, not just the
+offset.
+
+**Open:** the draft PR → `main` and the branch re-sync; the arc's standing open items — comets
+lack stellar aberration (~20″), identify can name a star not drawn, DSOs are not extincted near
+the horizon.
