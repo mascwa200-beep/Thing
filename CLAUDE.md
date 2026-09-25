@@ -15069,3 +15069,50 @@ stars only), so S7b's rule has nothing to apply to there; whether a tap should n
 feature, not a defect, and the same `visible(i, limit, fov, extinction)` is the rule to use if it is
 built. **Task #20 (retire IMAP) is still HELD** pending the owner's Pixel confirmation of
 notification-mail.
+
+#### S7 follow-up — CI caught a test the local run skipped, and the review caught four more (same PR)
+
+⚠️ **S7 went out with one red workflow, and the cause is a verification gap worth naming exactly.**
+The commit's local verification ran `CometsTest` against the whole core, `:desktop:build`, the gate
+chain and the `:core:sky` frontend — and NOT `:core:feeds:test`, which has its own end-to-end comet
+pin (`CometRepositoryTest`: parse a real MPC line, drive the solver, land where JPL puts Halley). It
+pinned the ASTROMETRIC place, the solver now publishes the apparent one, and CI (LCARS #2215) failed
+by exactly the 17.3″ S7a added. **The test was right to fail.** It now pins the apparent place and
+keeps the astrometric one beside it as a 7–21″ guard, so a solver that stops aberrating fails here
+too. **Rule: a change to a shared core's OUTPUT must run every module's tests, not the module's own**
+— `grep -rl "Comets\." --include=*Test.kt` would have named the second pin in a second.
+
+**The adversarial review of `28f26c6d` (one ultracode workflow, 11 agents, 6.3M tokens — the owner
+allowed it) confirmed four findings, each by two independent verifiers, 0 refuted — and every one was
+re-verified against the code here before it was acted on.** All four are one shape: *the tap applies
+a subset of what the draw pass applies*, on the commit whose stated invariant was that they agree.
+1. **Float vs Double.** The hit test rounded the extincted magnitude to a Float before the cut while
+   `collectStars` compares a Double, so a star rejected by under half a float ulp was named. Both are
+   Doubles now. ⚠️ **The test SEARCHES for its fixture** (an altitude whose extinction lands a star
+   inside that half-ulp) and asserts the search succeeded — the only way a test of a 5e-7-magnitude
+   window can be sure it reached the branch.
+2. **GROUND.** The chart skips the below-horizon batches and paints over every body under the drawn
+   horizon; the tap named Canopus ten degrees under the fill. `nearestDrawnStar` takes `ground`.
+3. **No on-screen cut.** `collectStars` refuses a star past `EDGE_MARGIN`; the tap did not, and a
+   2.4° tolerance at the top of a portrait screen spans more than the margin. `identify` now takes
+   the viewport the picture was drawn on. ⚠️ The margin is a **parameter** of the hit test because
+   `SkyRenderer` is Compose-bound and the hit test's whole point is to be testable without it; the
+   KDoc names the value the caller must pass.
+4. **Deep-sky labels.** `DeepSky.labels` read the catalogue magnitude while the star label pass
+   re-checks `m0 + extinction`, so Andromeda at the drawn horizon was a marker at half a percent alpha
+   beside a full-strength name. `DeepSkyLayer.labelled` takes the air off the **limit** — the
+   magnitude is nullable inside `labels`, and an unmeasured object is named for its size before the
+   limit is read, so the air has no say over it, exactly as in `visible`.
+⚠️ **And a fifth of the same shape, found by reading the draw pass for #2 rather than by the review:
+the tap ignored the DAYLIGHT cut on a planet** — the chart hides Neptune at noon, `identify` named it.
+So `core/sky/.../sky/BodyHitTest.kt` is now the ONE rule for whether a body is drawn at all (planet
+under daylight, anything under the ground), called by both; and the tap projects each body through
+`horizonBasisFor` — the same basis the chart draws it with — and applies the same `onScreen`.
+
+**Verification:** `:core:feeds:test` through the real Gradle task 7/7; StarHitTestTest 7/7,
+BodyHitTestTest 3/3, DeepSkyLayerTest 3/3 under kotlinc + JUnit; gate chain clean; `:core:sky`
+frontend clean. **Ten rules negative-tested** (`scratchpad/sky/neg_s7.sh`, one per invocation, baseline asserted green, anchor matched exactly once, restore byte-compared) — all ten awake, each failing exactly the tests that name it. ⚠️ The `hit_rank_by_catalogue` perturbation had to widen the Float it assigns once `bestDrawn` became a Double: a perturbation that does not compile is not evidence a guard is awake.
+
+⚠️ **Owner-verify on the Pixel, added to the list above:** GROUND on, tap the ground where a bright
+star sets — nothing should be named; atmosphere on at noon, tap where Neptune is — nothing; a galaxy
+setting with the atmosphere on should lose its name a few degrees before it loses its marker.

@@ -76,7 +76,16 @@ class CometRepositoryTest {
      * Every assertion above compares one number against another number, which a consistently
      * shifted parser could still satisfy if the expectations were derived the same wrong way. This
      * one does not: it feeds the parsed elements to the solver and requires the answer to land where
-     * JPL DE421 independently says Halley is. Nothing about that value came from this file.
+     * Skyfield over JPL DE421 independently puts Halley's APPARENT place. Nothing about that value
+     * came from this file.
+     *
+     * ⚠️ **Apparent, not astrometric, since the solver applies annual aberration** — as every planet
+     * does — and the two places are 17″ apart for Halley at this instant. This test pinned the
+     * ASTROMETRIC place until the aberration landed, and CI caught the change, which is exactly the
+     * check working: a solver that publishes a different frame from the one the test expects is a
+     * fact worth failing on. The astrometric place is kept beside the apparent one so the two cannot
+     * be confused again — the solved position has to sit a real aberration's distance from it, which
+     * is what a solver that quietly stopped aberrating would fail.
      */
     @Test
     fun `a parsed line drives the solver to the position JPL independently gives`() {
@@ -85,10 +94,21 @@ class CometRepositoryTest {
         assertNotNull(s)
         val err = Ephemeris.angularSeparationDeg(
             s!!.equatorial.rightAscensionDeg, s.equatorial.declinationDeg,
-            124.92977054178874, 3.16251749030594,
+            124.92535810191579, 3.164456411133322,
         ) * 3600.0
         assertTrue("parsed Halley is $err arcseconds from where DE421 puts it", err < 1.0)
         assertTrue("and at the right distance", abs(s.geocentricAu - 35.84032869882962) < 1e-4)
+        // The astrometric place for the same instant, from the same reference: the apparent one
+        // must be a whole aberration away from it, never on top of it.
+        val fromAstrometric = Ephemeris.angularSeparationDeg(
+            s.equatorial.rightAscensionDeg, s.equatorial.declinationDeg,
+            124.92977054178874, 3.16251749030594,
+        ) * 3600.0
+        assertTrue(
+            "the solved place is $fromAstrometric arcseconds from the astrometric one — annual " +
+                "aberration is between 7 and 21 arcseconds, so anything else means a frame was lost",
+            fromAstrometric > 7.0 && fromAstrometric < 21.0,
+        )
     }
 
     @Test

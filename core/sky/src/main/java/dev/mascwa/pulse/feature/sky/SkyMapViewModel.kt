@@ -24,6 +24,8 @@ import dev.mascwa.pulse.sky.SkySite
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.DeepSkyLayer
 import dev.mascwa.pulse.sky.SkyFrame
+import dev.mascwa.pulse.sky.BodyHitTest
+import dev.mascwa.pulse.sky.SkyRenderer
 import dev.mascwa.pulse.sky.StarHitTest
 import dev.mascwa.pulse.sky.StarField
 import dev.mascwa.pulse.sky.StarLayer
@@ -869,6 +871,17 @@ class SkyMapViewModel(
         return SkyProjection.basisOf(pointForward, pointUp[0], pointUp[1], pointUp[2], fovDeg, 0.0)
     }
 
+    /**
+     * The basis everything held in horizon coordinates is projected through — the eight bodies,
+     * the horizon line, the four letters, the twilight glow: the pointed basis while the handset
+     * is aiming, the view's own otherwise. ⚠️ ONE of the two is ever in play, and
+     * [pointedHorizonBasis] says why the pointed one is not merely `basisOf(view)` with a roll.
+     * Read by the draw pass and by [identify], so a body is hit-tested through the projection it
+     * was drawn through and "past the edge of the screen" means the same thing to both.
+     */
+    fun horizonBasisFor(view: SkyProjection.View, pointed: SkyProjection.Basis?): SkyProjection.Basis =
+        pointed ?: SkyProjection.basisOf(view)
+
     private var pointingJob: kotlinx.coroutines.Job? = null
 
     /**
@@ -1048,8 +1061,13 @@ class SkyMapViewModel(
      *
      * ⚠️ Brighter wins a tie rather than nearer. Two stars within a finger's width of each other are
      * both "what you meant"; the one you can actually see is the answer.
+     *
+     * @param viewport the surface the picture was drawn on, in screen units — so a star or a body
+     *   past its edge (the tolerance is an angle, the edge is a line, and near the top of a
+     *   portrait screen a degree spans more of the surface than in the middle) is as absent to the
+     *   tap as it was to the draw pass.
      */
-    fun identify(screenX: Double, screenY: Double) {
+    fun identify(screenX: Double, screenY: Double, viewport: SkyProjection.Viewport) {
         val v = _view.value
         // ⚠️ **Through the pointed frame while the handset is aiming, for the same reason the
         // horizon is.** [view] is the angle form of the aim and it is not the aim: its altitude is
@@ -1067,6 +1085,19 @@ class SkyMapViewModel(
         // The tolerance reads only the field, which both paths share, so it needs no branch.
         val toleranceDeg = SkyProjection.degreesPerUnit(v) * TAP_RADIUS_FRACTION
 
+        // ⚠️ **Under the SAME sky the picture was drawn under, with the SAME switches.** The cut,
+        // the daylight dimming, the ground and the horizon basis are derived once here and handed
+        // to both searches, through the same functions the draw pass calls — [drawnStarLimit],
+        // [horizonBasisFor], [BodyHitTest] — so a tap is judged against the numbers the picture was
+        // drawn with and never against a copy of them. Snapshots of the switches, as the draw pass
+        // takes them, so one tap cannot read a flow twice and see it change.
+        val atmosphere = _atmosphere.value
+        val groundOn = _ground.value
+        val skyAlt = skySunAltitudeDeg(skySun(_bodies.value, atmosphere))
+        val limit = drawnStarLimit(v.fovDeg, _deepest.value, skyAlt)
+        val dimming = SkyBrightness.dimmingMag(skyAlt)
+        val horizonBasis = horizonBasisFor(v, pointed)
+
         // ⚠️ **The tap is in the DRAWN sky, which is the refracted one.** Every altitude below is
         // apparent until it is lowered: the eight bodies are compared where the chart draws them,
         // and the star search lowers the touched direction to its true altitude before carrying it
@@ -1074,12 +1105,23 @@ class SkyMapViewModel(
         // be un-bent to meet them. Skipping either half puts a tap near the horizon half a degree
         // from what it landed on, which at a narrow field is the whole screen.
         // The Sun, the Moon and the planets: eight things, still in horizon coordinates.
+        // ⚠️ **Only the ones the chart DREW.** A planet the daylight took, a body under the ground,
+        // or one past the edge of the surface is not there to name — the same three tests the draw
+        // pass makes, through the same rule and the same projection. A tap that named Neptune at
+        // noon, or Canopus under an opaque fill, in confident detail, is what this replaces.
         var best = _bodies.value
             .asSequence()
-            .filter {
-                SkyProjection.separationDeg(
-                    az, alt, it.azimuthDeg, apparentAltitudeDeg(it.altitudeDeg),
-                ) <= toleranceDeg
+            .filter { b ->
+                val drawnAlt = apparentAltitudeDeg(b.altitudeDeg, atmosphere)
+                SkyProjection.separationDeg(az, alt, b.azimuthDeg, drawnAlt) <= toleranceDeg &&
+                    BodyHitTest.drawn(
+                        b.kind == Kind.PLANET, b.magnitude, drawnAlt, groundOn, dimming, limit,
+                    ) &&
+                    run {
+                        val bv = SkyProjection.unitVector(b.azimuthDeg, drawnAlt)
+                        SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
+                            .onScreen(viewport, SkyRenderer.EDGE_MARGIN)
+                    }
             }
             .minByOrNull { it.magnitude }
 
@@ -1118,13 +1160,14 @@ class SkyMapViewModel(
             // empty patch of sky. The frame and the limit are the SAME derivations the draw pass
             // uses ([frameFor], [drawnStarLimit]), so the tap and the picture cannot disagree
             // about what is there.
-            val frame = frameFor(v, here, at, _pointing.value, _atmosphere.value)
-            val limit = drawnStarLimit(
-                v.fovDeg, _deepest.value, skySunAltitudeDeg(skySun(_bodies.value, _atmosphere.value)),
+            val frame = frameFor(v, here, at, _pointing.value, atmosphere)
+            val star = StarHitTest.nearestDrawnStar(
+                brightStars, t, cosTolerance, frame, limit, viewport, SkyRenderer.EDGE_MARGIN, groundOn,
             )
-            val star = StarHitTest.nearestDrawnStar(brightStars, t, cosTolerance, frame, limit)
             val deep = deepField?.layer?.let {
-                StarHitTest.nearestDrawnStar(it, t, cosTolerance, frame, limit)
+                StarHitTest.nearestDrawnStar(
+                    it, t, cosTolerance, frame, limit, viewport, SkyRenderer.EDGE_MARGIN, groundOn,
+                )
             }
 
             val starBody = star?.let { i -> namedStar(i, here, at) }

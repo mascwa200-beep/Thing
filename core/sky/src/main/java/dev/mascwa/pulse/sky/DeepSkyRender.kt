@@ -145,7 +145,11 @@ fun DrawScope.drawDeepSky(
                 style = Stroke(width = markerStroke),
             )
         }
-        if (DeepSky.labels(e, limit)) onLabel(x, y, e.label)
+        // ⚠️ Extincted like the marker it names — the star label pass re-checks its headroom
+        // against `m0 + extinction` for the same reason — or a galaxy the air has dimmed to a
+        // marker at half a percent alpha keeps a full-strength name beside nothing visible.
+        // Exactly the catalogue rule with the air off. See DeepSkyLayer.labelled.
+        if (layer.labelled(i, limit, extinction)) onLabel(x, y, e.label)
         drawn++
     }
     return drawn

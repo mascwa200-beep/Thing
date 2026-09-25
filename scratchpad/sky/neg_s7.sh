@@ -37,13 +37,51 @@ case "$CASE" in
     FILE=$S/StarHitTest.kt; OLD='            if (m > limit || m >= bestDrawn) continue'; NEW='            if (m >= bestDrawn) continue'
     RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.StarHitTestTest $S/StarHitTest.kt $S/StarLayer.kt $S/SkyFrame.kt -- $T/StarHitTestTest.kt"
     EXPECT="a star the air dims past the cut is not named" ;;
-  # S7b — ranking by the drawn magnitude rather than the catalogue one.
+  # S7b — ranking by the drawn magnitude rather than the catalogue one. (`bestDrawn` is a Double
+  # since the review, so the catalogue Float has to be widened or the perturbation does not compile
+  # — and a compile error is not evidence a guard is awake.)
   hit_rank_by_catalogue)
     FILE=$S/StarHitTest.kt; OLD='            bestDrawn = m
-'; NEW='            bestDrawn = m0
+'; NEW='            bestDrawn = m0.toDouble()
 '
     RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.StarHitTestTest $S/StarHitTest.kt $S/StarLayer.kt $S/SkyFrame.kt -- $T/StarHitTestTest.kt"
     EXPECT="the brightest DRAWN star wins" ;;
+  # Review follow-up — the extincted cut compared as a Double, bit-identical to collectStars.
+  hit_float_cut)
+    FILE=$S/StarHitTest.kt; OLD='            val m = m0 + frame.extinctionMag(s)
+'; NEW='            val m = (m0 + frame.extinctionMag(s)).toFloat().toDouble()
+'
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.StarHitTestTest $S/StarHitTest.kt $S/StarLayer.kt $S/SkyFrame.kt -- $T/StarHitTestTest.kt"
+    EXPECT="less than a float can tell" ;;
+  # Review follow-up — the ground hides what is under the drawn horizon.
+  hit_no_ground_cut)
+    FILE=$S/StarHitTest.kt; OLD='            if (ground && !frame.aboveHorizon(s)) continue
+'; NEW=''
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.StarHitTestTest $S/StarHitTest.kt $S/StarLayer.kt $S/SkyFrame.kt -- $T/StarHitTestTest.kt"
+    EXPECT="with the ground on" ;;
+  # Review follow-up — a star past the edge of the surface is not drawn, so not named.
+  hit_no_screen_cut)
+    FILE=$S/StarHitTest.kt; OLD='            if (!frame.project(x, y, z).onScreen(viewport, edgeMarginUnits)) continue
+'; NEW=''
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.StarHitTestTest $S/StarHitTest.kt $S/StarLayer.kt $S/SkyFrame.kt -- $T/StarHitTestTest.kt"
+    EXPECT="past the edge of the screen" ;;
+  # Review follow-up — the daylight cut on a planet, shared by the draw pass and the tap.
+  body_no_daylight_cut)
+    FILE=$S/BodyHitTest.kt; OLD='        if (isPlanet && dimmingMag > 0.0 && magnitude > limit) return false
+'; NEW=''
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.BodyHitTestTest $S/BodyHitTest.kt -- $T/BodyHitTestTest.kt"
+    EXPECT="fainter than the cut is not drawn while the sky is bright" ;;
+  # Review follow-up — the ground hides a body under the drawn horizon.
+  body_no_ground_cut)
+    FILE=$S/BodyHitTest.kt; OLD='        if (ground && drawnAltDeg < 0.0) return false
+'; NEW=''
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.BodyHitTestTest $S/BodyHitTest.kt -- $T/BodyHitTestTest.kt"
+    EXPECT="under the drawn horizon is hidden" ;;
+  # Review follow-up — a deep-sky name loses the headroom the air takes.
+  dso_label_no_extinction)
+    FILE=$S/DeepSkyLayer.kt; OLD='        DeepSky.labels(entries[i], limit - extinctionMag)'; NEW='        DeepSky.labels(entries[i], limit)'
+    RUN="/tmp/skytest.sh dev.mascwa.pulse.sky.DeepSkyLayerTest $S/DeepSkyLayer.kt -- $T/DeepSkyLayerTest.kt"
+    EXPECT="a name is withheld when the air has taken the headroom" ;;
   # S7c — the air added to the deep-sky magnitude before the cut.
   dso_no_extinction)
     FILE=$S/DeepSkyLayer.kt; OLD='            magnitude[i].toDouble() + extinctionMag, majorArcmin[i].toDouble(), limit, fovDeg,'; NEW='            magnitude[i].toDouble(), majorArcmin[i].toDouble(), limit, fovDeg,'

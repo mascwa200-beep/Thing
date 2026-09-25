@@ -39,6 +39,7 @@ import dev.mascwa.pulse.core.telemetry.SkyBrightness
 import dev.mascwa.pulse.core.telemetry.SkyPointing
 import dev.mascwa.pulse.core.telemetry.SkyProjection
 import dev.mascwa.pulse.core.telemetry.StarGlyph
+import dev.mascwa.pulse.sky.BodyHitTest
 import dev.mascwa.pulse.sky.ConstellationField
 import dev.mascwa.pulse.sky.GroundShape
 import dev.mascwa.pulse.sky.LineBatch
@@ -221,6 +222,10 @@ fun SkyChart(
                     vm.identify(
                         ((offset.x - size.width / 2f) / half).toDouble(),
                         ((offset.y - size.height / 2f) / half).toDouble(),
+                        // The surface the picture was drawn on — the same `viewportOf` the draw
+                        // pass builds below — so a star past its edge is as absent to the tap as
+                        // it was to the draw.
+                        SkyProjection.viewportOf(size.width.toDouble(), size.height.toDouble()),
                     )
                 }
             },
@@ -263,7 +268,9 @@ fun SkyChart(
         // aiming, and then the view's own basis is right — the point is that only ONE of the two is
         // ever in play. Built before the Milky Way so the glow can be drawn under it.
         val pointedBasis = vm.pointedHorizonBasis(view.fovDeg)
-        val horizonBasis = pointedBasis ?: SkyProjection.basisOf(view)
+        // The view model's derivation, which [SkyMapViewModel.identify] reads too: a body is
+        // hit-tested through the projection it was drawn through.
+        val horizonBasis = vm.horizonBasisFor(view, pointedBasis)
         // Where the middle of the screen looks, in the horizon frame — the cap-test direction for
         // the horizon grid and the probe direction for the ground. The pointed vectors when aiming,
         // for the reason `pointedHorizonBasis` gives; the view's own direction otherwise, clamped
@@ -448,13 +455,6 @@ fun SkyChart(
         // handset straight up is most likely to be pointing AT, so the clamp landed hardest exactly
         // where it was least welcome. See the note where that basis is built.
         bodies.forEach { b ->
-            // ⚠️ A planet the daylight has swallowed is not drawn — the same cut the stars get —
-            // and ONLY while the sky is actually bright. On a dark sky the dimming is exactly zero
-            // and this never fires, so Neptune at 7.8 is drawn at a wide field exactly as it always
-            // was; the Sun and the Moon are never cut, because they are what a daytime sky shows.
-            if (b.kind == SkyMapViewModel.Kind.PLANET && dimming > 0.0 && b.magnitude > limit) {
-                return@forEach
-            }
             // ⚠️ Drawn at the APPARENT altitude — the same bend the stars get inside
             // `SkyFrame.project`, applied here to the eight things that never go through that
             // frame. The rising Moon is the case: truly half a diameter under the horizon, seen
@@ -465,6 +465,19 @@ fun SkyChart(
             // through the same function below, so a limb cannot end up bent differently from its
             // own centre.
             val drawnAlt = vm.apparentAltitudeDeg(b.altitudeDeg, atmosphere)
+            // ⚠️ Whether it is drawn AT ALL is ONE rule, shared with the tap — see BodyHitTest. A
+            // planet the daylight has swallowed is not drawn (the same cut the stars get, and ONLY
+            // while the sky is actually bright: on a dark sky the dimming is exactly zero, so
+            // Neptune at 7.8 is drawn at a wide field exactly as it always was; the Sun and the
+            // Moon are never cut, because they are what a daytime sky shows), and nor is a body
+            // under the GROUND — skipped here rather than drawn and painted over, which is the same
+            // picture and the same answer `identify` gives.
+            if (!BodyHitTest.drawn(
+                    b.kind == SkyMapViewModel.Kind.PLANET, b.magnitude, drawnAlt, ground, dimming, limit,
+                )
+            ) {
+                return@forEach
+            }
             val bv = SkyProjection.unitVector(b.azimuthDeg, drawnAlt)
             val p = SkyProjection.projectUnit(bv[0], bv[1], bv[2], horizonBasis)
             if (!p.onScreen(viewport, SkyRenderer.EDGE_MARGIN)) return@forEach

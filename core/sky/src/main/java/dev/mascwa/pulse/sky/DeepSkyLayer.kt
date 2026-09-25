@@ -70,4 +70,22 @@ class DeepSkyLayer(val entries: List<DeepSky.Entry>) {
         DeepSky.visibleAt(
             magnitude[i].toDouble() + extinctionMag, majorArcmin[i].toDouble(), limit, fovDeg,
         )
+
+    /**
+     * Whether object [i]'s name is drawn at this cut — [DeepSky.labels], with the air taken off
+     * the headroom.
+     *
+     * ⚠️ The star label pass re-checks its headroom against `m0 + extinction` so a star the air
+     * has dimmed to a speck loses the name its catalogue brightness earned; this is the same rule
+     * for a galaxy, and it was missing — the marker went to half a percent alpha at the horizon
+     * while the label stayed at full strength beside it. The subtraction is on the LIMIT rather
+     * than the magnitude because the magnitude is nullable inside [DeepSky.labels], and an object
+     * with no measured brightness is named for its size before the limit is read — so the air has
+     * no say over it, exactly as it has none over [visible]'s size clause.
+     *
+     * @param extinctionMag [SkyFrame.extinctionMag] at the object's altitude; zero with the
+     *   atmosphere off, so the answer is the catalogue rule to the bit.
+     */
+    fun labelled(i: Int, limit: Double, extinctionMag: Double = 0.0): Boolean =
+        DeepSky.labels(entries[i], limit - extinctionMag)
 }
