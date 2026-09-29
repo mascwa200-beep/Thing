@@ -54,7 +54,7 @@ class CalendarObjectivesRepository(private val context: Context) {
                 val loc = cur.getString(2)?.takeIf { it.isNotBlank() } ?: continue
                 val begin = cur.getLong(3)
                 val coords = if (geoCache.containsKey(loc)) geoCache[loc]
-                    else geocode(loc).also { geoCache[loc] = it }
+                    else geocodeRemembered(loc).also { geoCache[loc] = it }
                 if (coords == null) continue
                 out += Objective(
                     id = "cal_${id}_$begin",
@@ -90,8 +90,50 @@ class CalendarObjectivesRepository(private val context: Context) {
         }.getOrNull()
     }
 
+    /**
+     * [geocode], remembered across calls for the life of the process.
+     *
+     * ⚠️ **This is what let the advisory miss its window on the widget.** The Oracle asks for two days
+     * of located events on every read, and each distinct location string was geocoded again every
+     * time — sequentially, up to four seconds each, up to twenty of them. A diary that says "Big
+     * lounge", "Cafeteria", "Dorm" and "Your room" asks the geocoder about four places that never
+     * move, every fifteen minutes, and none of them resolve to anything anyway. The widget gives the
+     * advisory a budget, and that alone could spend it.
+     *
+     * A place that resolved is kept for [HIT_TTL_MS]; one that did not is kept for [MISS_TTL_MS], so a
+     * string the geocoder cannot place is asked about a few times a day rather than on every read.
+     * ⚠️ A miss here is also what a network failure looks like, which is why it is not kept long.
+     *
+     * ⚠️ Only the calendar path uses this. [geocode] itself stays live, because it also serves a
+     * place the user types by hand, and remembering a failure there would refuse their retry.
+     */
+    private suspend fun geocodeRemembered(place: String): Pair<Double, Double>? {
+        val now = System.currentTimeMillis()
+        GEOCODED[place]?.let { (coords, at) ->
+            val ttl = if (coords != null) HIT_TTL_MS else MISS_TTL_MS
+            if (now - at in 0..ttl) return coords
+        }
+        val coords = geocode(place)
+        // Bounded, crudely: a diary with more distinct places than this is rare, and starting again
+        // costs one round of lookups rather than an unbounded map.
+        if (GEOCODED.size >= MAX_REMEMBERED) GEOCODED.clear()
+        GEOCODED[place] = coords to now
+        return coords
+    }
+
     private companion object {
         // Hard cap on distinct geocode calls per refresh — the platform Geocoder is rate-limited.
         const val MAX_GEOCODES = 20
+
+        /** A place that resolved does not move: a week. */
+        const val HIT_TTL_MS = 7 * 24 * 3_600_000L
+
+        /** A place that did not resolve — or a lookup that failed — is asked again after three hours. */
+        const val MISS_TTL_MS = 3 * 3_600_000L
+
+        const val MAX_REMEMBERED = 200
+
+        /** Process-wide: the repository is a container singleton, but the cache must not depend on it. */
+        val GEOCODED = java.util.concurrent.ConcurrentHashMap<String, Pair<Pair<Double, Double>?, Long>>()
     }
 }

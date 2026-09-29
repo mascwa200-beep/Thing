@@ -622,7 +622,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
             coroutineScope {
                 val oracle = async {
-                    widgetSource<dev.mascwa.pulse.core.telemetry.Insight>(Source.ORACLE, outcomes) {
+                    // ⚠️ Its own, longer budget. The advisory is the lead row and the one read that
+                    // weighs every other feed, so it is also the slowest; at the shared four seconds it
+                    // was the row most often reported as "no answer". The load's outer bound (seven
+                    // seconds) still caps it, well inside a goAsync receiver's window.
+                    widgetSource<dev.mascwa.pulse.core.telemetry.Insight>(Source.ORACLE, outcomes, budgetMs = ORACLE_BUDGET_MS) {
                         // visible = 1: this widget renders exactly one insight, and telling the
                         // learning layer otherwise would credit rows nobody was shown.
                         OracleEngine.read(c, s, visible = 1).firstOrNull()
@@ -1289,6 +1293,9 @@ class LockWidgetProvider : AppWidgetProvider() {
     private companion object {
         /** The feeds that need a coordinate, and so go quiet together when there is none. */
         val PLACE_SOURCES = listOf(Source.WEATHER, Source.SAFETY, Source.SKY, Source.WATER)
+
+        /** The advisory's budget — see where it is used. Below [WIDGET_LOAD_TIMEOUT_MS] by design. */
+        const val ORACLE_BUDGET_MS = 6_000L
 
         /**
          * The row slots in `widget_lock.xml`, in order.
