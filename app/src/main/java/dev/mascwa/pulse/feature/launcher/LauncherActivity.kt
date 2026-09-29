@@ -30,6 +30,7 @@ import dev.mascwa.pulse.ui.theme.NightwireTheme
 import dev.mascwa.pulse.widget.LockBoard
 import dev.mascwa.pulse.widget.openRouteIntent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -49,6 +50,13 @@ import kotlin.math.roundToInt
  * [HomeConsole] — the lock screen's console, with the dock, a search box, the board and every app.
  * The board is the widget's, from [LockBoard], so the widget, the lock screen and the home screen
  * show one reading of the world.
+ *
+ * ## If it crashes as it starts
+ *
+ * A default Home that dies on start is a phone whose Home button leads nowhere, reopened by Android
+ * the moment it dies. So every start is counted ([HomeGuardPolicy]) and, after three that never lived
+ * five seconds within two minutes, this hands Home back to the previous launcher and switches itself
+ * off. Settings says when that happened.
  *
  * ## The Home button
  *
@@ -74,6 +82,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (standDownIfLooping()) return
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -141,6 +150,35 @@ class LauncherActivity : ComponentActivity() {
 
         reload()
         unwatch = apps.watch { reload() }
+    }
+
+    /**
+     * The crash-loop guard ([HomeGuardPolicy]). True when this start is the one that stands the home
+     * screen down, in which case it has already handed Home back and is finishing.
+     *
+     * ⚠️ Runs before anything that could crash, and its record is written synchronously, for the
+     * reason `HomeStore.guardState` gives. A start that then lives [HomeGuardPolicy.HEALTHY_AFTER_MS]
+     * clears the record, so only starts that die young count against it.
+     */
+    private fun standDownIfLooping(): Boolean {
+        val now = System.currentTimeMillis()
+        val verdict = runCatching { HomeGuardPolicy.onStart(store.guardState(), now) }.getOrNull() ?: return false
+        runCatching { store.saveGuard(verdict.state) }
+        if (verdict.standDown) {
+            HomeSwitch.standDown(this, now)
+            // Hand the phone to whichever Home Android now resolves — the old launcher, or the
+            // picker if there is more than one. Never this one: its alias is off.
+            runCatching {
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            finish()
+            return true
+        }
+        lifecycleScope.launch {
+            delay(HomeGuardPolicy.HEALTHY_AFTER_MS)
+            withContext(Dispatchers.IO) { runCatching { store.saveGuard(HomeGuardPolicy.onHealthy()) } }
+        }
+        return false
     }
 
     override fun onStart() {

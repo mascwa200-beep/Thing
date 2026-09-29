@@ -3,6 +3,8 @@ package dev.mascwa.pulse.security
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 
 /**
  * Opt-in **Device-Owner** security policies for Pulse. These powers exist only because the owner
@@ -150,6 +152,31 @@ class DevicePolicyController(context: Context) {
         if (!isDeviceOwner() || dpm == null || packages.isEmpty()) return emptyArray()
         dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspended)
     }.getOrNull()
+
+    /**
+     * Make [home] the phone's Home, or with null hand Home back to whatever the owner had chosen.
+     * DO-only; true if applied.
+     *
+     * A persistent preferred activity is the device owner's way to answer the Home picker for good,
+     * so pressing Home opens LCARS with no chooser — which is what "make it my home screen" means.
+     *
+     * ⚠️ **Clears every persistent preference this package has set before setting one.** Nothing
+     * else in LCARS sets one, so today that is only an earlier Home; a future caller of
+     * `addPersistentPreferredActivity` would have its preference cleared here and must not be added
+     * without changing this.
+     */
+    fun setPersistentHome(home: ComponentName?): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.clearPackagePersistentPreferredActivities(admin, appContext.packageName)
+        if (home != null) {
+            val filter = IntentFilter(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }
+            dpm.addPersistentPreferredActivity(admin, filter, home)
+        }
+        true
+    }.getOrDefault(false)
 
     companion object {
         /**

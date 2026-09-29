@@ -102,7 +102,7 @@ object SettingsSections {
     )
     val APPEARANCE = SettingsSection(
         "appearance", SettingsCategory.INTERFACE, "Appearance",
-        "appearance haptics sounds audio boot theme lock screen lockscreen keyguard board",
+        "appearance haptics sounds audio boot theme lock screen lockscreen keyguard board home homescreen launcher dock",
     )
     val REGION_UNITS = SettingsSection(
         "region_units", SettingsCategory.REGION, "Region & units",

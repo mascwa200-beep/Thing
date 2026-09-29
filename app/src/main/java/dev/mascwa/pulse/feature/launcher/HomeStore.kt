@@ -39,9 +39,48 @@ class HomeStore(context: Context) {
         next
     }
 
+    // ── the crash-loop guard's record ───────────────────────────────────────────────────────────
+
+    /**
+     * The guard's record, read BLOCKING on purpose.
+     *
+     * ⚠️ The guard exists for a home screen that crashes as it starts, so its record has to be on
+     * disk before whatever might crash does — a write handed to a background thread could simply not
+     * have happened when the process died, and a crash loop would then never add up to anything.
+     * The file is a few dozen bytes, so this costs one small read on the start it protects.
+     */
+    fun guardState(): HomeGuardPolicy.State = HomeGuardPolicy.State(
+        pendingStartMs = prefs.getLong(KEY_PENDING, NONE).takeIf { it != NONE },
+        failuresMs = prefs.getString(KEY_FAILURES, null).orEmpty().split(',').mapNotNull { it.toLongOrNull() },
+    )
+
+    /** Written with commit(), for the reason [guardState] gives: it must land before a crash does. */
+    fun saveGuard(state: HomeGuardPolicy.State) {
+        prefs.edit()
+            .putLong(KEY_PENDING, state.pendingStartMs ?: NONE)
+            .putString(KEY_FAILURES, state.failuresMs.joinToString(","))
+            .commit()
+    }
+
+    /** When the home screen last stood itself down, for Settings to say so. Null if it never has. */
+    fun standDownAtMs(): Long? = prefs.getLong(KEY_STOOD_DOWN, NONE).takeIf { it != NONE }
+
+    fun recordStandDown(atMs: Long) {
+        prefs.edit().putLong(KEY_STOOD_DOWN, atMs).commit()
+    }
+
+    /** Switched back on by hand: the old record is not evidence against the new start. */
+    fun clearGuard() {
+        prefs.edit().remove(KEY_PENDING).remove(KEY_FAILURES).remove(KEY_STOOD_DOWN).commit()
+    }
+
     private companion object {
         const val FILE = "lcars_home"
         const val KEY_PINS = "pins"
+        const val KEY_PENDING = "guard_pending"
+        const val KEY_FAILURES = "guard_failures"
+        const val KEY_STOOD_DOWN = "guard_stood_down"
+        const val NONE = -1L
 
         /** A key is a component name, a `#` and a number, so it can never contain a line break. */
         const val SEPARATOR = "\n"

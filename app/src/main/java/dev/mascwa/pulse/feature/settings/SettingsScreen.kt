@@ -692,6 +692,7 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    HomeScreenRows()
                 }
             }
 
