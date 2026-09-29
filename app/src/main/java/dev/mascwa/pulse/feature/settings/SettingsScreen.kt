@@ -647,6 +647,21 @@ fun SettingsScreen(
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
                     }
+                    // ⚠️ Says what is missing when Android will not let it open, rather than showing
+                    // a switch that is on and does nothing — the board is started from the
+                    // background, and from Android 15 only a device owner may do that.
+                    val boardCanOpen = remember { dev.mascwa.pulse.feature.lockboard.LockBoardTrigger.canLaunch(context) }
+                    PrefSwitch(
+                        "Lock-screen board",
+                        if (boardCanOpen) {
+                            "The widget's board over the lock screen, there when the screen comes on. " +
+                                "Tap it or UNLOCK to unlock. Anyone who picks the phone up sees it, calendar included."
+                        } else {
+                            "Needs LCARS to be this phone's device owner: from Android 15 nothing else " +
+                                "may open a screen from the background."
+                        },
+                        s.lockScreenBoard,
+                    ) { v -> vm.update { it.copy(lockScreenBoard = v) } }
                 }
             }
 

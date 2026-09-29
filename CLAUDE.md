@@ -15377,3 +15377,60 @@ and WidgetLinkageTest 8, all run locally. **Ten rules negative-tested.**
 6. Hours later, the subhead should say `PLACE FROM …`.
 7. The emergency watch's ongoing notification should say it is watching where LCARS last saw you,
    not "needs location".
+
+### THE LOCK-SCREEN BOARD — the widget's board is the first thing seen on wake (this session)
+
+Owner: *"I would like to make the lock screen widget be the first thing I see when I turn my phone
+screen on before I ever get to log in."* **Zero subagent and zero workflow spend.**
+
+**Shape:** `feature/lockboard/LockBoardActivity` — a `showWhenLocked` activity over the lock-screen
+wallpaper (`Theme.Pulse.LockBoard`: opaque window, `windowShowWallpaper`, a 66% scrim) that applies
+the widget's OWN full-height `RemoteViews` from `WidgetBoard.render`. It has no layout of its own,
+so the widget and the lock board are one design. The board comes from `widget/LockBoard`, a
+process-wide `StateFlow` that **every widget render publishes to** (the provider now decorates once
+per pass, not per id). When nothing recent is held (no widget placed, or older than 5 min) it loads
+its own through `LockWidgetProvider().loadBoard()` — the same `build` pass, recording nothing — and
+redraws in place when that lands.
+
+**⚠️ Launched as the screen goes OFF, not on.** A screen-on broadcast arrives after the keyguard has
+drawn, so a board started then is visibly second. `LockBoardTrigger` (installed from
+`PulseApplication`, **main process only**) starts it at SCREEN_OFF and again at SCREEN_ON as a
+safety net. Every decision is `LockBoardPolicy` (pure, 11 tests, 8 rules negative-tested):
+
+| rule | why |
+|---|---|
+| a call wins over everything | proximity turns the screen off mid-call; the board would wait over the call screen |
+| never over our own takeover | a newer activity draws on top, burying an unacknowledged red alert (`LockScreenGuests`, counted create→destroy because a takeover is *stopped* at exactly the moment this asks) |
+| not while an alarm or ringtone sounds | something else woke the phone (active-playback usages) |
+| screen-on needs a LOCKED keyguard; screen-off does not ask | the lock delay has not run out at screen-off |
+| `finishOnResume` only when **lit and unlocked** | a board resumed in the dark before the lock delay must not throw itself away |
+
+⚠️ **Background start: a device owner may; `SYSTEM_ALERT_WINDOW` is NOT enough on Android 15+ at
+target 35** — it now counts only while an overlay is visible, and at screen-off none is. A refused
+start is DROPPED, not thrown, so `canLaunch` is asked first and the Settings row says what is
+missing. The owner's phone is DO.
+
+⚠️ **Every tap unlocks first, and the mechanism is read out of the platform, not assumed.**
+`RemoteViews.RemoteResponse.startPendingIntent` calls `view.getContext().startIntentSender(6 args)`,
+and `RemoteViewsContextWrapper` does not override it — so the board is applied with a `TapGate`
+`ContextWrapper` that turns every launch (list rows included) into `requestDismissKeyguard` →
+open on success. `RemoteViews.InteractionHandler` exists but is hidden API; do not reach for it.
+
+**Never a trap:** Back leaves; USER_PRESENT (fingerprint/face/bouncer) ends it; it never turns the
+screen on or keeps it on. Not `noHistory` — that finishes on invisibility, i.e. at screen-off.
+
+**Setting:** `AppSettings.lockScreenBoard`, **default ON** (asked for by name), Settings ▸ Interface
+▸ Appearance ▸ "Lock-screen board"; the subtitle says anyone who picks the phone up sees it,
+calendar included. Section keywords gained `lock screen lockscreen keyguard board` (the findability
+gate failed without them — negative-tested).
+
+**Verified locally:** the policy tests; the whole lock-board package + `LockBoard` type-checked clean
+against the real platform + activity/lifecycle AARs (stubs copied from the real declarations; gate
+negative-tested with a planted typo); `WidgetLinkageTest` and `SettingsSectionCoverageTest` green.
+The provider refactor cannot compile here (R cascades) — CI is its gate.
+
+⚠️ **Owner-verify on the Pixel — none of this can be seen from a build machine:** press power off
+and on: the board should already be there, not the stock lock screen first. Fingerprint while it is
+up — does it unlock and step aside, or does it need UNLOCK? (Occluding activities vary here; UNLOCK
+always works.) Tap a region: bouncer, then that screen. During a call, and with an alarm ringing, it
+must stay out of the way. If it never appears, Settings says why.

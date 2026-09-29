@@ -233,6 +233,23 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- THE LOCK-SCREEN BOARD — the widget's situation board over the lock screen, started as the
+             screen goes off so it is the first thing seen when it comes back. showWhenLocked and
+             nothing more: it never turns the screen on or keeps it on, Back leaves, and unlocking by
+             any route ends it. Its own task affinity so starting it never brings LCARS's own screens
+             forward, and excluded from Recents because it is not somewhere anybody goes back to.
+             NOT noHistory: that finishes an activity once it is no longer visible, and screen-off is
+             exactly when this one has just been put in place. -->
+        <activity
+            android:name=".feature.lockboard.LockBoardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.lockboard"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+            android:theme="@style/Theme.Pulse.LockBoard" />
+
         <!-- OFFICIAL EMERGENCY ALERT — a full-screen condition-red takeover with a full-volume alarm on
              the alarm stream, raised from a government CAP feed (never from a news headline). Back is
              deliberately disabled; the acknowledge button is the only way out. Shows over the lock screen

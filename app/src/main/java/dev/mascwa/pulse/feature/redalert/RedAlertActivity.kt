@@ -52,6 +52,8 @@ class RedAlertActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Counted so the lock-screen board never starts on top of an unacknowledged emergency.
+        dev.mascwa.pulse.feature.lockboard.LockScreenGuests.enter()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -106,6 +108,7 @@ class RedAlertActivity : ComponentActivity() {
         // by any route at all.
         klaxon?.stop()
         klaxon = null
+        dev.mascwa.pulse.feature.lockboard.LockScreenGuests.leave()
         super.onDestroy()
     }
 

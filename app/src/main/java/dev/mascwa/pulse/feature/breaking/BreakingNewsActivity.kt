@@ -35,6 +35,8 @@ class BreakingNewsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Counted so the lock-screen board never starts on top of a story somebody is reading.
+        dev.mascwa.pulse.feature.lockboard.LockScreenGuests.enter()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)   // show over the keyguard, instantly
             setTurnScreenOn(true)     // wake the screen
@@ -64,6 +66,11 @@ class BreakingNewsActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         current = intent
+    }
+
+    override fun onDestroy() {
+        dev.mascwa.pulse.feature.lockboard.LockScreenGuests.leave()
+        super.onDestroy()
     }
 
     private fun clearAndFinish() {

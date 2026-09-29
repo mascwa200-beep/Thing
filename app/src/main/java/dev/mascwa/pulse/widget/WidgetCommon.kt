@@ -1,5 +1,9 @@
 package dev.mascwa.pulse.widget
 
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.R
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.weather.WeatherData
@@ -202,3 +206,22 @@ suspend fun resolveWeather(c: AppContainer, place: WidgetPlace?): WeatherData? {
 /** Today's weather without waking the GPS, resolving the place itself. */
 suspend fun resolveWeather(c: AppContainer, s: AppSettings?): WeatherData? =
     resolveWeather(c, widgetPlace(c, s))
+
+/**
+ * Open LCARS on [route] — the one tap target every widget region and every lock-screen board region
+ * uses, so the two surfaces cannot open different screens for the same line.
+ *
+ * ⚠️ [requestCode] must differ between regions whose routes differ: `Intent.filterEquals` ignores the
+ * route extra, so two regions sharing a code share ONE PendingIntent and every tap lands wherever the
+ * last-built one pointed — the collision already corrected once in `NotifId`.
+ */
+fun widgetOpenIntent(context: Context, route: String, requestCode: Int): PendingIntent {
+    val open = Intent(context, MainActivity::class.java)
+        .setAction(Intent.ACTION_VIEW)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        .putExtra(MainActivity.EXTRA_ROUTE, route)
+    return PendingIntent.getActivity(
+        context, requestCode, open,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+}
