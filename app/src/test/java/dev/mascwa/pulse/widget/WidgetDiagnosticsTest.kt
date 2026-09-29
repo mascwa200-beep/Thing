@@ -275,6 +275,25 @@ class WidgetDiagnosticsTest {
         assertEquals("", WidgetDiagnostics.staleNote(mapOf(Source.MARKETS to now + 3 * HOUR), now) { "t$it" })
     }
 
+    @Test
+    fun `a saved place or a live fix has no age to confess`() {
+        assertEquals("", WidgetDiagnostics.placeNote(null, 30 * HOUR) { "t$it" })
+    }
+
+    @Test
+    fun `a kept place is named once it is older than six hours, and not before`() {
+        val now = 30 * HOUR
+        assertEquals("", WidgetDiagnostics.placeNote(now - 6 * HOUR, now) { "t$it" })
+        val at = now - 6 * HOUR - 1
+        assertEquals("PLACE FROM t$at", WidgetDiagnostics.placeNote(at, now) { "t$it" })
+    }
+
+    @Test
+    fun `a kept place stamped in the future is not old`() {
+        val now = 30 * HOUR
+        assertEquals("", WidgetDiagnostics.placeNote(now + 2 * HOUR, now) { "t$it" })
+    }
+
     private companion object {
         const val HOUR = 3_600_000L
         const val NOTICE = "⚠ no answer from weather, markets — tap for why"

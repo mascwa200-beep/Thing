@@ -215,6 +215,29 @@ object WidgetDiagnostics {
     }
 
     /**
+     * How old a kept location may be before the widget says so. See [placeNote].
+     *
+     * Six hours, the same as the slower feeds above: long enough that an ordinary morning away from
+     * LCARS draws no note, short enough that yesterday's place is always named.
+     */
+    const val PLACE_NOTE_AFTER_MS = 6 * 60 * 60_000L
+
+    /**
+     * "PLACE FROM 9:12 AM" when the location under the weather, air, water, safety and sky lines is a
+     * kept fix older than [PLACE_NOTE_AFTER_MS], or "" otherwise.
+     *
+     * ⚠️ The widget renders in the background, where the platform refuses it any live fix, so those
+     * lines are usually drawn for the place LCARS last saw. Within a few hours that is simply here; past
+     * that it is a claim about where the phone WAS, and a weather line that does not say so passes it
+     * off as where the phone is. [recordedAtMs] null means a saved place or a live fix — nothing to
+     * confess. A time in the future is a clock that moved, not an old place.
+     */
+    fun placeNote(recordedAtMs: Long?, nowMs: Long, time: (Long) -> String): String {
+        val at = recordedAtMs ?: return ""
+        return if (nowMs - at > PLACE_NOTE_AFTER_MS) "PLACE FROM ${time(at)}" else ""
+    }
+
+    /**
      * The rows a widget with [cap] slots should actually draw, with [notice] — the [degradedLine]
      * row — guaranteed one of them.
      *

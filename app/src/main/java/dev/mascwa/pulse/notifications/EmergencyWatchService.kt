@@ -116,13 +116,24 @@ class EmergencyWatchService : Service() {
             stopSelf()
             return
         }
-        val loc = container.locationProvider.current()
-        if (loc == null) {
+        // ⚠️ The live read answers nothing in the background — the app holds foreground-only
+        // location and this service carries no `location` type — so on its own it left the watch on
+        // NEEDS_LOCATION for as long as the phone was not in someone's hand, which is exactly when a
+        // warning is most likely to go unseen. The fix LCARS last took stands in within a day: an
+        // official warning is issued for an area, and "where the phone was this morning" is almost
+        // always inside it. The ongoing line says which one is in use.
+        val live = container.locationProvider.current()
+        val kept = if (live == null) {
+            container.locationProvider.recorded()?.takeIf { it.usableAt(System.currentTimeMillis()) }
+        } else null
+        val lat = live?.latitude ?: kept?.latitude
+        val lon = live?.longitude ?: kept?.longitude
+        if (lat == null || lon == null) {
             updateOngoing(NEEDS_LOCATION)
             return
         }
-        updateOngoing(WATCHING)
-        val alerts = container.emergencyAlertRepository.active(loc.latitude, loc.longitude)
+        updateOngoing(if (live != null) WATCHING else WATCHING_KEPT)
+        val alerts = container.emergencyAlertRepository.active(lat, lon)
         if (alerts.isEmpty()) return
 
         val now = System.currentTimeMillis()
@@ -219,8 +230,10 @@ class EmergencyWatchService : Service() {
         private const val POLL_MS = 60_000L
 
         private const val WATCHING = "Watching for official alerts in your area."
+        private const val WATCHING_KEPT =
+            "Watching for official alerts where LCARS last saw you — open it to update."
         private const val NEEDS_LOCATION =
-            "Needs location access — without a position there is no area to check."
+            "Needs a location — open LCARS once, with location allowed, so there is an area to check."
 
         /** Start it if the user has it on. Safe to call repeatedly — a running loop is not stacked. */
         fun start(context: Context) {

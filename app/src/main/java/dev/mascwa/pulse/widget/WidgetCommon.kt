@@ -103,8 +103,19 @@ fun widgetAccentRes(): Int =
  */
 fun signedPercent(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)
 
-/** Where the widget believes it is. */
-data class WidgetPlace(val latitude: Double, val longitude: Double, val name: String)
+/**
+ * Where the widget believes it is.
+ *
+ * [recordedAtMs] is non-null exactly when this is a [RecordedFix] standing in for a live one — the
+ * moment that fix was TAKEN — so the caller can say how old "here" is rather than let weather at
+ * this morning's place pass for weather where the phone is now.
+ */
+data class WidgetPlace(
+    val latitude: Double,
+    val longitude: Double,
+    val name: String,
+    val recordedAtMs: Long? = null,
+)
 
 /**
  * The one answer to "where are we", for every feed that needs a coordinate.
@@ -164,8 +175,17 @@ suspend fun widgetPlaceLookup(
     if (!hasLocationPermission()) return PlaceLookup(null, "location permission not granted")
     if (!isLocationOn()) return PlaceLookup(null, "turn on the phone's Location")
     val here = c.locationProvider.current()
+    if (here != null) return PlaceLookup(WidgetPlace(here.latitude, here.longitude, here.name), null)
+    // ⚠️ The live read above answers nothing whenever this runs in the BACKGROUND, which is nearly
+    // always: the app holds foreground-only location, so the platform refuses a widget render every
+    // fix it asks for. The fix LCARS last took stands in for it, within a day — see [RecordedFix].
+    // This is also what makes "open LCARS once" true: before it, nothing kept that fix.
+    val kept = c.locationProvider.recorded()
         ?: return PlaceLookup(null, "no location fix yet — open LCARS once")
-    return PlaceLookup(WidgetPlace(here.latitude, here.longitude, here.name), null)
+    if (!kept.usableAt(System.currentTimeMillis())) {
+        return PlaceLookup(null, "last location over a day old — open LCARS")
+    }
+    return PlaceLookup(WidgetPlace(kept.latitude, kept.longitude, kept.name, recordedAtMs = kept.atMs), null)
 }
 
 /**

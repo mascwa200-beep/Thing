@@ -1015,9 +1015,21 @@ class LockWidgetProvider : AppWidgetProvider() {
         // drew nothing has no age to confess to.
         val today = Agenda.localDay(nowMs, offsetAt)
         val dayName = SimpleDateFormat("EEE", Locale.getDefault())
-        val staleNote = WidgetDiagnostics.staleNote(dataAt.filterKeys { outcomes[it] == Outcome.Ok }, nowMs) { ms ->
+        val whenLabel: (Long) -> String = { ms ->
             if (Agenda.localDay(ms, offsetAt) == today) clock.format(Date(ms)) else dayName.format(Date(ms)).uppercase()
-        }.takeIf { it.isNotBlank() }
+        }
+        val feedNote = WidgetDiagnostics.staleNote(dataAt.filterKeys { outcomes[it] == Outcome.Ok }, nowMs, whenLabel)
+        // Only when something was actually drawn at that place: a kept fix under four feeds that all
+        // went quiet has no line to qualify.
+        val placeNote = WidgetDiagnostics.placeNote(
+            place?.recordedAtMs?.takeIf { PLACE_SOURCES.any { src -> outcomes[src] == Outcome.Ok } },
+            nowMs,
+            whenLabel,
+        )
+        // One slot for both, joined, so neither pushes the stamp beside it any further along a
+        // one-line subhead than the old note alone did.
+        val staleNote = listOf(feedNote, placeNote).filter { it.isNotBlank() }.joinToString(" · ")
+            .takeIf { it.isNotBlank() }
         val sysLine = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
