@@ -43,7 +43,9 @@ import kotlin.math.roundToInt
  * ⚠️ **This activity is not a Home by itself.** The HOME intent filter lives on an `activity-alias`
  * declared DISABLED in the manifest, so a phone that has not switched the home screen on never even
  * sees LCARS offered as a launcher, and switching it off removes it completely rather than leaving a
- * second Home to be chosen by accident. The alias is enabled from Settings.
+ * second Home to be chosen by accident. As device owner the alias is switched on ONCE by default
+ * ([HomeSwitch.applyDefaultOnce], on the first start of a build carrying it); after that the Settings
+ * switch is the only thing that changes it.
  *
  * ## What it draws
  *

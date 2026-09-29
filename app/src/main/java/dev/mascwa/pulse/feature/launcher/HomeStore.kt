@@ -74,12 +74,26 @@ class HomeStore(context: Context) {
         prefs.edit().remove(KEY_PENDING).remove(KEY_FAILURES).remove(KEY_STOOD_DOWN).commit()
     }
 
+    // ── the one-time default ────────────────────────────────────────────────────────────────────
+
+    /** Whether LCARS has already been made the Home by default once — see [HomeDefaultPolicy]. */
+    fun defaultApplied(): Boolean = prefs.getBoolean(KEY_DEFAULT_APPLIED, false)
+
+    /**
+     * Written with commit() for the same reason as the guard. If the record were lost, a later start
+     * would apply the default again over a Home somebody had deliberately switched off.
+     */
+    fun recordDefaultApplied() {
+        prefs.edit().putBoolean(KEY_DEFAULT_APPLIED, true).commit()
+    }
+
     private companion object {
         const val FILE = "lcars_home"
         const val KEY_PINS = "pins"
         const val KEY_PENDING = "guard_pending"
         const val KEY_FAILURES = "guard_failures"
         const val KEY_STOOD_DOWN = "guard_stood_down"
+        const val KEY_DEFAULT_APPLIED = "default_applied"
         const val NONE = -1L
 
         /** A key is a component name, a `#` and a number, so it can never contain a line break. */

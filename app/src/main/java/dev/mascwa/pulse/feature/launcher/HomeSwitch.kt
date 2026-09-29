@@ -79,6 +79,35 @@ object HomeSwitch {
         return if (setAlias(context, PackageManager.COMPONENT_ENABLED_STATE_DEFAULT)) Result.OFF else Result.FAILED
     }
 
+    /**
+     * Make LCARS the Home by default, once. Returns null when [HomeDefaultPolicy] says this start
+     * should not do it, and otherwise the outcome of the single attempt.
+     *
+     * ⚠️ **One attempt, recorded whatever it did.** A default that retried on every start would sooner
+     * or later override somebody's deliberate "off". A failure is not left half-done, either. If the
+     * alias came on but Android would not make it THE Home, the alias goes back off, because a
+     * half-applied default is precisely the unasked "which Home?" chooser the device-owner condition
+     * exists to prevent. The Settings switch remains the way to try again.
+     *
+     * Blocking — it writes with commit() and talks to the package manager — so call it off the main
+     * thread.
+     */
+    fun applyDefaultOnce(context: Context): Result? {
+        val store = HomeStore(context)
+        val applies = runCatching {
+            HomeDefaultPolicy.shouldApply(
+                applied = store.defaultApplied(),
+                deviceOwner = DevicePolicyController.isDeviceOwner(context),
+                stoodDownAtMs = store.standDownAtMs(),
+            )
+        }.getOrDefault(false)
+        if (!applies) return null
+        val result = runCatching { turnOn(context) }.getOrDefault(Result.FAILED)
+        if (result != Result.DEFAULT_SET) runCatching { turnOff(context) }
+        runCatching { store.recordDefaultApplied() }
+        return result
+    }
+
     /** The guard's way out: hand Home back and say when, so Settings can explain it. */
     fun standDown(context: Context, nowMs: Long) {
         turnOff(context)
