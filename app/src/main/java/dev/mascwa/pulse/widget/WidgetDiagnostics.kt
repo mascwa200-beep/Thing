@@ -179,6 +179,42 @@ object WidgetDiagnostics {
     private const val MAX_NEEDS = 3
 
     /**
+     * How old a feed's data may be before the widget names it beside its UPDATED stamp.
+     *
+     * ⚠️ The stamp is when the board was REDRAWN, and a redraw does not mean fresh data: every feed is
+     * read with `force = false`, and when the network fails a repository hands back whatever it last
+     * saved, however old — yesterday's quotes stamped "UPDATED 14:05". `Fetched` has always carried
+     * when its data was saved; the widget kept only `.data` and threw that away.
+     *
+     * Only feeds whose value is about NOW are listed. Fuel prices are weekly and the economy series
+     * annual — a day-old copy of either is simply what those feeds are, and naming it would teach the
+     * reader to ignore the note. An hour for a quote, because markets move by the minute and any TTL
+     * hit is far younger than that; six hours for the rest, which update a few times a day.
+     */
+    val STALE_AFTER_MS: Map<Source, Long> = mapOf(
+        Source.MARKETS to 60 * 60_000L,
+        Source.NEWS to 6 * 60 * 60_000L,
+        Source.SPACE to 6 * 60 * 60_000L,
+        Source.SAFETY to 6 * 60 * 60_000L,
+    )
+
+    /**
+     * "MARKETS FROM 9:12 AM", naming the oldest feed older than its limit, or "" when none is.
+     *
+     * [dataAt] is when each drawn feed's data was saved; [time] renders an instant the way the reader
+     * expects (a clock time today, a day name before that). One feed is named and the rest counted,
+     * because this rides a one-line subhead. A time in the future — a clock that moved — is not stale.
+     */
+    fun staleNote(dataAt: Map<Source, Long>, nowMs: Long, time: (Long) -> String): String {
+        val stale = dataAt.entries
+            .filter { (src, at) -> STALE_AFTER_MS[src]?.let { limit -> nowMs - at > limit } == true }
+            .sortedBy { it.value }
+        val oldest = stale.firstOrNull() ?: return ""
+        val more = if (stale.size > 1) " +${stale.size - 1}" else ""
+        return "${oldest.key.label.uppercase()} FROM ${time(oldest.value)}$more"
+    }
+
+    /**
      * The rows a widget with [cap] slots should actually draw, with [notice] — the [degradedLine]
      * row — guaranteed one of them.
      *

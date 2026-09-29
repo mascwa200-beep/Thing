@@ -15185,6 +15185,7 @@ for approval.
 | `2b2e15a` | review fix: a calendar that fails is not a clear fortnight |
 | `5ea51fb` | **A3**: redraws on calendar change (content-URI worker) and at event starts, ends and midnight (RTC alarm) |
 | `c8af435` | **A4**: every region answers a tap; UPDATED stamp; OFFLINE AT REFRESH; NEEDS YOU |
+| next | second review fix: data older than the stamp is named; a slow or switched-off location says so |
 
 **`Agenda.kt` lives in `:app`, not `:core:telemetry`, on purpose.** A core change fires four
 workflows and republishes three apps for a class none of them can call. Its test runs under
@@ -15241,6 +15242,24 @@ workflows and republishes three apps for a class none of them can call. Its test
   with no place and was recorded as Empty.
 - **UPDATED sits before the stardate** in the one-line subhead, so an ellipsis cuts the decoration and
   not the fact.
+- ⚠️ **The second review confirmed all three of its findings, and they were all honesty defects in
+  the honesty slice itself.**
+  1. **UPDATED is the time of the redraw, not of the data.** Every feed is read with `force = false`,
+     and on a network failure a repository returns its last save however old, so yesterday's quotes
+     were stamped "UPDATED 14:05". `Fetched.timestampEpochMs` had always carried the save time, and the
+     widget kept only `.data`. `WidgetDiagnostics.staleNote` now names the oldest time-sensitive feed
+     past its limit beside the stamp, e.g. "MARKETS FROM 9:12 AM". The limits are markets 1 h, and
+     news, space and safety 6 h. Fuel and economy are deliberately untracked, because a day-old copy
+     of a weekly or annual series is simply what it is.
+  2. **A slow location fix was reported as four feeds giving no answer.** The lookup budget is 4 s and
+     the provider's own fix wait is 8 s, so indoors or GPS-only the budget ran out on ordinary
+     refreshes, and I had recorded that as TimedOut. None of those feeds was asked, so none may be
+     reported as failing. It is now `Skipped("location too slow — add a saved place", fixable)`, and a
+     lookup that threw is a non-fixable skip with its reason.
+  3. **With the system Location switch off, NEEDS YOU said "open LCARS once"**, the wrong remedy,
+     since LCARS asks the same provider. The switch is now checked first and named.
+     ⚠️ `widgetPlaceLookup`'s two lambdas are passed by name: with two trailing function
+     parameters, a bare trailing lambda binds to the LAST one.
 
 #### Verification (all local and free, then CI)
 

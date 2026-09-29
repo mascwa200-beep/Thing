@@ -7,6 +7,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
@@ -492,9 +493,10 @@ class LockWidgetProvider : AppWidgetProvider() {
             if (s?.use24HourClock != false) "HH:mm" else "h:mm a",
             Locale.getDefault(),
         )
-        // ⚠️ When this reading was taken. A widget is a picture, and the ticking clock beside it made
-        // every line read as live — a stale market or an "OFFLINE" from a phone that was dozing looked
-        // exactly like a fresh one. The stamp is what tells the two apart.
+        // ⚠️ When the board was last REDRAWN. A widget is a picture, and the ticking clock beside it
+        // made every line read as live, so a widget nothing had redrawn for hours looked current. This
+        // stamp answers exactly that and no more: a redraw can still serve old cached data when the
+        // network fails, and saying so is `staleNote`'s job, drawn beside it.
         val updated = "UPDATED ${clock.format(Date())}"
         // The board says where you are and what it is like there; the stardate drops to the line
         // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
@@ -536,19 +538,42 @@ class LockWidgetProvider : AppWidgetProvider() {
         // that had not taken a fix since it slept — three different things to do, one sentence. And
         // WEATHER was not in the list at all: it ran with no place, returned null and was recorded
         // as Empty, "nothing to report", which is not what a widget with no idea where it is knows.
-        val placeLookup = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) {
+        // Null here means the budget ran out; a failed Result means the lookup threw. They are kept
+        // apart below because they are different sentences.
+        val placeAttempt = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) {
             runCatching {
-                widgetPlaceLookup(c, s) {
-                    context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                }
-            }.getOrNull()
+                widgetPlaceLookup(
+                    c, s,
+                    hasLocationPermission = {
+                        context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    },
+                    isLocationOn = {
+                        context.getSystemService(LocationManager::class.java)?.isLocationEnabled != false
+                    },
+                )
+            }
         }
+        val placeLookup = placeAttempt?.getOrNull()
         val place = placeLookup?.place
         if (place == null) {
-            // A lookup that never finished is a failure of ours, not something the owner can fix,
-            // so it is TimedOut and lands in the degraded line rather than in NEEDS YOU.
-            val outcome = placeLookup?.why?.let { Outcome.Skipped(it, fixable = true) } ?: Outcome.TimedOut
+            // ⚠️ None of these four feeds was ASKED, so none of them may be reported as having failed
+            // to answer — which is what TimedOut would say, in the degraded line, as "no answer from
+            // weather, safety, sky +1". The review caught exactly that: this budget is four seconds
+            // and the location provider's own fix wait is eight, so indoors or GPS-only it runs out
+            // on ordinary refreshes. What the owner can do about a slow fix is keep a saved place,
+            // which always answers at once — so that is the sentence, and it is fixable.
+            val outcome = when {
+                placeAttempt == null ->
+                    Outcome.Skipped("location too slow — add a saved place", fixable = true)
+                placeLookup == null ->
+                    // Threw: ours, not the owner's. Kept for the crash console, out of NEEDS YOU.
+                    Outcome.Skipped(
+                        "location lookup failed: " +
+                            WidgetDiagnostics.describe(placeAttempt.exceptionOrNull() ?: IllegalStateException("no result")),
+                    )
+                else -> Outcome.Skipped(placeLookup.why ?: "no location", fixable = true)
+            }
             for (src in PLACE_SOURCES) outcomes[src] = outcome
         }
 
@@ -581,6 +606,9 @@ class LockWidgetProvider : AppWidgetProvider() {
         var fuelLines: List<String> = emptyList()
         var dataLine: String? = null
         var commsLines: List<String> = emptyList()
+        // When each time-sensitive feed's data was SAVED — see `staleNote`. Written from several
+        // coroutines at once.
+        val dataAt = java.util.concurrent.ConcurrentHashMap<Source, Long>()
         var agendaEvents: List<Agenda.Event> = emptyList()
         var agendaPlan: Agenda.Plan? = null
         var econLines: List<String> = emptyList()
@@ -641,7 +669,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 val markets = async {
                     widgetSource<Mkt>(Source.MARKETS, outcomes) {
-                        val quotes = c.marketsRepository.fetchWatchlist(force = false).data
+                        val fetched = c.marketsRepository.fetchWatchlist(force = false)
+                        dataAt[Source.MARKETS] = fetched.timestampEpochMs
+                        val quotes = fetched.data
                             .orEmpty().filter { it.changePercent != null }
                         if (quotes.isEmpty()) return@widgetSource null
                         val mover = quotes.maxByOrNull { abs(it.changePercent ?: 0.0) }
@@ -675,8 +705,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // `news.search()`.
                 val news = async {
                     widgetSource<List<String>>(Source.NEWS, outcomes) {
-                        val articles = c.newsRepository
-                            .fetchCategory(NewsCategory.TOP, force = false).data.orEmpty()
+                        val fetched = c.newsRepository.fetchCategory(NewsCategory.TOP, force = false)
+                        dataAt[Source.NEWS] = fetched.timestampEpochMs
+                        val articles = fetched.data.orEmpty()
                         BreakingNews.perOutlet(
                             articles,
                             outlet = { it.source },
@@ -698,8 +729,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 val space = async {
                     widgetSource<String>(Source.SPACE, outcomes) {
-                        c.spaceWeatherRepository.fetch(force = false, heavy = false).data?.kp
-                            ?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }
+                        val fetched = c.spaceWeatherRepository.fetch(force = false, heavy = false)
+                        dataAt[Source.SPACE] = fetched.timestampEpochMs
+                        fetched.data?.kp?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }
                     }
                 }
                 val fuel = async {
@@ -752,8 +784,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // what someone does in the next hour.
                 val safety = async {
                     if (place == null) null else widgetSource<String>(Source.SAFETY, outcomes) {
-                        val near = c.safetyRepository.fetch(place.latitude, place.longitude, force = false)
-                            .data?.incidents.orEmpty()
+                        val fetched = c.safetyRepository.fetch(place.latitude, place.longitude, force = false)
+                        dataAt[Source.SAFETY] = fetched.timestampEpochMs
+                        val near = fetched.data?.incidents.orEmpty()
                             .filter { it.distanceMeters <= SAFETY_RADIUS_M }
                             .minByOrNull { it.distanceMeters }
                             ?: return@widgetSource null
@@ -977,10 +1010,19 @@ class LockWidgetProvider : AppWidgetProvider() {
             }
         }
 
+        // ⚠️ The stamp says when the board was REDRAWN; this says when any time-sensitive data on it
+        // was actually saved, when that is old. Only feeds that drew something count — a feed that
+        // drew nothing has no age to confess to.
+        val today = Agenda.localDay(nowMs, offsetAt)
+        val dayName = SimpleDateFormat("EEE", Locale.getDefault())
+        val staleNote = WidgetDiagnostics.staleNote(dataAt.filterKeys { outcomes[it] == Outcome.Ok }, nowMs) { ms ->
+            if (Agenda.localDay(ms, offsetAt) == today) clock.format(Date(ms)) else dayName.format(Date(ms)).uppercase()
+        }.takeIf { it.isNotBlank() }
         val sysLine = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
-            "SYS  PWR $batt$chg  ·  ${networkAtRefresh(it.network)}  ·  $updated"
+            listOfNotNull("SYS  PWR $batt$chg", networkAtRefresh(it.network), updated, staleNote)
+                .joinToString("  ·  ")
         }
         sysLine?.let { rows += Row(it, Role.FOOTNOTE) }
 
@@ -1036,7 +1078,10 @@ class LockWidgetProvider : AppWidgetProvider() {
             // can flip, and consulted by nobody. Following the DEVICE setting here instead would
             // have been the easy call and would have left it dead.
             clock24 = s?.use24HourClock ?: true,
-            subhead = boardSubhead,
+            // The stale note sits beside the stamp it qualifies, and ahead of the stardate for the
+            // same reason the stamp does: when the line ellipsizes, the decoration goes first.
+            subhead = listOfNotNull(greeting, updated, staleNote, stardate)
+                .filter { it.isNotBlank() }.joinToString(" · "),
             upNext = upNext?.let { Agenda.upNextLine(it, agendaPlan?.today ?: it.day, agendaFormat) },
             upNextArgb = upNext?.takeIf { it.state == Agenda.State.NOW }
                 ?.let { ContextCompat.getColor(context, widgetAccentRes()) },
