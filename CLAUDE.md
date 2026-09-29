@@ -15148,3 +15148,127 @@ readings run 04:07 → 04:51 → 05:03 → 12:50 with nothing between, and the g
 was posed, and the stamp came from the reading taken before asking. I first recorded the
 discrepancy as "unexplained"; it was my own stale reading. **Re-read the clock after any call that
 blocks on the owner, and prefer the event's own timestamp when one exists.**
+
+### THE WIDGET GETS A REAL CALENDAR, AND EVERY PART OF IT ANSWERS A TAP (this session, PR #476)
+
+Owner, with a screenshot of the widget on the Pixel: *"Make the whole widget more comprehensive,
+better calendar access, better everything (mostly cause calendar, but everything else too.)"* Then:
+*"Use ultracode wo/ blowing the usage."* The four binding answers from AskUserQuestion:
+
+- **Horizon:** 14 days.
+- **Agenda form:** a scrollable list filling the empty height, where tapping an event opens it.
+- **Everything else:** "everything tappable + honesty".
+- **Timing:** an exact, non-waking alarm, plus a refresh when the calendar changes.
+
+Ultracode was spent on exactly **two bounded review workflows** (six agents each: three finder
+lenses, and one refuting skeptic per surviving finding). Everything else was written inline, with no
+exploration agents.
+
+#### ⚠️ A1 AND A2 WERE LOST ONCE. Nothing verified sits unpushed.
+
+Both slices were built, verified and committed, then **never pushed**. The session sat on an
+unanswered Workflow approval prompt, and the container was reclaimed. They were rebuilt from
+fragments of the compacted transcript: the tail of `Agenda.kt`, the head of the test, the negative-test
+harness, and most of the board and provider diffs. Nothing survived of the repository, the intents,
+the trampoline, the item layouts or the manifest.
+
+**Rule: push each slice as soon as it is verified, and never call anything that can wait on the owner
+while verified work exists only locally.** A Workflow call is exactly such a call, because it prompts
+for approval.
+
+#### What shipped
+
+| commit | slice |
+|---|---|
+| `854d1c9` | **A1**: `CalendarRepository.agenda`, the pure `widget/Agenda.kt` planner and 23 tests |
+| `f71d326` | **A2**: a fortnight fills the full board as a `RemoteCollectionItems` list, and every event opens |
+| `2b2e15a` | review fix: a calendar that fails is not a clear fortnight |
+| `5ea51fb` | **A3**: redraws on calendar change (content-URI worker) and at event starts, ends and midnight (RTC alarm) |
+| `c8af435` | **A4**: every region answers a tap; UPDATED stamp; OFFLINE AT REFRESH; NEEDS YOU |
+
+**`Agenda.kt` lives in `:app`, not `:core:telemetry`, on purpose.** A core change fires four
+workflows and republishes three apps for a class none of them can call. Its test runs under
+`:app:testDebugUnitTest`, following the `WidgetDiagnostics` precedent.
+
+#### The decisions worth keeping
+
+- ⚠️ **All-day instances are keyed on the UTC date of BEGIN.** The provider stores them as UTC
+  midnights, so keying them on the local date puts every all-day event on the day before for the owner
+  (UTC−4). Timed events are keyed on the local date with `Math.floorDiv`. Day labels are formatted
+  from the epoch day's UTC midnight **in UTC**, or the same trap returns at the last step.
+- ⚠️ **`startOfLocalDay` had a real defect, found by a negative test coming back asleep.** Swept over
+  every zone for 2025–2027 (545,310 zone-days), the shipped rule was wrong 9 times.
+  - Offset-at-refined alone fails where the clock springs forward AT midnight (Havana, Santiago).
+  - Offset-at-guess alone fails in Auckland, Sydney, Santiago and Beirut on change days.
+  - The rule now takes the earliest candidate that actually falls on the day: 0 wrong.
+- **Calendar selection** is `VISIBLE = 1 AND (SELF_ATTENDEE_STATUS IS NULL OR != DECLINED)`, and is
+  null-safe on purpose, because SQL `NULL != 2` is NULL. This changes every caller of `upcoming()` too.
+- ⚠️ **A list row needs a MUTABLE template, and Android 14+ refuses a mutable PendingIntent carrying
+  an implicit intent.** Rows therefore go through `CalendarEventActivity`: explicit, invisible, and
+  accepting only `com.android.calendar` URIs.
+- **Render retry ladder before the fault card.** The render tries the full list, then the list cut to
+  24 rows, then no list. The agenda is the one region whose size depends on the diary, against a hard
+  binder ceiling. The review argued this hides faults and was **refuted**: a non-size fault recurs on
+  the last rung and still reaches the fault card.
+- ⚠️ **`agenda()` throws where `upcoming()` answers empty.** The first review confirmed that `query`
+  swallowed every provider exception, so *"Could not read the calendar"* was unreachable and a
+  provider error drew *"Nothing in the next 14 days"*. A null cursor, or one that dies part-way, is
+  now a failure rather than a shorter diary. The other callers keep the empty answer deliberately:
+  in them the calendar is only ever an aside.
+- **Boundary alarm.** `WidgetBoundaryAlarm` arms one alarm at `Agenda.nextBoundaryMs`, computed from
+  the same events and instant the render drew.
+  - It is **RTC, never RTC_WAKEUP**: a sleeping phone's home screen is not being read.
+  - `setExact` is used when `canScheduleExactAlarms()` allows it (`USE_EXACT_ALARM` is granted at
+    install from API 33); otherwise a ten-minute `setWindow`.
+  - The first review confirmed `nextBoundaryMs` had no caller while a comment claimed the alarm existed.
+- ⚠️ **A content-URI trigger fires once.** `CalendarChangeWorker` re-arms itself with
+  `APPEND_OR_REPLACE`, which queues the successor behind the running work.
+  - **`KEEP` there would keep the very run in progress** and leave nothing behind it.
+  - `REPLACE` would cancel the run doing the work.
+  - It is armed only while a widget is placed and the calendar is readable.
+- **Request codes.** `Intent.filterEquals` ignores the route extra, so each slot whose route differs
+  gets its own request code.
+  - The board now fills 100..119, and `CalendarIntents` starts at 120. There is no room to grow in
+    between: a fifth readout slot or a fourth pair means renumbering, not extending.
+  - The alarm uses 130. It is a broadcast, so its type alone keeps it apart from the activity codes.
+- **NEEDS YOU** lists only `Skipped(…, fixable = true)` causes, deduplicated by the fix, because four
+  feeds without a location are one thing to do.
+  - `fixable` defaults to false, so a future skip nobody can fix must opt in rather than nag.
+  - A place lookup that never finished counts as **TimedOut**, so it shows in the degraded line
+    instead.
+- **`widgetPlaceLookup` is `widgetPlace` with the reason** rather than a second copy of the rule. The
+  single *"no saved location"* becomes three things to do. WEATHER was never in the skip list: it ran
+  with no place and was recorded as Empty.
+- **UPDATED sits before the stardate** in the one-line subhead, so an ellipsis cuts the decoration and
+  not the fact.
+
+#### Verification (all local and free, then CI)
+
+- `AgendaTest` 23 tests, with every rule negative-tested (18 cases, all awake).
+- `WidgetDiagnosticsTest` 18/18, including the four NEEDS YOU rules, each negative-tested.
+- `WidgetLinkageTest` 8/8.
+- The following compile clean against the real platform classes, `androidx.core:core:1.15.0` and
+  `work-runtime:2.10.0`: `WidgetBoard`, `CalendarIntents`, `CalendarEventActivity`, `WidgetRefresh`,
+  `CalendarChangeWorker` and `CalendarRepository`. The gate was negative-tested with a planted typo.
+- Stubs were derived from the real declarations. The `Routes` stub is now **extracted by
+  brace-matching** from `Destinations.kt`, not hand-written.
+- Typed probes compiled the provider's new expressions against the real types. The resolve gate's
+  complaints were its documented cascade: no Android jar on that classpath, and new files with no
+  baseline.
+- ⚠️ **Tooling fixed on a fresh container.**
+  - Three scripts had no fallback for the coroutines jar. On an empty Gradle cache the compiler died
+    before reading a line.
+  - `check_changed.sh` now reports a gate that did not run as a **FAIL**, not "gates clean".
+
+⚠️ **Owner-verify on the Pixel.** CI compiles a widget but never draws one.
+
+1. Resize to full height: the agenda should fill the bottom and scroll.
+2. Tap an event: it should open. `+ ADD` should create one.
+3. Add an event in the calendar app: it should appear within about a minute.
+4. NOW should flip at the start time with the screen on.
+5. An all-day event should land on its own day.
+6. Tap every region: each should open its screen, and "tap for why" should open the crash console.
+7. With location off and no saved place, NEEDS YOU should say so instead of the weather silently vanishing.
+
+**Open:** the weather/advisory location root cause itself (NEEDS YOU names it; it was out of scope).
+The forecast column, sun times and ECONOMY formatting were offered and not chosen.
