@@ -186,7 +186,116 @@ class WidgetDiagnosticsTest {
         assertEquals("labels must be unique or a report is ambiguous", Source.entries.size, Source.entries.map { it.label }.toSet().size)
     }
 
+    // ── NEEDS YOU ──────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `needs you names what the owner can fix, once per fix`() {
+        // Four feeds skipped for one missing location are ONE thing to do, not four.
+        val location = "add a place, or turn on device location"
+        val outcomes = linkedMapOf<Source, Outcome>(
+            Source.WEATHER to Outcome.Skipped(location, fixable = true),
+            Source.SAFETY to Outcome.Skipped(location, fixable = true),
+            Source.SKY to Outcome.Skipped(location, fixable = true),
+            Source.WATER to Outcome.Skipped(location, fixable = true),
+            Source.CALENDAR to Outcome.Skipped("calendar permission not granted", fixable = true),
+        )
+        assertEquals(
+            "NEEDS YOU · $location · calendar permission not granted",
+            WidgetDiagnostics.needsYouLine(outcomes),
+        )
+    }
+
+    @Test
+    fun `a skip nobody can fix never tells anybody to fix it`() {
+        // A US-only feed abroad is not a thing to go and repair. Defaulted to not fixable, so a new
+        // kind of skip has to opt in rather than nag by accident.
+        val outcomes = mapOf<Source, Outcome>(Source.FUEL to Outcome.Skipped("US only"))
+        assertEquals("", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
+    @Test
+    fun `a failed feed belongs to the degraded line, not to needs you`() {
+        val outcomes = mapOf(
+            Source.NEWS to Outcome.Failed("boom"),
+            Source.MARKETS to Outcome.TimedOut,
+            Source.TASKS to Outcome.Empty,
+            Source.STUDY to Outcome.Ok,
+        )
+        assertEquals("", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
+    @Test
+    fun `needs you counts the causes it has no room to name`() {
+        val outcomes = linkedMapOf<Source, Outcome>(
+            Source.WEATHER to Outcome.Skipped("one", fixable = true),
+            Source.CALENDAR to Outcome.Skipped("two", fixable = true),
+            Source.DATA to Outcome.Skipped("three", fixable = true),
+            Source.COMMS to Outcome.Skipped("four", fixable = true),
+            Source.SKY to Outcome.Skipped("five", fixable = true),
+        )
+        assertEquals("NEEDS YOU · one · two · three +2", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
+    // ── the stamp's honesty: data older than the redraw ────────────────────────────────────────
+
+    @Test
+    fun `a feed served from an old cache is named beside the stamp`() {
+        // The shipped defect: an offline redraw at 14:05 over yesterday's quotes read "UPDATED 14:05".
+        val now = 14 * HOUR
+        val dataAt = mapOf(Source.MARKETS to now - 5 * HOUR, Source.NEWS to now - 10 * 60_000L)
+        assertEquals("MARKETS FROM t${now - 5 * HOUR}", WidgetDiagnostics.staleNote(dataAt, now) { "t$it" })
+    }
+
+    @Test
+    fun `fresh data and slow-moving feeds say nothing`() {
+        val now = 14 * HOUR
+        val dataAt = mapOf(
+            Source.MARKETS to now - 10 * 60_000L,
+            // A day-old fuel or economy reading is what those feeds are, not a failure.
+            Source.FUEL to now - 30 * HOUR,
+            Source.ECONOMY to now - 300 * HOUR,
+        )
+        assertEquals("", WidgetDiagnostics.staleNote(dataAt, now) { "t$it" })
+    }
+
+    @Test
+    fun `the oldest stale feed is named and the rest counted`() {
+        val now = 40 * HOUR
+        val dataAt = mapOf(
+            Source.NEWS to now - 7 * HOUR,
+            Source.MARKETS to now - 20 * HOUR,
+            Source.SPACE to now - 9 * HOUR,
+        )
+        assertEquals("MARKETS FROM x +2", WidgetDiagnostics.staleNote(dataAt, now) { "x" })
+    }
+
+    @Test
+    fun `a saved time in the future is not stale`() {
+        val now = 14 * HOUR
+        assertEquals("", WidgetDiagnostics.staleNote(mapOf(Source.MARKETS to now + 3 * HOUR), now) { "t$it" })
+    }
+
+    @Test
+    fun `a saved place or a live fix has no age to confess`() {
+        assertEquals("", WidgetDiagnostics.placeNote(null, 30 * HOUR) { "t$it" })
+    }
+
+    @Test
+    fun `a kept place is named once it is older than six hours, and not before`() {
+        val now = 30 * HOUR
+        assertEquals("", WidgetDiagnostics.placeNote(now - 6 * HOUR, now) { "t$it" })
+        val at = now - 6 * HOUR - 1
+        assertEquals("PLACE FROM t$at", WidgetDiagnostics.placeNote(at, now) { "t$it" })
+    }
+
+    @Test
+    fun `a kept place stamped in the future is not old`() {
+        val now = 30 * HOUR
+        assertEquals("", WidgetDiagnostics.placeNote(now + 2 * HOUR, now) { "t$it" })
+    }
+
     private companion object {
+        const val HOUR = 3_600_000L
         const val NOTICE = "⚠ no answer from weather, markets — tap for why"
     }
 }

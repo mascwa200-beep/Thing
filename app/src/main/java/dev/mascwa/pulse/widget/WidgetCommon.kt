@@ -103,8 +103,19 @@ fun widgetAccentRes(): Int =
  */
 fun signedPercent(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)
 
-/** Where the widget believes it is. */
-data class WidgetPlace(val latitude: Double, val longitude: Double, val name: String)
+/**
+ * Where the widget believes it is.
+ *
+ * [recordedAtMs] is non-null exactly when this is a [RecordedFix] standing in for a live one — the
+ * moment that fix was TAKEN — so the caller can say how old "here" is rather than let weather at
+ * this morning's place pass for weather where the phone is now.
+ */
+data class WidgetPlace(
+    val latitude: Double,
+    val longitude: Double,
+    val name: String,
+    val recordedAtMs: Long? = null,
+)
 
 /**
  * The one answer to "where are we", for every feed that needs a coordinate.
@@ -118,12 +129,63 @@ data class WidgetPlace(val latitude: Double, val longitude: Double, val name: St
  * time this rule existed in more than one place one of the copies had silently dropped its
  * `useDeviceLocation` branch — see the note at the top of this file.
  */
-suspend fun widgetPlace(c: AppContainer, s: AppSettings?): WidgetPlace? {
-    s ?: return null
+suspend fun widgetPlace(c: AppContainer, s: AppSettings?): WidgetPlace? =
+    widgetPlaceLookup(c, s).place
+
+/**
+ * A place, or the reason there is none — in words the owner can act on.
+ *
+ * [why] is null exactly when [place] is not.
+ */
+data class PlaceLookup(val place: WidgetPlace?, val why: String?)
+
+/**
+ * [widgetPlace], answering WHY when it cannot answer where.
+ *
+ * ⚠️ The same rule, not a second copy of it — [widgetPlace] is this with the reason thrown away. The
+ * reason is what the widget was missing: four feeds need a coordinate, and all four used to go quiet
+ * together with one line in the crash console saying "no saved location" even when the owner HAD
+ * turned on device location and the real cause was a permission, or a phone that had not taken a fix
+ * since it went to sleep. Those are three different things to do about it, so they are three
+ * different sentences.
+ *
+ * [hasLocationPermission] and [isLocationOn] are asked only to choose the sentence, never to decide
+ * the place — the provider already refuses without them, and the rule must not fork on the caller's
+ * context. Both default to true, which is exactly [widgetPlace]'s behaviour.
+ *
+ * ⚠️ The system Location switch is checked BEFORE asking for a fix. With it off, every path to a
+ * coordinate fails fast, and the only sentence left used to be "no location fix yet — open LCARS
+ * once": the wrong remedy, since LCARS asks the same provider and gets the same nothing. The switch
+ * is the fix, so the switch is what gets named.
+ *
+ * ⚠️ Pass both lambdas by NAME. With two trailing function parameters, a bare trailing lambda binds
+ * to the LAST one, so `widgetPlaceLookup(c, s) { permission }` would quietly be read as the Location
+ * switch.
+ */
+suspend fun widgetPlaceLookup(
+    c: AppContainer,
+    s: AppSettings?,
+    hasLocationPermission: () -> Boolean = { true },
+    isLocationOn: () -> Boolean = { true },
+): PlaceLookup {
+    s ?: return PlaceLookup(null, "settings could not be read")
     val saved = s.savedLocations.getOrNull(s.selectedLocationIndex) ?: s.savedLocations.firstOrNull()
-    if (saved != null) return WidgetPlace(saved.latitude, saved.longitude, saved.name)
-    if (!s.useDeviceLocation) return null
-    return c.locationProvider.current()?.let { WidgetPlace(it.latitude, it.longitude, it.name) }
+    if (saved != null) return PlaceLookup(WidgetPlace(saved.latitude, saved.longitude, saved.name), null)
+    if (!s.useDeviceLocation) return PlaceLookup(null, "add a place, or turn on device location")
+    if (!hasLocationPermission()) return PlaceLookup(null, "location permission not granted")
+    if (!isLocationOn()) return PlaceLookup(null, "turn on the phone's Location")
+    val here = c.locationProvider.current()
+    if (here != null) return PlaceLookup(WidgetPlace(here.latitude, here.longitude, here.name), null)
+    // ⚠️ The live read above answers nothing whenever this runs in the BACKGROUND, which is nearly
+    // always: the app holds foreground-only location, so the platform refuses a widget render every
+    // fix it asks for. The fix LCARS last took stands in for it, within a day — see [RecordedFix].
+    // This is also what makes "open LCARS once" true: before it, nothing kept that fix.
+    val kept = c.locationProvider.recorded()
+        ?: return PlaceLookup(null, "no location fix yet — open LCARS once")
+    if (!kept.usableAt(System.currentTimeMillis())) {
+        return PlaceLookup(null, "last location over a day old — open LCARS")
+    }
+    return PlaceLookup(WidgetPlace(kept.latitude, kept.longitude, kept.name, recordedAtMs = kept.atMs), null)
 }
 
 /**

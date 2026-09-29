@@ -21,6 +21,9 @@ import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.usage.FeatureCatalog
 import dev.mascwa.pulse.di.AppContainer
 import dev.mascwa.pulse.feature.weather.WeatherFormat
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 
 /**
@@ -32,19 +35,51 @@ import java.util.Calendar
 object OracleEngine {
 
     /** Snapshot every subsystem into the pure signal bundle the [Oracle] reasons over. */
-    suspend fun snapshot(container: AppContainer, settings: AppSettings): OracleSignals {
+    suspend fun snapshot(container: AppContainer, settings: AppSettings): OracleSignals = coroutineScope {
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance()
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         val minute = hour * 60 + cal.get(Calendar.MINUTE)
         val dow = ((cal.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 1 // 1=Mon..7=Sun
 
+        // ⚠️ The slow reads start TOGETHER. They were one after another, so this read cost the SUM of a
+        // location fix, a geocode per located event, the watchlist, the crypto list, space weather and
+        // the news — and the widget, which gives the advisory a fixed budget, reported "no answer from
+        // advisory" whenever that sum ran long. None of them depends on another (the weather waits on
+        // the location below, and only the weather), so the cost is now the slowest one alone.
+        // Every read keeps its own runCatching: one failing still mutes only its own rules.
+        //
+        // ⚠️ The located events are an ENRICHMENT — they add a distance to an event the calendar has
+        // already supplied — so they get a bound of their own rather than the power to hold the whole
+        // read up. A geocoder that is slow or absent costs "how far away", never the advisory.
+        val locatedD = async {
+            runCatching {
+                withTimeoutOrNull(LOCATED_EVENTS_BUDGET_MS) { container.calendarObjectives.upcoming(2) }
+            }.getOrNull().orEmpty()
+        }
+        val moversD = async {
+            runCatching {
+                container.marketsRepository.fetchAll(force = false).data
+                    .mapNotNull { q -> q.changePercent?.let { OracleMover(name = q.label, changePct = it, onWatchlist = true) } }
+            }.getOrDefault(emptyList())
+        }
+        val kpD = async {
+            runCatching { container.spaceWeatherRepository.fetch(force = false, heavy = false).data.kp }.getOrNull()
+        }
+        val emergencyD = async {
+            runCatching {
+                container.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data
+                    .maxByOrNull { EmergencyNews.severity(it.title, it.summary) }
+                    ?.takeIf { EmergencyNews.isMajor(it.title, it.summary) }?.title
+            }.getOrNull()
+        }
+
         val loc = runCatching { container.locationProvider.current() }.getOrNull()
 
         // Calendar: times from CalendarRepository, coordinates (when present) from the geocoded objectives.
         val events = runCatching {
             val timed = container.calendarRepository.upcoming(now)
-            val located = runCatching { container.calendarObjectives.upcoming(2) }.getOrDefault(emptyList())
+            val located = locatedD.await()
             val coordByEventId = located.associateBy {
                 it.id.removePrefix("cal_").substringBefore('_').toLongOrNull()
             }
@@ -86,18 +121,9 @@ object OracleEngine {
             .mapNotNull { it.temperatureC }
             .minOrNull()
 
-        val movers = runCatching {
-            container.marketsRepository.fetchAll(force = false).data
-                .mapNotNull { q -> q.changePercent?.let { OracleMover(name = q.label, changePct = it, onWatchlist = true) } }
-        }.getOrDefault(emptyList())
-
-        val kp = runCatching { container.spaceWeatherRepository.fetch(force = false, heavy = false).data.kp }.getOrNull()
-
-        val emergency = runCatching {
-            container.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data
-                .maxByOrNull { EmergencyNews.severity(it.title, it.summary) }
-                ?.takeIf { EmergencyNews.isMajor(it.title, it.summary) }?.title
-        }.getOrNull()
+        val movers = moversD.await()
+        val kp = kpD.await()
+        val emergency = emergencyD.await()
 
         val dc = runCatching { container.deviceContextProvider.snapshot() }.getOrNull()
         // ⚠️ Through the one accessor rather than a second `StatFs` of its own. The old copy also
@@ -166,7 +192,7 @@ object OracleEngine {
             container.studyStore.weakestGuide()
         }.getOrNull()
 
-        return OracleSignals(
+        OracleSignals(
             nowMs = now, hourOfDay = hour, minuteOfDay = minute, dayOfWeek = dow,
             lat = loc?.latitude, lon = loc?.longitude, placeName = loc?.name, speedMps = loc?.speedMps,
             movement = movement, awayFromHome = awayFromHome,
@@ -250,4 +276,10 @@ object OracleEngine {
      * hour of navigation cannot push the relevant visit off the end of the buffer.
      */
     private const val VISIT_LOOKBACK = 120
+
+    /**
+     * How long the located events may take. Well inside the widget's advisory budget, and long
+     * enough for a warm geocode cache — which is the ordinary case once a diary has been read once.
+     */
+    private const val LOCATED_EVENTS_BUDGET_MS = 1_500L
 }

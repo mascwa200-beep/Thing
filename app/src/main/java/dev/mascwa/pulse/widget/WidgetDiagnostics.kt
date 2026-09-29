@@ -74,8 +74,15 @@ object WidgetDiagnostics {
         /** Did not finish inside its own budget. Its own — see [WidgetCommon]. */
         data object TimedOut : Outcome
 
-        /** Never asked, because something it needs is absent (no location, no saved place). */
-        data class Skipped(val why: String) : Outcome
+        /**
+         * Never asked, because something it needs is absent (no location, no saved place).
+         *
+         * [fixable] says the owner can do something about it — grant a permission, add a place —
+         * and only those reach the NEEDS YOU line ([needsYouLine]). ⚠️ Defaulted to false: a
+         * future skip that is simply not applicable here (a US-only feed abroad) must not tell
+         * somebody to go and fix what cannot be fixed, so opting in is the explicit act.
+         */
+        data class Skipped(val why: String, val fixable: Boolean = false) : Outcome
     }
 
     /** One complete render attempt. */
@@ -145,6 +152,89 @@ object WidgetDiagnostics {
         val named = bad.take(3).joinToString(", ") { it.label }
         val more = if (bad.size > 3) " +${bad.size - 3}" else ""
         return "⚠ no answer from $named$more — tap for why"
+    }
+
+    /**
+     * What the owner could do to make the widget show more, or "" when nothing.
+     *
+     * The other half of [degradedLine]. That one names feeds that TRIED and got no answer; this names
+     * the ones that were never asked because of something the owner controls — a permission, a
+     * place. Without it those went quiet with a reason recorded only in the crash console, where a
+     * widget missing its weather looked the same as a weather service that was down.
+     *
+     * ⚠️ Deduplicated by the sentence, not the source: four feeds skipped for want of a location are
+     * one thing to do, and listing it four times would read as four problems.
+     */
+    fun needsYouLine(outcomes: Map<Source, Outcome>): String {
+        val why = outcomes.values.filterIsInstance<Outcome.Skipped>()
+            .filter { it.fixable }
+            .map { it.why }
+            .distinct()
+        if (why.isEmpty()) return ""
+        val more = if (why.size > MAX_NEEDS) " +${why.size - MAX_NEEDS}" else ""
+        return "NEEDS YOU · ${why.take(MAX_NEEDS).joinToString(" · ")}$more"
+    }
+
+    /** How many causes the NEEDS YOU line names before it counts the rest. */
+    private const val MAX_NEEDS = 3
+
+    /**
+     * How old a feed's data may be before the widget names it beside its UPDATED stamp.
+     *
+     * ⚠️ The stamp is when the board was REDRAWN, and a redraw does not mean fresh data: every feed is
+     * read with `force = false`, and when the network fails a repository hands back whatever it last
+     * saved, however old — yesterday's quotes stamped "UPDATED 14:05". `Fetched` has always carried
+     * when its data was saved; the widget kept only `.data` and threw that away.
+     *
+     * Only feeds whose value is about NOW are listed. Fuel prices are weekly and the economy series
+     * annual — a day-old copy of either is simply what those feeds are, and naming it would teach the
+     * reader to ignore the note. An hour for a quote, because markets move by the minute and any TTL
+     * hit is far younger than that; six hours for the rest, which update a few times a day.
+     */
+    val STALE_AFTER_MS: Map<Source, Long> = mapOf(
+        Source.MARKETS to 60 * 60_000L,
+        Source.NEWS to 6 * 60 * 60_000L,
+        Source.SPACE to 6 * 60 * 60_000L,
+        Source.SAFETY to 6 * 60 * 60_000L,
+    )
+
+    /**
+     * "MARKETS FROM 9:12 AM", naming the oldest feed older than its limit, or "" when none is.
+     *
+     * [dataAt] is when each drawn feed's data was saved; [time] renders an instant the way the reader
+     * expects (a clock time today, a day name before that). One feed is named and the rest counted,
+     * because this rides a one-line subhead. A time in the future — a clock that moved — is not stale.
+     */
+    fun staleNote(dataAt: Map<Source, Long>, nowMs: Long, time: (Long) -> String): String {
+        val stale = dataAt.entries
+            .filter { (src, at) -> STALE_AFTER_MS[src]?.let { limit -> nowMs - at > limit } == true }
+            .sortedBy { it.value }
+        val oldest = stale.firstOrNull() ?: return ""
+        val more = if (stale.size > 1) " +${stale.size - 1}" else ""
+        return "${oldest.key.label.uppercase()} FROM ${time(oldest.value)}$more"
+    }
+
+    /**
+     * How old a kept location may be before the widget says so. See [placeNote].
+     *
+     * Six hours, the same as the slower feeds above: long enough that an ordinary morning away from
+     * LCARS draws no note, short enough that yesterday's place is always named.
+     */
+    const val PLACE_NOTE_AFTER_MS = 6 * 60 * 60_000L
+
+    /**
+     * "PLACE FROM 9:12 AM" when the location under the weather, air, water, safety and sky lines is a
+     * kept fix older than [PLACE_NOTE_AFTER_MS], or "" otherwise.
+     *
+     * ⚠️ The widget renders in the background, where the platform refuses it any live fix, so those
+     * lines are usually drawn for the place LCARS last saw. Within a few hours that is simply here; past
+     * that it is a claim about where the phone WAS, and a weather line that does not say so passes it
+     * off as where the phone is. [recordedAtMs] null means a saved place or a live fix — nothing to
+     * confess. A time in the future is a clock that moved, not an old place.
+     */
+    fun placeNote(recordedAtMs: Long?, nowMs: Long, time: (Long) -> String): String {
+        val at = recordedAtMs ?: return ""
+        return if (nowMs - at > PLACE_NOTE_AFTER_MS) "PLACE FROM ${time(at)}" else ""
     }
 
     /**

@@ -83,16 +83,6 @@ fun CountryPicker(current: String, onSelect: (String) -> Unit, modifier: Modifie
     }
 }
 
-fun formatLatest(series: IndicatorSeries): String {
-    val v = series.latest?.value ?: return "—"
-    return when (series.format) {
-        ValueFormat.PERCENT -> Formatters.percent(v)
-        ValueFormat.CURRENCY_USD -> Formatters.currency(v, "USD", 0)
-        ValueFormat.COMPACT -> Formatters.compact(v)
-        ValueFormat.NUMBER -> Formatters.number(v)
-    }
-}
-
 @Composable
 fun IndicatorCard(series: IndicatorSeries, modifier: Modifier = Modifier) {
     val c = Pulse.colors

@@ -64,7 +64,9 @@ class LocationProvider(private val context: Context) {
         // skip the fused path entirely and go straight to the platform GPS provider —
         // faster first fix, and no failed Play-Services round-trip.
         val loc = (if (isGmsAvailable()) fusedFix() else null) ?: managerFix() ?: lastKnown() ?: return null
-        val name = reverseGeocode(loc.latitude, loc.longitude) ?: formatCoords(loc.latitude, loc.longitude)
+        val geocoded = reverseGeocode(loc.latitude, loc.longitude)
+        val name = geocoded ?: formatCoords(loc.latitude, loc.longitude)
+        record(loc, geocoded)
         return DeviceLocation(
             loc.latitude, loc.longitude, name,
             if (loc.hasAccuracy()) loc.accuracy else null,
@@ -72,6 +74,43 @@ class LocationProvider(private val context: Context) {
             speedMps = if (loc.hasSpeed()) loc.speed.toDouble() else null,
         )
     }
+
+    /**
+     * The last fix [current] took, for a reader that cannot take one itself — or null.
+     *
+     * ⚠️ Deliberately NOT a fallback inside [current]. NAV draws [current] as "you are here", and a
+     * position from this morning drawn there would be a lie; the readers that want this (the widget,
+     * the emergency watch) ask for it by name and must check [RecordedFix.usableAt] themselves.
+     */
+    suspend fun recorded(): RecordedFix? = withContext(Dispatchers.IO) {
+        runCatching { lastFix.read() }.getOrNull()
+    }
+
+    /**
+     * Keep this fix for [recorded]. Best-effort: a fix that cannot be kept costs the next background
+     * reader its weather, never this caller its location.
+     *
+     * ⚠️ The name is kept only when it came from the geocoder. The fallback name is the coordinates
+     * themselves at three decimals, and keeping that would put back the precision the rounding
+     * exists to drop — so it is rewritten from the rounded values instead.
+     */
+    private suspend fun record(loc: Location, geocoded: String?) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                // When the fix was TAKEN, not when it was read. The last-known fallback can hand back
+                // a fix hours old, and stamping it now would let it pass for a fresh one.
+                val takenAt = loc.time.takeIf { it > 0L } ?: System.currentTimeMillis()
+                // And never over a newer one: an old last-known fix must not replace the fresh fix a
+                // screen took a minute ago.
+                if ((lastFix.read()?.atMs ?: 0L) >= takenAt) return@withContext
+                val fix = RecordedFix.of(loc.latitude, loc.longitude, "", takenAt)
+                val name = geocoded ?: Geodesy.formatDecimal(fix.latitude, fix.longitude, decimals = RecordedFix.DECIMALS)
+                lastFix.write(fix.copy(name = name))
+            }
+        }
+    }
+
+    private val lastFix by lazy { LastFixStore(context) }
 
     /**
      * True only when Google Play Services is actually installed. Lets us avoid touching

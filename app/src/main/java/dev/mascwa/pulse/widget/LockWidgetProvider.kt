@@ -1,10 +1,13 @@
 package dev.mascwa.pulse.widget
 
+import android.Manifest
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
@@ -19,6 +22,7 @@ import dev.mascwa.pulse.core.telemetry.DayPart
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.MailGlance
 import dev.mascwa.pulse.core.telemetry.MarketMood
+import dev.mascwa.pulse.core.telemetry.NetworkKind
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
@@ -32,6 +36,7 @@ import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.weather.WeatherCode
+import dev.mascwa.pulse.feature.economy.economyLine
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.widget.WidgetDiagnostics.Outcome
 import dev.mascwa.pulse.widget.WidgetDiagnostics.Source
@@ -112,10 +117,28 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 record(context, outcomes, started, fault = null)
+                // Armed after the render, from what the render drew. Both are best-effort and never
+                // throw: a widget that drew and failed to schedule its next redraw is still a widget
+                // that drew, and the periodic refresh is the backstop.
+                WidgetBoundaryAlarm.schedule(context, loaded.nextRefreshMs)
+                CalendarChangeWorker.ensure(context)
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    /**
+     * The last widget was removed: take down the two things that exist only to redraw it.
+     *
+     * Both would stand themselves down on their next firing anyway — each finds no widget ids and
+     * cancels — but the calendar trigger would first wait for the next calendar change to learn that,
+     * and there is no reason to leave a job registered with the system for a widget nobody has.
+     */
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetBoundaryAlarm.cancel(context)
+        CalendarChangeWorker.cancel(context)
     }
 
     // ── rows ────────────────────────────────────────────────────────────────────────────────────
@@ -140,6 +163,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         val role: Role,
         val argb: Int? = null,
         val route: String? = null,
+        /**
+         * A tap target that is not an app route — the calendar's up-next row opens the event in the
+         * calendar app. Wins over [route] when set.
+         */
+        val pending: PendingIntent? = null,
     )
 
     /** The weather, in the lengths the widget needs it at, plus the air as its own reading. */
@@ -162,7 +190,16 @@ class LockWidgetProvider : AppWidgetProvider() {
      * from the same pass over the feeds, so the two forms can never disagree about what the widget
      * knows — and a size that shows less is showing less of the same reading, not a different one.
      */
-    private data class Loaded(val rows: List<Row>, val board: WidgetBoard.Board)
+    private data class Loaded(
+        val rows: List<Row>,
+        val board: WidgetBoard.Board,
+        /**
+         * When the agenda next changes on its own — an event starting or ending, or midnight. The
+         * boundary alarm is armed for it after the render, so NOW and NEXT flip on time rather than
+         * whenever the next periodic refresh lands. Null when the calendar was never read.
+         */
+        val nextRefreshMs: Long? = null,
+    )
 
     private fun render(
         context: Context,
@@ -171,7 +208,21 @@ class LockWidgetProvider : AppWidgetProvider() {
         loaded: Loaded,
         outcomes: Map<Source, Outcome>,
     ) {
-        val rows = loaded.rows
+        // ⚠️ NEEDS YOU goes just above the SYS footnote rather than at the end. `fit` sheds from the
+        // tail, and "you could fix this" is worth more of a short widget than a battery percentage.
+        // It is not given a reserved slot like the degraded line: that one reports the widget being
+        // wrong, this one only how it could be more.
+        val needsYou = WidgetDiagnostics.needsYouLine(outcomes).takeIf { it.isNotBlank() }
+        val rows = loaded.rows.let { base ->
+            if (needsYou == null) {
+                base
+            } else {
+                val at = base.indexOfLast { it.role == Role.FOOTNOTE }.let { if (it < 0) base.size else it }
+                base.toMutableList().apply {
+                    add(at, Row(needsYou, Role.FOOTNOTE, argb = ContextCompat.getColor(context, widgetAccentRes()), route = Routes.SETTINGS))
+                }
+            }
+        }
         // ⚠️ THE COMMENT THAT USED TO BE HERE WAS EXACTLY BACKWARDS. It read "it goes last so it
         // never pushes real content off a small widget" — but `viewsFor` ends in `rows.take(limit)`,
         // so going last is precisely what made this THE FIRST ROW DROPPED. A fully-populated widget
@@ -182,9 +233,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         // instead of being displaced by one. That is the right way round: the notice exists to say
         // the content is incomplete, so spending one row on it costs nothing that was not already
         // in doubt.
+        // ⚠️ "Tap for why" opens the crash console, which is where the why IS — the widget's own
+        // render record, source by source. It used to open HOME, a promise with nothing behind it.
         val degradedRow = WidgetDiagnostics.degradedLine(outcomes)
             .takeIf { it.isNotBlank() }
-            ?.let { Row(it, Role.DEGRADED, route = Routes.HOME) }
+            ?.let { Row(it, Role.DEGRADED, route = Routes.CRASH_LOG) }
         val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
         // ⚠️ Drawn ONCE, here, and the same instances go to both board variants. They share a
         // `BitmapCache` that de-duplicates on identity, so reusing the instances costs one copy of
@@ -192,11 +245,47 @@ class LockWidgetProvider : AppWidgetProvider() {
         // `WidgetBoard.render` would quietly double the parcel.
         // ⚠️ The board could not report a failure AT ALL until now — `degradedLine` was folded
         // only into the row list, so on both tall sizes a dead source looked like a quiet day.
-        val board = withCharts(context, loaded.board.copy(degraded = degradedRow?.text))
+        val board = withCharts(
+            context,
+            loaded.board.copy(
+                degraded = degradedRow?.text,
+                degradedRoute = Routes.CRASH_LOG,
+                needsYou = needsYou,
+                needsYouRoute = Routes.SETTINGS,
+            ),
+        )
 
+        // ⚠️ The agenda is the one region whose size depends on the diary, and a binder transaction
+        // has a hard ceiling. So a render that fails is retried with a shorter list and then with no
+        // list, BEFORE the caller falls back to the fault card: fourteen days of a busy diary must
+        // never be the reason the whole widget says it could not draw. Only the last failure is
+        // rethrown, so the fault card still names a real reason when even the plain board fails.
+        val attempts = listOfNotNull(
+            board,
+            board.agenda?.takeIf { it.rows.size > REDUCED_AGENDA_ROWS }
+                ?.let { board.copy(agenda = it.copy(rows = it.rows.take(REDUCED_AGENDA_ROWS))) },
+            board.agenda?.let { board.copy(agenda = null) },
+        )
+        var lastError: Throwable? = null
+        for (attempt in attempts) {
+            val applied = runCatching { manager.updateAppWidget(id, variants(context, rows, degradedRow, attempt, open)) }
+            if (applied.isSuccess) return
+            lastError = applied.exceptionOrNull()
+        }
+        throw lastError ?: IllegalStateException("no render attempt was made")
+    }
+
+    /** Every size variant, from one board. The host picks the entry that fits. */
+    private fun variants(
+        context: Context,
+        rows: List<Row>,
+        degradedRow: Row?,
+        board: WidgetBoard.Board,
+        open: (String, Int) -> PendingIntent,
+    ): RemoteViews {
         // ⚠️ The host picks. Each entry is the SAME layout with a different number of rows, so a
         // bigger widget genuinely shows more instead of the same lines with more air between them.
-        val views = RemoteViews(
+        return RemoteViews(
             mapOf(
                 // ⚠️ Each height is DERIVED from its row count, not chosen: a row is ~16dp of 12sp
                 // text plus its 2dp margin, over 20dp of vertical padding. A breakpoint below its
@@ -208,25 +297,35 @@ class LockWidgetProvider : AppWidgetProvider() {
                 SizeF(250f, 275f) to viewsFor(context, rows, degradedRow, LARGE_ROWS),
                 SizeF(300f, 385f) to viewsFor(context, rows, degradedRow, MAX_ROWS),
                 // ⚠️ The two entries the widget was missing, and their absence WAS the sparseness:
-                // the resize range reaches 640dp while the tallest variant stopped at 385, so above
+                // the resize range reached 640dp while the tallest variant stopped at 385, so above
                 // that the host had nothing richer to pick and stretched twenty rows instead.
                 //
                 // Both heights are derived from the board's own content, under the same rule as the
                 // row variants above — a breakpoint below its content clips, one above it can never
                 // be picked. Compact carries header + lead + both instrument strips + breadth +
-                // readouts (~319dp of content, declared at 420); full adds the three two-column
-                // regions and the footer (~589dp, declared at 610).
+                // readouts (~319dp of content, ~333dp with the up-next line, declared at 420); full
+                // adds the three two-column regions and the footer (see the full entry below).
                 //
                 // ⚠️ Both grew with the board: a fourth readout is ~14dp and the third pair region
                 // is a label plus four lines, ~70dp. A breakpoint left where it was would be BELOW
-                // its content, which clips — the rule governing every entry in this list. 610 still
-                // sits under the 640dp `maxResizeHeight` in `lock_widget_info.xml`, which is what
-                // makes it reachable at all.
+                // its content, which clips — the rule governing every entry in this list. Every
+                // height here must sit under `maxResizeHeight` in `lock_widget_info.xml` (1000dp),
+                // which is what makes it reachable at all.
                 SizeF(300f, 420f) to WidgetBoard.render(context, board, full = false, open),
-                SizeF(300f, 610f) to WidgetBoard.render(context, board, full = true, open),
+                // ⚠️ Still the tallest entry, and it no longer needs a taller sibling: the agenda list
+                // at the bottom of the full board takes every dp above this, at any height, so a
+                // widget stretched to 800dp or more fills rather than ending two fifths of the way
+                // down — which is what the owner's screenshot showed before the list existed.
+                //
+                // ⚠️ Moved from 610 to 680, by the same derivation as every entry above. The full
+                // board gained the up-next line (~14dp), a rule (~9dp) and the agenda heading (~12dp)
+                // — ~624dp before the list gets anything — and a list squeezed to zero rows is a
+                // heading over nothing. 680 leaves room for a day heading and one two-line event
+                // (~18 + ~29dp); below it the compact board, which carries the up-next line, is the
+                // better answer.
+                SizeF(300f, FULL_BOARD_MIN_HEIGHT_DP) to WidgetBoard.render(context, board, full = true, open),
             ),
         )
-        manager.updateAppWidget(id, views)
     }
 
     /**
@@ -257,7 +356,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             // ⚠️ A distinct request code per row. `Intent.filterEquals` ignores extras, so rows
             // sharing a code would silently share ONE PendingIntent and every tap would land
             // wherever the last-built row pointed — the collision already corrected once in NotifId.
-            v.setOnClickPendingIntent(viewId, openIntent(context, row.route ?: Routes.HOME, i))
+            v.setOnClickPendingIntent(viewId, row.pending ?: openIntent(context, row.route ?: Routes.HOME, i))
         }
         return v
     }
@@ -388,10 +487,6 @@ class LockWidgetProvider : AppWidgetProvider() {
             Role.HEADER,
             argb = ContextCompat.getColor(context, widgetAccentRes()),
         )
-        // The board says where you are and what it is like there; the stardate drops to the line
-        // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
-        // only falls back to the device's own — nothing here may ever name a fixed town.
-        val boardSubhead = listOf(greeting, stardate).filter { it.isNotBlank() }.joinToString(" · ")
         // ⚠️ The SAME preference the header clock follows, so the agenda cannot print 14:00
         // beside a header reading 2:00 PM. Locale.US on the PATTERN only — the pattern is a
         // format string, while the rendered digits still come out in the device's own locale.
@@ -399,20 +494,88 @@ class LockWidgetProvider : AppWidgetProvider() {
             if (s?.use24HourClock != false) "HH:mm" else "h:mm a",
             Locale.getDefault(),
         )
+        // ⚠️ When the board was last REDRAWN. A widget is a picture, and the ticking clock beside it
+        // made every line read as live, so a widget nothing had redrawn for hours looked current. This
+        // stamp answers exactly that and no more: a redraw can still serve old cached data when the
+        // network fails, and saying so is `staleNote`'s job, drawn beside it.
+        val updated = "UPDATED ${clock.format(Date())}"
+        // The board says where you are and what it is like there; the stardate drops to the line
+        // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
+        // only falls back to the device's own — nothing here may ever name a fixed town.
+        // The stamp sits BEFORE the stardate: the subhead is one line, and when it ellipsizes it is
+        // the decoration that should go, not the fact.
+        val boardSubhead = listOf(greeting, updated, stardate).filter { it.isNotBlank() }.joinToString(" · ")
 
         if (s == null) {
             return Loaded(rows, WidgetBoard.Board(header = date.ifBlank { greeting }, subhead = boardSubhead))
         }
 
-        // ⚠️ Resolved ONCE, and on its own budget. Three feeds need a coordinate, and the fallback
+        // ⚠️ ONE instant and ONE zone for the whole calendar reading. The agenda's NOW/NEXT, its day
+        // headings and the alarm that refreshes it at the next boundary must all agree about "now",
+        // and a zone read twice can differ across a clock change mid-load. The zone enters the core
+        // as a function — `getOffset` at each instant — which is what makes it DST-correct.
+        val nowMs = System.currentTimeMillis()
+        val zone = TimeZone.getDefault()
+        val offsetAt: (Long) -> Long = { ms -> zone.getOffset(ms).toLong() }
+        // ⚠️ Day labels are formatted in UTC ON PURPOSE. The core hands back epoch DAYS, and an epoch
+        // day's UTC midnight formatted in UTC is that date everywhere — formatted in the device zone
+        // it is the day before for anyone west of Greenwich, which is the all-day trap the core exists
+        // to avoid, walked straight back into at the last step.
+        val dayFmt = SimpleDateFormat("EEE d MMM", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val agendaFormat = Agenda.Format(
+            clock = { ms -> clock.format(Date(ms)) },
+            day = { epochDay -> dayFmt.format(Date(epochDay * Agenda.DAY_MS)).uppercase() },
+        )
+
+        // ⚠️ Resolved ONCE, and on its own budget. Four feeds need a coordinate, and the fallback
         // branch can touch the location provider — doing that three times would triple the slowest
         // thing in the load. Null is a fact about us, not about the world, so the feeds that need
         // it are recorded as never asked rather than left silently absent.
-        val place = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) { runCatching { widgetPlace(c, s) }.getOrNull() }
+        //
+        // ⚠️ With the REASON. Every one of these used to read "no saved location", including for an
+        // owner who had turned device location on and whose real problem was a permission or a phone
+        // that had not taken a fix since it slept — three different things to do, one sentence. And
+        // WEATHER was not in the list at all: it ran with no place, returned null and was recorded
+        // as Empty, "nothing to report", which is not what a widget with no idea where it is knows.
+        // Null here means the budget ran out; a failed Result means the lookup threw. They are kept
+        // apart below because they are different sentences.
+        val placeAttempt = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) {
+            runCatching {
+                widgetPlaceLookup(
+                    c, s,
+                    hasLocationPermission = {
+                        context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    },
+                    isLocationOn = {
+                        context.getSystemService(LocationManager::class.java)?.isLocationEnabled != false
+                    },
+                )
+            }
+        }
+        val placeLookup = placeAttempt?.getOrNull()
+        val place = placeLookup?.place
         if (place == null) {
-            outcomes[Source.SAFETY] = Outcome.Skipped("no saved location")
-            outcomes[Source.SKY] = Outcome.Skipped("no saved location")
-            outcomes[Source.WATER] = Outcome.Skipped("no saved location")
+            // ⚠️ None of these four feeds was ASKED, so none of them may be reported as having failed
+            // to answer — which is what TimedOut would say, in the degraded line, as "no answer from
+            // weather, safety, sky +1". The review caught exactly that: this budget is four seconds
+            // and the location provider's own fix wait is eight, so indoors or GPS-only it runs out
+            // on ordinary refreshes. What the owner can do about a slow fix is keep a saved place,
+            // which always answers at once — so that is the sentence, and it is fixable.
+            val outcome = when {
+                placeAttempt == null ->
+                    Outcome.Skipped("location too slow — add a saved place", fixable = true)
+                placeLookup == null ->
+                    // Threw: ours, not the owner's. Kept for the crash console, out of NEEDS YOU.
+                    Outcome.Skipped(
+                        "location lookup failed: " +
+                            WidgetDiagnostics.describe(placeAttempt.exceptionOrNull() ?: IllegalStateException("no result")),
+                    )
+                else -> Outcome.Skipped(placeLookup.why ?: "no location", fixable = true)
+            }
+            for (src in PLACE_SOURCES) outcomes[src] = outcome
         }
 
         // ⚠️ Asked once, up front, for the same reason `place` is: the answer decides whether a
@@ -420,7 +583,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // as Empty — "asked, nothing to report" — which is the wrong thing to say about a
         // permission that was never granted. One cheap AppOps call.
         val usageAccess = runCatching { c.mobileData.hasUsageAccess() }.getOrDefault(false)
-        if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted")
+        if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted", fixable = true)
 
         // ⚠️ Same reasoning, and the calendar needs it more than most: `upcoming` returns an empty
         // list for a refused permission, an unavailable provider AND a genuinely clear diary, so
@@ -428,7 +591,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // never allowed to look. Asked here rather than inside the source for the reason above —
         // null from inside `widgetSource` is recorded as Empty.
         val canReadCalendar = runCatching { c.calendarRepository.canRead() }.getOrDefault(false)
-        if (!canReadCalendar) outcomes[Source.CALENDAR] = Outcome.Skipped("calendar permission not granted")
+        if (!canReadCalendar) outcomes[Source.CALENDAR] = Outcome.Skipped("calendar permission not granted", fixable = true)
 
         // ⚠️ Captured out of the parallel block so the board can be assembled from the SAME pass
         // that fills the rows. Building it from a second read would let the two forms of the widget
@@ -444,7 +607,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         var fuelLines: List<String> = emptyList()
         var dataLine: String? = null
         var commsLines: List<String> = emptyList()
-        var agendaLines: List<String> = emptyList()
+        // When each time-sensitive feed's data was SAVED — see `staleNote`. Written from several
+        // coroutines at once.
+        val dataAt = java.util.concurrent.ConcurrentHashMap<Source, Long>()
+        var agendaEvents: List<Agenda.Event> = emptyList()
+        var agendaPlan: Agenda.Plan? = null
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
@@ -456,7 +623,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
             coroutineScope {
                 val oracle = async {
-                    widgetSource<dev.mascwa.pulse.core.telemetry.Insight>(Source.ORACLE, outcomes) {
+                    // ⚠️ Its own, longer budget. The advisory is the lead row and the one read that
+                    // weighs every other feed, so it is also the slowest; at the shared four seconds it
+                    // was the row most often reported as "no answer". The load's outer bound (seven
+                    // seconds) still caps it, well inside a goAsync receiver's window.
+                    widgetSource<dev.mascwa.pulse.core.telemetry.Insight>(Source.ORACLE, outcomes, budgetMs = ORACLE_BUDGET_MS) {
                         // visible = 1: this widget renders exactly one insight, and telling the
                         // learning layer otherwise would credit rows nobody was shown.
                         OracleEngine.read(c, s, visible = 1).firstOrNull()
@@ -468,7 +639,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val weather = async {
-                    widgetSource<Wx>(Source.WEATHER, outcomes) {
+                    if (place == null) null else widgetSource<Wx>(Source.WEATHER, outcomes) {
                         val wd = resolveWeather(c, place) ?: return@widgetSource null
                         val cur = wd.current ?: return@widgetSource null
                         val u = wd.tempUnitSymbol
@@ -503,7 +674,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 val markets = async {
                     widgetSource<Mkt>(Source.MARKETS, outcomes) {
-                        val quotes = c.marketsRepository.fetchWatchlist(force = false).data
+                        val fetched = c.marketsRepository.fetchWatchlist(force = false)
+                        dataAt[Source.MARKETS] = fetched.timestampEpochMs
+                        val quotes = fetched.data
                             .orEmpty().filter { it.changePercent != null }
                         if (quotes.isEmpty()) return@widgetSource null
                         val mover = quotes.maxByOrNull { abs(it.changePercent ?: 0.0) }
@@ -537,8 +710,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // `news.search()`.
                 val news = async {
                     widgetSource<List<String>>(Source.NEWS, outcomes) {
-                        val articles = c.newsRepository
-                            .fetchCategory(NewsCategory.TOP, force = false).data.orEmpty()
+                        val fetched = c.newsRepository.fetchCategory(NewsCategory.TOP, force = false)
+                        dataAt[Source.NEWS] = fetched.timestampEpochMs
+                        val articles = fetched.data.orEmpty()
                         BreakingNews.perOutlet(
                             articles,
                             outlet = { it.source },
@@ -560,12 +734,16 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 val space = async {
                     widgetSource<String>(Source.SPACE, outcomes) {
-                        c.spaceWeatherRepository.fetch(force = false, heavy = false).data?.kp
-                            ?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }
+                        val fetched = c.spaceWeatherRepository.fetch(force = false, heavy = false)
+                        dataAt[Source.SPACE] = fetched.timestampEpochMs
+                        fetched.data?.kp?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }
                     }
                 }
                 val fuel = async {
-                    widgetSource<List<String>>(Source.FUEL, outcomes) {
+                    // The board's lines, and the row form's one line. ⚠️ They differ on purpose: the
+                    // board draws these under a column already titled FUEL, where a "FUEL  " prefix
+                    // printed the word twice; the row form has no heading, so its line keeps it.
+                    widgetSource<Pair<List<String>, String>>(Source.FUEL, outcomes) {
                         // ⚠️ ONE fetch for both lines. The pump price rides on the same call as the
                         // benchmark — `usRetail` was being fetched and thrown away — and asking the
                         // repository twice inside a four-second budget would pay for it twice.
@@ -573,7 +751,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                         val crude = d.benchmarks.firstOrNull()?.let { b ->
                             val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
                             val pct = b.changePercent?.let { " ${signedPercent(it)}%" }.orEmpty()
-                            "FUEL  ${b.label} $price$pct".trim()
+                            "${b.label} $price$pct".trim()
                         }
                         // ⚠️ US-only and key-gated, by the repository — EIA is an American agency
                         // and the World Bank retired both of its pump-price indicators, so there is
@@ -587,7 +765,8 @@ class LockWidgetProvider : AppWidgetProvider() {
                             }
                             .ifBlank { null }
                             ?.let { "PUMP  $it /gal" }
-                        listOfNotNull(crude, pump).ifEmpty { null }
+                        val lines = listOfNotNull(crude, pump).ifEmpty { return@widgetSource null }
+                        lines to (crude?.let { "FUEL  $it" } ?: lines.first())
                     }
                 }
                 val data = async {
@@ -614,8 +793,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 // what someone does in the next hour.
                 val safety = async {
                     if (place == null) null else widgetSource<String>(Source.SAFETY, outcomes) {
-                        val near = c.safetyRepository.fetch(place.latitude, place.longitude, force = false)
-                            .data?.incidents.orEmpty()
+                        val fetched = c.safetyRepository.fetch(place.latitude, place.longitude, force = false)
+                        dataAt[Source.SAFETY] = fetched.timestampEpochMs
+                        val near = fetched.data?.incidents.orEmpty()
                             .filter { it.distanceMeters <= SAFETY_RADIUS_M }
                             .minByOrNull { it.distanceMeters }
                             ?: return@widgetSource null
@@ -638,24 +818,43 @@ class LockWidgetProvider : AppWidgetProvider() {
                         c.waterRepository.cached(place.latitude, place.longitude)?.line
                     }
                 }
-                // The next few things actually in the diary. No network and no cache — a direct
-                // Instances query, which expands recurrences for us.
+                // Fourteen days of the diary, from the start of today — so an event already under
+                // way is included. No network and no cache: a direct Instances query, which expands
+                // recurrences for us, and filters hidden calendars and declined invitations exactly
+                // as the calendar app does (see CalendarRepository).
                 //
-                // ⚠️ `upcoming` is NOT a suspend function and does its ContentProvider query on
+                // ⚠️ `agenda` is NOT a suspend function and does its ContentProvider query on
                 // whatever thread calls it, so it is dispatched explicitly. It happens to be called
                 // from an IO dispatcher here already, but relying on that would make this correct by
                 // where it sits rather than by what it says.
                 //
                 // ⚠️ Deliberately not `CalendarObjectivesRepository.upcoming`, which geocodes each
                 // event's location string over the network.
+                //
+                // ⚠️ The query asks for more than the list shows. The CORE caps what is drawn and
+                // counts what it left out, and it can only count what it was given — capping in the
+                // query would make "+N more" impossible to state.
                 val calendar = async {
-                    if (!canReadCalendar) null else widgetSource<List<String>>(Source.CALENDAR, outcomes) {
+                    if (!canReadCalendar) null else widgetSource<List<Agenda.Event>>(Source.CALENDAR, outcomes) {
                         withContext(Dispatchers.IO) {
+                            val today = Agenda.localDay(nowMs, offsetAt)
                             c.calendarRepository
-                                .upcoming(System.currentTimeMillis(), CALENDAR_HORIZON_MS, WidgetBoard.COLUMN_LINES)
+                                .agenda(
+                                    fromMs = Agenda.startOfLocalDay(today, offsetAt),
+                                    toMs = Agenda.startOfLocalDay(today + AGENDA_DAYS, offsetAt),
+                                    max = AGENDA_QUERY_MAX,
+                                )
                                 .map { ev ->
-                                    val whenIt = if (ev.allDay) "ALL DAY" else clock.format(Date(ev.startMs))
-                                    "$whenIt  ${ev.title.ifBlank { "(untitled)" }}".take(40)
+                                    Agenda.Event(
+                                        id = ev.id,
+                                        title = ev.title,
+                                        startMs = ev.startMs,
+                                        endMs = ev.endMs,
+                                        allDay = ev.allDay,
+                                        location = ev.location,
+                                        calendarName = ev.calendarName,
+                                        colorArgb = ev.colorArgb,
+                                    )
                                 }
                                 .ifEmpty { null }
                         }
@@ -730,13 +929,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                         val wanted = listOf("FP.CPI.TOTL.ZG", "NY.GDP.MKTP.KD.ZG", "SL.UEM.TOTL.ZS")
                         val ordered = wanted.mapNotNull { id -> series.firstOrNull { it.indicatorId == id } } +
                             series.filter { it.indicatorId !in wanted }
-                        ordered.take(3).mapNotNull { s2 ->
-                            s2.latest?.let { p ->
-                                // ⚠️ These are World Bank ANNUAL series, so the year is not
-                                // decoration — "2.9%" without it reads as this month's print.
-                                "${s2.indicatorTitle.take(18)} ${Formatters.number(p.value, 1)}${s2.unit.take(10)} · ${p.year}"
-                            }
-                        }.ifEmpty { null }
+                        // ⚠️ Through the Economy screen's own formatter. Built here by hand it read
+                        // "Inflation (CPI) 3annual % · 2025" — see `economyLine`.
+                        ordered.take(3).mapNotNull { economyLine(it) }.ifEmpty { null }
                     }
                 }
 
@@ -760,6 +955,22 @@ class LockWidgetProvider : AppWidgetProvider() {
                 safety.await()?.let {
                     alertLine = it
                     rows += Row(it, Role.PRIMARY, argb = ContextCompat.getColor(context, R.color.nw_negative), route = Routes.SAFETY)
+                }
+
+                // The calendar is local and quick, and what you are in or about to be in belongs
+                // straight after anything urgent — ahead of every measured reading below it.
+                calendar.await()?.let { agendaEvents = it }
+                val plan = Agenda.plan(agendaEvents, nowMs, offsetAt, AGENDA_DAYS, AGENDA_MAX_ITEMS)
+                agendaPlan = plan
+                Agenda.upNext(plan)?.let { e ->
+                    rows += Row(
+                        Agenda.upNextLine(e, plan.today, agendaFormat),
+                        Role.PRIMARY,
+                        argb = if (e.state == Agenda.State.NOW) ContextCompat.getColor(context, widgetAccentRes()) else null,
+                        pending = CalendarIntents.event(
+                            context, e.event.id, e.event.startMs, e.event.endMs, CalendarIntents.RC_UP_NEXT_ROW,
+                        ),
+                    )
                 }
 
                 // The active objective needs no I/O — it is already in settings.
@@ -788,9 +999,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
                 space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
                 water.await()?.let { waterLine = it; rows += Row(it, Role.SECONDARY, route = Routes.WEATHER) }
-                fuel.await()?.let {
-                    fuelLines = it
-                    rows += Row(it.first(), Role.SECONDARY, route = Routes.MARKETS)
+                fuel.await()?.let { (lines, rowText) ->
+                    fuelLines = lines
+                    rows += Row(rowText, Role.SECONDARY, route = Routes.FUEL)
                 }
                 data.await()?.let { dataLine = it; rows += Row(it, Role.SECONDARY, route = Routes.SETTINGS) }
                 comms.await()?.let {
@@ -799,19 +1010,36 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 econ.await()?.let {
                     econLines = it
-                    rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
+                    rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.ECONOMY)
                 }
-                // ⚠️ Board only, and no row. The row list already builds more entries than
-                // MAX_ROWS can draw, so adding one here would push something else off the
-                // bottom in silence rather than adding anything.
-                calendar.await()?.let { agendaLines = it }
             }
         }
 
+        // ⚠️ The stamp says when the board was REDRAWN; this says when any time-sensitive data on it
+        // was actually saved, when that is old. Only feeds that drew something count — a feed that
+        // drew nothing has no age to confess to.
+        val today = Agenda.localDay(nowMs, offsetAt)
+        val dayName = SimpleDateFormat("EEE", Locale.getDefault())
+        val whenLabel: (Long) -> String = { ms ->
+            if (Agenda.localDay(ms, offsetAt) == today) clock.format(Date(ms)) else dayName.format(Date(ms)).uppercase()
+        }
+        val feedNote = WidgetDiagnostics.staleNote(dataAt.filterKeys { outcomes[it] == Outcome.Ok }, nowMs, whenLabel)
+        // Only when something was actually drawn at that place: a kept fix under four feeds that all
+        // went quiet has no line to qualify.
+        val placeNote = WidgetDiagnostics.placeNote(
+            place?.recordedAtMs?.takeIf { PLACE_SOURCES.any { src -> outcomes[src] == Outcome.Ok } },
+            nowMs,
+            whenLabel,
+        )
+        // One slot for both, joined, so neither pushes the stamp beside it any further along a
+        // one-line subhead than the old note alone did.
+        val staleNote = listOf(feedNote, placeNote).filter { it.isNotBlank() }.joinToString(" · ")
+            .takeIf { it.isNotBlank() }
         val sysLine = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
-            "SYS  PWR $batt$chg  ·  ${it.network.name}"
+            listOfNotNull("SYS  PWR $batt$chg", networkAtRefresh(it.network), updated, staleNote)
+                .joinToString("  ·  ")
         }
         sysLine?.let { rows += Row(it, Role.FOOTNOTE) }
 
@@ -833,7 +1061,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             val saver = if (it.isPowerSave) "  ·  saver" else ""
             "POWER  $batt$chg$saver"
         }
-        val netLine = ctx?.let { "SYS  ${it.network.name}" }
+        val netLine = ctx?.let { "SYS  ${networkAtRefresh(it.network)}" }
 
         // ── the same reading, as a board ────────────────────────────────────────────────────────
         // Nothing here fetches: every value was loaded once, above. A field left null is a region
@@ -846,28 +1074,38 @@ class LockWidgetProvider : AppWidgetProvider() {
             }
         }.getOrNull()
 
-        val econColumn = WidgetBoard.Column("ECONOMY", econLines)
-        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine))
+        val econColumn = WidgetBoard.Column("ECONOMY", econLines, Routes.ECONOMY)
+        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine), Routes.STUDY)
         // ⚠️ Split into two rather than grown to four lines: a column holds three, and the crude
         // benchmark and the pump price answer a different question from what this handset has
         // spent. The second slot of the pair was left empty in the last slice for exactly this.
-        val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
-        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine))
-        val commsColumn = WidgetBoard.Column("WAITING", commsLines)
-        // ⚠️ This slot has been drawn half-blank since the board was built —
-        // `commsColumn to Column("", emptyList())` — so the region has always cost its full height
-        // for one column of content. Nothing had to grow to hold the agenda; it just had to be put
-        // where the empty half already was.
-        val agendaColumn = WidgetBoard.Column("AGENDA", agendaLines)
+        val fuelColumn = WidgetBoard.Column("FUEL", fuelLines, Routes.FUEL)
+        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine), Routes.SETTINGS)
+        val commsColumn = WidgetBoard.Column("WAITING", commsLines, Routes.SETTINGS)
+        // ⚠️ The agenda used to be this pair's right half — four lines of today, the only calendar the
+        // widget had. It is now its own region at the foot of the full board (see `agendaBlock`), so
+        // this half is empty again and the pair draws WAITING alone, as it did before the agenda.
+        val upNext = agendaPlan?.let(Agenda::upNext)
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
+            headerRoute = Routes.HOME,
             // ⚠️ This is the ONLY reader of `use24HourClock` in the whole repository. The switch has
             // existed in Settings and done nothing at all — declared, given a PrefSwitch the user
             // can flip, and consulted by nobody. Following the DEVICE setting here instead would
             // have been the easy call and would have left it dead.
             clock24 = s?.use24HourClock ?: true,
-            subhead = boardSubhead,
+            // The stale note sits beside the stamp it qualifies, and ahead of the stardate for the
+            // same reason the stamp does: when the line ellipsizes, the decoration goes first.
+            subhead = listOfNotNull(greeting, updated, staleNote, stardate)
+                .filter { it.isNotBlank() }.joinToString(" · "),
+            upNext = upNext?.let { Agenda.upNextLine(it, agendaPlan?.today ?: it.day, agendaFormat) },
+            upNextArgb = upNext?.takeIf { it.state == Agenda.State.NOW }
+                ?.let { ContextCompat.getColor(context, widgetAccentRes()) },
+            upNextOpen = upNext?.let {
+                CalendarIntents.event(context, it.event.id, it.event.startMs, it.event.endMs, CalendarIntents.RC_UP_NEXT_BOARD)
+            },
+            agenda = agendaBlock(context, agendaPlan, canReadCalendar, outcomes[Source.CALENDAR], agendaFormat, nowMs, offsetAt),
             alert = alertLine,
             alertRoute = Routes.SAFETY,
             lead = leadTitle,
@@ -875,6 +1113,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             leadArgb = leadArgb,
             leadRoute = leadRoute,
             sources = headlines,
+            sourcesRoute = Routes.NEWS,
             // ⚠️ The label states the horizon because the two numbers in a cell are not the same
             // span: the percentage is TODAY's move, and the line is `Quote.sparkline` — about a
             // month of daily closes. Intraday bars exist but are memory-cached only, so a restarted
@@ -892,8 +1131,14 @@ class LockWidgetProvider : AppWidgetProvider() {
             // the water line came to vanish whenever the weather detail, the air quality and space
             // weather were all present. Ordered most-consequential first, so what is shed is the
             // least useful line rather than whichever happened to be last.
-            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, waterLine, spaceLine)
-                .take(WidgetBoard.MAX_READOUTS),
+            readouts = listOfNotNull(
+                wx?.detail?.ifBlank { null }?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                // The air lives on WEATHER's own AIR sub-tab, so that is where it opens.
+                wx?.air?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                // The lake or tide gauge has no screen of its own; the forecast is the nearest thing.
+                waterLine?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                spaceLine?.let { WidgetBoard.Readout(it, Routes.SPACE_WX) },
+            ).take(WidgetBoard.MAX_READOUTS),
             // ⚠️ Only pairs that have something GO in — `pairs` drops an empty column rather than
             // drawing a labelled blank, which would read as a feed that failed rather than one
             // this phone cannot answer. WAITING is empty until a mailbox is added or the texts
@@ -904,11 +1149,107 @@ class LockWidgetProvider : AppWidgetProvider() {
             pairs = listOf(
                 econColumn to dayColumn,
                 fuelColumn to phoneColumn,
-                commsColumn to agendaColumn,
+                commsColumn to WidgetBoard.Column("", emptyList()),
             ).take(WidgetBoard.MAX_PAIRS),
             foot = netLine,
+            footRoute = Routes.SETTINGS,
         )
-        return Loaded(rows, board)
+        // ⚠️ From the SAME events and the same instant the agenda was planned with, so the alarm
+        // fires at a boundary this reading actually drew — computed from a second read, it could
+        // arm for an event the board does not show. Only when the calendar could be read: without
+        // it there is no boundary to be right about, and the periodic refresh covers the date.
+        val nextRefreshMs = if (canReadCalendar) Agenda.nextBoundaryMs(agendaEvents, nowMs, offsetAt) else null
+        return Loaded(rows, board, nextRefreshMs)
+    }
+
+    /**
+     * The fourteen-day list as the full board draws it — or the one sentence saying why there is no
+     * list.
+     *
+     * ⚠️ Three different empties, three different sentences, two different tap targets. "The calendar
+     * may not be read", "the calendar could not be read this time" and "there is nothing in it" are
+     * facts about the app, about this refresh and about the diary respectively; rendering them the
+     * same way is how a widget comes to tell someone their fortnight is free when it was never
+     * allowed to look. Only the first sends the tap to the permission page.
+     */
+    private fun agendaBlock(
+        context: Context,
+        plan: Agenda.Plan?,
+        canRead: Boolean,
+        outcome: Outcome?,
+        fmt: Agenda.Format,
+        nowMs: Long,
+        offsetAt: (Long) -> Long,
+    ): WidgetBoard.AgendaBlock {
+        val heading = "AGENDA · $AGENDA_DAYS DAYS"
+        if (!canRead) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Calendar access not granted — tap to allow it",
+                emptyOpensSettings = true, todayMs = nowMs,
+            )
+        }
+        if (outcome is Outcome.Failed || outcome is Outcome.TimedOut) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Could not read the calendar this time — tap to open it", todayMs = nowMs,
+            )
+        }
+        if (plan == null || plan.all.isEmpty()) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Nothing in the next $AGENDA_DAYS days — tap to open your calendar",
+                todayMs = nowMs,
+            )
+        }
+        val accent = ContextCompat.getColor(context, widgetAccentRes())
+        val otherCalendars = Agenda.otherCalendars(plan)
+        val todayStart = Agenda.startOfLocalDay(plan.today, offsetAt)
+        val rows = buildList {
+            // A list that opens on Thursday reads as though today had been forgotten. Say it is clear.
+            if (plan.days.firstOrNull()?.kind != Agenda.DayKind.TODAY) {
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.DAY, Agenda.clearTodayHeading(plan.today, fmt),
+                        textArgb = accent, fillIn = CalendarIntents.dayFillIn(todayStart),
+                    ),
+                )
+            }
+            plan.days.forEach { day ->
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.DAY, Agenda.dayHeading(day, fmt),
+                        textArgb = accent.takeIf { day.kind == Agenda.DayKind.TODAY },
+                        fillIn = CalendarIntents.dayFillIn(Agenda.startOfLocalDay(day.epochDay, offsetAt)),
+                    ),
+                )
+                day.entries.forEach { e ->
+                    add(
+                        WidgetBoard.AgendaRow(
+                            WidgetBoard.AgendaKind.EVENT,
+                            Agenda.titleLine(e, fmt),
+                            Agenda.detailLine(e, fmt, withCalendar = e.event.calendarName.trim() in otherCalendars),
+                            textArgb = accent.takeIf { e.state == Agenda.State.NOW },
+                            barArgb = e.event.colorArgb,
+                            fillIn = CalendarIntents.eventFillIn(e.event.id, e.event.startMs, e.event.endMs),
+                        ),
+                    )
+                }
+            }
+            // ⚠️ Never silently short. A list that stops is otherwise indistinguishable from a diary
+            // that stops, and the cap exists for the binder, not because the rest does not matter.
+            if (plan.omitted > 0) {
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.EVENT,
+                        "+${plan.omitted} more in the next $AGENDA_DAYS days",
+                        "open your calendar to see them",
+                        fillIn = CalendarIntents.dayFillIn(todayStart),
+                    ),
+                )
+            }
+        }
+        val n = plan.all.size
+        return WidgetBoard.AgendaBlock(
+            "$heading · $n ${if (n == 1) "EVENT" else "EVENTS"}", rows, todayMs = nowMs,
+        )
     }
 
     /**
@@ -933,14 +1274,33 @@ class LockWidgetProvider : AppWidgetProvider() {
     private fun cellFor(q: dev.mascwa.pulse.data.markets.Quote): WidgetBoard.Cell {
         val pct = q.changePercent ?: 0.0
         return WidgetBoard.Cell(
-            label = q.label.take(9).uppercase(),
+            // ⚠️ Not `take(9)`: that turned NASDAQ 100 into "NASDAQ 10", a different and wrong
+            // number, silently. The cell has room for about sixteen characters and its style already
+            // ellipsizes, so a label too long for it ends in "…" rather than in a new meaning.
+            label = q.label.uppercase(),
             value = "${signedPercent(pct)}%",
             colorRes = if (pct >= 0) R.color.nw_positive else R.color.nw_negative,
             series = q.sparkline,
         )
     }
 
+    /**
+     * The connection as it was when the reading was taken.
+     *
+     * ⚠️ "OFFLINE" alone read as a claim about now. The worker often refreshes while the phone is
+     * dozing, when the platform reports no network at all, so a phone sitting on home Wi-Fi showed
+     * OFFLINE for as long as the reading stood.
+     */
+    private fun networkAtRefresh(kind: NetworkKind): String =
+        if (kind == NetworkKind.OFFLINE) "OFFLINE AT REFRESH" else kind.name
+
     private companion object {
+        /** The feeds that need a coordinate, and so go quiet together when there is none. */
+        val PLACE_SOURCES = listOf(Source.WEATHER, Source.SAFETY, Source.SKY, Source.WATER)
+
+        /** The advisory's budget — see where it is used. Below [WIDGET_LOAD_TIMEOUT_MS] by design. */
+        const val ORACLE_BUDGET_MS = 6_000L
+
         /**
          * The row slots in `widget_lock.xml`, in order.
          *
@@ -959,15 +1319,30 @@ class LockWidgetProvider : AppWidgetProvider() {
         /** Nothing further away than this is "near you" on a home-screen row. */
         const val SAFETY_RADIUS_M = 150_000.0
 
+        /** How many days the agenda covers, today included. The owner's choice. */
+        const val AGENDA_DAYS = 14
+
         /**
-         * How far ahead the agenda looks.
-         *
-         * A day and a half, so that late one evening the column is showing tomorrow rather than
-         * running out — but not so far that the four lines fill with things you cannot act on
-         * today. The column holds [WidgetBoard.COLUMN_LINES] entries and the query is capped there,
-         * so a busy diary is truncated by the layout's own capacity rather than by the horizon.
+         * How many events the list draws. A binder transaction has a hard ceiling and every row is a
+         * small RemoteViews of its own; sixty events with their day headings is ~75 rows, well
+         * inside it with the charts, and [REDUCED_AGENDA_ROWS] is the retry if a phone disagrees.
          */
-        const val CALENDAR_HORIZON_MS = 36L * 60 * 60 * 1000
+        const val AGENDA_MAX_ITEMS = 60
+
+        /**
+         * How many the query may return. More than [AGENDA_MAX_ITEMS] on purpose: the core counts
+         * what the cap leaves out, and it can only count what it was handed.
+         */
+        const val AGENDA_QUERY_MAX = 400
+
+        /** The shorter list a failed render is retried with, before it is retried with none. */
+        const val REDUCED_AGENDA_ROWS = 24
+
+        /**
+         * The full board's breakpoint. See the note where it is used: ~624dp of regions before the
+         * list gets anything, plus room for a day heading and one event.
+         */
+        const val FULL_BOARD_MIN_HEIGHT_DP = 680f
 
         /** The station. Home propagates the same object from the same cached element set. */
         const val ISS_NORAD_ID = 25544

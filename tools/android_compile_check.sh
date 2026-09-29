@@ -188,6 +188,10 @@ done
 # one and it dies before compiling a line — which looks exactly like a clean pass, hence the check
 # below. A silent false pass is worse than no check at all.
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
+# ⚠️ A fresh container has an EMPTY Gradle cache, and the find above then comes back blank — the
+# compiler dies before reading a line. The Gradle distribution ships its own coroutines jar, which is
+# all the compiler's -cp needs, so fall back to it rather than send someone off to run a build first.
+[ -n "$COR" ] || COR=$(ls "$G"/kotlinx-coroutines-core-jvm-*.jar 2>/dev/null | head -1)
 SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.jar' 2>/dev/null | head -1)
 # ⚠️ jsoup is a DEPENDENCY OF :core:telemetry (Readability.kt), so any run that passes the whole
 # core fails wholesale without it — and the resulting hundreds of errors are all in Readability,

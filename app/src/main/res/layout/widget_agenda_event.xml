@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One event in the board's agenda list.
+
+  Two lines: "8:00 AM  Training" and, dimmed beneath it, "until 11:00 AM · Gym · CLASH". The bar on
+  the left carries the calendar's own colour — the same colour the calendar app draws the event in —
+  so a glance tells work from home without reading.
+
+  ⚠️ The bar is a TextView holding a block glyph that the code writes and tints with the typed
+  `setTextColor`, not an ImageView tinted through `setInt(…, "setColorFilter", …)`. A method reached
+  by NAME must be on WidgetLinkageTest's verified-remotable allowlist, and a typed call needs no such
+  check — the colour arrives by the safer road.
+
+  No android:text anywhere (WidgetLinkageTest), and every view states `visibility="visible"`
+  because the shared board style defaults to GONE. The detail line is hidden in code when it is
+  empty, so a bare event is one line rather than one line and a gap.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_agenda_event_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/widget_agenda_event_bar"
+        style="@style/WidgetLine.Board"
+        android:layout_width="wrap_content"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="5dp"
+        android:textSize="12sp"
+        android:visibility="visible" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_agenda_event_title"
+            style="@style/WidgetLine.Board"
+            android:layout_marginTop="0dp"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/widget_agenda_event_detail"
+            style="@style/WidgetLine.Board.Dim"
+            android:layout_marginTop="0dp"
+            android:visibility="visible" />
+    </LinearLayout>
+</LinearLayout>

@@ -588,23 +588,9 @@ class RefreshWorker(
      * freeze it.
      */
     private fun refreshWidgets() {
-        runCatching {
-            val mgr = android.appwidget.AppWidgetManager.getInstance(applicationContext)
-            val component = android.content.ComponentName(
-                applicationContext, dev.mascwa.pulse.widget.LockWidgetProvider::class.java,
-            )
-            val ids = mgr.getAppWidgetIds(component)
-            if (ids.isNotEmpty()) {
-                applicationContext.sendBroadcast(
-                    android.content.Intent(
-                        android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE,
-                    ).apply {
-                        setComponent(component)
-                        putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-                    },
-                )
-            }
-        }
+        // ⚠️ The shared broadcast, not a copy of it — the calendar trigger and the boundary alarm
+        // send the same one, and an update broadcast without its ids redraws nothing at all.
+        dev.mascwa.pulse.widget.requestWidgetUpdate(applicationContext)
     }
 
     private suspend fun resolveWeather(settings: AppSettings): WeatherData? {
