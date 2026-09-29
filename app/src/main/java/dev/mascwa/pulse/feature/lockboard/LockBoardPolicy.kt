@@ -63,9 +63,81 @@ object LockBoardPolicy {
         f.inCall -> "a call is ringing or in progress"
         f.takeoverAlive -> "an alert or breaking story is already on screen"
         f.alertSounding -> "an alarm or ringtone is sounding"
-        f.boardAlive -> "the board is already up"
-        trigger == Trigger.SCREEN_ON && !f.keyguardLocked -> "the phone is not locked"
+        f.boardAlive -> ALREADY_UP
+        trigger == Trigger.SCREEN_ON && !f.keyguardLocked -> NOT_LOCKED
         else -> null
+    }
+
+    /** The board is up and the screen went off or on again: the board working, not failing. */
+    const val ALREADY_UP = "the board is already up"
+
+    /** The screen came back within the lock delay: the phone was never locked, so nothing to cover. */
+    const val NOT_LOCKED = "the phone is not locked"
+
+    // ── what became of a screen-off ─────────────────────────────────────────────────────────────
+
+    /**
+     * What the log records about one screen-off, so Settings and a debug report can say why the
+     * board was or was not there. Without it, a board that did not appear is indistinguishable from
+     * one that was never asked for, and the owner can only report "I still had to swipe".
+     */
+    enum class Outcome {
+        /** Asked Android to open the board; not yet known whether it did. */
+        REQUESTED,
+
+        /** The board's screen came into being. */
+        SHOWN,
+
+        /** [decide] said no, with a reason worth keeping. */
+        SKIPPED,
+
+        /**
+         * Asked, and the board never came into being. ⚠️ A background start that Android refuses is
+         * DROPPED, not thrown, so there is no error to catch: the only evidence is its absence.
+         */
+        REFUSED,
+    }
+
+    /**
+     * Whether a skip is worth recording. The two ordinary ones are not: [ALREADY_UP] happens on
+     * every screen-on while the board is working, and recording it would overwrite the SHOWN that
+     * says so.
+     */
+    fun worthRecording(reason: String): Boolean = reason != ALREADY_UP && reason != NOT_LOCKED
+
+    /**
+     * Checked a moment after the screen comes on: a board still only REQUESTED — asked for, never
+     * created — was refused by Android.
+     *
+     * ⚠️ **Resolved at screen-ON, not on a timer at screen-off.** Android may hold back creating an
+     * activity until the display wakes, so "not created two seconds after screen-off" would report a
+     * refusal that is not one. By the time the screen has been on for [REFUSAL_GRACE_MS] it either
+     * exists or it is not coming.
+     */
+    fun refused(last: Outcome?, boardAlive: Boolean): Boolean = last == Outcome.REQUESTED && !boardAlive
+
+    /** How long after the screen comes on a requested board has to appear before it counts as refused. */
+    const val REFUSAL_GRACE_MS = 1_500L
+
+    /**
+     * Whether an outcome goes into the activity log that travels with a debug report.
+     *
+     * Only changes, so a day of screen toggles cannot flood a 300-entry log: a refusal or a skip is
+     * logged when it differs from the last one logged, and SHOWN only when it follows one of those —
+     * the recovery is the useful line, and an ordinary shown board is the normal state.
+     */
+    fun worthLogging(now: Outcome, reason: String?, lastLogged: Pair<Outcome, String?>?): Boolean = when (now) {
+        Outcome.REQUESTED -> false
+        Outcome.SHOWN -> lastLogged != null && lastLogged.first != Outcome.SHOWN
+        Outcome.SKIPPED, Outcome.REFUSED -> (now to reason) != lastLogged
+    }
+
+    /** The outcome as a sentence, for the Settings row and the log. */
+    fun describe(outcome: Outcome, reason: String?): String = when (outcome) {
+        Outcome.REQUESTED -> "opening as the screen went off"
+        Outcome.SHOWN -> "shown"
+        Outcome.SKIPPED -> "not shown — ${reason ?: "no reason recorded"}"
+        Outcome.REFUSED -> "Android refused to open it"
     }
 
     /**

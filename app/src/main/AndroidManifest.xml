@@ -276,6 +276,18 @@
                 android:value="official_emergency_alert_watch" />
         </service>
 
+        <!-- Keeps LCARS running so it hears the screen go off, which is when the lock-screen board is put
+             in place. It does nothing else: the screen broadcasts reach only a live process, and a
+             board cannot appear for a screen-off nobody heard. Runs only while the board is on. -->
+        <service
+            android:name=".feature.lockboard.LockBoardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="lock_screen_board" />
+        </service>
+
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <!--
           ⚠️ The install-result receiver and the two install permissions are declared by

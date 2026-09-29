@@ -77,6 +77,9 @@ class LockBoardActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         alive = true
         setShowWhenLocked(true)
+        // The evidence the start was not refused: a background start Android drops returns
+        // normally, so this is the only place that knows the board really came into being.
+        LockBoardLog.record(this, LockBoardPolicy.Outcome.SHOWN)
 
         boardHost = FrameLayout(this)
         val unlockBar = TextView(this).apply {

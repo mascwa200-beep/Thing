@@ -59,6 +59,11 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings.notifications.emergencyTakeover) {
                     runCatching { EmergencyWatchService.start(context) }
                 }
+                // The lock-screen board's listener: without a live process nothing hears the screen
+                // go off, so the first lock after a reboot would show the stock lock screen.
+                runCatching {
+                    dev.mascwa.pulse.feature.lockboard.LockBoardService.sync(context, settings.lockScreenBoard)
+                }
             } finally {
                 pending.finish()
             }

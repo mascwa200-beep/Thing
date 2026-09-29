@@ -13,6 +13,7 @@ import android.provider.Settings
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.security.DevicePolicyController
 import dev.mascwa.pulse.widget.LockBoard
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -22,10 +23,13 @@ import kotlinx.coroutines.launch
  * already there. Every decision is [LockBoardPolicy]'s; this only gathers the facts and obeys.
  *
  * ⚠️ **The screen broadcasts can only be received by a receiver registered at runtime**, so this
- * lives as long as the app's process does — the one the ambient watch and the emergency watch keep
- * running. A phone where every one of those is switched off can have its process reclaimed, and
- * then there is nothing listening until LCARS is next opened. That is the platform's rule, not a
- * choice; the Settings row says what the board needs rather than letting it quietly not appear.
+ * lives as long as the app's process does. That is why [LockBoardService] exists: the first debug
+ * report after the board shipped showed the process dead until a widget render restarted it, and a
+ * board cannot appear for a screen-off nobody heard. The settings watch below starts and stops that
+ * service, so every start of the process re-arms it.
+ *
+ * Every outcome — shown, skipped with a reason, refused by Android — goes to [LockBoardLog], because
+ * each way this can fail to appear looks exactly like the stock lock screen from the outside.
  *
  * ⚠️ **Main process only.** `PulseApplication.onCreate` runs in every process this app has, and a
  * second process registering would start a second board on every screen-off.
@@ -45,10 +49,15 @@ object LockBoardTrigger {
         // Starts false and becomes the setting within moments of launch. A screen-off in that window
         // is simply not acted on, which is the safe way round for something that covers the screen.
         app.appScope.launch {
+            LockBoardLog.load(app)
             app.container.settingsRepository.settings
                 .map { it.lockScreenBoard }
                 .distinctUntilChanged()
-                .collect { enabled = it }
+                .collect { on ->
+                    enabled = on
+                    // Keep the process alive while the board is on, and let it go when it is not.
+                    LockBoardService.sync(app, on)
+                }
         }
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
@@ -83,7 +92,14 @@ object LockBoardTrigger {
             boardAlive = LockBoardActivity.alive,
             keyguardLocked = app.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true,
         )
-        if (LockBoardPolicy.decide(trigger, facts) != null) return
+        // Asked on every screen-on, whatever is decided below: a board requested at screen-off that
+        // still does not exist by now was refused, and that is only visible as its absence.
+        if (trigger == LockBoardPolicy.Trigger.SCREEN_ON) checkForRefusal(app)
+        val reason = LockBoardPolicy.decide(trigger, facts)
+        if (reason != null) {
+            if (LockBoardPolicy.worthRecording(reason)) LockBoardLog.record(app, LockBoardPolicy.Outcome.SKIPPED, reason)
+            return
+        }
         // Read the board while the screen is dark, so it is current when the screen comes back.
         LockBoard.refreshIfStale(app, app.appScope, System.currentTimeMillis())
         runCatching {
@@ -91,8 +107,23 @@ object LockBoardTrigger {
                 Intent(app, LockBoardActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
             )
+        }.onSuccess {
+            // Not "shown": a refused background start returns normally. The activity records SHOWN
+            // when it actually comes into being; [checkForRefusal] settles it otherwise.
+            LockBoardLog.record(app, LockBoardPolicy.Outcome.REQUESTED)
         }.onFailure { err ->
             dev.mascwa.pulse.crash.Breadcrumbs.drop("lockboard", "could not start: ${err.javaClass.simpleName}")
+            LockBoardLog.record(app, LockBoardPolicy.Outcome.REFUSED)
+        }
+    }
+
+    /** A moment after the screen comes on: a board asked for and never created was refused. */
+    private fun checkForRefusal(app: PulseApplication) {
+        app.appScope.launch {
+            delay(LockBoardPolicy.REFUSAL_GRACE_MS)
+            if (LockBoardPolicy.refused(LockBoardLog.latest.value?.outcome, LockBoardActivity.alive)) {
+                LockBoardLog.record(app, LockBoardPolicy.Outcome.REFUSED)
+            }
         }
     }
 

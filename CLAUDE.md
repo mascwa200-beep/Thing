@@ -15442,3 +15442,47 @@ and on: the board should already be there, not the stock lock screen first. Fing
 up — does it unlock and step aside, or does it need UNLOCK? (Occluding activities vary here; UNLOCK
 always works.) Tap a region: bouncer, then that screen. During a call, and with an alarm ringing, it
 must stay out of the way. If it never appears, Settings says why.
+
+#### "I still have to swipe" — the phone was on #2225; the board was never installed (this session)
+
+Owner sent a screenshot of the stock Android 17 lock screen being swiped to reveal the system's own
+widget page: *"I still have to swipe to get it … No swiping."* **The debug reports settled it before
+any code was read:** three reports on `debug-reports` at 14:21 EDT, two minutes after the
+screenshot, all say `build: 1.0.2225-debug`. The board ships in **#2228** (`249bd97`). What was
+swiped to is Android's own lock-screen widget hub, which always needs a swipe. ⚠️ **Read
+`debug-reports` first whenever the owner reports a feature "not working"** — the build line answers
+the most common cause in one fetch. The phone had been on cellular all day, and the background
+installer waits for unmetered.
+
+The same reports showed two things worth fixing even once installed:
+- **The phone is Android 17 (API 37)**, two releases past the API 35 the background-start reasoning
+  was checked against. Device owner should still be exempt; nothing proves it on the device.
+- **The process is not reliably resident**: it had been dead until a widget render restarted it at
+  14:18. The screen-off broadcast reaches only a live process, so no board can appear for a
+  screen-off nobody heard.
+
+Owner chose (AskUserQuestion) a **dedicated service** over relying on the existing watches:
+- **`LockBoardService`** — a `specialUse` FGS (`NotifId.FGS_LOCK_BOARD = 7404`, IMPORTANCE_MIN
+  channel `lock_board`, START_STICKY) that does nothing but keep the process alive. Runs only while
+  `lockScreenBoard && canLaunch` — a notification promising a board Android will refuse is worse than
+  none. Started and stopped from `LockBoardTrigger`'s settings watch (so any process start re-arms
+  it), revived by `BootReceiver`, self-healed by `RefreshWorker`.
+- **`LockBoardLog`** — the last outcome (REQUESTED / SHOWN / SKIPPED+reason / REFUSED) in a small
+  prefs file, under the Settings switch as "Last screen-off", and to the activity log on change.
+  ⚠️ **A refused background start is DROPPED, not thrown**, so REFUSED is inferred: the trigger
+  records REQUESTED, `LockBoardActivity.onCreate` records SHOWN, and 1.5 s after the next screen-on a
+  still-REQUESTED entry with no live board becomes REFUSED. Resolved at screen-ON rather than on a
+  timer at screen-off because Android may hold back creating the activity until the display wakes.
+  The two routine skips (`ALREADY_UP`, `NOT_LOCKED`) are not recorded, or every screen-on would
+  overwrite the SHOWN that says it worked.
+- `tools/run_notifid_test.sh` gained the `/opt/gradle` jar fallback the other gates already had — on a
+  fresh container its Gradle-cache lookup found nothing and it refused to run.
+
+**Verified locally:** `LockBoardPolicyTest` 14/14 with all four new rules negative-tested (each fails
+exactly its own test); `NotifIdTest` 4/4, negative-tested by dropping the new entry; the whole
+lock-board package plus the service and log compile clean against the real platform and AndroidX
+jars, gate negative-tested with a planted typo; a typed probe compiled the Settings row's
+expressions. ⚠️ **Owner-verify on the Pixel, on #2229 or later:** a quiet "Lock-screen board ready"
+notification exists; power off/on shows the board with no swipe; Settings ▸ Appearance ▸ Last
+screen-off says "shown". If it says "Android refused to open it", Android 17 has closed the
+device-owner exemption and the design needs rethinking.

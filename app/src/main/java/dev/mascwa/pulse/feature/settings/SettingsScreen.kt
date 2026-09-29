@@ -662,6 +662,25 @@ fun SettingsScreen(
                         },
                         s.lockScreenBoard,
                     ) { v -> vm.update { it.copy(lockScreenBoard = v) } }
+                    // What became of the last screen-off. Every way the board can fail to appear
+                    // looks exactly like the stock lock screen, so this is where the reason lives.
+                    val boardLast by dev.mascwa.pulse.feature.lockboard.LockBoardLog.latest.collectAsStateWithLifecycle()
+                    LaunchedEffect(Unit) {
+                        withContext(Dispatchers.IO) { dev.mascwa.pulse.feature.lockboard.LockBoardLog.load(context) }
+                    }
+                    if (s.lockScreenBoard) {
+                        val last = boardLast
+                        PrefInfo(
+                            "Last screen-off",
+                            subtitle = if (last == null) {
+                                "Nothing yet — turn the screen off and on once."
+                            } else {
+                                java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                                    .format(java.util.Date(last.atMs)) + " — " +
+                                    dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.describe(last.outcome, last.reason)
+                            },
+                        )
+                    }
                 }
             }
 

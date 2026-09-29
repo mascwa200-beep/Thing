@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.feature.lockboard
 
 import dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.Facts
+import dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.Outcome as O
 import dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.Trigger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -105,5 +106,46 @@ class LockBoardPolicyTest {
         assertFalse(LockBoardPolicy.isStale(now - LockBoardPolicy.STALE_AFTER_MS, now))
         assertTrue(LockBoardPolicy.isStale(now - LockBoardPolicy.STALE_AFTER_MS - 1, now))
         assertTrue(LockBoardPolicy.isStale(now + 60_000L, now))
+    }
+
+    // ── the outcome log ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `the two ordinary skips are not recorded, every other reason is`() {
+        // ALREADY_UP happens on every screen-on while the board works; recording it would overwrite
+        // the SHOWN that says so.
+        assertFalse(LockBoardPolicy.worthRecording(LockBoardPolicy.decide(Trigger.SCREEN_ON, clear.copy(boardAlive = true))!!))
+        assertFalse(LockBoardPolicy.worthRecording(LockBoardPolicy.decide(Trigger.SCREEN_ON, clear.copy(keyguardLocked = false))!!))
+        for (f in listOf(
+            clear.copy(enabled = false), clear.copy(canLaunch = false), clear.copy(inCall = true),
+            clear.copy(takeoverAlive = true), clear.copy(alertSounding = true),
+        )) {
+            assertTrue(LockBoardPolicy.worthRecording(LockBoardPolicy.decide(Trigger.SCREEN_OFF, f)!!))
+        }
+    }
+
+    @Test
+    fun `a board asked for and never created is a refusal, and only that`() {
+        assertTrue(LockBoardPolicy.refused(O.REQUESTED, boardAlive = false))
+        // Created late but alive by now: not refused, whatever the log says.
+        assertFalse(LockBoardPolicy.refused(O.REQUESTED, boardAlive = true))
+        assertFalse(LockBoardPolicy.refused(O.SHOWN, boardAlive = false))
+        assertFalse(LockBoardPolicy.refused(O.SKIPPED, boardAlive = false))
+        assertFalse(LockBoardPolicy.refused(null, boardAlive = false))
+    }
+
+    @Test
+    fun `the activity log gets changes, not every screen-off`() {
+        // A refusal is logged, and a second identical one is not.
+        assertTrue(LockBoardPolicy.worthLogging(O.REFUSED, null, lastLogged = null))
+        assertFalse(LockBoardPolicy.worthLogging(O.REFUSED, null, lastLogged = O.REFUSED to null))
+        // A different skip reason is a change.
+        assertTrue(LockBoardPolicy.worthLogging(O.SKIPPED, "a call", lastLogged = O.SKIPPED to "an alarm"))
+        assertFalse(LockBoardPolicy.worthLogging(O.SKIPPED, "a call", lastLogged = O.SKIPPED to "a call"))
+        // SHOWN is the normal state: logged only as the recovery from a refusal or a skip.
+        assertFalse(LockBoardPolicy.worthLogging(O.SHOWN, null, lastLogged = null))
+        assertTrue(LockBoardPolicy.worthLogging(O.SHOWN, null, lastLogged = O.REFUSED to null))
+        assertFalse(LockBoardPolicy.worthLogging(O.SHOWN, null, lastLogged = O.SHOWN to null))
+        assertFalse(LockBoardPolicy.worthLogging(O.REQUESTED, null, lastLogged = O.REFUSED to null))
     }
 }
