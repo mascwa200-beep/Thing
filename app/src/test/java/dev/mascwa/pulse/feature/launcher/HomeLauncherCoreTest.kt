@@ -105,4 +105,18 @@ class HomeLauncherCoreTest {
         assertEquals(listOf("Charlie", "Alpha"), docked.map { it.label })
         assertNull(HomeDirectory.docked(emptyList(), apps) { it.key }.firstOrNull())
     }
+
+    @Test
+    fun `pinning appends at the end and unpinning removes only that pin`() {
+        assertEquals(listOf("a", "b", "c"), HomeDirectory.togglePin(listOf("a", "b"), "c"))
+        assertEquals(listOf("a", "c"), HomeDirectory.togglePin(listOf("a", "b", "c"), "b"))
+    }
+
+    @Test
+    fun `a full dock refuses a new pin but still lets one go`() {
+        val full = (1..HomeDirectory.MAX_PINS).map { "p$it" }
+        assertNull(HomeDirectory.togglePin(full, "new"))
+        // Unpinning is never refused, or a full dock could never be changed at all.
+        assertEquals(full - "p3", HomeDirectory.togglePin(full, "p3"))
+    }
 }

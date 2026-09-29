@@ -54,6 +54,23 @@ object HomeDirectory {
         return pins.distinct().mapNotNull { byKey[it] }
     }
 
+    /**
+     * The pins after [key] is pinned or unpinned: removed if it was there, otherwise added at the
+     * END, so the dock keeps the order things were pinned in.
+     *
+     * Null when [key] is not pinned and the dock is already [max] long. A full dock refuses rather
+     * than quietly dropping the oldest pin, because the pin that would vanish is one somebody put
+     * there on purpose and would not see go.
+     */
+    fun togglePin(pins: List<String>, key: String, max: Int = MAX_PINS): List<String>? = when {
+        key in pins -> pins.filter { it != key }
+        pins.size >= max -> null
+        else -> pins + key
+    }
+
+    /** How many apps the dock holds: one row on a phone, and more than that is a second directory. */
+    const val MAX_PINS = 8
+
     /** Lower case, accents stripped, runs of whitespace collapsed. */
     internal fun fold(s: String): String =
         Normalizer.normalize(s, Normalizer.Form.NFD)

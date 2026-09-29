@@ -250,6 +250,40 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
             android:theme="@style/Theme.Pulse.LockBoard" />
 
+        <!-- The LCARS home screen. Not a Home on its own: the HOME filter is on the alias below. It is
+             its own task (empty affinity, singleTask) the way a launcher is, is never in Recents, and
+             resumes while the previous app is still pausing so the Home button feels immediate.
+             configChanges keeps a rotation or a font change from recreating it, which the crash-loop
+             guard would otherwise count as a start. -->
+        <activity
+            android:name=".feature.launcher.LauncherActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:resumeWhilePausing="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- What makes it a Home. ⚠️ DISABLED in the manifest: a phone that has not switched the LCARS
+             home screen on in Settings never sees LCARS offered as a launcher, and switching it off
+             disables this again, so no stray Home is left behind to be picked by accident. -->
+        <activity-alias
+            android:name=".LcarsHome"
+            android:targetActivity=".feature.launcher.LauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- OFFICIAL EMERGENCY ALERT — a full-screen condition-red takeover with a full-volume alarm on
              the alarm stream, raised from a government CAP feed (never from a news headline). Back is
              deliberately disabled; the acknowledge button is the only way out. Shows over the lock screen

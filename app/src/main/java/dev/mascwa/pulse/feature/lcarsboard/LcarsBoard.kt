@@ -198,7 +198,7 @@ internal fun LcarsBoardPanels(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         board.upNext?.takeIf { it.isNotBlank() }?.let { line ->
             val open = board.upNextOpen
-            Panel("Up next", tab(0), progress, next()) {
+            ConsolePanel("Up next", tab(0), progress, next()) {
                 BoardLine(
                     line,
                     color = board.upNextArgb?.let { Color(it) } ?: c.ink,
@@ -209,7 +209,7 @@ internal fun LcarsBoardPanels(
         }
 
         board.alert?.takeIf { it.isNotBlank() }?.let { alert ->
-            Panel("Alert", c.negative, progress, next()) {
+            ConsolePanel("Alert", c.negative, progress, next()) {
                 BoardLine(alert, color = c.negative, size = 15.sp, onClick = board.alertRoute?.route(onTap))
             }
         }
@@ -218,7 +218,7 @@ internal fun LcarsBoardPanels(
         val detail = board.leadDetail?.takeIf { it.isNotBlank() }
         val sources = board.sources.filter { it.isNotBlank() }
         if (lead != null || detail != null || sources.isNotEmpty()) {
-            Panel("News", tab(1), progress, next()) {
+            ConsolePanel("News", tab(1), progress, next()) {
                 lead?.let {
                     BoardLine(
                         it,
@@ -237,7 +237,7 @@ internal fun LcarsBoardPanels(
         val pct = board.breadthPct
         if (board.indices.isNotEmpty() || board.stocks.isNotEmpty() || breadth != null || pct != null) {
             val markets = Routes.MARKETS.route(onTap)
-            Panel("Markets", tab(2), progress, next(), onTitle = markets) {
+            ConsolePanel("Markets", tab(2), progress, next(), onTitle = markets) {
                 if (board.indices.isNotEmpty()) Cells(board.indicesLabel, board.indices, markets)
                 if (board.stocks.isNotEmpty()) Cells(board.stocksLabel, board.stocks, markets)
                 breadth?.let { BoardLine(it, color = c.ink, size = 13.sp, mono = true, onClick = markets) }
@@ -254,7 +254,7 @@ internal fun LcarsBoardPanels(
 
         val readouts = board.readouts.filter { it.text.isNotBlank() }
         if (readouts.isNotEmpty()) {
-            Panel("Readings", tab(3), progress, next()) {
+            ConsolePanel("Readings", tab(3), progress, next()) {
                 readouts.forEach { r -> BoardLine(r.text, color = c.ink, size = 13.sp, mono = true, onClick = r.route?.route(onTap)) }
             }
         }
@@ -265,7 +265,7 @@ internal fun LcarsBoardPanels(
                 listOf(left, right).forEachIndexed { side, col ->
                     val shown = col.label.isNotBlank() || col.lines.any { it.isNotBlank() }
                     if (shown) {
-                        Panel(col.label.ifBlank { "·" }, tab(4 + side), progress, index, Modifier.weight(1f), onTitle = col.route?.route(onTap)) {
+                        ConsolePanel(col.label.ifBlank { "·" }, tab(4 + side), progress, index, Modifier.weight(1f), onTitle = col.route?.route(onTap)) {
                             col.lines.filter { it.isNotBlank() }.forEach {
                                 BoardLine(it, color = c.ink, size = 12.sp, mono = true, onClick = col.route?.route(onTap))
                             }
@@ -279,7 +279,7 @@ internal fun LcarsBoardPanels(
 
         board.agenda?.let { block ->
             val day = BoardTap.Sender(CalendarIntents.day(context, block.todayMs).intentSender)
-            Panel(
+            ConsolePanel(
                 block.heading,
                 tab(6),
                 progress,
@@ -313,19 +313,19 @@ internal fun LcarsBoardPanels(
         }
 
         board.foot?.takeIf { it.isNotBlank() }?.let { foot ->
-            Panel("System", tab(7), progress, next()) {
+            ConsolePanel("System", tab(7), progress, next()) {
                 BoardLine(foot, color = c.muted, size = 12.sp, mono = true, onClick = board.footRoute?.route(onTap))
             }
         }
 
         board.degraded?.takeIf { it.isNotBlank() }?.let { degraded ->
-            Panel("Feeds down", c.amber, progress, next()) {
+            ConsolePanel("Feeds down", c.amber, progress, next()) {
                 BoardLine(degraded, color = c.amber, size = 13.sp, onClick = board.degradedRoute?.route(onTap))
             }
         }
 
         board.needsYou?.takeIf { it.isNotBlank() }?.let { needs ->
-            Panel("Needs you", c.accent, progress, next()) {
+            ConsolePanel("Needs you", c.accent, progress, next()) {
                 BoardLine(needs, color = c.accent, size = 13.sp, onClick = board.needsYouRoute?.route(onTap))
             }
         }
@@ -337,17 +337,19 @@ internal fun LcarsBoardPanels(
 private fun String.route(onTap: (BoardTap) -> Unit): () -> Unit = { onTap(BoardTap.Route(this)) }
 
 /** Width of the coloured cap down a panel's left edge, and the gap between it and the words. */
-private val CapWidth = 8.dp
-private val CapGap = 10.dp
+internal val PanelCapWidth = 8.dp
+internal val PanelCapGap = 10.dp
 
 /**
  * One region: a solid cap down its left edge, a solid tab carrying its name, and its lines on black.
  *
  * The cap is DRAWN rather than laid out, so the panel needs no intrinsic measurement to know how
  * tall its cap should be — it is simply as tall as the panel turned out.
+ *
+ * Shared with the home screen, so its dock is a panel of the same console rather than a lookalike.
  */
 @Composable
-private fun Panel(
+internal fun ConsolePanel(
     title: String,
     tab: Color,
     progress: () -> Float,
@@ -357,7 +359,6 @@ private fun Panel(
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val cue = rememberLcarsCue()
     Column(
         modifier
             .fillMaxWidth()
@@ -365,48 +366,65 @@ private fun Panel(
             .drawBehind {
                 drawRoundRect(
                     color = tab,
-                    size = Size(CapWidth.toPx(), size.height),
-                    cornerRadius = CornerRadius(CapWidth.toPx() / 2f),
+                    size = Size(PanelCapWidth.toPx(), size.height),
+                    cornerRadius = CornerRadius(PanelCapWidth.toPx() / 2f),
                 )
             }
-            .padding(start = CapWidth + CapGap),
+            .padding(start = PanelCapWidth + PanelCapGap),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .clip(lcarsBlockShape(8.dp, LcarsCorner.TopEnd))
-                    .background(tab)
-                    .then(
-                        if (onTitle != null) {
-                            Modifier.clickable { cue(SoundCue.TAP, HapticCue.TAP_CRISP); onTitle() }
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
-            ) {
-                Text(
-                    title.uppercase(),
-                    fontFamily = Antonio,
-                    fontSize = 14.sp,
-                    letterSpacing = 1.5.sp,
-                    color = textOnBlock(tab),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            Box(Modifier.weight(1f).height(6.dp).background(tab))
-            if (trailing != null) {
-                Spacer(Modifier.width(4.dp))
-                trailing()
-            }
-        }
+        PanelTab(title, tab, onTitle, trailing)
         Column(
             Modifier.padding(top = 6.dp, bottom = 2.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             content = content,
         )
+    }
+}
+
+/**
+ * A panel's title: a solid tab carrying the name, lettered for its own colour, and a bar of the same
+ * colour running out to the edge. Tapping the tab opens what [onTitle] names.
+ *
+ * Also the home screen's letter headings, so the directory is ruled the way the board is.
+ */
+@Composable
+internal fun PanelTab(
+    title: String,
+    tab: Color,
+    onTitle: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val cue = rememberLcarsCue()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .clip(lcarsBlockShape(8.dp, LcarsCorner.TopEnd))
+                .background(tab)
+                .then(
+                    if (onTitle != null) {
+                        Modifier.clickable { cue(SoundCue.TAP, HapticCue.TAP_CRISP); onTitle() }
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        ) {
+            Text(
+                title.uppercase(),
+                fontFamily = Antonio,
+                fontSize = 14.sp,
+                letterSpacing = 1.5.sp,
+                color = textOnBlock(tab),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Box(Modifier.weight(1f).height(6.dp).background(tab))
+        if (trailing != null) {
+            Spacer(Modifier.width(4.dp))
+            trailing()
+        }
     }
 }
 
