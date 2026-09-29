@@ -259,7 +259,7 @@ object Agenda {
      *
      * The end is dated when it falls on another day — "until WED 30 SEP 2:00 AM" — because an
      * overnight shift that says only "until 2:00 AM" reads as ending before it began. The calendar's
-     * name is included only when [withCalendar]: with one calendar it is the same word on every row.
+     * name is included only when [withCalendar] — see [otherCalendars] for which rows earn it.
      */
     fun detailLine(e: Entry, fmt: Format, withCalendar: Boolean): String? {
         val parts = mutableListOf<String>()
@@ -287,9 +287,30 @@ object Agenda {
         return parts.joinToString(" · ")
     }
 
-    /** Whether the calendars differ enough to be worth naming on each row. */
-    fun showsCalendars(plan: Plan): Boolean =
-        plan.all.map { it.event.calendarName.trim() }.filter { it.isNotEmpty() }.distinct().size >= 2
+    /**
+     * The calendars worth naming on a row: every one except the main one, or none when there is
+     * only one.
+     *
+     * ⚠️ **This used to be a yes/no for the whole list, and the widget printed the owner's own email
+     * address under every single event.** Once two calendars appeared anywhere in the fortnight — a
+     * holidays calendar is enough — every row was named, including the ones in the calendar nearly
+     * all of them belong to, whose name on a Google account IS the account's email. Eight rows of
+     * `mascwa200@gmail.com` told the reader nothing, and put an address on a home screen and a lock
+     * screen that anyone can read. Naming only the exceptions says the one useful thing: this one is
+     * from somewhere else.
+     *
+     * The main calendar is the one with the most events in the whole plan, ties broken by name so the
+     * choice cannot flip between two renders of the same diary.
+     */
+    fun otherCalendars(plan: Plan): Set<String> {
+        val counts = plan.all.map { it.event.calendarName.trim() }
+            .filter { it.isNotEmpty() }
+            .groupingBy { it }.eachCount()
+        if (counts.size < 2) return emptySet()
+        val main = counts.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .first().key
+        return counts.keys - main
+    }
 
     private fun titleOf(e: Event): String = e.title.trim().ifEmpty { "(no title)" }
 

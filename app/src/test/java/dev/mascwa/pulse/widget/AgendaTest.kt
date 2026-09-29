@@ -326,13 +326,41 @@ class AgendaTest {
     }
 
     @Test
-    fun `one calendar is not worth naming on every row`() {
+    fun `one calendar is never named`() {
         val one = plan(listOf(timed(1, "A", d(9), d(10), calendar = "Work"), timed(2, "B", d(11), d(12), calendar = "Work")), d(7))
-        assertFalse(Agenda.showsCalendars(one))
+        assertEquals(emptySet<String>(), Agenda.otherCalendars(one))
         val blank = plan(listOf(timed(1, "A", d(9), d(10), calendar = "Work"), timed(2, "B", d(11), d(12), calendar = " ")), d(7))
-        assertFalse(Agenda.showsCalendars(blank))
-        val two = plan(listOf(timed(1, "A", d(9), d(10), calendar = "Work"), timed(2, "B", d(11), d(12), calendar = "Home")), d(7))
-        assertTrue(Agenda.showsCalendars(two))
+        assertEquals(emptySet<String>(), Agenda.otherCalendars(blank))
+        // No named calendar at all — a provider that reports none, or an empty fortnight. There is no
+        // main calendar to pick, and picking one from nothing must not throw.
+        val unnamed = plan(listOf(timed(1, "A", d(9), d(10)), timed(2, "B", d(11), d(12))), d(7))
+        assertEquals(emptySet<String>(), Agenda.otherCalendars(unnamed))
+        assertEquals(emptySet<String>(), Agenda.otherCalendars(plan(emptyList(), d(7))))
+    }
+
+    @Test
+    fun `the main calendar goes unnamed and the exceptions are named`() {
+        // The screenshot's shape: the owner's own calendar on nearly every event, one holiday elsewhere.
+        val p = plan(
+            listOf(
+                timed(1, "Training", d(9), d(10), calendar = "me@example.com"),
+                timed(2, "Dinner", d(17), d(18), calendar = "me@example.com"),
+                timed(3, "Lights out", d(22), d(23), calendar = "me@example.com"),
+                timed(4, "Equinox", d(12), d(13), calendar = "Holidays"),
+            ),
+            d(7),
+        )
+        assertEquals(setOf("Holidays"), Agenda.otherCalendars(p))
+    }
+
+    @Test
+    fun `a tie is broken by name so the choice cannot flip between renders`() {
+        // "Home" sorts first, so it is the main one and "Work" is the exception — whichever of the two
+        // comes first in the day. The plan orders by time, so it is the TIMES that are swapped here.
+        val workFirst = plan(listOf(timed(1, "A", d(9), d(10), calendar = "Work"), timed(2, "B", d(11), d(12), calendar = "Home")), d(7))
+        assertEquals(setOf("Work"), Agenda.otherCalendars(workFirst))
+        val homeFirst = plan(listOf(timed(1, "A", d(11), d(12), calendar = "Work"), timed(2, "B", d(9), d(10), calendar = "Home")), d(7))
+        assertEquals(setOf("Work"), Agenda.otherCalendars(homeFirst))
     }
 
     @Test

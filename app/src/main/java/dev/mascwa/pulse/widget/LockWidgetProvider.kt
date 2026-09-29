@@ -36,6 +36,7 @@ import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.weather.WeatherCode
+import dev.mascwa.pulse.feature.economy.economyLine
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.widget.WidgetDiagnostics.Outcome
 import dev.mascwa.pulse.widget.WidgetDiagnostics.Source
@@ -739,7 +740,10 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val fuel = async {
-                    widgetSource<List<String>>(Source.FUEL, outcomes) {
+                    // The board's lines, and the row form's one line. ⚠️ They differ on purpose: the
+                    // board draws these under a column already titled FUEL, where a "FUEL  " prefix
+                    // printed the word twice; the row form has no heading, so its line keeps it.
+                    widgetSource<Pair<List<String>, String>>(Source.FUEL, outcomes) {
                         // ⚠️ ONE fetch for both lines. The pump price rides on the same call as the
                         // benchmark — `usRetail` was being fetched and thrown away — and asking the
                         // repository twice inside a four-second budget would pay for it twice.
@@ -747,7 +751,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                         val crude = d.benchmarks.firstOrNull()?.let { b ->
                             val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
                             val pct = b.changePercent?.let { " ${signedPercent(it)}%" }.orEmpty()
-                            "FUEL  ${b.label} $price$pct".trim()
+                            "${b.label} $price$pct".trim()
                         }
                         // ⚠️ US-only and key-gated, by the repository — EIA is an American agency
                         // and the World Bank retired both of its pump-price indicators, so there is
@@ -761,7 +765,8 @@ class LockWidgetProvider : AppWidgetProvider() {
                             }
                             .ifBlank { null }
                             ?.let { "PUMP  $it /gal" }
-                        listOfNotNull(crude, pump).ifEmpty { null }
+                        val lines = listOfNotNull(crude, pump).ifEmpty { return@widgetSource null }
+                        lines to (crude?.let { "FUEL  $it" } ?: lines.first())
                     }
                 }
                 val data = async {
@@ -924,13 +929,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                         val wanted = listOf("FP.CPI.TOTL.ZG", "NY.GDP.MKTP.KD.ZG", "SL.UEM.TOTL.ZS")
                         val ordered = wanted.mapNotNull { id -> series.firstOrNull { it.indicatorId == id } } +
                             series.filter { it.indicatorId !in wanted }
-                        ordered.take(3).mapNotNull { s2 ->
-                            s2.latest?.let { p ->
-                                // ⚠️ These are World Bank ANNUAL series, so the year is not
-                                // decoration — "2.9%" without it reads as this month's print.
-                                "${s2.indicatorTitle.take(18)} ${Formatters.number(p.value, 1)}${s2.unit.take(10)} · ${p.year}"
-                            }
-                        }.ifEmpty { null }
+                        // ⚠️ Through the Economy screen's own formatter. Built here by hand it read
+                        // "Inflation (CPI) 3annual % · 2025" — see `economyLine`.
+                        ordered.take(3).mapNotNull { economyLine(it) }.ifEmpty { null }
                     }
                 }
 
@@ -998,9 +999,9 @@ class LockWidgetProvider : AppWidgetProvider() {
                 sky.await()?.let { skyLine = it; rows += Row(it, Role.SECONDARY, route = Routes.ORBITAL) }
                 space.await()?.let { spaceLine = it; rows += Row(it, Role.SECONDARY, route = Routes.HOME) }
                 water.await()?.let { waterLine = it; rows += Row(it, Role.SECONDARY, route = Routes.WEATHER) }
-                fuel.await()?.let {
-                    fuelLines = it
-                    rows += Row(it.first(), Role.SECONDARY, route = Routes.FUEL)
+                fuel.await()?.let { (lines, rowText) ->
+                    fuelLines = lines
+                    rows += Row(rowText, Role.SECONDARY, route = Routes.FUEL)
                 }
                 data.await()?.let { dataLine = it; rows += Row(it, Role.SECONDARY, route = Routes.SETTINGS) }
                 comms.await()?.let {
@@ -1199,7 +1200,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             )
         }
         val accent = ContextCompat.getColor(context, widgetAccentRes())
-        val withCalendar = Agenda.showsCalendars(plan)
+        val otherCalendars = Agenda.otherCalendars(plan)
         val todayStart = Agenda.startOfLocalDay(plan.today, offsetAt)
         val rows = buildList {
             // A list that opens on Thursday reads as though today had been forgotten. Say it is clear.
@@ -1224,7 +1225,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                         WidgetBoard.AgendaRow(
                             WidgetBoard.AgendaKind.EVENT,
                             Agenda.titleLine(e, fmt),
-                            Agenda.detailLine(e, fmt, withCalendar),
+                            Agenda.detailLine(e, fmt, withCalendar = e.event.calendarName.trim() in otherCalendars),
                             textArgb = accent.takeIf { e.state == Agenda.State.NOW },
                             barArgb = e.event.colorArgb,
                             fillIn = CalendarIntents.eventFillIn(e.event.id, e.event.startMs, e.event.endMs),
@@ -1273,7 +1274,10 @@ class LockWidgetProvider : AppWidgetProvider() {
     private fun cellFor(q: dev.mascwa.pulse.data.markets.Quote): WidgetBoard.Cell {
         val pct = q.changePercent ?: 0.0
         return WidgetBoard.Cell(
-            label = q.label.take(9).uppercase(),
+            // ⚠️ Not `take(9)`: that turned NASDAQ 100 into "NASDAQ 10", a different and wrong
+            // number, silently. The cell has room for about sixteen characters and its style already
+            // ellipsizes, so a label too long for it ends in "…" rather than in a new meaning.
+            label = q.label.uppercase(),
             value = "${signedPercent(pct)}%",
             colorRes = if (pct >= 0) R.color.nw_positive else R.color.nw_negative,
             series = q.sparkline,
