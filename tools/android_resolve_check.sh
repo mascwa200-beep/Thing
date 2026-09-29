@@ -71,6 +71,8 @@ set -uo pipefail
 G=/opt/gradle-8.14.3/lib
 GC=/root/.gradle/caches/modules-2/files-2.1
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
+# A fresh container's Gradle cache is empty; the distribution carries its own coroutines jar.
+[ -n "$COR" ] || COR=$(ls /opt/gradle-8.14.3/lib/kotlinx-coroutines-core-jvm-*.jar 2>/dev/null | head -1)
 # kotlinx-serialization too: without it every @Serializable app model fails on the annotation,
 # and the differencing then reports each NEWLY ADDED member of that model as unresolved. That is
 # a pure false positive and it fires on the commonest edit there is — adding a field to a cached
@@ -220,6 +222,9 @@ OKIO=$(find "$GC/com.squareup.okio" -name 'okio-jvm-*.jar' 2>/dev/null | head -1
 SERJ=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-json-jvm-*.jar' 2>/dev/null | head -1)
 if [ ! -d "$FEEDS" ]; then
   echo "note: $FEEDS not built — run ./gradlew :core:feeds:classes or expect false positives" >&2
+  # ⚠️ Left OFF the classpath rather than passed as a path that does not exist: the compiler throws
+  # NoSuchFileException on it and never reads a line, which cost a whole gate on a fresh container.
+  FEEDS=""
 fi
 # ⚠️ STALE, not just missing. These are classes from whenever feeds was last built, so a member you
 # have just ADDED to `core/feeds` source is absent from them and every call to it is reported as a

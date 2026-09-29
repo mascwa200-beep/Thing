@@ -199,6 +199,8 @@ KOTLINC="$G/kotlin-compiler-embeddable-2.0.21.jar"
 STDLIB=$(ls "$G"/kotlin-stdlib-*.jar 2>/dev/null | head -1)
 TROVE=$(ls "$G"/trove4j-*.jar 2>/dev/null | head -1)
 COROUT=$(find /root/.gradle ~/.gradle -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
+# A fresh container's Gradle cache is empty; the distribution carries its own coroutines jar.
+[ -n "$COROUT" ] || COROUT=$(ls "$G"/kotlinx-coroutines-core-jvm-*.jar 2>/dev/null | head -1)
 # ⚠️ Assert the jars exist. Without coroutines on the COMPILER's own -cp it dies before reading a
 # line, and empty output is indistinguishable from a clean pass — that has been read as success once.
 for j in "$KOTLINC" "$STDLIB" "$TROVE" "$COROUT"; do
@@ -229,7 +231,14 @@ if [ -z "$APP" ]; then
     echo "   (no app files changed)"
 else
     # shellcheck disable=SC2086
-    bash tools/android_resolve_check.sh $APP 2>&1 | tail -12 | sed 's/^/   /'
+    RES=$(bash tools/android_resolve_check.sh $APP 2>&1)
+    echo "$RES" | tail -12 | sed 's/^/   /'
+    # ⚠️ Advisory by design — its findings carry a known cascade, so they never fail this script.
+    # But a gate that could not RUN is not advisory, it is absent, and must not end in "gates clean".
+    if echo "$RES" | grep -qE 'DID NOT RUN|MISSING JAR|missing a required jar'; then
+        echo "   the resolve gate did not run — this is NOT a pass"
+        FAIL=1
+    fi
 fi
 
 # ---- 4. :core:health, compiled in full ----------------------------------------------------------
