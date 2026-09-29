@@ -15185,7 +15185,7 @@ for approval.
 | `2b2e15a` | review fix: a calendar that fails is not a clear fortnight |
 | `5ea51fb` | **A3**: redraws on calendar change (content-URI worker) and at event starts, ends and midnight (RTC alarm) |
 | `c8af435` | **A4**: every region answers a tap; UPDATED stamp; OFFLINE AT REFRESH; NEEDS YOU |
-| next | second review fix: data older than the stamp is named; a slow or switched-off location says so |
+| `f35fa9b` | second review fix: data older than the stamp is named; a slow or switched-off location says so |
 
 **`Agenda.kt` lives in `:app`, not `:core:telemetry`, on purpose.** A core change fires four
 workflows and republishes three apps for a class none of them can call. Its test runs under
@@ -15278,6 +15278,11 @@ workflows and republishes three apps for a class none of them can call. Its test
   - Three scripts had no fallback for the coroutines jar. On an empty Gradle cache the compiler died
     before reading a line.
   - `check_changed.sh` now reports a gate that did not run as a **FAIL**, not "gates clean".
+
+**CI: LCARS #2222 is fully green on `f35fa9b`** and published to `latest` at 16:09Z. Unit tests
+took 3m15s and the release APK 9m39s, and every packaging assertion plus the R8 keep gate passed. The
+builds on `854d1c9`, `5ea51fb` and `c8af435` were superseded under `cancel-in-progress`. `f71d326` was
+green on its own.
 
 ⚠️ **Owner-verify on the Pixel.** CI compiles a widget but never draws one.
 
