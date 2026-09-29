@@ -15419,6 +15419,14 @@ open on success. `RemoteViews.InteractionHandler` exists but is hidden API; do n
 **Never a trap:** Back leaves; USER_PRESENT (fingerprint/face/bouncer) ends it; it never turns the
 screen on or keeps it on. Not `noHistory` — that finishes on invisibility, i.e. at screen-off.
 
+⚠️ **One unlock path, not three (found re-reading the diff while CI ran).** Three signals say the
+phone is unlocked — the dismiss callback, USER_PRESENT, and `onResume` seeing a lit unlocked phone —
+and Android does not order them. As first written they acted separately: `onResume` winning finished
+the board with a tap still held, so the callback then launched from a finishing activity and the
+event somebody unlocked to open could be lost; USER_PRESENT with a tap held did nothing. All three
+now call `unlocked()`, which takes the held tap exactly once — whichever arrives first opens it.
+The CI compile gate on `401f7a7` (LCARS #2227) had already passed; this rode the next push.
+
 **Setting:** `AppSettings.lockScreenBoard`, **default ON** (asked for by name), Settings ▸ Interface
 ▸ Appearance ▸ "Lock-screen board"; the subtitle says anyone who picks the phone up sees it,
 calendar included. Section keywords gained `lock screen lockscreen keyguard board` (the findability

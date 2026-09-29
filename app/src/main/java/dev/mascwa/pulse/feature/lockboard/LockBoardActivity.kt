@@ -115,13 +115,12 @@ class LockBoardActivity : ComponentActivity() {
             override fun handleOnBackPressed() = finish()
         })
 
-        // Unlocked some other way — fingerprint, face, the bouncer after UNLOCK: step aside. An
-        // unlock WE asked for finishes in its own callback, after opening what was tapped.
+        // Unlocked — fingerprint, face, the bouncer after UNLOCK — by whichever route: see [unlocked].
         // ⚠️ Registered at runtime because it has to be: USER_PRESENT is never delivered to a
         // manifest receiver. No export flag, as for every protected system broadcast in this app.
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
-                if (intent?.action == Intent.ACTION_USER_PRESENT && pendingTap == null) finish()
+                if (intent?.action == Intent.ACTION_USER_PRESENT) unlocked()
             }
         }
         runCatching { registerReceiver(r, IntentFilter(Intent.ACTION_USER_PRESENT)) }
@@ -147,7 +146,7 @@ class LockBoardActivity : ComponentActivity() {
         super.onResume()
         // ⚠️ A missing manager reads as "lit and unlocked", which sends the board away: a lock
         // screen that cannot tell whether the phone is locked has no business staying up.
-        if (LockBoardPolicy.finishOnResume(power?.isInteractive != false, keyguard?.isKeyguardLocked == true)) finish()
+        if (LockBoardPolicy.finishOnResume(power?.isInteractive != false, keyguard?.isKeyguardLocked == true)) unlocked()
     }
 
     override fun onDestroy() {
@@ -206,19 +205,14 @@ class LockBoardActivity : ComponentActivity() {
 
     /** Unlock, then open [tap] if there is one. The keyguard's own screen asks for the PIN. */
     private fun unlock(tap: Tap?) {
+        pendingTap = tap
         val km = keyguard
         if (km == null || !km.isKeyguardLocked) {
-            tap?.let(::open)
-            finish()
+            unlocked()
             return
         }
-        pendingTap = tap
         km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
-            override fun onDismissSucceeded() {
-                pendingTap?.let(::open)
-                pendingTap = null
-                finish()
-            }
+            override fun onDismissSucceeded() = unlocked()
 
             override fun onDismissCancelled() {
                 pendingTap = null
@@ -228,6 +222,25 @@ class LockBoardActivity : ComponentActivity() {
                 pendingTap = null
             }
         })
+    }
+
+    /**
+     * The keyguard has gone: open what was tapped, if anything, and step aside.
+     *
+     * ⚠️ **Three signals say the phone is unlocked and Android does not order them**: the dismiss
+     * callback, the USER_PRESENT broadcast, and [onResume] finding a lit, unlocked phone. They used
+     * to act separately, and the order mattered — `onResume` winning finished the board with a tap
+     * still held, so the callback then launched from an activity already finishing and the event
+     * somebody unlocked in order to open could be lost; USER_PRESENT arriving while a tap was held
+     * did nothing, leaving the board over an unlocked phone if the callback never came. Every signal
+     * comes here instead, and the held tap is taken exactly once, so whichever arrives first opens it
+     * and the others find nothing left to do.
+     */
+    private fun unlocked() {
+        val tap = pendingTap
+        pendingTap = null
+        tap?.let(::open)
+        if (!isFinishing) finish()
     }
 
     /** The real launch — the activity's own, which the gate is not in front of. */
