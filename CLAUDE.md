@@ -15296,3 +15296,84 @@ green on its own.
 
 **Open:** the weather/advisory location root cause itself (NEEDS YOU names it; it was out of scope).
 The forecast column, sun times and ECONOMY formatting were offered and not chosen.
+⚠️ **SUPERSEDED — all three were closed by the next section, from the owner's screenshot.**
+
+### THE SCREENSHOT FIXES — location, the advisory, and four text defects (this session, PR #476)
+
+Owner sent a Pixel screenshot of the new widget: *"Mark it ready and merge into main + deal with any
+issues in this img"*. The agenda works. Six problems were visible, each traced to its code, and one
+suspected problem was measured and found **not** to be a bug. **Zero subagent and zero workflow
+spend.** Three commits: `26c89c6` W1 location · `d383c84` W2 advisory · `55f6c3b` W3 text.
+
+**⚠️ W1 — THE ROOT CAUSE, and it reaches past the widget.** The app holds **foreground-only**
+location: there is no `ACCESS_BACKGROUND_LOCATION`, and **no foreground service declares the
+`location` type**. The platform's app-op therefore refuses every location read from the background:
+fused, `LocationManager`, and even `getLastKnownLocation`. A widget render is a background broadcast,
+so weather, air, water, safety and sky were silently absent. Nothing persisted a fix, so NEEDS YOU's
+*"open LCARS once"* was advice that changed nothing.
+- `RecordedFix` (pure) + `LastFixStore` (a private prefs file, outside both backup rule sets, which
+  include only `datastore/`).
+- `LocationProvider.current()` records each fix, stamped with when it was TAKEN, rounded to 2 dp
+  (~1 km), and never over a newer one.
+- `widgetPlaceLookup` falls back to it within a day.
+- ⚠️ **`current()` itself is unchanged**, so NAV never draws yesterday's position as "you". Readers ask
+  for `recorded()` by name and must check `usableAt`.
+- The subhead says `PLACE FROM <time>` once the kept place is over 6 h old, and only when something
+  was drawn there.
+- ⚠️ **The same denial had silenced `EmergencyWatchService` in the background** since it shipped: it sat
+  on "needs location" whenever the phone was not in hand. It now watches the kept place and its
+  ongoing line says which place it is watching.
+- **Every other background `current()` caller has the same blindness and is NOT changed:**
+  `RefreshWorker`, `BriefEngine`, `DayAheadEngine` and the Oracle. Each wants its own decision
+  (a stale position is wrong for a departure time), so `recorded()` is there to be adopted deliberately.
+
+**W2 — "no answer from advisory".** `OracleEngine.snapshot` ran its slow reads **sequentially**
+inside the widget's 4 s source budget. One of them, `calendarObjectives.upcoming(2)`, **geocodes every
+distinct event location, uncached, up to 4 s each** — and the owner's diary says "Big lounge",
+"Cafeteria", "Dorm" and "Your room", every render.
+- The slow reads now start together, with `coroutineScope { async }`; weather still waits on location.
+- Located events get a 1.5 s bound of their own, since they are an enrichment.
+- `CalendarObjectivesRepository` remembers geocodes process-wide (hits for 7 d, misses for 3 h).
+  Calendar path only: a place typed by hand stays live, so a retry is never refused.
+- The advisory gets its own 6 s widget budget.
+- ⚠️ **The cause is inferred from the code, not measured on the device.** The fix addresses every
+  slow read, so it holds whichever one it was.
+
+**W3 — text.**
+- `Inflation (CPI) 3annual % · 2025` → `3.0% · 2025`. `formatLatest` moved to a Compose-free
+  `EconomyFormat.kt` (same package, same name, so no call site moved) with `economyLine` beside it,
+  so the widget and the screen cannot disagree.
+- **The owner's email on every agenda row.** `showsCalendars` was one yes/no for the whole list, and
+  a Google calendar's name is the account email. `Agenda.otherCalendars` names only calendars other
+  than the main one: most events, ties broken by name.
+- `NASDAQ 10`: a `take(9)` that silently changed a number; the style already ellipsizes.
+- `FUEL` printed twice. The board line is unprefixed; the row form keeps its prefix.
+- **Brent −8.17% is REAL.** One Yahoo probe gave previous close 105.28 and now 96.84. Checked
+  before touching anything.
+
+**Verification.** RecordedFixTest 5, WidgetDiagnosticsTest 25, AgendaTest 25, EconomyFormatTest 2
+and WidgetLinkageTest 8, all run locally. **Ten rules negative-tested.**
+- ⚠️ One guard came back asleep, and the guard was fine: the fixture never reached the branch where
+  there is no named calendar at all and `.first()` would throw. That case is now tested.
+- `LocationProvider`, `LastFixStore`, `RecordedFix` and `CalendarObjectivesRepository` compile clean
+  against the real platform and Play Services jars. The gate caught a planted typo.
+- Typed probes ran the place lookup, the note and the fuel `Pair` destructuring.
+
+⚠️ **Two recipe notes.**
+- `LocationProvider` needs `-l …play-services-base:18.5.0` on top of location/tasks/basement, or
+  untouched `fusedFix` reports `HasApiKey` unreadable.
+- ⚠️ **Maven Central answered Gradle with 429** from this container, so `./gradlew :core:feeds:classes`
+  could not run and the serialization compiler plugin is not cached. The kotlinx-serialization
+  RUNTIME jar is enough to compile an `@Serializable` model for a test that never calls
+  `serializer()`. A plain curl of a single artifact still succeeded on retry.
+
+⚠️ **Owner-verify on the Pixel.**
+1. Open LCARS once, then leave it. The widget should show weather, air, water and safety, and NEEDS
+   YOU should be gone.
+2. The advisory should answer.
+3. Economy should read `3.0%`.
+4. Agenda rows should carry no email.
+5. The index cell should read `NASDAQ 100`.
+6. Hours later, the subhead should say `PLACE FROM …`.
+7. The emergency watch's ongoing notification should say it is watching where LCARS last saw you,
+   not "needs location".
