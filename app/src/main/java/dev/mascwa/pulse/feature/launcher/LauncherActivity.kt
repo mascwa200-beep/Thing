@@ -25,6 +25,7 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
+import dev.mascwa.pulse.feature.lcarsboard.hideStatusBarForConsole
 import dev.mascwa.pulse.ui.ProvideStardate
 import dev.mascwa.pulse.ui.theme.NightwireTheme
 import dev.mascwa.pulse.widget.LockBoard
@@ -89,6 +90,9 @@ class LauncherActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        // The console owns the top of the screen: Android's status bar is hidden, and the header
+        // carries the time and the battery instead. The gesture bar stays.
+        hideStatusBarForConsole()
 
         val defaults = AppSettings()
         val sweepMs = ConsoleSequence.durationFor(animatorScale())
@@ -181,6 +185,12 @@ class LauncherActivity : ComponentActivity() {
             withContext(Dispatchers.IO) { runCatching { store.saveGuard(HomeGuardPolicy.onHealthy()) } }
         }
         return false
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // A bar swiped into view, or a window that was over this one, can leave it showing.
+        if (hasFocus) hideStatusBarForConsole()
     }
 
     override fun onStart() {
