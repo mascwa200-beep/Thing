@@ -58,6 +58,17 @@
             android:id="@+id/widget_board_subhead"
             style="@style/WidgetLine.Board.Dim" />
 
+        <!--
+          What you are in the middle of, or what comes next — "NOW · Inspections · until 7:55" /
+          "NEXT 8:00 AM · Training · Gym". Directly under the clock because it is the calendar's
+          answer to the question the clock asks, and drawn on BOTH tall sizes: the compact board has
+          no room for the agenda list, but it always has room for this one line. Tapping it opens
+          the event in the calendar app.
+        -->
+        <TextView
+            android:id="@+id/widget_board_up_next"
+            style="@style/WidgetLine.Board" />
+
         <ImageView
             android:id="@+id/widget_board_rule_0"
             style="@style/WidgetBoardRule" />
@@ -567,6 +578,64 @@
                 style="@style/WidgetLine.Board.Dim" />
             </LinearLayout>
         </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_board_rule_7"
+            style="@style/WidgetBoardRule" />
+
+        <!--
+          The agenda: fourteen days of the diary, full board only.
+
+          ⚠️ This is the one region that is NOT wrap_content, and that is the point of it. Every
+          other region is sized by what it says, so the board used to end ~590dp down however tall
+          the widget was — and on the owner's phone that left the bottom two fifths of the widget
+          empty. The list is `0dp` with a weight, so it takes every dp the other regions do not use,
+          at any height, and scrolls for the rest. The heading row above it says how much there is.
+
+          The list is filled with RemoteCollectionItems (API 31, this app's floor), so there is no
+          RemoteViewsService and nothing to keep alive; its rows are `widget_agenda_day.xml` and
+          `widget_agenda_event.xml`. When there is nothing to list — or the calendar may not be
+          read — the list is hidden and `widget_board_agenda_empty` says which of those it is.
+        -->
+        <LinearLayout
+            android:id="@+id/widget_board_agenda_head_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_board_agenda_head"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="0dp"
+                android:visibility="visible" />
+
+            <TextView
+                android:id="@+id/widget_board_agenda_add"
+                style="@style/WidgetLine.Board.Section"
+                android:layout_width="wrap_content"
+                android:layout_marginTop="0dp"
+                android:layout_marginStart="8dp"
+                android:textColor="@color/nw_accent"
+                android:visibility="visible" />
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/widget_board_agenda"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbars="none"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_board_agenda_empty"
+            style="@style/WidgetLine.Board.Dim"
+            android:maxLines="2" />
 
         <!--
           ⚠️ This rule was declared between pair_0 and pair_1, while `render` has always drawn it

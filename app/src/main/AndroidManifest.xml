@@ -307,6 +307,20 @@
                 android:resource="@xml/lock_widget_info" />
         </receiver>
 
+        <!--
+          The widget agenda's trampoline (see widget/CalendarIntents.kt). A list row can only open
+          something through a MUTABLE template, and since Android 14 a mutable PendingIntent may not
+          carry an implicit intent, so the template names this activity and it opens the calendar.
+          Unexported, invisible, gone from history and recents the moment it has forwarded.
+        -->
+        <activity
+            android:name=".widget.CalendarEventActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
              the service picks the matching type at runtime. -->
         <service

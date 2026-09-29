@@ -12,4 +12,5 @@ OUT=$(mktemp -d)
 java -cp "$KC:$STD:$TRV:$ANN:$COR" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -nowarn -d "$OUT" -cp "$STD:$JU:$HC" "$@" "$T" 2>&1 | grep -Ev '^(warning|info):'
 [ -n "$(find "$OUT" -name '*.class' -print -quit)" ] || { echo "NOTHING COMPILED"; exit 3; }
 PKG=$(grep -m1 -E '^package ' "$T" | sed -E 's/^package +//')
-java -cp "$OUT:$STD:$JU:$HC" org.junit.runner.JUnitCore "$PKG.$(basename "$T" .kt)" 2>&1 | grep -v JAVA_TOOL_OPTIONS
+# RUN_DIR: tests that read source by relative path resolve it from the MODULE dir, as Gradle does.
+cd "${RUN_DIR:-.}" && java -cp "$OUT:$STD:$JU:$HC" org.junit.runner.JUnitCore "$PKG.$(basename "$T" .kt)" 2>&1 | grep -v JAVA_TOOL_OPTIONS

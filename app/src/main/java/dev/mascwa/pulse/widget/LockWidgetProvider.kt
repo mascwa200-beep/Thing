@@ -140,6 +140,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         val role: Role,
         val argb: Int? = null,
         val route: String? = null,
+        /**
+         * A tap target that is not an app route — the calendar's up-next row opens the event in the
+         * calendar app. Wins over [route] when set.
+         */
+        val pending: PendingIntent? = null,
     )
 
     /** The weather, in the lengths the widget needs it at, plus the air as its own reading. */
@@ -194,9 +199,37 @@ class LockWidgetProvider : AppWidgetProvider() {
         // only into the row list, so on both tall sizes a dead source looked like a quiet day.
         val board = withCharts(context, loaded.board.copy(degraded = degradedRow?.text))
 
+        // ⚠️ The agenda is the one region whose size depends on the diary, and a binder transaction
+        // has a hard ceiling. So a render that fails is retried with a shorter list and then with no
+        // list, BEFORE the caller falls back to the fault card: fourteen days of a busy diary must
+        // never be the reason the whole widget says it could not draw. Only the last failure is
+        // rethrown, so the fault card still names a real reason when even the plain board fails.
+        val attempts = listOfNotNull(
+            board,
+            board.agenda?.takeIf { it.rows.size > REDUCED_AGENDA_ROWS }
+                ?.let { board.copy(agenda = it.copy(rows = it.rows.take(REDUCED_AGENDA_ROWS))) },
+            board.agenda?.let { board.copy(agenda = null) },
+        )
+        var lastError: Throwable? = null
+        for (attempt in attempts) {
+            val applied = runCatching { manager.updateAppWidget(id, variants(context, rows, degradedRow, attempt, open)) }
+            if (applied.isSuccess) return
+            lastError = applied.exceptionOrNull()
+        }
+        throw lastError ?: IllegalStateException("no render attempt was made")
+    }
+
+    /** Every size variant, from one board. The host picks the entry that fits. */
+    private fun variants(
+        context: Context,
+        rows: List<Row>,
+        degradedRow: Row?,
+        board: WidgetBoard.Board,
+        open: (String, Int) -> PendingIntent,
+    ): RemoteViews {
         // ⚠️ The host picks. Each entry is the SAME layout with a different number of rows, so a
         // bigger widget genuinely shows more instead of the same lines with more air between them.
-        val views = RemoteViews(
+        return RemoteViews(
             mapOf(
                 // ⚠️ Each height is DERIVED from its row count, not chosen: a row is ~16dp of 12sp
                 // text plus its 2dp margin, over 20dp of vertical padding. A breakpoint below its
@@ -208,25 +241,35 @@ class LockWidgetProvider : AppWidgetProvider() {
                 SizeF(250f, 275f) to viewsFor(context, rows, degradedRow, LARGE_ROWS),
                 SizeF(300f, 385f) to viewsFor(context, rows, degradedRow, MAX_ROWS),
                 // ⚠️ The two entries the widget was missing, and their absence WAS the sparseness:
-                // the resize range reaches 640dp while the tallest variant stopped at 385, so above
+                // the resize range reached 640dp while the tallest variant stopped at 385, so above
                 // that the host had nothing richer to pick and stretched twenty rows instead.
                 //
                 // Both heights are derived from the board's own content, under the same rule as the
                 // row variants above — a breakpoint below its content clips, one above it can never
                 // be picked. Compact carries header + lead + both instrument strips + breadth +
-                // readouts (~319dp of content, declared at 420); full adds the three two-column
-                // regions and the footer (~589dp, declared at 610).
+                // readouts (~319dp of content, ~333dp with the up-next line, declared at 420); full
+                // adds the three two-column regions and the footer (see the full entry below).
                 //
                 // ⚠️ Both grew with the board: a fourth readout is ~14dp and the third pair region
                 // is a label plus four lines, ~70dp. A breakpoint left where it was would be BELOW
-                // its content, which clips — the rule governing every entry in this list. 610 still
-                // sits under the 640dp `maxResizeHeight` in `lock_widget_info.xml`, which is what
-                // makes it reachable at all.
+                // its content, which clips — the rule governing every entry in this list. Every
+                // height here must sit under `maxResizeHeight` in `lock_widget_info.xml` (1000dp),
+                // which is what makes it reachable at all.
                 SizeF(300f, 420f) to WidgetBoard.render(context, board, full = false, open),
-                SizeF(300f, 610f) to WidgetBoard.render(context, board, full = true, open),
+                // ⚠️ Still the tallest entry, and it no longer needs a taller sibling: the agenda list
+                // at the bottom of the full board takes every dp above this, at any height, so a
+                // widget stretched to 800dp or more fills rather than ending two fifths of the way
+                // down — which is what the owner's screenshot showed before the list existed.
+                //
+                // ⚠️ Moved from 610 to 680, by the same derivation as every entry above. The full
+                // board gained the up-next line (~14dp), a rule (~9dp) and the agenda heading (~12dp)
+                // — ~624dp before the list gets anything — and a list squeezed to zero rows is a
+                // heading over nothing. 680 leaves room for a day heading and one two-line event
+                // (~18 + ~29dp); below it the compact board, which carries the up-next line, is the
+                // better answer.
+                SizeF(300f, FULL_BOARD_MIN_HEIGHT_DP) to WidgetBoard.render(context, board, full = true, open),
             ),
         )
-        manager.updateAppWidget(id, views)
     }
 
     /**
@@ -257,7 +300,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             // ⚠️ A distinct request code per row. `Intent.filterEquals` ignores extras, so rows
             // sharing a code would silently share ONE PendingIntent and every tap would land
             // wherever the last-built row pointed — the collision already corrected once in NotifId.
-            v.setOnClickPendingIntent(viewId, openIntent(context, row.route ?: Routes.HOME, i))
+            v.setOnClickPendingIntent(viewId, row.pending ?: openIntent(context, row.route ?: Routes.HOME, i))
         }
         return v
     }
@@ -404,6 +447,25 @@ class LockWidgetProvider : AppWidgetProvider() {
             return Loaded(rows, WidgetBoard.Board(header = date.ifBlank { greeting }, subhead = boardSubhead))
         }
 
+        // ⚠️ ONE instant and ONE zone for the whole calendar reading. The agenda's NOW/NEXT, its day
+        // headings and the alarm that refreshes it at the next boundary must all agree about "now",
+        // and a zone read twice can differ across a clock change mid-load. The zone enters the core
+        // as a function — `getOffset` at each instant — which is what makes it DST-correct.
+        val nowMs = System.currentTimeMillis()
+        val zone = TimeZone.getDefault()
+        val offsetAt: (Long) -> Long = { ms -> zone.getOffset(ms).toLong() }
+        // ⚠️ Day labels are formatted in UTC ON PURPOSE. The core hands back epoch DAYS, and an epoch
+        // day's UTC midnight formatted in UTC is that date everywhere — formatted in the device zone
+        // it is the day before for anyone west of Greenwich, which is the all-day trap the core exists
+        // to avoid, walked straight back into at the last step.
+        val dayFmt = SimpleDateFormat("EEE d MMM", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val agendaFormat = Agenda.Format(
+            clock = { ms -> clock.format(Date(ms)) },
+            day = { epochDay -> dayFmt.format(Date(epochDay * Agenda.DAY_MS)).uppercase() },
+        )
+
         // ⚠️ Resolved ONCE, and on its own budget. Three feeds need a coordinate, and the fallback
         // branch can touch the location provider — doing that three times would triple the slowest
         // thing in the load. Null is a fact about us, not about the world, so the feeds that need
@@ -444,7 +506,8 @@ class LockWidgetProvider : AppWidgetProvider() {
         var fuelLines: List<String> = emptyList()
         var dataLine: String? = null
         var commsLines: List<String> = emptyList()
-        var agendaLines: List<String> = emptyList()
+        var agendaEvents: List<Agenda.Event> = emptyList()
+        var agendaPlan: Agenda.Plan? = null
         var econLines: List<String> = emptyList()
         var leadTitle: String? = null
         var leadDetail: String? = null
@@ -638,24 +701,43 @@ class LockWidgetProvider : AppWidgetProvider() {
                         c.waterRepository.cached(place.latitude, place.longitude)?.line
                     }
                 }
-                // The next few things actually in the diary. No network and no cache — a direct
-                // Instances query, which expands recurrences for us.
+                // Fourteen days of the diary, from the start of today — so an event already under
+                // way is included. No network and no cache: a direct Instances query, which expands
+                // recurrences for us, and filters hidden calendars and declined invitations exactly
+                // as the calendar app does (see CalendarRepository).
                 //
-                // ⚠️ `upcoming` is NOT a suspend function and does its ContentProvider query on
+                // ⚠️ `agenda` is NOT a suspend function and does its ContentProvider query on
                 // whatever thread calls it, so it is dispatched explicitly. It happens to be called
                 // from an IO dispatcher here already, but relying on that would make this correct by
                 // where it sits rather than by what it says.
                 //
                 // ⚠️ Deliberately not `CalendarObjectivesRepository.upcoming`, which geocodes each
                 // event's location string over the network.
+                //
+                // ⚠️ The query asks for more than the list shows. The CORE caps what is drawn and
+                // counts what it left out, and it can only count what it was given — capping in the
+                // query would make "+N more" impossible to state.
                 val calendar = async {
-                    if (!canReadCalendar) null else widgetSource<List<String>>(Source.CALENDAR, outcomes) {
+                    if (!canReadCalendar) null else widgetSource<List<Agenda.Event>>(Source.CALENDAR, outcomes) {
                         withContext(Dispatchers.IO) {
+                            val today = Agenda.localDay(nowMs, offsetAt)
                             c.calendarRepository
-                                .upcoming(System.currentTimeMillis(), CALENDAR_HORIZON_MS, WidgetBoard.COLUMN_LINES)
+                                .agenda(
+                                    fromMs = Agenda.startOfLocalDay(today, offsetAt),
+                                    toMs = Agenda.startOfLocalDay(today + AGENDA_DAYS, offsetAt),
+                                    max = AGENDA_QUERY_MAX,
+                                )
                                 .map { ev ->
-                                    val whenIt = if (ev.allDay) "ALL DAY" else clock.format(Date(ev.startMs))
-                                    "$whenIt  ${ev.title.ifBlank { "(untitled)" }}".take(40)
+                                    Agenda.Event(
+                                        id = ev.id,
+                                        title = ev.title,
+                                        startMs = ev.startMs,
+                                        endMs = ev.endMs,
+                                        allDay = ev.allDay,
+                                        location = ev.location,
+                                        calendarName = ev.calendarName,
+                                        colorArgb = ev.colorArgb,
+                                    )
                                 }
                                 .ifEmpty { null }
                         }
@@ -762,6 +844,22 @@ class LockWidgetProvider : AppWidgetProvider() {
                     rows += Row(it, Role.PRIMARY, argb = ContextCompat.getColor(context, R.color.nw_negative), route = Routes.SAFETY)
                 }
 
+                // The calendar is local and quick, and what you are in or about to be in belongs
+                // straight after anything urgent — ahead of every measured reading below it.
+                calendar.await()?.let { agendaEvents = it }
+                val plan = Agenda.plan(agendaEvents, nowMs, offsetAt, AGENDA_DAYS, AGENDA_MAX_ITEMS)
+                agendaPlan = plan
+                Agenda.upNext(plan)?.let { e ->
+                    rows += Row(
+                        Agenda.upNextLine(e, plan.today, agendaFormat),
+                        Role.PRIMARY,
+                        argb = if (e.state == Agenda.State.NOW) ContextCompat.getColor(context, widgetAccentRes()) else null,
+                        pending = CalendarIntents.event(
+                            context, e.event.id, e.event.startMs, e.event.endMs, CalendarIntents.RC_UP_NEXT_ROW,
+                        ),
+                    )
+                }
+
                 // The active objective needs no I/O — it is already in settings.
                 s.waypoints.firstOrNull { it.id == s.activeWaypointId }?.label
                     ?.let { rows += Row("◎ ${it.take(40)}", Role.PRIMARY, route = Routes.NAV) }
@@ -801,10 +899,6 @@ class LockWidgetProvider : AppWidgetProvider() {
                     econLines = it
                     rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
                 }
-                // ⚠️ Board only, and no row. The row list already builds more entries than
-                // MAX_ROWS can draw, so adding one here would push something else off the
-                // bottom in silence rather than adding anything.
-                calendar.await()?.let { agendaLines = it }
             }
         }
 
@@ -854,11 +948,10 @@ class LockWidgetProvider : AppWidgetProvider() {
         val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
         val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine))
         val commsColumn = WidgetBoard.Column("WAITING", commsLines)
-        // ⚠️ This slot has been drawn half-blank since the board was built —
-        // `commsColumn to Column("", emptyList())` — so the region has always cost its full height
-        // for one column of content. Nothing had to grow to hold the agenda; it just had to be put
-        // where the empty half already was.
-        val agendaColumn = WidgetBoard.Column("AGENDA", agendaLines)
+        // ⚠️ The agenda used to be this pair's right half — four lines of today, the only calendar the
+        // widget had. It is now its own region at the foot of the full board (see `agendaBlock`), so
+        // this half is empty again and the pair draws WAITING alone, as it did before the agenda.
+        val upNext = agendaPlan?.let(Agenda::upNext)
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
@@ -868,6 +961,13 @@ class LockWidgetProvider : AppWidgetProvider() {
             // have been the easy call and would have left it dead.
             clock24 = s?.use24HourClock ?: true,
             subhead = boardSubhead,
+            upNext = upNext?.let { Agenda.upNextLine(it, agendaPlan?.today ?: it.day, agendaFormat) },
+            upNextArgb = upNext?.takeIf { it.state == Agenda.State.NOW }
+                ?.let { ContextCompat.getColor(context, widgetAccentRes()) },
+            upNextOpen = upNext?.let {
+                CalendarIntents.event(context, it.event.id, it.event.startMs, it.event.endMs, CalendarIntents.RC_UP_NEXT_BOARD)
+            },
+            agenda = agendaBlock(context, agendaPlan, canReadCalendar, outcomes[Source.CALENDAR], agendaFormat, nowMs, offsetAt),
             alert = alertLine,
             alertRoute = Routes.SAFETY,
             lead = leadTitle,
@@ -904,11 +1004,101 @@ class LockWidgetProvider : AppWidgetProvider() {
             pairs = listOf(
                 econColumn to dayColumn,
                 fuelColumn to phoneColumn,
-                commsColumn to agendaColumn,
+                commsColumn to WidgetBoard.Column("", emptyList()),
             ).take(WidgetBoard.MAX_PAIRS),
             foot = netLine,
         )
         return Loaded(rows, board)
+    }
+
+    /**
+     * The fourteen-day list as the full board draws it — or the one sentence saying why there is no
+     * list.
+     *
+     * ⚠️ Three different empties, three different sentences, two different tap targets. "The calendar
+     * may not be read", "the calendar could not be read this time" and "there is nothing in it" are
+     * facts about the app, about this refresh and about the diary respectively; rendering them the
+     * same way is how a widget comes to tell someone their fortnight is free when it was never
+     * allowed to look. Only the first sends the tap to the permission page.
+     */
+    private fun agendaBlock(
+        context: Context,
+        plan: Agenda.Plan?,
+        canRead: Boolean,
+        outcome: Outcome?,
+        fmt: Agenda.Format,
+        nowMs: Long,
+        offsetAt: (Long) -> Long,
+    ): WidgetBoard.AgendaBlock {
+        val heading = "AGENDA · $AGENDA_DAYS DAYS"
+        if (!canRead) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Calendar access not granted — tap to allow it",
+                emptyOpensSettings = true, todayMs = nowMs,
+            )
+        }
+        if (outcome is Outcome.Failed || outcome is Outcome.TimedOut) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Could not read the calendar this time — tap to open it", todayMs = nowMs,
+            )
+        }
+        if (plan == null || plan.all.isEmpty()) {
+            return WidgetBoard.AgendaBlock(
+                heading, emptyList(), "Nothing in the next $AGENDA_DAYS days — tap to open your calendar",
+                todayMs = nowMs,
+            )
+        }
+        val accent = ContextCompat.getColor(context, widgetAccentRes())
+        val withCalendar = Agenda.showsCalendars(plan)
+        val todayStart = Agenda.startOfLocalDay(plan.today, offsetAt)
+        val rows = buildList {
+            // A list that opens on Thursday reads as though today had been forgotten. Say it is clear.
+            if (plan.days.firstOrNull()?.kind != Agenda.DayKind.TODAY) {
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.DAY, Agenda.clearTodayHeading(plan.today, fmt),
+                        textArgb = accent, fillIn = CalendarIntents.dayFillIn(todayStart),
+                    ),
+                )
+            }
+            plan.days.forEach { day ->
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.DAY, Agenda.dayHeading(day, fmt),
+                        textArgb = accent.takeIf { day.kind == Agenda.DayKind.TODAY },
+                        fillIn = CalendarIntents.dayFillIn(Agenda.startOfLocalDay(day.epochDay, offsetAt)),
+                    ),
+                )
+                day.entries.forEach { e ->
+                    add(
+                        WidgetBoard.AgendaRow(
+                            WidgetBoard.AgendaKind.EVENT,
+                            Agenda.titleLine(e, fmt),
+                            Agenda.detailLine(e, fmt, withCalendar),
+                            textArgb = accent.takeIf { e.state == Agenda.State.NOW },
+                            barArgb = e.event.colorArgb,
+                            fillIn = CalendarIntents.eventFillIn(e.event.id, e.event.startMs, e.event.endMs),
+                        ),
+                    )
+                }
+            }
+            // ⚠️ Never silently short. A list that stops is otherwise indistinguishable from a diary
+            // that stops, and the cap exists for the binder, not because the rest does not matter.
+            if (plan.omitted > 0) {
+                add(
+                    WidgetBoard.AgendaRow(
+                        WidgetBoard.AgendaKind.EVENT,
+                        "+${plan.omitted} more in the next $AGENDA_DAYS days",
+                        "open your calendar to see them",
+                        fillIn = CalendarIntents.dayFillIn(todayStart),
+                    ),
+                )
+            }
+        }
+        val n = plan.all.size
+        return WidgetBoard.AgendaBlock(
+            "$heading · $n ${if (n == 1) "EVENT" else "EVENTS"}", rows, todayMs = nowMs,
+        )
     }
 
     /**
@@ -959,15 +1149,30 @@ class LockWidgetProvider : AppWidgetProvider() {
         /** Nothing further away than this is "near you" on a home-screen row. */
         const val SAFETY_RADIUS_M = 150_000.0
 
+        /** How many days the agenda covers, today included. The owner's choice. */
+        const val AGENDA_DAYS = 14
+
         /**
-         * How far ahead the agenda looks.
-         *
-         * A day and a half, so that late one evening the column is showing tomorrow rather than
-         * running out — but not so far that the four lines fill with things you cannot act on
-         * today. The column holds [WidgetBoard.COLUMN_LINES] entries and the query is capped there,
-         * so a busy diary is truncated by the layout's own capacity rather than by the horizon.
+         * How many events the list draws. A binder transaction has a hard ceiling and every row is a
+         * small RemoteViews of its own; sixty events with their day headings is ~75 rows, well
+         * inside it with the charts, and [REDUCED_AGENDA_ROWS] is the retry if a phone disagrees.
          */
-        const val CALENDAR_HORIZON_MS = 36L * 60 * 60 * 1000
+        const val AGENDA_MAX_ITEMS = 60
+
+        /**
+         * How many the query may return. More than [AGENDA_MAX_ITEMS] on purpose: the core counts
+         * what the cap leaves out, and it can only count what it was handed.
+         */
+        const val AGENDA_QUERY_MAX = 400
+
+        /** The shorter list a failed render is retried with, before it is retried with none. */
+        const val REDUCED_AGENDA_ROWS = 24
+
+        /**
+         * The full board's breakpoint. See the note where it is used: ~624dp of regions before the
+         * list gets anything, plus room for a day heading and one event.
+         */
+        const val FULL_BOARD_MIN_HEIGHT_DP = 680f
 
         /** The station. Home propagates the same object from the same cached element set. */
         const val ISS_NORAD_ID = 25544

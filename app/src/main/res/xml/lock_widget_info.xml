@@ -2,11 +2,16 @@
 <!--
   The app's only widget.
 
-  ⚠️ **The resize range is load-bearing, not decoration.** The provider ships four `RemoteViews`
-  keyed on `SizeF` — 120×90, 180×165, 250×275 and 300×385 — and the HOST picks between them. A range
-  that never reaches a breakpoint means that variant can never be drawn, however carefully it was
-  built, and nothing would report it: the widget would simply look like it had one layout. So the
-  floor here is exactly the smallest breakpoint, and the ceiling is comfortably past the largest.
+  ⚠️ **The resize range is load-bearing, not decoration.** The provider ships six `RemoteViews`
+  keyed on `SizeF` — four row forms (120×90, 180×165, 250×275, 300×385), the compact board (300×420)
+  and the full board (300×680) — and the HOST picks between them. A range that never reaches a
+  breakpoint means that variant can never be drawn, however carefully it was built, and nothing
+  would report it: the widget would simply look like it had one layout. So the floor here is exactly
+  the smallest breakpoint, and the ceiling is well past the largest.
+
+  ⚠️ The ceiling is 1000dp, not the 640 it was, because the full board now GROWS: its agenda list
+  takes every dp above 680 at any height. The owner's widget is placed around 830dp tall; at 640 a
+  strict launcher would clamp it, and the list is the thing the extra height is for.
 
   `targetCellWidth`/`targetCellHeight` are the size it is PLACED at (API 31+, and minSdk is 31 so
   there is no legacy fallback to keep in step). Four by three lands a fresh placement around the third
@@ -27,7 +32,7 @@
     android:minResizeWidth="120dp"
     android:minResizeHeight="90dp"
     android:maxResizeWidth="500dp"
-    android:maxResizeHeight="640dp"
+    android:maxResizeHeight="1000dp"
     android:targetCellWidth="4"
     android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"

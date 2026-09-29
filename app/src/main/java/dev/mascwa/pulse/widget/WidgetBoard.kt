@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import dev.mascwa.pulse.R
 
 /**
@@ -58,13 +59,38 @@ internal object WidgetBoard {
     internal data class Column(val label: String, val lines: List<String>)
 
     /**
-     * How many lines one column of a two-column region can draw.
+     * One row of the agenda list: a day heading, an event, or the "more" line at the end.
      *
-     * ⚠️ Exposed for the same reason as [MAX_SOURCES], [MAX_READOUTS] and [MAX_PAIRS]: [column]
-     * fills these with `getOrNull(i)`, so a fifth line is dropped with nothing said. A caller should
-     * ask the layout how much room it has rather than pick a number that happens to fit today.
+     * [fillIn] is what the row adds to the list's single template — see [CalendarIntents] for why a
+     * list row cannot carry a PendingIntent of its own. [textArgb] colours the main line (NOW in the
+     * accent); [barArgb] is the calendar's own colour and only an event row has one.
      */
-    const val COLUMN_LINES = 4
+    internal data class AgendaRow(
+        val kind: AgendaKind,
+        val text: String,
+        val detail: String? = null,
+        val textArgb: Int? = null,
+        val barArgb: Int? = null,
+        val fillIn: android.content.Intent,
+    )
+
+    internal enum class AgendaKind { DAY, EVENT }
+
+    /**
+     * The agenda, as the full board draws it.
+     *
+     * [rows] empty means [empty] is shown instead, and [emptyOpensSettings] says whether tapping that
+     * line should take the user to the app's permission page (the calendar may not be read) or simply
+     * open their calendar (it may, and there is nothing in it).
+     */
+    internal data class AgendaBlock(
+        val heading: String,
+        val rows: List<AgendaRow>,
+        val empty: String? = null,
+        val emptyOpensSettings: Boolean = false,
+        /** Where tapping the heading lands: the calendar app, on today. */
+        val todayMs: Long,
+    )
 
     /**
      * Everything the board can draw. Every field is optional because every field is a feed that can
@@ -79,6 +105,15 @@ internal object WidgetBoard {
          */
         val clock24: Boolean = true,
         val subhead: String = "",
+        /**
+         * The calendar's one-line answer — what you are in, or what is next. [upNextArgb] is the
+         * accent when it is under way; [upNextOpen] opens that event.
+         */
+        val upNext: String? = null,
+        val upNextArgb: Int? = null,
+        val upNextOpen: PendingIntent? = null,
+        /** The fourteen-day list, full board only. Null draws no agenda region at all. */
+        val agenda: AgendaBlock? = null,
         val alert: String? = null,
         val alertRoute: String? = null,
         val lead: String? = null,
@@ -137,6 +172,16 @@ internal object WidgetBoard {
         v.setCharSequence(R.id.widget_board_clock, "setFormat24Hour", clockPattern)
 
         text(v, R.id.widget_board_subhead, board.subhead)
+
+        // ── the calendar's headline ─────────────────────────────────────────────────────────────
+        // Above the rule and the Oracle, beside the clock: it answers the question the clock asks.
+        if (text(v, R.id.widget_board_up_next, board.upNext)) {
+            v.setTextColor(
+                R.id.widget_board_up_next,
+                board.upNextArgb ?: ContextCompat.getColor(context, R.color.nw_ink),
+            )
+            board.upNextOpen?.let { v.setOnClickPendingIntent(R.id.widget_board_up_next, it) }
+        }
 
         // ── what is happening ───────────────────────────────────────────────────────────────────
         val alertShown = text(v, R.id.widget_board_alert, board.alert)
@@ -201,6 +246,7 @@ internal object WidgetBoard {
             v.setViewVisibility(spec.container, if (shown) View.VISIBLE else View.GONE)
             if (shown) pairShown = true
         }
+        val agendaShown = full && agenda(context, v, board.agenda)
         val footShown = full && text(v, R.id.widget_board_foot, board.foot)
         // ⚠️ NOT gated on `full`. A failure notice that shows at one height and not the other is
         // half a diagnostic, and the shorter board is no less capable of having a dead feed.
@@ -213,9 +259,99 @@ internal object WidgetBoard {
         rule(v, R.id.widget_board_rule_2, idxShown, stkShown || meterShown || readShown)
         rule(v, R.id.widget_board_rule_3, stkShown, meterShown || readShown)
         rule(v, R.id.widget_board_rule_4, meterShown, readShown || pairShown || footShown)
-        rule(v, R.id.widget_board_rule_5, readShown, pairShown || footShown)
-        rule(v, R.id.widget_board_rule_6, pairShown && full, footShown)
+        rule(v, R.id.widget_board_rule_5, readShown, pairShown || agendaShown || footShown)
+        rule(
+            v, R.id.widget_board_rule_7,
+            topShown || idxShown || stkShown || meterShown || readShown || pairShown, agendaShown,
+        )
+        rule(v, R.id.widget_board_rule_6, (pairShown || agendaShown) && full, footShown)
         return v
+    }
+
+    /**
+     * Draw the agenda region, or hide it. Returns whether anything was drawn.
+     *
+     * ⚠️ The list and its empty line are shown and hidden HERE rather than through
+     * `setEmptyView`. The empty view is driven by the adapter's count, and "the calendar may not be
+     * read" is not an empty adapter — it is a different sentence with a different tap target, and
+     * letting the adapter decide would show one where the other belongs.
+     */
+    private fun agenda(context: Context, v: RemoteViews, block: AgendaBlock?): Boolean {
+        if (block == null) {
+            v.setViewVisibility(R.id.widget_board_agenda_head_row, View.GONE)
+            v.setViewVisibility(R.id.widget_board_agenda, View.GONE)
+            v.setViewVisibility(R.id.widget_board_agenda_empty, View.GONE)
+            return false
+        }
+        v.setViewVisibility(R.id.widget_board_agenda_head_row, View.VISIBLE)
+        v.setTextViewText(R.id.widget_board_agenda_head, block.heading)
+        v.setOnClickPendingIntent(R.id.widget_board_agenda_head, CalendarIntents.day(context, block.todayMs))
+        v.setTextViewText(R.id.widget_board_agenda_add, ADD_LABEL)
+        v.setOnClickPendingIntent(R.id.widget_board_agenda_add, CalendarIntents.addEvent(context))
+
+        if (block.rows.isEmpty()) {
+            v.setViewVisibility(R.id.widget_board_agenda, View.GONE)
+            text(v, R.id.widget_board_agenda_empty, block.empty)
+            v.setOnClickPendingIntent(
+                R.id.widget_board_agenda_empty,
+                if (block.emptyOpensSettings) {
+                    CalendarIntents.openAppDetails(context)
+                } else {
+                    CalendarIntents.day(context, block.todayMs)
+                },
+            )
+            return true
+        }
+        v.setViewVisibility(R.id.widget_board_agenda_empty, View.GONE)
+        v.setViewVisibility(R.id.widget_board_agenda, View.VISIBLE)
+
+        val items = RemoteViews.RemoteCollectionItems.Builder()
+            // ⚠️ Not stable ids. An id must be unique across the list, and the only natural key — an
+            // event id plus its occurrence — can still repeat when one event is on two calendars the
+            // provider reports separately. Positions cannot collide, and the list is rebuilt whole on
+            // every refresh anyway.
+            .setHasStableIds(false)
+            .setViewTypeCount(AgendaKind.entries.size)
+        block.rows.forEachIndexed { i, row -> items.addItem(i.toLong(), agendaItem(context, row)) }
+        v.setRemoteAdapter(R.id.widget_board_agenda, items.build())
+        v.setPendingIntentTemplate(R.id.widget_board_agenda, CalendarIntents.template(context))
+        return true
+    }
+
+    private fun agendaItem(context: Context, row: AgendaRow): RemoteViews = when (row.kind) {
+        AgendaKind.DAY -> RemoteViews(context.packageName, R.layout.widget_agenda_day).apply {
+            setTextViewText(R.id.widget_agenda_day_label, row.text)
+            setTextColor(
+                R.id.widget_agenda_day_label,
+                row.textArgb ?: ContextCompat.getColor(context, R.color.nw_muted),
+            )
+            setOnClickFillInIntent(R.id.widget_agenda_day_root, row.fillIn)
+        }
+        AgendaKind.EVENT -> RemoteViews(context.packageName, R.layout.widget_agenda_event).apply {
+            setTextViewText(R.id.widget_agenda_event_bar, BAR_GLYPH)
+            // ⚠️ Alpha forced opaque. The provider's colours are ARGB but an app can store one with a
+            // zero alpha byte, and a transparent bar reads as a row that failed to draw. Done with
+            // ColorUtils rather than a hex mask: WidgetLinkageTest fails the build on any hex colour in
+            // a widget file, and a mask is indistinguishable from one to a gate reading text.
+            setTextColor(
+                R.id.widget_agenda_event_bar,
+                row.barArgb?.let { ColorUtils.setAlphaComponent(it, FULL_ALPHA) }
+                    ?: ContextCompat.getColor(context, R.color.nw_muted),
+            )
+            setTextViewText(R.id.widget_agenda_event_title, row.text)
+            setTextColor(
+                R.id.widget_agenda_event_title,
+                row.textArgb ?: ContextCompat.getColor(context, R.color.nw_ink),
+            )
+            val detail = row.detail
+            if (detail.isNullOrBlank()) {
+                setViewVisibility(R.id.widget_agenda_event_detail, View.GONE)
+            } else {
+                setViewVisibility(R.id.widget_agenda_event_detail, View.VISIBLE)
+                setTextViewText(R.id.widget_agenda_event_detail, detail)
+            }
+            setOnClickFillInIntent(R.id.widget_agenda_event_root, row.fillIn)
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────
@@ -313,6 +449,18 @@ internal object WidgetBoard {
     private const val RC_BREADTH = 104
 
     private const val MARKETS_ROUTE = dev.mascwa.pulse.navigation.Routes.MARKETS
+
+    /**
+     * Written by code rather than held in the layout: WidgetLinkageTest fails the build on static text
+     * in a widget layout, because a string nothing can replace is how the old `J.A.R.V.I.S.` title
+     * survived three renames.
+     */
+    private const val ADD_LABEL = "+ ADD"
+
+    /** The calendar-colour bar. A left-half block, so it reads as a stripe rather than a square. */
+    private const val BAR_GLYPH = "▌"
+
+    private const val FULL_ALPHA = 255
 
     private val SOURCE_IDS = listOf(
         R.id.widget_board_src_0, R.id.widget_board_src_1, R.id.widget_board_src_2,

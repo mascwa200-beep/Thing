@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A day heading in the board's agenda list: "TODAY · TUE 29 SEP · 5 EVENTS".
+
+  One of the two row types in the RemoteCollectionItems list (the other is widget_agenda_event.xml).
+  ⚠️ Like every widget layout, it carries no android:text — WidgetLinkageTest fails the build on
+  static text that nothing replaces — and it states `visibility="visible"` because the shared
+  WidgetLine.Board style defaults to GONE for the board's show-when-there-is-something regions,
+  while a list row is only ever built when there is something.
+
+  The whole row is the tap target: it fills in the calendar app's "time" URI for that day.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_agenda_day_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="6dp"
+    android:paddingBottom="1dp">
+
+    <TextView
+        android:id="@+id/widget_agenda_day_label"
+        style="@style/WidgetLine.Board.Section"
+        android:layout_marginTop="0dp"
+        android:visibility="visible" />
+</LinearLayout>
