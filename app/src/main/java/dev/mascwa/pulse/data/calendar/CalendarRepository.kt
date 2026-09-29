@@ -48,13 +48,24 @@ class CalendarRepository(private val context: Context) {
      * events), soonest first, capped at [max]. Empty if READ_CALENDAR isn't granted or anything fails.
      */
     fun upcoming(nowMs: Long, horizonMs: Long = 48L * 3_600_000L, max: Int = 20): List<CalEvent> =
-        query(nowMs, nowMs + horizonMs, max)
+        query(nowMs, nowMs + horizonMs, max).getOrDefault(emptyList())
 
     /**
      * Every instance overlapping `[fromMs, toMs)`, soonest first, capped at [max] — the widget's
      * fortnight. The same query as [upcoming]; only the window differs.
+     *
+     * ⚠️ **Throws when the provider fails, where [upcoming] answers empty — and that difference is
+     * the point.** The widget draws "Nothing in the next 14 days" for an empty list and "Could not
+     * read the calendar" for a failure; swallowing the exception here made the second sentence
+     * unreachable, so a provider error told somebody their fortnight was clear. A cursor that dies
+     * part-way is a failure too, not a shorter diary: a truncated list would draw a confidently
+     * incomplete fortnight with a "+N more" counted from the part that was read.
+     *
+     * The other callers keep [upcoming]'s empty answer on purpose: the Oracle, the brief and the
+     * day-ahead planner each already treat "no events" as "nothing to say", which is the right
+     * failure for a line that is only ever an aside there.
      */
-    fun agenda(fromMs: Long, toMs: Long, max: Int): List<CalEvent> = query(fromMs, toMs, max)
+    fun agenda(fromMs: Long, toMs: Long, max: Int): List<CalEvent> = query(fromMs, toMs, max).getOrThrow()
 
     /**
      * The one query both windows share.
@@ -67,8 +78,8 @@ class CalendarRepository(private val context: Context) {
      * attendee list, has no status at all, and in SQL `NULL != 2` is NULL — which a WHERE treats as
      * false, so the plain comparison would silently drop every event you made yourself.
      */
-    private fun query(fromMs: Long, toMs: Long, max: Int): List<CalEvent> {
-        if (!canRead() || max <= 0) return emptyList()
+    private fun query(fromMs: Long, toMs: Long, max: Int): Result<List<CalEvent>> {
+        if (!canRead() || max <= 0) return Result.success(emptyList())
         val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
         ContentUris.appendId(builder, fromMs)
         ContentUris.appendId(builder, toMs)
@@ -86,11 +97,13 @@ class CalendarRepository(private val context: Context) {
             "${CalendarContract.Instances.SELF_ATTENDEE_STATUS} IS NULL OR " +
             "${CalendarContract.Instances.SELF_ATTENDEE_STATUS} != " +
             "${CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED})"
-        val out = mutableListOf<CalEvent>()
-        runCatching {
-            context.contentResolver.query(
+        return runCatching {
+            val out = mutableListOf<CalEvent>()
+            // ⚠️ A null cursor is the provider not answering at all — a failure, not an empty diary.
+            val cursor = context.contentResolver.query(
                 builder.build(), projection, selection, null, "${CalendarContract.Instances.BEGIN} ASC",
-            )?.use { cur ->
+            ) ?: error("the calendar provider did not answer")
+            cursor.use { cur ->
                 while (cur.moveToNext() && out.size < max) {
                     out += CalEvent(
                         id = cur.getLong(0),
@@ -104,7 +117,7 @@ class CalendarRepository(private val context: Context) {
                     )
                 }
             }
+            out
         }
-        return out
     }
 }
