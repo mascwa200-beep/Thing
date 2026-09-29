@@ -118,12 +118,42 @@ data class WidgetPlace(val latitude: Double, val longitude: Double, val name: St
  * time this rule existed in more than one place one of the copies had silently dropped its
  * `useDeviceLocation` branch — see the note at the top of this file.
  */
-suspend fun widgetPlace(c: AppContainer, s: AppSettings?): WidgetPlace? {
-    s ?: return null
+suspend fun widgetPlace(c: AppContainer, s: AppSettings?): WidgetPlace? =
+    widgetPlaceLookup(c, s) { true }.place
+
+/**
+ * A place, or the reason there is none — in words the owner can act on.
+ *
+ * [why] is null exactly when [place] is not.
+ */
+data class PlaceLookup(val place: WidgetPlace?, val why: String?)
+
+/**
+ * [widgetPlace], answering WHY when it cannot answer where.
+ *
+ * ⚠️ The same rule, not a second copy of it — [widgetPlace] is this with the reason thrown away. The
+ * reason is what the widget was missing: four feeds need a coordinate, and all four used to go quiet
+ * together with one line in the crash console saying "no saved location" even when the owner HAD
+ * turned on device location and the real cause was a permission, or a phone that had not taken a fix
+ * since it went to sleep. Those are three different things to do about it, so they are three
+ * different sentences.
+ *
+ * [hasLocationPermission] is asked only to choose the sentence, never to decide the place — the
+ * provider already refuses without it, and the rule must not fork on the caller's context.
+ */
+suspend fun widgetPlaceLookup(
+    c: AppContainer,
+    s: AppSettings?,
+    hasLocationPermission: () -> Boolean,
+): PlaceLookup {
+    s ?: return PlaceLookup(null, "settings could not be read")
     val saved = s.savedLocations.getOrNull(s.selectedLocationIndex) ?: s.savedLocations.firstOrNull()
-    if (saved != null) return WidgetPlace(saved.latitude, saved.longitude, saved.name)
-    if (!s.useDeviceLocation) return null
-    return c.locationProvider.current()?.let { WidgetPlace(it.latitude, it.longitude, it.name) }
+    if (saved != null) return PlaceLookup(WidgetPlace(saved.latitude, saved.longitude, saved.name), null)
+    if (!s.useDeviceLocation) return PlaceLookup(null, "add a place, or turn on device location")
+    if (!hasLocationPermission()) return PlaceLookup(null, "location permission not granted")
+    val here = c.locationProvider.current()
+        ?: return PlaceLookup(null, "no location fix yet — open LCARS once")
+    return PlaceLookup(WidgetPlace(here.latitude, here.longitude, here.name), null)
 }
 
 /**

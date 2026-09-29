@@ -1,10 +1,12 @@
 package dev.mascwa.pulse.widget
 
+import android.Manifest
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
@@ -19,6 +21,7 @@ import dev.mascwa.pulse.core.telemetry.DayPart
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.MailGlance
 import dev.mascwa.pulse.core.telemetry.MarketMood
+import dev.mascwa.pulse.core.telemetry.NetworkKind
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
@@ -203,7 +206,21 @@ class LockWidgetProvider : AppWidgetProvider() {
         loaded: Loaded,
         outcomes: Map<Source, Outcome>,
     ) {
-        val rows = loaded.rows
+        // ⚠️ NEEDS YOU goes just above the SYS footnote rather than at the end. `fit` sheds from the
+        // tail, and "you could fix this" is worth more of a short widget than a battery percentage.
+        // It is not given a reserved slot like the degraded line: that one reports the widget being
+        // wrong, this one only how it could be more.
+        val needsYou = WidgetDiagnostics.needsYouLine(outcomes).takeIf { it.isNotBlank() }
+        val rows = loaded.rows.let { base ->
+            if (needsYou == null) {
+                base
+            } else {
+                val at = base.indexOfLast { it.role == Role.FOOTNOTE }.let { if (it < 0) base.size else it }
+                base.toMutableList().apply {
+                    add(at, Row(needsYou, Role.FOOTNOTE, argb = ContextCompat.getColor(context, widgetAccentRes()), route = Routes.SETTINGS))
+                }
+            }
+        }
         // ⚠️ THE COMMENT THAT USED TO BE HERE WAS EXACTLY BACKWARDS. It read "it goes last so it
         // never pushes real content off a small widget" — but `viewsFor` ends in `rows.take(limit)`,
         // so going last is precisely what made this THE FIRST ROW DROPPED. A fully-populated widget
@@ -214,9 +231,11 @@ class LockWidgetProvider : AppWidgetProvider() {
         // instead of being displaced by one. That is the right way round: the notice exists to say
         // the content is incomplete, so spending one row on it costs nothing that was not already
         // in doubt.
+        // ⚠️ "Tap for why" opens the crash console, which is where the why IS — the widget's own
+        // render record, source by source. It used to open HOME, a promise with nothing behind it.
         val degradedRow = WidgetDiagnostics.degradedLine(outcomes)
             .takeIf { it.isNotBlank() }
-            ?.let { Row(it, Role.DEGRADED, route = Routes.HOME) }
+            ?.let { Row(it, Role.DEGRADED, route = Routes.CRASH_LOG) }
         val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
         // ⚠️ Drawn ONCE, here, and the same instances go to both board variants. They share a
         // `BitmapCache` that de-duplicates on identity, so reusing the instances costs one copy of
@@ -224,7 +243,15 @@ class LockWidgetProvider : AppWidgetProvider() {
         // `WidgetBoard.render` would quietly double the parcel.
         // ⚠️ The board could not report a failure AT ALL until now — `degradedLine` was folded
         // only into the row list, so on both tall sizes a dead source looked like a quiet day.
-        val board = withCharts(context, loaded.board.copy(degraded = degradedRow?.text))
+        val board = withCharts(
+            context,
+            loaded.board.copy(
+                degraded = degradedRow?.text,
+                degradedRoute = Routes.CRASH_LOG,
+                needsYou = needsYou,
+                needsYouRoute = Routes.SETTINGS,
+            ),
+        )
 
         // ⚠️ The agenda is the one region whose size depends on the diary, and a binder transaction
         // has a hard ceiling. So a render that fails is retried with a shorter list and then with no
@@ -458,10 +485,6 @@ class LockWidgetProvider : AppWidgetProvider() {
             Role.HEADER,
             argb = ContextCompat.getColor(context, widgetAccentRes()),
         )
-        // The board says where you are and what it is like there; the stardate drops to the line
-        // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
-        // only falls back to the device's own — nothing here may ever name a fixed town.
-        val boardSubhead = listOf(greeting, stardate).filter { it.isNotBlank() }.joinToString(" · ")
         // ⚠️ The SAME preference the header clock follows, so the agenda cannot print 14:00
         // beside a header reading 2:00 PM. Locale.US on the PATTERN only — the pattern is a
         // format string, while the rendered digits still come out in the device's own locale.
@@ -469,6 +492,16 @@ class LockWidgetProvider : AppWidgetProvider() {
             if (s?.use24HourClock != false) "HH:mm" else "h:mm a",
             Locale.getDefault(),
         )
+        // ⚠️ When this reading was taken. A widget is a picture, and the ticking clock beside it made
+        // every line read as live — a stale market or an "OFFLINE" from a phone that was dozing looked
+        // exactly like a fresh one. The stamp is what tells the two apart.
+        val updated = "UPDATED ${clock.format(Date())}"
+        // The board says where you are and what it is like there; the stardate drops to the line
+        // under it. ⚠️ The place comes from `widgetPlace` below, which prefers a SAVED location and
+        // only falls back to the device's own — nothing here may ever name a fixed town.
+        // The stamp sits BEFORE the stardate: the subhead is one line, and when it ellipsizes it is
+        // the decoration that should go, not the fact.
+        val boardSubhead = listOf(greeting, updated, stardate).filter { it.isNotBlank() }.joinToString(" · ")
 
         if (s == null) {
             return Loaded(rows, WidgetBoard.Board(header = date.ifBlank { greeting }, subhead = boardSubhead))
@@ -493,15 +526,30 @@ class LockWidgetProvider : AppWidgetProvider() {
             day = { epochDay -> dayFmt.format(Date(epochDay * Agenda.DAY_MS)).uppercase() },
         )
 
-        // ⚠️ Resolved ONCE, and on its own budget. Three feeds need a coordinate, and the fallback
+        // ⚠️ Resolved ONCE, and on its own budget. Four feeds need a coordinate, and the fallback
         // branch can touch the location provider — doing that three times would triple the slowest
         // thing in the load. Null is a fact about us, not about the world, so the feeds that need
         // it are recorded as never asked rather than left silently absent.
-        val place = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) { runCatching { widgetPlace(c, s) }.getOrNull() }
+        //
+        // ⚠️ With the REASON. Every one of these used to read "no saved location", including for an
+        // owner who had turned device location on and whose real problem was a permission or a phone
+        // that had not taken a fix since it slept — three different things to do, one sentence. And
+        // WEATHER was not in the list at all: it ran with no place, returned null and was recorded
+        // as Empty, "nothing to report", which is not what a widget with no idea where it is knows.
+        val placeLookup = withTimeoutOrNull(WIDGET_SOURCE_TIMEOUT_MS) {
+            runCatching {
+                widgetPlaceLookup(c, s) {
+                    context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                        context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                }
+            }.getOrNull()
+        }
+        val place = placeLookup?.place
         if (place == null) {
-            outcomes[Source.SAFETY] = Outcome.Skipped("no saved location")
-            outcomes[Source.SKY] = Outcome.Skipped("no saved location")
-            outcomes[Source.WATER] = Outcome.Skipped("no saved location")
+            // A lookup that never finished is a failure of ours, not something the owner can fix,
+            // so it is TimedOut and lands in the degraded line rather than in NEEDS YOU.
+            val outcome = placeLookup?.why?.let { Outcome.Skipped(it, fixable = true) } ?: Outcome.TimedOut
+            for (src in PLACE_SOURCES) outcomes[src] = outcome
         }
 
         // ⚠️ Asked once, up front, for the same reason `place` is: the answer decides whether a
@@ -509,7 +557,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // as Empty — "asked, nothing to report" — which is the wrong thing to say about a
         // permission that was never granted. One cheap AppOps call.
         val usageAccess = runCatching { c.mobileData.hasUsageAccess() }.getOrDefault(false)
-        if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted")
+        if (!usageAccess) outcomes[Source.DATA] = Outcome.Skipped("Usage Access not granted", fixable = true)
 
         // ⚠️ Same reasoning, and the calendar needs it more than most: `upcoming` returns an empty
         // list for a refused permission, an unavailable provider AND a genuinely clear diary, so
@@ -517,7 +565,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         // never allowed to look. Asked here rather than inside the source for the reason above —
         // null from inside `widgetSource` is recorded as Empty.
         val canReadCalendar = runCatching { c.calendarRepository.canRead() }.getOrDefault(false)
-        if (!canReadCalendar) outcomes[Source.CALENDAR] = Outcome.Skipped("calendar permission not granted")
+        if (!canReadCalendar) outcomes[Source.CALENDAR] = Outcome.Skipped("calendar permission not granted", fixable = true)
 
         // ⚠️ Captured out of the parallel block so the board can be assembled from the SAME pass
         // that fills the rows. Building it from a second read would let the two forms of the widget
@@ -558,7 +606,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 val weather = async {
-                    widgetSource<Wx>(Source.WEATHER, outcomes) {
+                    if (place == null) null else widgetSource<Wx>(Source.WEATHER, outcomes) {
                         val wd = resolveWeather(c, place) ?: return@widgetSource null
                         val cur = wd.current ?: return@widgetSource null
                         val u = wd.tempUnitSymbol
@@ -915,7 +963,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 water.await()?.let { waterLine = it; rows += Row(it, Role.SECONDARY, route = Routes.WEATHER) }
                 fuel.await()?.let {
                     fuelLines = it
-                    rows += Row(it.first(), Role.SECONDARY, route = Routes.MARKETS)
+                    rows += Row(it.first(), Role.SECONDARY, route = Routes.FUEL)
                 }
                 data.await()?.let { dataLine = it; rows += Row(it, Role.SECONDARY, route = Routes.SETTINGS) }
                 comms.await()?.let {
@@ -924,7 +972,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 }
                 econ.await()?.let {
                     econLines = it
-                    rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.MARKETS)
+                    rows += Row("ECON  ${it.first()}", Role.SECONDARY, route = Routes.ECONOMY)
                 }
             }
         }
@@ -932,7 +980,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         val sysLine = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
-            "SYS  PWR $batt$chg  ·  ${it.network.name}"
+            "SYS  PWR $batt$chg  ·  ${networkAtRefresh(it.network)}  ·  $updated"
         }
         sysLine?.let { rows += Row(it, Role.FOOTNOTE) }
 
@@ -954,7 +1002,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             val saver = if (it.isPowerSave) "  ·  saver" else ""
             "POWER  $batt$chg$saver"
         }
-        val netLine = ctx?.let { "SYS  ${it.network.name}" }
+        val netLine = ctx?.let { "SYS  ${networkAtRefresh(it.network)}" }
 
         // ── the same reading, as a board ────────────────────────────────────────────────────────
         // Nothing here fetches: every value was loaded once, above. A field left null is a region
@@ -967,14 +1015,14 @@ class LockWidgetProvider : AppWidgetProvider() {
             }
         }.getOrNull()
 
-        val econColumn = WidgetBoard.Column("ECONOMY", econLines)
-        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine))
+        val econColumn = WidgetBoard.Column("ECONOMY", econLines, Routes.ECONOMY)
+        val dayColumn = WidgetBoard.Column("YOUR DAY", listOfNotNull(taskLine, studyLine, skyLine), Routes.STUDY)
         // ⚠️ Split into two rather than grown to four lines: a column holds three, and the crude
         // benchmark and the pump price answer a different question from what this handset has
         // spent. The second slot of the pair was left empty in the last slice for exactly this.
-        val fuelColumn = WidgetBoard.Column("FUEL", fuelLines)
-        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine))
-        val commsColumn = WidgetBoard.Column("WAITING", commsLines)
+        val fuelColumn = WidgetBoard.Column("FUEL", fuelLines, Routes.FUEL)
+        val phoneColumn = WidgetBoard.Column("THIS PHONE", listOfNotNull(powerLine, dataLine, storageLine), Routes.SETTINGS)
+        val commsColumn = WidgetBoard.Column("WAITING", commsLines, Routes.SETTINGS)
         // ⚠️ The agenda used to be this pair's right half — four lines of today, the only calendar the
         // widget had. It is now its own region at the foot of the full board (see `agendaBlock`), so
         // this half is empty again and the pair draws WAITING alone, as it did before the agenda.
@@ -982,6 +1030,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         val board = WidgetBoard.Board(
             header = listOfNotNull(place?.name?.uppercase(), date.ifBlank { null }, wx?.compact)
                 .joinToString("  ·  "),
+            headerRoute = Routes.HOME,
             // ⚠️ This is the ONLY reader of `use24HourClock` in the whole repository. The switch has
             // existed in Settings and done nothing at all — declared, given a PrefSwitch the user
             // can flip, and consulted by nobody. Following the DEVICE setting here instead would
@@ -1002,6 +1051,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             leadArgb = leadArgb,
             leadRoute = leadRoute,
             sources = headlines,
+            sourcesRoute = Routes.NEWS,
             // ⚠️ The label states the horizon because the two numbers in a cell are not the same
             // span: the percentage is TODAY's move, and the line is `Quote.sparkline` — about a
             // month of daily closes. Intraday bars exist but are memory-cached only, so a restarted
@@ -1019,8 +1069,14 @@ class LockWidgetProvider : AppWidgetProvider() {
             // the water line came to vanish whenever the weather detail, the air quality and space
             // weather were all present. Ordered most-consequential first, so what is shed is the
             // least useful line rather than whichever happened to be last.
-            readouts = listOfNotNull(wx?.detail?.ifBlank { null }, wx?.air, waterLine, spaceLine)
-                .take(WidgetBoard.MAX_READOUTS),
+            readouts = listOfNotNull(
+                wx?.detail?.ifBlank { null }?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                // The air lives on WEATHER's own AIR sub-tab, so that is where it opens.
+                wx?.air?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                // The lake or tide gauge has no screen of its own; the forecast is the nearest thing.
+                waterLine?.let { WidgetBoard.Readout(it, Routes.WEATHER) },
+                spaceLine?.let { WidgetBoard.Readout(it, Routes.SPACE_WX) },
+            ).take(WidgetBoard.MAX_READOUTS),
             // ⚠️ Only pairs that have something GO in — `pairs` drops an empty column rather than
             // drawing a labelled blank, which would read as a feed that failed rather than one
             // this phone cannot answer. WAITING is empty until a mailbox is added or the texts
@@ -1034,6 +1090,7 @@ class LockWidgetProvider : AppWidgetProvider() {
                 commsColumn to WidgetBoard.Column("", emptyList()),
             ).take(WidgetBoard.MAX_PAIRS),
             foot = netLine,
+            footRoute = Routes.SETTINGS,
         )
         // ⚠️ From the SAME events and the same instant the agenda was planned with, so the alarm
         // fires at a boundary this reading actually drew — computed from a second read, it could
@@ -1162,7 +1219,20 @@ class LockWidgetProvider : AppWidgetProvider() {
         )
     }
 
+    /**
+     * The connection as it was when the reading was taken.
+     *
+     * ⚠️ "OFFLINE" alone read as a claim about now. The worker often refreshes while the phone is
+     * dozing, when the platform reports no network at all, so a phone sitting on home Wi-Fi showed
+     * OFFLINE for as long as the reading stood.
+     */
+    private fun networkAtRefresh(kind: NetworkKind): String =
+        if (kind == NetworkKind.OFFLINE) "OFFLINE AT REFRESH" else kind.name
+
     private companion object {
+        /** The feeds that need a coordinate, and so go quiet together when there is none. */
+        val PLACE_SOURCES = listOf(Source.WEATHER, Source.SAFETY, Source.SKY, Source.WATER)
+
         /**
          * The row slots in `widget_lock.xml`, in order.
          *

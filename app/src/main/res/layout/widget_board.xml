@@ -389,6 +389,7 @@
             android:visibility="gone">
 
             <LinearLayout
+                android:id="@+id/widget_board_p0l"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -418,6 +419,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/widget_board_p0r"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -455,6 +457,7 @@
             android:visibility="gone">
 
             <LinearLayout
+                android:id="@+id/widget_board_p1l"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -484,6 +487,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/widget_board_p1r"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -521,6 +525,7 @@
             android:visibility="gone">
 
             <LinearLayout
+                android:id="@+id/widget_board_p2l"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -550,6 +555,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/widget_board_p2r"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -666,4 +672,13 @@
         <TextView
             android:id="@+id/widget_board_degraded"
             style="@style/WidgetLine.Board.Degraded" />
+
+        <!--
+          The other half of the line above: not a feed that failed, but one that was never asked
+          because of something the owner controls — a permission, a place. Drawn at every size for
+          the same reason, and invisible when there is nothing to do.
+        -->
+        <TextView
+            android:id="@+id/widget_board_needs"
+            style="@style/WidgetLine.Board.Dim" />
 </LinearLayout>

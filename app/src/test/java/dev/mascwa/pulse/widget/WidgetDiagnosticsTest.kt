@@ -186,6 +186,56 @@ class WidgetDiagnosticsTest {
         assertEquals("labels must be unique or a report is ambiguous", Source.entries.size, Source.entries.map { it.label }.toSet().size)
     }
 
+    // ── NEEDS YOU ──────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `needs you names what the owner can fix, once per fix`() {
+        // Four feeds skipped for one missing location are ONE thing to do, not four.
+        val location = "add a place, or turn on device location"
+        val outcomes = linkedMapOf<Source, Outcome>(
+            Source.WEATHER to Outcome.Skipped(location, fixable = true),
+            Source.SAFETY to Outcome.Skipped(location, fixable = true),
+            Source.SKY to Outcome.Skipped(location, fixable = true),
+            Source.WATER to Outcome.Skipped(location, fixable = true),
+            Source.CALENDAR to Outcome.Skipped("calendar permission not granted", fixable = true),
+        )
+        assertEquals(
+            "NEEDS YOU · $location · calendar permission not granted",
+            WidgetDiagnostics.needsYouLine(outcomes),
+        )
+    }
+
+    @Test
+    fun `a skip nobody can fix never tells anybody to fix it`() {
+        // A US-only feed abroad is not a thing to go and repair. Defaulted to not fixable, so a new
+        // kind of skip has to opt in rather than nag by accident.
+        val outcomes = mapOf<Source, Outcome>(Source.FUEL to Outcome.Skipped("US only"))
+        assertEquals("", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
+    @Test
+    fun `a failed feed belongs to the degraded line, not to needs you`() {
+        val outcomes = mapOf(
+            Source.NEWS to Outcome.Failed("boom"),
+            Source.MARKETS to Outcome.TimedOut,
+            Source.TASKS to Outcome.Empty,
+            Source.STUDY to Outcome.Ok,
+        )
+        assertEquals("", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
+    @Test
+    fun `needs you counts the causes it has no room to name`() {
+        val outcomes = linkedMapOf<Source, Outcome>(
+            Source.WEATHER to Outcome.Skipped("one", fixable = true),
+            Source.CALENDAR to Outcome.Skipped("two", fixable = true),
+            Source.DATA to Outcome.Skipped("three", fixable = true),
+            Source.COMMS to Outcome.Skipped("four", fixable = true),
+            Source.SKY to Outcome.Skipped("five", fixable = true),
+        )
+        assertEquals("NEEDS YOU · one · two · three +2", WidgetDiagnostics.needsYouLine(outcomes))
+    }
+
     private companion object {
         const val NOTICE = "⚠ no answer from weather, markets — tap for why"
     }

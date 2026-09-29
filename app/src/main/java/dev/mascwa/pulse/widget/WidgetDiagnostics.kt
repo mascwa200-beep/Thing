@@ -74,8 +74,15 @@ object WidgetDiagnostics {
         /** Did not finish inside its own budget. Its own — see [WidgetCommon]. */
         data object TimedOut : Outcome
 
-        /** Never asked, because something it needs is absent (no location, no saved place). */
-        data class Skipped(val why: String) : Outcome
+        /**
+         * Never asked, because something it needs is absent (no location, no saved place).
+         *
+         * [fixable] says the owner can do something about it — grant a permission, add a place —
+         * and only those reach the NEEDS YOU line ([needsYouLine]). ⚠️ Defaulted to false: a
+         * future skip that is simply not applicable here (a US-only feed abroad) must not tell
+         * somebody to go and fix what cannot be fixed, so opting in is the explicit act.
+         */
+        data class Skipped(val why: String, val fixable: Boolean = false) : Outcome
     }
 
     /** One complete render attempt. */
@@ -146,6 +153,30 @@ object WidgetDiagnostics {
         val more = if (bad.size > 3) " +${bad.size - 3}" else ""
         return "⚠ no answer from $named$more — tap for why"
     }
+
+    /**
+     * What the owner could do to make the widget show more, or "" when nothing.
+     *
+     * The other half of [degradedLine]. That one names feeds that TRIED and got no answer; this names
+     * the ones that were never asked because of something the owner controls — a permission, a
+     * place. Without it those went quiet with a reason recorded only in the crash console, where a
+     * widget missing its weather looked the same as a weather service that was down.
+     *
+     * ⚠️ Deduplicated by the sentence, not the source: four feeds skipped for want of a location are
+     * one thing to do, and listing it four times would read as four problems.
+     */
+    fun needsYouLine(outcomes: Map<Source, Outcome>): String {
+        val why = outcomes.values.filterIsInstance<Outcome.Skipped>()
+            .filter { it.fixable }
+            .map { it.why }
+            .distinct()
+        if (why.isEmpty()) return ""
+        val more = if (why.size > MAX_NEEDS) " +${why.size - MAX_NEEDS}" else ""
+        return "NEEDS YOU · ${why.take(MAX_NEEDS).joinToString(" · ")}$more"
+    }
+
+    /** How many causes the NEEDS YOU line names before it counts the rest. */
+    private const val MAX_NEEDS = 3
 
     /**
      * The rows a widget with [cap] slots should actually draw, with [notice] — the [degradedLine]
