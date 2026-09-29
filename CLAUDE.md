@@ -15486,3 +15486,108 @@ expressions. ⚠️ **Owner-verify on the Pixel, on #2229 or later:** a quiet "L
 notification exists; power off/on shows the board with no swipe; Settings ▸ Appearance ▸ Last
 screen-off says "shown". If it says "Android refused to open it", Android 17 has closed the
 device-owner exemption and the design needs rethinking.
+
+### THE LCARS CONSOLE — a full lock screen, a home screen, and one power-up run both ways (this session, PR #477)
+
+Owner: *"Make the lock screen when it turns off have the same animation as when it comes back on,
+also make a custom LCARS lock screen and home screen that doesn't clash with any text colors or hide
+anything. It can't just be outline, full lockscreen."* Three AskUserQuestion answers: an **LCARS
+launcher** (not a wallpaper), a **full opaque LCARS console** for the lock screen, and an **LCARS
+power-up / power-down**. **Zero subagent and zero workflow spend**, per the standing usage
+constraint. Four commits: `8c44348` C1 cores · `76be111` C2 lock console · `07fa7a4` C3 launcher ·
+`71144c4` C4 becoming Home.
+
+**Why it read as "outline":** the lock board applied the widget's `RemoteViews`, and
+`widget_board.xml` has no background plate — floating text over the wallpaper behind a 66% scrim.
+The lock screen and the home screen now draw the SAME `WidgetBoard.Board` with their own Compose
+renderer (`feature/lcarsboard/`): solid corner and header bar, the rail, each board region in its
+own black `ConsolePanel` under a solid coloured tab, controls as solid capsules. `Theme.Pulse.LockBoard`
+is opaque black; `lock_board_scrim` is deleted.
+
+**"Never clashes" is arithmetic, not taste.** `LcarsContrast` (WCAG luminance/ratio, 4.5:1):
+`legible(fg, bg)` lifts a colour toward white or black only as far as needed — every DYNAMIC colour
+goes through it (calendar colours, `leadArgb`, `upNextArgb`, cells) — and `onBlock(block)` letters a
+solid block black or white, whichever reads. A test sweeps every colour in `TosPalette.kt` against
+the console's black and every block. ⚠️ **It found a real clash that shipped:** `LcarsRail` stencilled
+its codes in hardcoded `c.void` black, which on the dark red-alert blocks (`#660A0A`) is ~1.4:1.
+It uses `textOnBlock` now.
+
+**"Hides nothing":** `LcarsBoardCoverageTest` parses `WidgetBoard.Board`'s parameter list and fails
+the build if any field is read nowhere in `feature/lcarsboard/` — two renderers of one data class is
+exactly how a region goes quietly missing. It says in its own KDoc what it cannot catch (a field read
+and not drawn). The board scrolls; header, rail and controls stay put; `safeDrawing` insets keep the
+system's own status and gesture bars on black, never on an LCARS colour; a long agenda on the home
+screen is capped with a COUNTED "+N more" line that opens the calendar.
+
+**One timeline, both ways (`ConsoleSequence`).** The power-down is the power-up's progress
+travelling backward, so "the same animation, reversed" holds by construction; a reversal continues
+from wherever the sweep is. Staggered per element, 650 ms, animator scale 0 = instant.
+- ⚠️ **`ACTION_SCREEN_OFF` is useless for the power-down**: it is sent after the display is already
+  dark. The console polls `PowerManager.isInteractive` every 50 ms while RESUMED (it flips at the
+  power button) plus an `onPause` check. `ACTION_SCREEN_ON` IS early enough for the power-up.
+- ⚠️ **Android darkens the display on its own schedule and no app can hold it lit**, so the power-down
+  is MEASURED, not promised: `LockBoardLog.recordPowerDown` → Settings ▸ Appearance ▸ "Last
+  power-down" says NONE / BRIEF / how many of 650 ms / WHOLE, logged only on a band change.
+
+**⚠️ A route is never minted as a PendingIntent from the consoles.** `widgetOpenIntent` uses
+`FLAG_UPDATE_CURRENT` under fixed request codes and `filterEquals` ignores the route extra, so a
+console minting one would silently retarget the placed widget's own tap. `openRouteIntent` was
+extracted; `BoardTap.Route` opens with an explicit intent, `BoardTap.Sender` sends what the board
+was handed (the up-next PendingIntent, the calendar template + a row's fill-in). The lock console
+still unlocks first through the one idempotent `unlocked()` path; `TapGate` is gone with
+`RemoteViews`.
+
+**The home screen (`feature/launcher/`).**
+- `HomeApps` — `LauncherApps` across every profile, a package-manager fallback if that answers
+  nothing, an icon LRU, launch through the service (and the ordinary way only for this profile — a
+  work app started that way opens the wrong copy), reload on install/remove/update. Keys carry the
+  profile's SERIAL, not the per-boot `UserHandle` id.
+- `HomeConsole` — dock (four to a row, never behind a sideways scroll), search (Go launches the
+  first match), the board (`agendaLimit = 8`), then A–Z under `PanelTab` letter headings. Rows draw
+  their section's cap with `drawBehind` and no gap, so a section reads as one panel even though a
+  lazy list cannot put rows inside one. Long-press → `LcarsDialog` PIN/UNPIN + APP INFO.
+  `LazyKeyTest` was negative-tested against this screen's two keyed lists.
+- `HomeStore` — pins in `lcars_home` prefs; `HomeDirectory.togglePin`: a FULL dock (8) refuses a new
+  pin rather than dropping the oldest one somebody put there.
+- Home while home: clear search + scroll to top, decided by `hasWindowFocus()` and not
+  `FLAG_ACTIVITY_BROUGHT_TO_FRONT` (Launcher3's own test — lifecycle state cannot answer it because an
+  activity at the top may be paused around a new intent). Back only clears search; an
+  always-enabled callback registered BEFORE `setContent` swallows it otherwise.
+
+**⚠️ Becoming Home, and the switch is the alias.** The HOME filter is on `.LcarsHome`, an
+`activity-alias` **declared disabled**: no phone is offered LCARS as a launcher until Settings ▸
+Appearance ▸ "LCARS home screen" enables it. There is deliberately **no `AppSettings` field** — the
+alias's enabled state is what Android persists, and a second copy could disagree with it.
+- ON: enable the alias; as device owner `setPersistentHome` (`addPersistentPreferredActivity`) so
+  Home opens LCARS with no chooser; otherwise open `ACTION_HOME_SETTINGS`.
+- OFF: clear the preference FIRST, then return the alias to `COMPONENT_ENABLED_STATE_DEFAULT` (the
+  manifest's disabled), `DONT_KILL_APP` so Settings is not closed under the owner.
+- ⚠️ `setPersistentHome` calls `clearPackagePersistentPreferredActivities` — nothing else in LCARS
+  sets one today; a future caller would be cleared by it.
+- ⚠️ The alias is named by its FULL class with the context's package — the `.debug` suffix makes a
+  relative name point at a component that does not exist.
+
+**⚠️ The crash-loop guard.** A persistent default Home that crashes is a phone with no Home.
+`HomeGuardPolicy` (pure, tested): a start is pending until alive 5 s; three pending starts within
+2 min stand it down. The record is written with `commit()` BEFORE anything that could crash
+(a background write might not have landed when the process died). Stand-down hands Home back,
+opens whatever Home Android now resolves, and records the time; Settings says so and points at the
+crash console. ⚠️ **It cannot guard a crash in `PulseApplication.onCreate`** — that kills every
+entry point, not just Home.
+
+**Verification:** pure cores 23 tests (contrast 7, sequence 6, launcher 10) plus the two coverage
+gates; **18 rules negative-tested** across C1–C3 (12 + 3 + 3) against a baseline asserted green first. Every
+Compose file type-checks clean against the real platform, Compose 1.7.6, material3 1.3.1, activity
+1.9.3, lifecycle 2.8.7 and core-ktx, with stubs extracted from the real declarations
+(`scratchpad/lcars/compile_c3.sh`), each check negative-tested with a planted typo.
+⚠️ Two C1 guards came back asleep first — fixtures that never reached the branch (ink one mix-step
+from white rounds back to itself; `durationFor(0)` is also caught by the NaN guard). Fixed with a
+GOLD fixture and `durationFor(-1f)`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a console, it never draws one:**
+1. Screen on: the lock console powers up with no swipe; text legible everywhere; nothing under the
+   status bar; a long agenda scrolls; UNLOCK, fingerprint and a tap on an event all work.
+2. Screen off with it showing, then Settings ▸ Appearance ▸ Last power-down — how much there was.
+3. Appearance ▸ LCARS home screen ON → press Home: the console, dock, search and directory; hold an
+   app to pin it; Home while home returns to the top.
+4. Switch it OFF: the old launcher is Home again.
