@@ -112,10 +112,28 @@ class LockWidgetProvider : AppWidgetProvider() {
                     }
                 }
                 record(context, outcomes, started, fault = null)
+                // Armed after the render, from what the render drew. Both are best-effort and never
+                // throw: a widget that drew and failed to schedule its next redraw is still a widget
+                // that drew, and the periodic refresh is the backstop.
+                WidgetBoundaryAlarm.schedule(context, loaded.nextRefreshMs)
+                CalendarChangeWorker.ensure(context)
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    /**
+     * The last widget was removed: take down the two things that exist only to redraw it.
+     *
+     * Both would stand themselves down on their next firing anyway — each finds no widget ids and
+     * cancels — but the calendar trigger would first wait for the next calendar change to learn that,
+     * and there is no reason to leave a job registered with the system for a widget nobody has.
+     */
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetBoundaryAlarm.cancel(context)
+        CalendarChangeWorker.cancel(context)
     }
 
     // ── rows ────────────────────────────────────────────────────────────────────────────────────
@@ -167,7 +185,16 @@ class LockWidgetProvider : AppWidgetProvider() {
      * from the same pass over the feeds, so the two forms can never disagree about what the widget
      * knows — and a size that shows less is showing less of the same reading, not a different one.
      */
-    private data class Loaded(val rows: List<Row>, val board: WidgetBoard.Board)
+    private data class Loaded(
+        val rows: List<Row>,
+        val board: WidgetBoard.Board,
+        /**
+         * When the agenda next changes on its own — an event starting or ending, or midnight. The
+         * boundary alarm is armed for it after the render, so NOW and NEXT flip on time rather than
+         * whenever the next periodic refresh lands. Null when the calendar was never read.
+         */
+        val nextRefreshMs: Long? = null,
+    )
 
     private fun render(
         context: Context,
@@ -1008,7 +1035,12 @@ class LockWidgetProvider : AppWidgetProvider() {
             ).take(WidgetBoard.MAX_PAIRS),
             foot = netLine,
         )
-        return Loaded(rows, board)
+        // ⚠️ From the SAME events and the same instant the agenda was planned with, so the alarm
+        // fires at a boundary this reading actually drew — computed from a second read, it could
+        // arm for an event the board does not show. Only when the calendar could be read: without
+        // it there is no boundary to be right about, and the periodic refresh covers the date.
+        val nextRefreshMs = if (canReadCalendar) Agenda.nextBoundaryMs(agendaEvents, nowMs, offsetAt) else null
+        return Loaded(rows, board, nextRefreshMs)
     }
 
     /**

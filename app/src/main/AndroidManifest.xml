@@ -106,6 +106,12 @@
 
     <!-- Optional: read calendar events with a location to show them as NAV objectives (opt-in). -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- The widget redraws at the moment an event starts or ends, so NOW and NEXT flip on time
+         (widget/WidgetRefresh.kt). Granted at install from API 33; on 31-32 it does not exist and
+         the alarm falls back to a ten-minute window. The alarm is RTC, never RTC_WAKEUP: it never
+         wakes a sleeping phone. Sideloaded, so Play's restriction on this permission does not apply;
+         a calendar display is also exactly what it is meant for. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!--
       Optional: count unread texts for the widget's comms line. Nothing is read but the number of
