@@ -148,4 +148,27 @@ class LockBoardPolicyTest {
         assertFalse(LockBoardPolicy.worthLogging(O.SHOWN, null, lastLogged = O.SHOWN to null))
         assertFalse(LockBoardPolicy.worthLogging(O.REQUESTED, null, lastLogged = O.REFUSED to null))
     }
+
+    // ── the power-down measurement ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `the power-down is described by how much of it there was time for`() {
+        val d = 650L
+        assertEquals(LockBoardPolicy.PowerDownSeen.NONE, LockBoardPolicy.powerDownSeen(10, d))
+        assertEquals(LockBoardPolicy.PowerDownSeen.BRIEF, LockBoardPolicy.powerDownSeen(120, d))
+        assertEquals(LockBoardPolicy.PowerDownSeen.PARTIAL, LockBoardPolicy.powerDownSeen(400, d))
+        assertEquals(LockBoardPolicy.PowerDownSeen.WHOLE, LockBoardPolicy.powerDownSeen(650, d))
+        // The partial sentence names both numbers, so nobody has to know the duration to read it.
+        assertEquals(
+            "400 of 650 ms of the power-down before the screen went dark",
+            LockBoardPolicy.describePowerDown(400, d),
+        )
+    }
+
+    @Test
+    fun `a power-down measurement is logged only when it changes band`() {
+        assertTrue(LockBoardPolicy.powerDownWorthLogging(120, lastLoggedMs = null))
+        assertFalse(LockBoardPolicy.powerDownWorthLogging(130, lastLoggedMs = 120))
+        assertTrue(LockBoardPolicy.powerDownWorthLogging(400, lastLoggedMs = 120))
+    }
 }

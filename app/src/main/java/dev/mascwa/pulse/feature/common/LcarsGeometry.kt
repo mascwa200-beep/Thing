@@ -66,6 +66,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.LocalConsoleBlocks
 import dev.mascwa.pulse.ui.theme.Orbitron
 import dev.mascwa.pulse.ui.theme.Pulse
+import dev.mascwa.pulse.feature.lcarsboard.textOnBlock
 
 /**
  * Original-series console geometry — cut plates and mitred elbow connectors, rendered in whatever
@@ -389,7 +390,6 @@ fun LcarsRail(
         Box(modifier)
         return
     }
-    val c = Pulse.colors
     val codes = remember(seed, weights.size) { LcarsCodes.column(seed, weights.size) }
     // Offset the colour cycle by the screen, so two screens side by side in memory don't read as
     // the same panel.
@@ -397,6 +397,7 @@ fun LcarsRail(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(RailGutter)) {
         weights.forEachIndexed { i, w ->
             val last = i == weights.lastIndex
+            val block = blocks[(i + offset) % blocks.size]
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -405,7 +406,7 @@ fun LcarsRail(
                         if (last) lcarsBlockShape(CornerSweep, LcarsCorner.BottomStart)
                         else RoundedCornerShape(0.dp),
                     )
-                    .background(blocks[(i + offset) % blocks.size]),
+                    .background(block),
                 contentAlignment = Alignment.BottomEnd,
             ) {
                 if (w >= CODE_MIN_WEIGHT) {
@@ -414,8 +415,10 @@ fun LcarsRail(
                         fontFamily = JetBrainsMono,
                         fontWeight = FontWeight.Bold,
                         fontSize = 9.sp,
-                        // Black on the block: the rail colours are all light, and this is stencilling.
-                        color = c.void,
+                        // Stencilled in whichever of black or white reads on the block. ⚠️ Not always
+                        // black: the ordinary blocks are all light, but the red-alert bank drains into
+                        // reds as dark as #660A0A, where black lettering simply disappears.
+                        color = textOnBlock(block),
                         maxLines = 1,
                         modifier = Modifier.padding(end = 5.dp, bottom = 3.dp),
                     )

@@ -3,53 +3,69 @@ package dev.mascwa.pulse.feature.lockboard
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.IntentSender
 import android.os.Bundle
 import android.os.PowerManager
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.view.WindowInsets
-import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameMillis
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.mascwa.pulse.PulseApplication
-import dev.mascwa.pulse.R
+import dev.mascwa.pulse.data.settings.AppSettings
+import dev.mascwa.pulse.feature.lcarsboard.BoardTap
+import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
+import dev.mascwa.pulse.ui.ProvideStardate
+import dev.mascwa.pulse.ui.theme.NightwireTheme
 import dev.mascwa.pulse.widget.LockBoard
-import dev.mascwa.pulse.widget.WidgetBoard
-import dev.mascwa.pulse.widget.widgetOpenIntent
+import dev.mascwa.pulse.widget.openRouteIntent
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The widget's situation board, over the lock screen — the first thing seen when the screen comes
- * on, before unlocking.
+ * The lock screen, as a full LCARS console — the first thing seen when the screen comes on, before
+ * unlocking.
  *
  * ## How it draws
  *
- * It does not have a layout of its own. It asks [WidgetBoard] for the SAME `RemoteViews` the widget
- * is drawn from, full-height form, and applies it into this window — so the lock screen and the
- * widget are one design with one set of rules, and anything fixed on the widget is fixed here too.
- * The board comes from [LockBoard], which every widget render feeds; when nothing recent is held it
- * shows a clock and a loading line, then redraws in place as soon as a board lands.
+ * [LockConsole]: solid LCARS chrome around the widget's board, each region in its own panel. The
+ * board is the SAME data the widget draws, from [LockBoard], which every widget render feeds, so the
+ * lock screen and the widget cannot disagree about what is going on. When nothing recent is held it
+ * shows the time and a loading line, then fills in place as soon as a board lands.
+ *
+ * ## The power-up, and the power-down
+ *
+ * The console assembles itself when the screen comes on and takes itself apart the same way when
+ * the screen goes off — one timeline, run forward and back ([ConsoleSequence]).
+ *
+ * - **Up** begins on `ACTION_SCREEN_ON`, which Android sends as the phone STARTS waking, so it plays
+ *   as the display lights. [onStart] covers a console shown while the screen is already on.
+ * - **Down** cannot wait for `ACTION_SCREEN_OFF`: that is sent only after the display is already
+ *   dark. So while the console is in front it watches `PowerManager.isInteractive`, which turns
+ *   false the moment the power button is pressed, and starts the reverse sweep then.
+ * - ⚠️ **Android darkens the display on its own schedule and no app can hold it lit**, so how much
+ *   of the power-down is seen is measured rather than promised: the time from that first signal to
+ *   the screen being off goes to [LockBoardLog] and appears under the Settings switch.
  *
  * ## Every tap unlocks first
  *
  * ⚠️ The board is full of tap targets — each region opens its screen, each event opens in the
  * calendar. From a screen shown over the lock screen, simply firing one would try to open an
- * ordinary screen behind a locked keyguard. So the context the board is applied with ([TapGate])
- * catches the launch: `RemoteViews` sends every click, list rows included, through
- * `Context.startIntentSender` on the view's context (read out of the platform), and the gate turns
- * that into "ask the keyguard to go away, and open this once it has". Cancel the unlock and nothing
- * opens.
+ * ordinary screen behind a locked keyguard. So a tap is HELD, the keyguard is asked to go away, and
+ * the held tap opens once it has. Cancel the unlock and nothing opens.
  *
  * ## Never a trap
  *
@@ -64,14 +80,21 @@ import kotlinx.coroutines.launch
  */
 class LockBoardActivity : ComponentActivity() {
 
-    private lateinit var boardHost: FrameLayout
     private val keyguard by lazy { getSystemService(KeyguardManager::class.java) }
     private val power by lazy { getSystemService(PowerManager::class.java) }
-    private val gate by lazy { TapGate(this) }
 
     /** What to open once the keyguard has gone — set only while an unlock is being asked for. */
-    private var pendingTap: Tap? = null
-    private var unlockReceiver: BroadcastReceiver? = null
+    private var pendingTap: BoardTap? = null
+    private var receiver: BroadcastReceiver? = null
+
+    /** Where the console stands: 0 dark, 1 fully up. Read inside draw layers, so a sweep never recomposes. */
+    private val progress = mutableFloatStateOf(0f)
+
+    /** Which way the console is heading. The sweep follows it from wherever it currently is. */
+    private val powered = mutableStateOf(false)
+
+    /** When the current power-down began (elapsed realtime), until it has been measured. */
+    private var powerDownAt: Long? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,57 +104,73 @@ class LockBoardActivity : ComponentActivity() {
         // normally, so this is the only place that knows the board really came into being.
         LockBoardLog.record(this, LockBoardPolicy.Outcome.SHOWN)
 
-        boardHost = FrameLayout(this)
-        val unlockBar = TextView(this).apply {
-            text = UNLOCK_LABEL
-            contentDescription = "Unlock"
-            gravity = Gravity.CENTER
-            setTextColor(getColor(R.color.nw_accent))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            letterSpacing = 0.2f
-            val pad = dp(18)
-            setPadding(pad, pad, pad, pad)
-            setOnClickListener { unlock(null) }
-        }
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(boardHost, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-            addView(unlockBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        }
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(getColor(R.color.lock_board_scrim))
-            // A tap on anything that is not itself a tap target — empty board, a heading — is the
-            // ordinary lock-screen gesture: unlock. Clickable views and the list consume their own.
-            setOnClickListener { unlock(null) }
-            addView(column, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            // ⚠️ Edge to edge is enforced at target 35, so the bars overlap the window: pad the
-            // content, not the scrim, so the wallpaper still runs to the edges behind it.
-            setOnApplyWindowInsetsListener { _, insets ->
-                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-                column.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                insets
+        // Dark bars with light icons over the console's black ground: the system's own clock and
+        // battery keep the contrast Android gave them, and never sit on an LCARS colour.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
+
+        val defaults = AppSettings()
+        val sweepMs = ConsoleSequence.durationFor(animatorScale())
+        setContent {
+            NightwireTheme(accent = defaults.accentColor, amoledBlack = defaults.amoledBlack) {
+                ProvideStardate {
+                    val snapshot by LockBoard.latest.collectAsStateWithLifecycle()
+                    val target by powered
+                    // ONE timeline, driven toward whichever end `powered` names, from wherever it is
+                    // — which is what makes a power-down that interrupts a power-up continue from the
+                    // half-assembled console instead of flashing it up first.
+                    LaunchedEffect(target) {
+                        val from = progress.floatValue
+                        val end = if (target) 1f else 0f
+                        if (from == end) return@LaunchedEffect
+                        val start = withFrameMillis { it }
+                        do {
+                            val now = withFrameMillis { it }
+                            progress.floatValue = ConsoleSequence.progressAt(now - start, target, from, sweepMs)
+                        } while (progress.floatValue != end)
+                    }
+                    val readProgress = remember { { progress.floatValue } }
+                    LockConsole(snapshot?.board, readProgress, ::unlock)
+                }
             }
         }
-        setContentView(root)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = finish()
         })
 
-        // Unlocked — fingerprint, face, the bouncer after UNLOCK — by whichever route: see [unlocked].
-        // ⚠️ Registered at runtime because it has to be: USER_PRESENT is never delivered to a
-        // manifest receiver. No export flag, as for every protected system broadcast in this app.
+        // ⚠️ Registered at runtime because they have to be: USER_PRESENT is never delivered to a
+        // manifest receiver, and the screen broadcasts are runtime-only too. No export flag, as for
+        // every protected system broadcast in this app.
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
-                if (intent?.action == Intent.ACTION_USER_PRESENT) unlocked()
+                when (intent?.action) {
+                    Intent.ACTION_USER_PRESENT -> unlocked()
+                    Intent.ACTION_SCREEN_ON -> powerUp()
+                    Intent.ACTION_SCREEN_OFF -> closePowerDown()
+                }
             }
         }
-        runCatching { registerReceiver(r, IntentFilter(Intent.ACTION_USER_PRESENT)) }
-            .onSuccess { unlockReceiver = r }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        runCatching { registerReceiver(r, filter) }.onSuccess { receiver = r }
 
+        // The earliest sign the screen is going off: isInteractive turns false at the power button.
+        // Only while the console is in front — nobody watches a power-down behind something else.
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                LockBoard.latest.collect { show(it) }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    delay(SLEEP_POLL_MS)
+                    if (power?.isInteractive == false) {
+                        beginPowerDown()
+                        break
+                    }
+                }
             }
         }
     }
@@ -143,6 +182,9 @@ class LockBoardActivity : ComponentActivity() {
         (application as? PulseApplication)?.let { app ->
             LockBoard.refreshIfStale(app, app.appScope, System.currentTimeMillis())
         }
+        // Already lit — the safety-net start at screen-on, or a return to the console — so power up
+        // now rather than waiting for a screen-on that has already happened.
+        if (power?.isInteractive != false) powerUp()
     }
 
     override fun onResume() {
@@ -152,62 +194,59 @@ class LockBoardActivity : ComponentActivity() {
         if (LockBoardPolicy.finishOnResume(power?.isInteractive != false, keyguard?.isKeyguardLocked == true)) unlocked()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Pausing because the phone is going to sleep: the power-down starts here if the watch
+        // above has not already seen it.
+        if (power?.isInteractive == false) beginPowerDown()
+    }
+
+    override fun onStop() {
+        // The screen is off, or the console has been left: measure what the power-down had, and
+        // stand the console at dark so the next wake assembles it from nothing.
+        closePowerDown()
+        powered.value = false
+        progress.floatValue = 0f
+        super.onStop()
+    }
+
     override fun onDestroy() {
-        unlockReceiver?.let { runCatching { unregisterReceiver(it) } }
-        unlockReceiver = null
+        receiver?.let { runCatching { unregisterReceiver(it) } }
+        receiver = null
         alive = false
         super.onDestroy()
     }
 
-    // ── drawing ─────────────────────────────────────────────────────────────────────────────────
+    // ── the sweep ───────────────────────────────────────────────────────────────────────────────
 
-    private fun show(snapshot: LockBoard.Snapshot?) {
-        val view = snapshot?.let { drawn(it.board) } ?: waiting()
-        boardHost.removeAllViews()
-        boardHost.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    private fun powerUp() {
+        powerDownAt = null
+        powered.value = true
     }
 
-    /**
-     * The widget's own full board, applied here.
-     *
-     * ⚠️ Tried again without the agenda before giving up, for the reason the widget does the same:
-     * the agenda is the one region whose content can be anything the diary holds, and a fortnight of
-     * it must never be why the whole board fails to draw. There is no binder ceiling in-process, so
-     * the shorter-list rung the widget has would buy nothing here.
-     */
-    private fun drawn(board: WidgetBoard.Board): View? {
-        val attempts = listOfNotNull(board, board.agenda?.let { board.copy(agenda = null) })
-        for (attempt in attempts) {
-            val view = runCatching {
-                WidgetBoard.render(this, attempt, full = true) { route, code -> widgetOpenIntent(this, route, code) }
-                    .apply(gate, boardHost)
-            }.getOrNull()
-            if (view != null) return view
-        }
-        return null
+    /** Start taking the console apart. Once per going-to-sleep, and only if it was up to take apart. */
+    private fun beginPowerDown() {
+        if (powerDownAt != null || !powered.value) return
+        powerDownAt = SystemClock.elapsedRealtime()
+        powered.value = false
     }
 
-    /** Before the first board of this process lands: the time, and a line saying what is coming. */
-    private fun waiting(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        addView(android.widget.TextClock(this@LockBoardActivity).apply {
-            setTextColor(getColor(R.color.nw_ink))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 48f)
-            gravity = Gravity.CENTER
-        })
-        addView(TextView(this@LockBoardActivity).apply {
-            text = WAITING_LABEL
-            setTextColor(getColor(R.color.nw_muted))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            gravity = Gravity.CENTER
-        })
+    /** The screen is off: record how long the power-down had. Idempotent — the first caller measures. */
+    private fun closePowerDown() {
+        val at = powerDownAt ?: return
+        powerDownAt = null
+        LockBoardLog.recordPowerDown(this, SystemClock.elapsedRealtime() - at)
     }
+
+    /** The system's animator scale; 0 means "remove animations", which the sweep honours. */
+    private fun animatorScale(): Float =
+        runCatching { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }
+            .getOrDefault(1f)
 
     // ── unlocking ───────────────────────────────────────────────────────────────────────────────
 
     /** Unlock, then open [tap] if there is one. The keyguard's own screen asks for the PIN. */
-    private fun unlock(tap: Tap?) {
+    private fun unlock(tap: BoardTap?) {
         pendingTap = tap
         val km = keyguard
         if (km == null || !km.isKeyguardLocked) {
@@ -246,53 +285,18 @@ class LockBoardActivity : ComponentActivity() {
         if (!isFinishing) finish()
     }
 
-    /** The real launch — the activity's own, which the gate is not in front of. */
-    private fun open(tap: Tap) {
-        runCatching {
-            startIntentSender(tap.sender, tap.fillIn, tap.flagsMask, tap.flagsValues, tap.extraFlags, tap.options)
-        }
-    }
-
-    /** One caught launch, held until the keyguard has gone. */
-    private class Tap(
-        val sender: IntentSender,
-        val fillIn: Intent?,
-        val flagsMask: Int,
-        val flagsValues: Int,
-        val extraFlags: Int,
-        val options: Bundle?,
-    )
-
     /**
-     * The context the board is applied with: identical to the activity, except that a launch goes
-     * through [unlock] first.
-     *
-     * ⚠️ Both overloads, because the platform has both and a caller could reach either; `RemoteViews`
-     * uses the six-argument one today. `RemoteViews` wraps whatever context it is given in its own
-     * `ContextWrapper`, which does not override either method, so the call arrives here.
+     * The real launch. A route opens LCARS with an explicit intent — never through the widget's
+     * PendingIntent helper, which would retarget the placed widget's own tap (see [BoardTap]).
      */
-    private class TapGate(private val board: LockBoardActivity) : ContextWrapper(board) {
-        override fun startIntentSender(
-            intent: IntentSender,
-            fillInIntent: Intent?,
-            flagsMask: Int,
-            flagsValues: Int,
-            extraFlags: Int,
-        ) = startIntentSender(intent, fillInIntent, flagsMask, flagsValues, extraFlags, null)
-
-        override fun startIntentSender(
-            intent: IntentSender,
-            fillInIntent: Intent?,
-            flagsMask: Int,
-            flagsValues: Int,
-            extraFlags: Int,
-            options: Bundle?,
-        ) {
-            board.unlock(Tap(intent, fillInIntent, flagsMask, flagsValues, extraFlags, options))
+    private fun open(tap: BoardTap) {
+        runCatching {
+            when (tap) {
+                is BoardTap.Route -> startActivity(openRouteIntent(this, tap.route))
+                is BoardTap.Sender -> startIntentSender(tap.sender, tap.fillIn, 0, 0, 0)
+            }
         }
     }
-
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     companion object {
         /**
@@ -304,7 +308,7 @@ class LockBoardActivity : ComponentActivity() {
         var alive: Boolean = false
             private set
 
-        private const val UNLOCK_LABEL = "▲  UNLOCK"
-        private const val WAITING_LABEL = "Reading the board…"
+        /** How often the console checks whether the phone has started going to sleep. */
+        private const val SLEEP_POLL_MS = 50L
     }
 }

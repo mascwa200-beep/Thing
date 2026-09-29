@@ -215,13 +215,22 @@ suspend fun resolveWeather(c: AppContainer, s: AppSettings?): WeatherData? =
  * route extra, so two regions sharing a code share ONE PendingIntent and every tap lands wherever the
  * last-built one pointed — the collision already corrected once in `NotifId`.
  */
-fun widgetOpenIntent(context: Context, route: String, requestCode: Int): PendingIntent {
-    val open = Intent(context, MainActivity::class.java)
+fun widgetOpenIntent(context: Context, route: String, requestCode: Int): PendingIntent =
+    PendingIntent.getActivity(
+        context, requestCode, openRouteIntent(context, route),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+/**
+ * The intent that opens LCARS on [route] — the one definition every surface uses, whether it wraps
+ * it in a PendingIntent (the widget) or starts it directly (the lock console and the home screen).
+ *
+ * ⚠️ The consoles start this directly rather than going through [widgetOpenIntent], and that is
+ * load-bearing: minting a PendingIntent under one of the widget's request codes with
+ * `FLAG_UPDATE_CURRENT` would rewrite the route on the placed widget's own tap target.
+ */
+fun openRouteIntent(context: Context, route: String): Intent =
+    Intent(context, MainActivity::class.java)
         .setAction(Intent.ACTION_VIEW)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         .putExtra(MainActivity.EXTRA_ROUTE, route)
-    return PendingIntent.getActivity(
-        context, requestCode, open,
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
-}

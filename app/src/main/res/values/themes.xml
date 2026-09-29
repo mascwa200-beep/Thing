@@ -13,13 +13,14 @@
         <item name="android:windowBackground">@color/nw_void</item>
     </style>
 
-    <!-- The lock-screen board: the wallpaper behind it rather than a painted background, so it reads as
-         the owner's own lock screen with the board on it. Opaque window, not translucent, on purpose:
-         a full-screen opaque showWhenLocked activity is what the system treats as covering the
-         keyguard, the way a navigation app does. -->
+    <!-- The lock console: a full, opaque LCARS screen on black. It was the widget's text over the
+         wallpaper behind a dark veil, which read as outlines; the owner asked for the whole lock
+         screen instead. Opaque window, not translucent, on purpose: a full-screen opaque
+         showWhenLocked activity is what the system treats as covering the keyguard, the way a
+         navigation app does. -->
     <style name="Theme.Pulse.LockBoard">
-        <item name="android:windowShowWallpaper">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowBackground">@color/nw_void</item>
     </style>
 
     <!-- Splash screen theme (androidx.core.splashscreen). -->

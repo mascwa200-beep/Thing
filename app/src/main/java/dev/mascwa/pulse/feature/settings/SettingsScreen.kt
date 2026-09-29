@@ -654,7 +654,7 @@ fun SettingsScreen(
                     PrefSwitch(
                         "Lock-screen board",
                         if (boardCanOpen) {
-                            "The widget's board over the lock screen, there when the screen comes on. " +
+                            "A full LCARS console over the lock screen, there when the screen comes on. " +
                                 "Tap it or UNLOCK to unlock. Anyone who picks the phone up sees it, calendar included."
                         } else {
                             "Needs LCARS to be this phone's device owner: from Android 15 nothing else " +
@@ -680,6 +680,17 @@ fun SettingsScreen(
                                     dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.describe(last.outcome, last.reason)
                             },
                         )
+                        // How much of the power-down there was time for. Measured rather than
+                        // promised: Android darkens the display on its own schedule.
+                        val powerDown by dev.mascwa.pulse.feature.lockboard.LockBoardLog.powerDown.collectAsStateWithLifecycle()
+                        powerDown?.let { pd ->
+                            PrefInfo(
+                                "Last power-down",
+                                subtitle = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                                    .format(java.util.Date(pd.atMs)) + " — " +
+                                    dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.describePowerDown(pd.windowMs),
+                            )
+                        }
                     }
                 }
             }

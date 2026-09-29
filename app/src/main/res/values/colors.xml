@@ -4,9 +4,6 @@
          (pure black) so the earliest-visible frame — window/splash background, launcher icon — is
          consistent with the in-app console palette. -->
     <color name="nw_void">#000000</color>
-    <!-- The lock-screen board's veil over the wallpaper: dark enough for the board's thin text to
-         read over any photo, light enough that it is still visibly the owner's own lock screen. -->
-    <color name="lock_board_scrim">#A8000000</color>
     <!-- The app's command gold. Was the LCARS orange #FF9900, and before that a stray cyberpunk
          cyan; each time it has been corrected rather than deleted so a future reference picks up the
          right colour instead of resurrecting a retired one. -->

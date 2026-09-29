@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.feature.lockboard
 
+import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
+
 /**
  * When the lock-screen board may put itself in front of you, as rules a JVM test can hold.
  *
@@ -139,6 +141,47 @@ object LockBoardPolicy {
         Outcome.SKIPPED -> "not shown — ${reason ?: "no reason recorded"}"
         Outcome.REFUSED -> "Android refused to open it"
     }
+
+    // ── how much of the power-down there was time for ───────────────────────────────────────────
+
+    /**
+     * How much of the console's power-down could have been seen.
+     *
+     * ⚠️ **This is measured because it cannot be promised.** The power-down begins the moment the
+     * phone reports it is going to sleep, and Android darkens the display on its own schedule — no
+     * app can hold it lit. [windowMs] is the time between those two, so the most of the sweep anybody
+     * could have seen; the Settings line says it in these words rather than claiming an animation that
+     * may have played to a dark screen.
+     */
+    enum class PowerDownSeen { NONE, BRIEF, PARTIAL, WHOLE }
+
+    fun powerDownSeen(windowMs: Long, durationMs: Long = ConsoleSequence.DURATION_MS): PowerDownSeen = when {
+        windowMs < POWER_DOWN_NONE_MS -> PowerDownSeen.NONE
+        windowMs < POWER_DOWN_BRIEF_MS -> PowerDownSeen.BRIEF
+        windowMs < durationMs -> PowerDownSeen.PARTIAL
+        else -> PowerDownSeen.WHOLE
+    }
+
+    fun describePowerDown(windowMs: Long, durationMs: Long = ConsoleSequence.DURATION_MS): String =
+        when (powerDownSeen(windowMs, durationMs)) {
+            PowerDownSeen.NONE -> "the screen went dark before the power-down could start"
+            PowerDownSeen.BRIEF -> "only $windowMs ms of the power-down before the screen went dark"
+            PowerDownSeen.PARTIAL -> "$windowMs of $durationMs ms of the power-down before the screen went dark"
+            PowerDownSeen.WHOLE -> "the whole power-down played before the screen went dark"
+        }
+
+    /** Under one frame at 20 fps: nothing that could register as movement. */
+    const val POWER_DOWN_NONE_MS = 50L
+
+    /** Under a quarter of a second: a flicker rather than a sweep. */
+    const val POWER_DOWN_BRIEF_MS = 250L
+
+    /**
+     * Whether a new measurement goes into the activity log: only when it lands in a different band,
+     * so a day of screen toggles cannot flood the log that travels with a debug report.
+     */
+    fun powerDownWorthLogging(windowMs: Long, lastLoggedMs: Long?): Boolean =
+        lastLoggedMs == null || powerDownSeen(windowMs) != powerDownSeen(lastLoggedMs)
 
     /**
      * Whether Android will let this app start an activity while it has no screen of its own.
