@@ -21,9 +21,12 @@ STD=/opt/gradle-8.14.3/lib/kotlin-stdlib-2.0.21.jar
 TRV=/opt/gradle-8.14.3/lib/trove4j-1.0.20200330.jar
 ANN=/opt/gradle-8.14.3/lib/annotations-24.0.1.jar
 GC="$HOME/.gradle/caches/modules-2/files-2.1"
-COR=$(find "$GC" -name 'kotlinx-coroutines-core-jvm-*.jar' | head -1)
-JU=$(find "$GC" -name 'junit-4.13.2.jar' | head -1)
-HC=$(find "$GC" -name 'hamcrest-core-1.3.jar' | head -1)
+# The Gradle cache is empty on a fresh container, so fall back to the jars the Gradle distribution
+# itself ships — the same fallback the other local gates carry.
+GL=/opt/gradle-8.14.3/lib
+COR=$(find "$GC" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1); COR=${COR:-$(ls $GL/kotlinx-coroutines-core-jvm-*.jar 2>/dev/null | head -1)}
+JU=$(find "$GC" -name 'junit-4.13.2.jar' 2>/dev/null | head -1); JU=${JU:-$GL/junit-4.13.2.jar}
+HC=$(find "$GC" -name 'hamcrest-core-1.3.jar' 2>/dev/null | head -1); HC=${HC:-$GL/hamcrest-core-1.3.jar}
 for j in "$KC" "$STD" "$TRV" "$ANN" "$COR" "$JU" "$HC"; do
   # ⚠️ Asserted rather than assumed: omitting a jar from the compiler's own -cp makes kotlinc die
   # before it compiles a line, which looks very much like a clean pass.

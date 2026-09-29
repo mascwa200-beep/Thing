@@ -647,6 +647,52 @@ fun SettingsScreen(
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
                     }
+                    // ⚠️ Says what is missing when Android will not let it open, rather than showing
+                    // a switch that is on and does nothing — the board is started from the
+                    // background, and from Android 15 only a device owner may do that.
+                    val boardCanOpen = remember { dev.mascwa.pulse.feature.lockboard.LockBoardTrigger.canLaunch(context) }
+                    PrefSwitch(
+                        "Lock-screen board",
+                        if (boardCanOpen) {
+                            "A full LCARS console over the lock screen, there when the screen comes on. " +
+                                "Tap it or UNLOCK to unlock. Anyone who picks the phone up sees it, calendar included."
+                        } else {
+                            "Needs LCARS to be this phone's device owner: from Android 15 nothing else " +
+                                "may open a screen from the background."
+                        },
+                        s.lockScreenBoard,
+                    ) { v -> vm.update { it.copy(lockScreenBoard = v) } }
+                    // What became of the last screen-off. Every way the board can fail to appear
+                    // looks exactly like the stock lock screen, so this is where the reason lives.
+                    val boardLast by dev.mascwa.pulse.feature.lockboard.LockBoardLog.latest.collectAsStateWithLifecycle()
+                    LaunchedEffect(Unit) {
+                        withContext(Dispatchers.IO) { dev.mascwa.pulse.feature.lockboard.LockBoardLog.load(context) }
+                    }
+                    if (s.lockScreenBoard) {
+                        val last = boardLast
+                        PrefInfo(
+                            "Last screen-off",
+                            subtitle = if (last == null) {
+                                "Nothing yet — turn the screen off and on once."
+                            } else {
+                                java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                                    .format(java.util.Date(last.atMs)) + " — " +
+                                    dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.describe(last.outcome, last.reason)
+                            },
+                        )
+                        // How much of the power-down there was time for. Measured rather than
+                        // promised: Android darkens the display on its own schedule.
+                        val powerDown by dev.mascwa.pulse.feature.lockboard.LockBoardLog.powerDown.collectAsStateWithLifecycle()
+                        powerDown?.let { pd ->
+                            PrefInfo(
+                                "Last power-down",
+                                subtitle = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                                    .format(java.util.Date(pd.atMs)) + " — " +
+                                    dev.mascwa.pulse.feature.lockboard.LockBoardPolicy.describePowerDown(pd.windowMs),
+                            )
+                        }
+                    }
+                    HomeScreenRows()
                 }
             }
 

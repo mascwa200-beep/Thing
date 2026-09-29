@@ -233,6 +233,57 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- THE LOCK-SCREEN BOARD — the widget's situation board over the lock screen, started as the
+             screen goes off so it is the first thing seen when it comes back. showWhenLocked and
+             nothing more: it never turns the screen on or keeps it on, Back leaves, and unlocking by
+             any route ends it. Its own task affinity so starting it never brings LCARS's own screens
+             forward, and excluded from Recents because it is not somewhere anybody goes back to.
+             NOT noHistory: that finishes an activity once it is no longer visible, and screen-off is
+             exactly when this one has just been put in place. -->
+        <activity
+            android:name=".feature.lockboard.LockBoardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.lockboard"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+            android:theme="@style/Theme.Pulse.LockBoard" />
+
+        <!-- The LCARS home screen. Not a Home on its own: the HOME filter is on the alias below. It is
+             its own task (empty affinity, singleTask) the way a launcher is, is never in Recents, and
+             resumes while the previous app is still pausing so the Home button feels immediate.
+             configChanges keeps a rotation or a font change from recreating it, which the crash-loop
+             guard would otherwise count as a start. -->
+        <activity
+            android:name=".feature.launcher.LauncherActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:resumeWhilePausing="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- What makes it a Home. ⚠️ DISABLED in the manifest: a phone that has not switched the LCARS
+             home screen on in Settings never sees LCARS offered as a launcher, and switching it off
+             disables this again, so no stray Home is left behind to be picked by accident. -->
+        <activity-alias
+            android:name=".LcarsHome"
+            android:targetActivity=".feature.launcher.LauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- OFFICIAL EMERGENCY ALERT — a full-screen condition-red takeover with a full-volume alarm on
              the alarm stream, raised from a government CAP feed (never from a news headline). Back is
              deliberately disabled; the acknowledge button is the only way out. Shows over the lock screen
@@ -257,6 +308,18 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="official_emergency_alert_watch" />
+        </service>
+
+        <!-- Keeps LCARS running so it hears the screen go off, which is when the lock-screen board is put
+             in place. It does nothing else: the screen broadcasts reach only a live process, and a
+             board cannot appear for a screen-off nobody heard. Runs only while the board is on. -->
+        <service
+            android:name=".feature.lockboard.LockBoardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="lock_screen_board" />
         </service>
 
         <!-- Re-arm the periodic refresh worker after a reboot. -->

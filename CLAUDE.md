@@ -15377,3 +15377,217 @@ and WidgetLinkageTest 8, all run locally. **Ten rules negative-tested.**
 6. Hours later, the subhead should say `PLACE FROM …`.
 7. The emergency watch's ongoing notification should say it is watching where LCARS last saw you,
    not "needs location".
+
+### THE LOCK-SCREEN BOARD — the widget's board is the first thing seen on wake (this session)
+
+Owner: *"I would like to make the lock screen widget be the first thing I see when I turn my phone
+screen on before I ever get to log in."* **Zero subagent and zero workflow spend.**
+
+**Shape:** `feature/lockboard/LockBoardActivity` — a `showWhenLocked` activity over the lock-screen
+wallpaper (`Theme.Pulse.LockBoard`: opaque window, `windowShowWallpaper`, a 66% scrim) that applies
+the widget's OWN full-height `RemoteViews` from `WidgetBoard.render`. It has no layout of its own,
+so the widget and the lock board are one design. The board comes from `widget/LockBoard`, a
+process-wide `StateFlow` that **every widget render publishes to** (the provider now decorates once
+per pass, not per id). When nothing recent is held (no widget placed, or older than 5 min) it loads
+its own through `LockWidgetProvider().loadBoard()` — the same `build` pass, recording nothing — and
+redraws in place when that lands.
+
+**⚠️ Launched as the screen goes OFF, not on.** A screen-on broadcast arrives after the keyguard has
+drawn, so a board started then is visibly second. `LockBoardTrigger` (installed from
+`PulseApplication`, **main process only**) starts it at SCREEN_OFF and again at SCREEN_ON as a
+safety net. Every decision is `LockBoardPolicy` (pure, 11 tests, 8 rules negative-tested):
+
+| rule | why |
+|---|---|
+| a call wins over everything | proximity turns the screen off mid-call; the board would wait over the call screen |
+| never over our own takeover | a newer activity draws on top, burying an unacknowledged red alert (`LockScreenGuests`, counted create→destroy because a takeover is *stopped* at exactly the moment this asks) |
+| not while an alarm or ringtone sounds | something else woke the phone (active-playback usages) |
+| screen-on needs a LOCKED keyguard; screen-off does not ask | the lock delay has not run out at screen-off |
+| `finishOnResume` only when **lit and unlocked** | a board resumed in the dark before the lock delay must not throw itself away |
+
+⚠️ **Background start: a device owner may; `SYSTEM_ALERT_WINDOW` is NOT enough on Android 15+ at
+target 35** — it now counts only while an overlay is visible, and at screen-off none is. A refused
+start is DROPPED, not thrown, so `canLaunch` is asked first and the Settings row says what is
+missing. The owner's phone is DO.
+
+⚠️ **Every tap unlocks first, and the mechanism is read out of the platform, not assumed.**
+`RemoteViews.RemoteResponse.startPendingIntent` calls `view.getContext().startIntentSender(6 args)`,
+and `RemoteViewsContextWrapper` does not override it — so the board is applied with a `TapGate`
+`ContextWrapper` that turns every launch (list rows included) into `requestDismissKeyguard` →
+open on success. `RemoteViews.InteractionHandler` exists but is hidden API; do not reach for it.
+
+**Never a trap:** Back leaves; USER_PRESENT (fingerprint/face/bouncer) ends it; it never turns the
+screen on or keeps it on. Not `noHistory` — that finishes on invisibility, i.e. at screen-off.
+
+⚠️ **One unlock path, not three (found re-reading the diff while CI ran).** Three signals say the
+phone is unlocked — the dismiss callback, USER_PRESENT, and `onResume` seeing a lit unlocked phone —
+and Android does not order them. As first written they acted separately: `onResume` winning finished
+the board with a tap still held, so the callback then launched from a finishing activity and the
+event somebody unlocked to open could be lost; USER_PRESENT with a tap held did nothing. All three
+now call `unlocked()`, which takes the held tap exactly once — whichever arrives first opens it.
+The CI compile gate on `401f7a7` (LCARS #2227) had already passed; this rode the next push.
+
+**Setting:** `AppSettings.lockScreenBoard`, **default ON** (asked for by name), Settings ▸ Interface
+▸ Appearance ▸ "Lock-screen board"; the subtitle says anyone who picks the phone up sees it,
+calendar included. Section keywords gained `lock screen lockscreen keyguard board` (the findability
+gate failed without them — negative-tested).
+
+**Verified locally:** the policy tests; the whole lock-board package + `LockBoard` type-checked clean
+against the real platform + activity/lifecycle AARs (stubs copied from the real declarations; gate
+negative-tested with a planted typo); `WidgetLinkageTest` and `SettingsSectionCoverageTest` green.
+The provider refactor cannot compile here (R cascades) — CI is its gate.
+
+⚠️ **Owner-verify on the Pixel — none of this can be seen from a build machine:** press power off
+and on: the board should already be there, not the stock lock screen first. Fingerprint while it is
+up — does it unlock and step aside, or does it need UNLOCK? (Occluding activities vary here; UNLOCK
+always works.) Tap a region: bouncer, then that screen. During a call, and with an alarm ringing, it
+must stay out of the way. If it never appears, Settings says why.
+
+#### "I still have to swipe" — the phone was on #2225; the board was never installed (this session)
+
+Owner sent a screenshot of the stock Android 17 lock screen being swiped to reveal the system's own
+widget page: *"I still have to swipe to get it … No swiping."* **The debug reports settled it before
+any code was read:** three reports on `debug-reports` at 14:21 EDT, two minutes after the
+screenshot, all say `build: 1.0.2225-debug`. The board ships in **#2228** (`249bd97`). What was
+swiped to is Android's own lock-screen widget hub, which always needs a swipe. ⚠️ **Read
+`debug-reports` first whenever the owner reports a feature "not working"** — the build line answers
+the most common cause in one fetch. The phone had been on cellular all day, and the background
+installer waits for unmetered.
+
+The same reports showed two things worth fixing even once installed:
+- **The phone is Android 17 (API 37)**, two releases past the API 35 the background-start reasoning
+  was checked against. Device owner should still be exempt; nothing proves it on the device.
+- **The process is not reliably resident**: it had been dead until a widget render restarted it at
+  14:18. The screen-off broadcast reaches only a live process, so no board can appear for a
+  screen-off nobody heard.
+
+Owner chose (AskUserQuestion) a **dedicated service** over relying on the existing watches:
+- **`LockBoardService`** — a `specialUse` FGS (`NotifId.FGS_LOCK_BOARD = 7404`, IMPORTANCE_MIN
+  channel `lock_board`, START_STICKY) that does nothing but keep the process alive. Runs only while
+  `lockScreenBoard && canLaunch` — a notification promising a board Android will refuse is worse than
+  none. Started and stopped from `LockBoardTrigger`'s settings watch (so any process start re-arms
+  it), revived by `BootReceiver`, self-healed by `RefreshWorker`.
+- **`LockBoardLog`** — the last outcome (REQUESTED / SHOWN / SKIPPED+reason / REFUSED) in a small
+  prefs file, under the Settings switch as "Last screen-off", and to the activity log on change.
+  ⚠️ **A refused background start is DROPPED, not thrown**, so REFUSED is inferred: the trigger
+  records REQUESTED, `LockBoardActivity.onCreate` records SHOWN, and 1.5 s after the next screen-on a
+  still-REQUESTED entry with no live board becomes REFUSED. Resolved at screen-ON rather than on a
+  timer at screen-off because Android may hold back creating the activity until the display wakes.
+  The two routine skips (`ALREADY_UP`, `NOT_LOCKED`) are not recorded, or every screen-on would
+  overwrite the SHOWN that says it worked.
+- `tools/run_notifid_test.sh` gained the `/opt/gradle` jar fallback the other gates already had — on a
+  fresh container its Gradle-cache lookup found nothing and it refused to run.
+
+**Verified locally:** `LockBoardPolicyTest` 14/14 with all four new rules negative-tested (each fails
+exactly its own test); `NotifIdTest` 4/4, negative-tested by dropping the new entry; the whole
+lock-board package plus the service and log compile clean against the real platform and AndroidX
+jars, gate negative-tested with a planted typo; a typed probe compiled the Settings row's
+expressions. ⚠️ **Owner-verify on the Pixel, on #2229 or later:** a quiet "Lock-screen board ready"
+notification exists; power off/on shows the board with no swipe; Settings ▸ Appearance ▸ Last
+screen-off says "shown". If it says "Android refused to open it", Android 17 has closed the
+device-owner exemption and the design needs rethinking.
+
+### THE LCARS CONSOLE — a full lock screen, a home screen, and one power-up run both ways (this session, PR #477)
+
+Owner: *"Make the lock screen when it turns off have the same animation as when it comes back on,
+also make a custom LCARS lock screen and home screen that doesn't clash with any text colors or hide
+anything. It can't just be outline, full lockscreen."* Three AskUserQuestion answers: an **LCARS
+launcher** (not a wallpaper), a **full opaque LCARS console** for the lock screen, and an **LCARS
+power-up / power-down**. **Zero subagent and zero workflow spend**, per the standing usage
+constraint. Four commits: `8c44348` C1 cores · `76be111` C2 lock console · `07fa7a4` C3 launcher ·
+`71144c4` C4 becoming Home.
+
+**Why it read as "outline":** the lock board applied the widget's `RemoteViews`, and
+`widget_board.xml` has no background plate — floating text over the wallpaper behind a 66% scrim.
+The lock screen and the home screen now draw the SAME `WidgetBoard.Board` with their own Compose
+renderer (`feature/lcarsboard/`): solid corner and header bar, the rail, each board region in its
+own black `ConsolePanel` under a solid coloured tab, controls as solid capsules. `Theme.Pulse.LockBoard`
+is opaque black; `lock_board_scrim` is deleted.
+
+**"Never clashes" is arithmetic, not taste.** `LcarsContrast` (WCAG luminance/ratio, 4.5:1):
+`legible(fg, bg)` lifts a colour toward white or black only as far as needed — every DYNAMIC colour
+goes through it (calendar colours, `leadArgb`, `upNextArgb`, cells) — and `onBlock(block)` letters a
+solid block black or white, whichever reads. A test sweeps every colour in `TosPalette.kt` against
+the console's black and every block. ⚠️ **It found a real clash that shipped:** `LcarsRail` stencilled
+its codes in hardcoded `c.void` black, which on the dark red-alert blocks (`#660A0A`) is ~1.4:1.
+It uses `textOnBlock` now.
+
+**"Hides nothing":** `LcarsBoardCoverageTest` parses `WidgetBoard.Board`'s parameter list and fails
+the build if any field is read nowhere in `feature/lcarsboard/` — two renderers of one data class is
+exactly how a region goes quietly missing. It says in its own KDoc what it cannot catch (a field read
+and not drawn). The board scrolls; header, rail and controls stay put; `safeDrawing` insets keep the
+system's own status and gesture bars on black, never on an LCARS colour; a long agenda on the home
+screen is capped with a COUNTED "+N more" line that opens the calendar.
+
+**One timeline, both ways (`ConsoleSequence`).** The power-down is the power-up's progress
+travelling backward, so "the same animation, reversed" holds by construction; a reversal continues
+from wherever the sweep is. Staggered per element, 650 ms, animator scale 0 = instant.
+- ⚠️ **`ACTION_SCREEN_OFF` is useless for the power-down**: it is sent after the display is already
+  dark. The console polls `PowerManager.isInteractive` every 50 ms while RESUMED (it flips at the
+  power button) plus an `onPause` check. `ACTION_SCREEN_ON` IS early enough for the power-up.
+- ⚠️ **Android darkens the display on its own schedule and no app can hold it lit**, so the power-down
+  is MEASURED, not promised: `LockBoardLog.recordPowerDown` → Settings ▸ Appearance ▸ "Last
+  power-down" says NONE / BRIEF / how many of 650 ms / WHOLE, logged only on a band change.
+
+**⚠️ A route is never minted as a PendingIntent from the consoles.** `widgetOpenIntent` uses
+`FLAG_UPDATE_CURRENT` under fixed request codes and `filterEquals` ignores the route extra, so a
+console minting one would silently retarget the placed widget's own tap. `openRouteIntent` was
+extracted; `BoardTap.Route` opens with an explicit intent, `BoardTap.Sender` sends what the board
+was handed (the up-next PendingIntent, the calendar template + a row's fill-in). The lock console
+still unlocks first through the one idempotent `unlocked()` path; `TapGate` is gone with
+`RemoteViews`.
+
+**The home screen (`feature/launcher/`).**
+- `HomeApps` — `LauncherApps` across every profile, a package-manager fallback if that answers
+  nothing, an icon LRU, launch through the service (and the ordinary way only for this profile — a
+  work app started that way opens the wrong copy), reload on install/remove/update. Keys carry the
+  profile's SERIAL, not the per-boot `UserHandle` id.
+- `HomeConsole` — dock (four to a row, never behind a sideways scroll), search (Go launches the
+  first match), the board (`agendaLimit = 8`), then A–Z under `PanelTab` letter headings. Rows draw
+  their section's cap with `drawBehind` and no gap, so a section reads as one panel even though a
+  lazy list cannot put rows inside one. Long-press → `LcarsDialog` PIN/UNPIN + APP INFO.
+  `LazyKeyTest` was negative-tested against this screen's two keyed lists.
+- `HomeStore` — pins in `lcars_home` prefs; `HomeDirectory.togglePin`: a FULL dock (8) refuses a new
+  pin rather than dropping the oldest one somebody put there.
+- Home while home: clear search + scroll to top, decided by `hasWindowFocus()` and not
+  `FLAG_ACTIVITY_BROUGHT_TO_FRONT` (Launcher3's own test — lifecycle state cannot answer it because an
+  activity at the top may be paused around a new intent). Back only clears search; an
+  always-enabled callback registered BEFORE `setContent` swallows it otherwise.
+
+**⚠️ Becoming Home, and the switch is the alias.** The HOME filter is on `.LcarsHome`, an
+`activity-alias` **declared disabled**: no phone is offered LCARS as a launcher until Settings ▸
+Appearance ▸ "LCARS home screen" enables it. There is deliberately **no `AppSettings` field** — the
+alias's enabled state is what Android persists, and a second copy could disagree with it.
+- ON: enable the alias; as device owner `setPersistentHome` (`addPersistentPreferredActivity`) so
+  Home opens LCARS with no chooser; otherwise open `ACTION_HOME_SETTINGS`.
+- OFF: clear the preference FIRST, then return the alias to `COMPONENT_ENABLED_STATE_DEFAULT` (the
+  manifest's disabled), `DONT_KILL_APP` so Settings is not closed under the owner.
+- ⚠️ `setPersistentHome` calls `clearPackagePersistentPreferredActivities` — nothing else in LCARS
+  sets one today; a future caller would be cleared by it.
+- ⚠️ The alias is named by its FULL class with the context's package — the `.debug` suffix makes a
+  relative name point at a component that does not exist.
+
+**⚠️ The crash-loop guard.** A persistent default Home that crashes is a phone with no Home.
+`HomeGuardPolicy` (pure, tested): a start is pending until alive 5 s; three pending starts within
+2 min stand it down. The record is written with `commit()` BEFORE anything that could crash
+(a background write might not have landed when the process died). Stand-down hands Home back,
+opens whatever Home Android now resolves, and records the time; Settings says so and points at the
+crash console. ⚠️ **It cannot guard a crash in `PulseApplication.onCreate`** — that kills every
+entry point, not just Home.
+
+**Verification:** pure cores 23 tests (contrast 7, sequence 6, launcher 10) plus the two coverage
+gates; **18 rules negative-tested** across C1–C3 (12 + 3 + 3) against a baseline asserted green first. Every
+Compose file type-checks clean against the real platform, Compose 1.7.6, material3 1.3.1, activity
+1.9.3, lifecycle 2.8.7 and core-ktx, with stubs extracted from the real declarations
+(`scratchpad/lcars/compile_c3.sh`), each check negative-tested with a planted typo.
+⚠️ Two C1 guards came back asleep first — fixtures that never reached the branch (ink one mix-step
+from white rounds back to itself; `durationFor(0)` is also caught by the NaN guard). Fixed with a
+GOLD fixture and `durationFor(-1f)`.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a console, it never draws one:**
+1. Screen on: the lock console powers up with no swipe; text legible everywhere; nothing under the
+   status bar; a long agenda scrolls; UNLOCK, fingerprint and a tap on an event all work.
+2. Screen off with it showing, then Settings ▸ Appearance ▸ Last power-down — how much there was.
+3. Appearance ▸ LCARS home screen ON → press Home: the console, dock, search and directory; hold an
+   app to pin it; Home while home returns to the top.
+4. Switch it OFF: the old launcher is Home again.

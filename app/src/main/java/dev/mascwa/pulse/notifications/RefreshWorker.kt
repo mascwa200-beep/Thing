@@ -69,6 +69,11 @@ class RefreshWorker(
         if (settings.notifications.emergencyTakeover) {
             runCatching { EmergencyWatchService.start(applicationContext) }
         }
+        // And the lock-screen board's listener, for the same reason: it is a service being alive, not
+        // a notification preference. If Android has killed it, this brings it back.
+        runCatching {
+            dev.mascwa.pulse.feature.lockboard.LockBoardService.sync(applicationContext, settings.lockScreenBoard)
+        }
 
         // ⚠️ Widgets refresh ABOVE the notification gates, for the same reason the two services do:
         // a home-screen widget is not a notification, and it should not go stale because you turned

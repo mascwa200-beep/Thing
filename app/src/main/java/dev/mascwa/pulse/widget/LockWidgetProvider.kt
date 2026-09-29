@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.util.SizeF
@@ -13,7 +12,6 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
-import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.device.MobileData
@@ -108,8 +106,14 @@ class LockWidgetProvider : AppWidgetProvider() {
                     fail(context, manager, ids, WidgetDiagnostics.describe(err), outcomes, started)
                     return@launch
                 }
+                // ⚠️ Decorated ONCE, not per widget: the board is the same for every placed instance,
+                // and the charts inside it are bitmaps whose identity is what keeps the parcel small.
+                val decorated = decorate(context, loaded, outcomes)
+                // The lock-screen board draws exactly what the widget draws, from the same pass — so
+                // a render here is also what keeps the board current. See `LockBoard`.
+                LockBoard.publish(decorated.board, System.currentTimeMillis())
                 ids.forEach { id ->
-                    runCatching { render(context, manager, id, loaded, outcomes) }.onFailure { err ->
+                    runCatching { render(manager, id, decorated) }.onFailure { err ->
                         // ⚠️ The rich RemoteViews could not be applied — too large for the binder
                         // transaction, an un-whitelisted view, a resource gone missing. This is the
                         // exact case that ends in "Can't load widget", so apply the small card.
@@ -201,13 +205,19 @@ class LockWidgetProvider : AppWidgetProvider() {
         val nextRefreshMs: Long? = null,
     )
 
-    private fun render(
-        context: Context,
-        manager: AppWidgetManager,
-        id: Int,
-        loaded: Loaded,
-        outcomes: Map<Source, Outcome>,
-    ) {
+    /**
+     * One load, finished for drawing: the rows with NEEDS YOU placed, the degraded notice given its
+     * reserved slot, and the board with those two and its charts. Shared by every placed widget and
+     * by the lock-screen board, so the three can never disagree about what the widget knows.
+     */
+    private class Decorated(
+        val context: Context,
+        val rows: List<Row>,
+        val degradedRow: Row?,
+        val board: WidgetBoard.Board,
+    )
+
+    private fun decorate(context: Context, loaded: Loaded, outcomes: Map<Source, Outcome>): Decorated {
         // ⚠️ NEEDS YOU goes just above the SYS footnote rather than at the end. `fit` sheds from the
         // tail, and "you could fix this" is worth more of a short widget than a battery percentage.
         // It is not given a reserved slot like the degraded line: that one reports the widget being
@@ -238,7 +248,6 @@ class LockWidgetProvider : AppWidgetProvider() {
         val degradedRow = WidgetDiagnostics.degradedLine(outcomes)
             .takeIf { it.isNotBlank() }
             ?.let { Row(it, Role.DEGRADED, route = Routes.CRASH_LOG) }
-        val open: (String, Int) -> PendingIntent = { route, code -> openIntent(context, route, code) }
         // ⚠️ Drawn ONCE, here, and the same instances go to both board variants. They share a
         // `BitmapCache` that de-duplicates on identity, so reusing the instances costs one copy of
         // each chart instead of two — but only because they are the same objects. Drawing inside
@@ -254,6 +263,15 @@ class LockWidgetProvider : AppWidgetProvider() {
                 needsYouRoute = Routes.SETTINGS,
             ),
         )
+        return Decorated(context, rows, degradedRow, board)
+    }
+
+    private fun render(manager: AppWidgetManager, id: Int, decorated: Decorated) {
+        val context = decorated.context
+        val rows = decorated.rows
+        val degradedRow = decorated.degradedRow
+        val board = decorated.board
+        val open: (String, Int) -> PendingIntent = { route, code -> widgetOpenIntent(context, route, code) }
 
         // ⚠️ The agenda is the one region whose size depends on the diary, and a binder transaction
         // has a hard ceiling. So a render that fails is retried with a shorter list and then with no
@@ -356,7 +374,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             // ⚠️ A distinct request code per row. `Intent.filterEquals` ignores extras, so rows
             // sharing a code would silently share ONE PendingIntent and every tap would land
             // wherever the last-built row pointed — the collision already corrected once in NotifId.
-            v.setOnClickPendingIntent(viewId, row.pending ?: openIntent(context, row.route ?: Routes.HOME, i))
+            v.setOnClickPendingIntent(viewId, row.pending ?: widgetOpenIntent(context, row.route ?: Routes.HOME, i))
         }
         return v
     }
@@ -388,17 +406,6 @@ class LockWidgetProvider : AppWidgetProvider() {
         )
     }
 
-    private fun openIntent(context: Context, route: String, requestCode: Int): PendingIntent {
-        val open = Intent(context, MainActivity::class.java)
-            .setAction(Intent.ACTION_VIEW)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(MainActivity.EXTRA_ROUTE, route)
-        return PendingIntent.getActivity(
-            context, requestCode, open,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-    }
-
     // ── the fault path ──────────────────────────────────────────────────────────────────────────
 
     /**
@@ -419,7 +426,7 @@ class LockWidgetProvider : AppWidgetProvider() {
         record(context, outcomes, startedMs, fault = reason)
         val v = RemoteViews(context.packageName, R.layout.widget_error)
         v.setTextViewText(R.id.widget_error_reason, reason)
-        v.setOnClickPendingIntent(R.id.widget_error_root, openIntent(context, Routes.HOME, FAULT_REQUEST_CODE))
+        v.setOnClickPendingIntent(R.id.widget_error_root, widgetOpenIntent(context, Routes.HOME, FAULT_REQUEST_CODE))
         ids.forEach { id -> runCatching { manager.updateAppWidget(id, v) } }
     }
 
@@ -445,6 +452,22 @@ class LockWidgetProvider : AppWidgetProvider() {
             app.container.usageRepository.log("widget", WidgetDiagnostics.logLine(render))
         }
     }
+
+    /**
+     * The board as the widget would draw it now, for a caller with no widget to draw it on: the
+     * lock-screen board, on a phone where no widget is placed (so no render ever publishes one), or
+     * where the last one has gone stale.
+     *
+     * ⚠️ It runs the SAME pass as a widget render — every source, every budget — and records nothing:
+     * the crash console's render record and the boundary alarm both describe the widget, and a lock
+     * screen that loaded its own copy is not a widget render. Null when even the load failed; the
+     * board then shows its own fallback rather than a fault card, because it is a screen the owner is
+     * looking at on the way to unlocking, not a slot a launcher is waiting to fill.
+     */
+    internal suspend fun loadBoard(context: Context): WidgetBoard.Board? = runCatching {
+        val outcomes = Collections.synchronizedMap(LinkedHashMap<Source, Outcome>())
+        decorate(context, build(context, outcomes), outcomes).board
+    }.getOrNull()
 
     // ── the data ────────────────────────────────────────────────────────────────────────────────
 

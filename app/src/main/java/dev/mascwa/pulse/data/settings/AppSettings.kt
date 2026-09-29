@@ -396,6 +396,9 @@ data class AppSettings(
     // Interface chirps, synthesised at runtime — see ui/effects/LcarsAudio.kt. Defaults on
     // because it was asked for explicitly; it is one switch away in Appearance if it grates.
     val sounds: Boolean = true,
+    // The widget's board over the lock screen, waiting when the screen comes on. Defaults on
+    // because it was asked for by name; one switch away in Appearance.
+    val lockScreenBoard: Boolean = true,
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)
