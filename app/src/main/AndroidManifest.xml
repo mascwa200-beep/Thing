@@ -318,8 +318,9 @@
         </service>
 
         <!-- THE LCARS KEYBOARD — an input method, picked in Android's own keyboard settings (an app
-             cannot pick itself). BIND_INPUT_METHOD means only the system can bind it. It records and
-             sends nothing; every other keyboard stays switched on as the way back. -->
+             cannot pick itself). BIND_INPUT_METHOD means only the system can bind it. It sends nothing;
+             the one thing it keeps is the words it learns, sealed on the phone (data/keyboard/LearnedWords).
+             Every other keyboard stays switched on as the way back. -->
         <service
             android:name=".feature.keyboard.LcarsKeyboard"
             android:exported="true"

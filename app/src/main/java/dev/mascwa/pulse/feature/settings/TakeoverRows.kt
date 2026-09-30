@@ -19,6 +19,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.data.keyboard.LearnedWords
+import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.dream.LcarsDream
 import dev.mascwa.pulse.feature.keyboard.LcarsKeyboard
 import dev.mascwa.pulse.feature.wallpaper.LcarsWallpaper
@@ -54,7 +57,7 @@ private enum class Chosen { YES, NO, UNKNOWN }
  * open them and say afterwards whether LCARS was picked.
  */
 @Composable
-internal fun TakeoverRows() {
+internal fun TakeoverRows(settings: AppSettings, onUpdate: ((AppSettings) -> AppSettings) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
@@ -146,12 +149,12 @@ internal fun TakeoverRows() {
         "LCARS keyboard",
         subtitle = when (st?.keyboard) {
             null -> "Checking…"
-            KeyboardStatus.CHOSEN -> "LCARS is the keyboard. It keeps nothing you type and sends nothing. Tap " +
-                "to pick another."
+            KeyboardStatus.CHOSEN -> "LCARS is the keyboard. It sends nothing you type anywhere; the only " +
+                "thing it keeps is the words it learns, below. Tap to pick another."
             KeyboardStatus.ENABLED -> "Switched on but not in use. Tap to pick it."
             KeyboardStatus.OFF -> "A full keyboard in the console's own look, for every app. Tap to switch it " +
-                "on in Android's keyboard list, then come back here to pick it. It keeps nothing you type and " +
-                "sends nothing; your other keyboards stay on."
+                "on in Android's keyboard list, then come back here to pick it. It sends nothing you type " +
+                "anywhere; your other keyboards stay on."
         },
         onClick = {
             val picked = st?.keyboard != KeyboardStatus.OFF && showKeyboardPicker(context)
@@ -160,8 +163,77 @@ internal fun TakeoverRows() {
             }
         },
     )
+    KeyboardWordRows(settings, onUpdate, refresh)
     openNote?.let { PrefInfo("Could not open", subtitle = it) }
 }
+
+/**
+ * The keyboard's corrections and the words it learns. ⚠️ **Forgetting asks twice**: it cannot be undone,
+ * and one tap on a long list of rows is easy to make by accident.
+ */
+@Composable
+private fun KeyboardWordRows(settings: AppSettings, onUpdate: ((AppSettings) -> AppSettings) -> Unit, refresh: Int) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val learned = remember {
+        runCatching { (context.applicationContext as PulseApplication).container.learnedWords }.getOrNull()
+    }
+    var forgotten by remember { mutableIntStateOf(0) }
+    var confirming by remember { mutableStateOf(false) }
+    val summary by produceState<LearnedWords.Summary?>(null, refresh, forgotten) {
+        value = learned?.let { l -> withContext(Dispatchers.IO) { l.load(); l.summary() } }
+    }
+
+    PrefSwitch(
+        "Autocorrect",
+        subtitle = "Fixes a slip as a word ends — \"teh\" becomes \"the\" — and delete straight after puts back " +
+            "what you typed. Never in a password, a web address or an email.",
+        checked = settings.keyboardAutocorrect,
+    ) { v -> onUpdate { it.copy(keyboardAutocorrect = v) } }
+
+    PrefSwitch(
+        "Glide typing",
+        subtitle = "Draw a word across the letters without lifting, and it goes in whole, the other readings " +
+            "above the keys. Never in a password, a web address or an email.",
+        checked = settings.keyboardGlide,
+    ) { v -> onUpdate { it.copy(keyboardGlide = v) } }
+
+    PrefSwitch(
+        "Learn words I type",
+        subtitle = "A word the keyboard does not know, typed twice, stops being corrected. Kept on this phone " +
+            "only, sealed with its hardware key; never learned in a password field or an address.",
+        checked = settings.keyboardLearn,
+    ) { v -> onUpdate { it.copy(keyboardLearn = v) } }
+
+    val s = summary
+    PrefClickable(
+        "Forget learned words",
+        subtitle = when {
+            learned == null -> "Not available."
+            s == null -> "Checking…"
+            s.unreadable -> "The learned words on this phone could not be opened — its key may have changed. " +
+                "Tap to forget them and start again."
+            s.words == 0 -> "Nothing learned yet."
+            confirming -> "Tap again to forget ${words(s.words)} for good."
+            else -> "${words(s.known)} learned, ${s.words - s.known} more seen once. Tap to forget them all."
+        },
+        onClick = {
+            val l = learned ?: return@PrefClickable
+            if (s == null || (s.words == 0 && !s.unreadable)) return@PrefClickable
+            if (!confirming && !s.unreadable) {
+                confirming = true
+                return@PrefClickable
+            }
+            confirming = false
+            scope.launch {
+                l.forget()
+                forgotten++
+            }
+        },
+    )
+}
+
+private fun words(n: Int): String = if (n == 1) "1 word" else "$n words"
 
 /**
  * Whether LCARS is the chosen screensaver. [Chosen.UNKNOWN] when Android will not say — the setting

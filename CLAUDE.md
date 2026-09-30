@@ -15873,3 +15873,228 @@ widget or answer Android's prompt.
 3. Home ▸ WIDGETS ▸ `+ WIDGET`: pick one. Android's prompt appears the first time only, a configure
    screen opens where the widget has one, and the widget appears and survives a restart.
 4. REMOVE asks first, then takes it off. Try a widget with a long name: REMOVE must still show.
+
+### THE KEYBOARD AT GBOARD'S SIZE, WORKING THE WAY GBOARD DOES — K1–K5 (this session)
+
+Owner, with a screenshot of the LCARS keyboard in use: *"Make the way the keyboard works, that it is the
+same size as the gboard and functions the same too."*
+
+**The owner's choices (AskUserQuestion):**
+- All four behaviours: suggestions + autocorrect, long-press alternates, swipe gestures on keys, and
+  glide typing.
+- **Learning: "on the phone only".** Words typed often are kept in an encrypted list on the phone,
+  never logged or uploaded, with a Settings button to clear it. ⚠️ This DELIBERATELY relaxes the Wave 3
+  "the keyboard stores nothing" rule, for one sanctioned store. Learning still never happens in a
+  password field, or where the field sets `IME_FLAG_NO_PERSONALIZED_LEARNING` or asks for no
+  suggestions.
+
+**Zero subagent and zero workflow spend.**
+
+**K1 — the size, and one touch surface.**
+- **The shape.** A 48 dp strip over four rows of 50 dp keys, 8 dp apart: **284 dp** above the
+  gesture bar, Gboard's shape. It replaces 46 dp keys and a 16 dp header whose "INPUT" was clipped in
+  the owner's screenshot. Every dimension is a named constant at the foot of `KeyboardPanel.kt`, so
+  the keyboard can be matched to a screenshot by changing one.
+- **`KeyboardGeometry` (pure)** places every key twice:
+  - a BOX, which is what is drawn;
+  - a CELL, which is where a touch counts — its share of the row plus half of each gap.
+  So a touch in a gap types the nearer key, and a touch outside every cell goes to the nearest row,
+  then the nearest key. Nothing on the keyboard is a dead zone.
+- **`KeyTouch` (pure)** is one finger's state machine:
+  - A letter types on RELEASE, and it is the letter the finger is on then, so sliding onto the right
+    one corrects a miss.
+  - A second finger coming down types the first one's letter at once (rollover), so fast typing
+    comes out in order.
+  - A key that DOES something acts only when it is released on itself.
+  - Delete acts on down and repeats.
+  - `preview` is the pop-up.
+- **The panel handles every touch itself**: one `pointerInput(Unit)` over the whole keyboard,
+  replacing a tap detector on each key. That was what made slide-to-correct, rollover and a pop-up
+  impossible.
+  - ⚠️ **It is keyed on nothing**, and reads the layout and callbacks through `rememberUpdatedState`.
+    A keyed `pointerInput` restarts when its key changes, which cancels every press in progress.
+  - Holding the space bar opens Android's keyboard picker, as it does in Gboard. So does holding 🌐.
+- ⚠️ **A CANCELLED touch arrives looking like a lift, and must type nothing.** It is what Android
+  sends when the system takes the gesture, such as a back swipe from the edge over q or p. Read out of
+  the Compose 1.7.6 `SuspendingPointerInputModifierNodeImpl.onCancelPointerInput` bytecode: the
+  synthetic lift is built with `isInitiallyConsumed` = the old `pressed`, so it arrives CONSUMED. A
+  real lift reaches this handler unconsumed, since nothing else on the keyboard handles touch.
+
+**Verification (K1):**
+- `KeyboardGeometryTest` (10) and `KeyTouchTest` (9); **18 rules negative-tested**, all awake.
+  - ⚠️ `nearest-row` came back ASLEEP on the first pass. Every fixture listed the rows top to bottom,
+    and `minBy` returns the first tie, so a wrong distance-above-a-row still landed on row 0. The fix is
+    a real property rather than a contrived fixture: *the answer does not depend on the order the keys
+    are listed*, tested on the reversed list.
+- The whole keyboard package is frontend-clean against real Compose 1.7.6 and the public SDK stub
+  (`scratchpad/lcars/compile_c3.sh`), and that gate was negative-tested with a planted typo.
+
+**K2 — long-press alternates.** `KeyAlternates` (pure) holds what each key offers when held:
+- Each top-row letter carries its digit first. That digit is drawn small in the key's corner, as Gboard
+  does.
+- The vowels and a few consonants carry their accents.
+- The full stop carries ten marks of punctuation.
+
+`AlternatePicker` lays out the row and reads the finger's position along it. At `KeyTouch.LONG_PRESS_MS`
+(300 ms, Gboard's default) the row opens. Sliding along it moves the highlight, lifting types the
+highlighted choice, and dragging a key-height below the key backs out.
+- ⚠️ **The first choice sits over the key whenever it can.** It is the one highlighted as the row opens,
+  while the finger has not moved. Near the right edge the row therefore runs LEFT, rather than sliding
+  along until it fits: sliding would put another choice under a still finger, and lifting would type
+  that one.
+- ⚠️ **One capital rule, `KeyboardModel.capital`, for the letter typed, its label and the alternates.**
+  `"ß".uppercase()` is "SS", two letters for one key. A character with no one-character capital now
+  stays as it is.
+- Sliding onto another letter starts that letter's own hold.
+
+Verification: 9 alternates tests, plus one new model test; **12 rules negative-tested**, all awake.
+
+**K3 — gestures on keys, and the double-space full stop.**
+- **Space-bar slide.** Sliding along the space bar moves the cursor one character for every 0.35 of a
+  key's width, sent as arrow keys. Arrow keys cross an emoji or a line break exactly as a hardware
+  keyboard would, and the keyboard never needs to know where in the text the cursor is. A slide never
+  types a space and never opens the picker.
+- **Delete swipe.** Swiping left from delete marks one more word for every half key. A wider pop-up
+  says "ERASE 2 WORDS" before anything goes, and lifting erases them. `WordErase` counts the characters
+  over what the field reports is there; if text is selected, the selection is deleted instead.
+- ⚠️ **"The last key was the space bar" is a claim about the TEXT.** `DoubleSpace.Tracker` remembers
+  where the space bar left the cursor. Any cursor move the keyboard did not make forgets it, so a space
+  typed after tapping elsewhere is only a space. `pending` covers a fast double tap that lands before
+  the editor reports where the first space went.
+- **No full stop** in passwords, web addresses, email addresses or number fields.
+- ⚠️ **A guard came back asleep, and the rule was real.** While a cursor step is wider than the 12 dp
+  slop, rounding down already turns a wobble into no movement, so the fixtures passed with no slop at
+  all. On narrow keys it is the slop alone that holds, and a narrow-key fixture now proves it.
+
+Verification: 14 gesture tests; **16 rules negative-tested**, all awake.
+
+**K4 — suggestions, autocorrect, and learning on the phone.**
+- **The word list is AOSP LatinIME's English source (Apache-2.0)**, cut by
+  `tools/keyboard/build_wordlist.py` to the 91,541 words at frequency 40 and up, with nothing flagged
+  `possibly_offensive` or `not_a_word`. `--check` rebuilds it and compares with what is committed.
+  `assets/keyboard/NOTICE.txt` carries LatinIME's copyright line verbatim, the changes made (§4(b)) and
+  the full licence text (§4(a)). The source has no duplicate words and nothing outside the BMP, which
+  is why the NOTICE can say no frequency was changed.
+- **`Suggest`** is a keyboard-aware Damerau distance: a neighbouring key, a swap, or a doubled or
+  missed double letter costs half, and an apostrophe a quarter. Candidates are drawn from the typed
+  first letter, its neighbours and the typed SECOND letter (which is how "hte" finds "the"). Typing in
+  lower case puts acronyms and names behind ordinary words, except "I" and its contractions.
+- ⚠️ **`cost()`'s early exit has to look back two rows.** A swap reaches back two, so a row can be over
+  the limit while the next one comes back under it. Stopping on the row alone turned "teh" at a limit
+  of 0.5 from 0.5 into 1.
+- **`Autocorrect` does nothing when in doubt**: never in a password, a web address or an email; never
+  on a known or learned word, a word with a digit, or one with a capital after its first letter; only
+  a CORRECTION (never a completion), within 1 edit under six letters and 2 above, and at least 0.2 ahead
+  of the next suggestion. Measured on the real list: teh/hte/tge/yhe→the, dont→don't, recieve,
+  becuase, keybaord, adn, tommorow, definately and wgat are corrected; helo, im, thr, wierd and og are
+  left for the strip. `KeyboardWordListAssetTest` pins all of that against the shipped list.
+- **`Composer`** keeps the typed word as COMPOSING text (Gboard's underline). A separator commits the
+  correction, and delete straight afterwards puts back what was typed, but only if the field still ends
+  with what was put in.
+- ⚠️ **The service decides "the cursor moved" from the text, not only the numbers.** An update can
+  arrive late, from before the last few keys, and report no composing word while one is plainly there.
+  A missing range is settled by reading what is before the cursor. The undo lasts until the first
+  update the correction itself made; any later move, or a selection, and delete is only a delete.
+- **`StripWords`**: about to correct, the typed word sits on the left in quotes (tap to keep it), the
+  correction in the middle in bold, the next word on the right. Otherwise the best suggestion is in the
+  middle. No word appears twice in different capitals.
+- **Learning (owner's call: on the phone only).** `data/keyboard/LearnedWords` is the one place anything
+  typed is kept.
+  - It stores words and counts only, sealed with `SecretCrypto` in `noBackupFilesDir`.
+  - ⚠️ **If the cipher cannot seal, nothing is written.**
+  - ⚠️ **A kept file that will not open is left alone, not written over**, until "Forget learned words".
+  - A word learned before the file was read is ADDED to it rather than replacing it.
+  - Only words the dictionary lacks are learned, typed twice or kept on purpose (an undone correction,
+    or the quoted typed word tapped).
+  - Nothing is learned in a password, a web address, an email, a field asking for no learning, or from
+    a word ended by a digit or `@` ("mp3" must not teach "mp").
+- **Gates.** `LearnedWordsTest` has eleven tests and checks the source: `AppContainer` must build the
+  store with `SecretCrypto::encrypt`/`decrypt` and `noBackupFilesDir`, nothing else may build it, and
+  it reaches for no log, report or network. `KeyboardRecordsNothingTest` gained a container allowlist:
+  the keyboard may take `settingsRepository` and `learnedWords` from the app and nothing else. That
+  allowlist was negative-tested both ways, with an extra reach and with a missing one.
+- **Settings ▸ Android takeover ▸ LCARS keyboard** has two new switches, Autocorrect and "Learn words I
+  type" (`AppSettings.keyboardAutocorrect`/`keyboardLearn`, both defaulting on). It also has "Forget
+  learned words", which asks twice before it deletes anything. The Glide switch is not there yet: it
+  lands with K5, so it is never a dead control.
+
+Verification:
+- 23 Suggest, 17 Composer, 7 learned-count, 5 strip, 6 real-list and 11 store tests, all run locally.
+- **63 rules negative-tested** (61 in the cores and store, 2 on the allowlist gate), all awake after fixes. One guard came back asleep: no test slipped the
+  first letter onto a neighbour, so "rhe"→"the" was added. One case was invalid because my perturbation
+  had the wrong indentation, and the harness refused it.
+- The keyboard, panel, store and Settings rows: 62 files frontend-clean against the public SDK and real
+  Compose, with the check proven by three planted mistakes. The container's exact construction compiles
+  clean against the real store and cipher.
+
+⚠️ **Owner-verify on the Pixel:**
+1. "teh " becomes "the ", and delete brings "teh" back.
+2. The strip shows three words, the correction bold.
+3. Tapping the quoted word keeps it; type it twice and it stops being corrected.
+4. Nothing is learned in a password field.
+5. "Forget learned words" empties the list.
+
+#### K5 — glide typing (this session, PR #481)
+
+The last slice of the owner's ask: draw a word across the letters without lifting, as Gboard does.
+**Zero subagent and zero workflow spend**, as with K1–K4.
+
+**`GlideDecoder` (pure)** is SHARK²: each word's ideal path is the polyline through its keys' centres,
+and the drawn path is compared with it for WHERE it went (mean point distance, in key widths) and for
+its SHAPE (both normalised to the same centre and size), minus a frequency bonus.
+- ⚠️ **A word is only scored if the path could have spelled it**: it starts within 1.2 keys of the
+  word's first key, ends within 1.2 of its last, and passes within 1.5 of every letter between, in
+  order. That is what keeps a decode to a few hundred words out of 91,541, and what stops a short path
+  matching a long word it only resembles.
+- ⚠️ **The path's two ENDS count on their own (`END_WEIGHT`).** A mean over thirty-two points cannot see
+  one key more or less at the end of a long word, so "keyboard" read as "keyboards" under noise until
+  the ends were weighed. A finger comes down and lifts deliberately; where it did is worth more.
+- A letter typed twice is one stop; an apostrophe or hyphen is not drawn; a word with an accented
+  letter is not a path at all. Learned words count, at `Suggest.LEARNED_FREQ`.
+- **Measured on the real list** (a Pixel's geometry, 1080 px at 2.625): 150/150 clean, 149/150 with
+  every key missed by up to a quarter (the miss, coffee → "code", has coffee second), and 590/600 on the
+  300 commonest words held out. The misses are paths that are genuinely the same (to/too, of/off,
+  its/it's), which is what the strip is for. About 5 ms a decode on a desktop JVM.
+
+**The panel.** A finger alone on the keyboard, on a letter, has its path kept (a point per sixth of a
+key, at most 1,024). Once it is **a key's width from where it came down** (`START_KEYS`) it is a glide:
+the finger is marked done, so its release types nothing and no hold opens a row of choices; a fading
+trail follows it; lifting hands the path over as a `Stroke`.
+- ⚠️ **Under a key's width is still slide-to-correct**: land on the edge of r, slide into t, lift, get
+  t. At a key's width and more it is a word, as Gboard has it — w to e is "we". The threshold is one
+  constant.
+- ⚠️ **A second finger landing ends the glide first**, so its word goes in before the next key.
+- A cancelled touch (the system taking a back swipe) hands over nothing.
+- If the path spells no word, the key the finger lifted on is typed, as a plain release would.
+- The trail is drawn in the draw pass only (a `Canvas` reading a snapshot map), so a moving finger is a
+  redraw and never a recomposition.
+
+**The service.**
+- Decoding runs on `Dispatchers.Default`. ⚠️ **Nothing overtakes a word being read**: every key, strip
+  tap, cursor slide, word erase and the next glide goes through `whenIdle`, which queues it behind a
+  decode in progress and runs the queue in order when it lands. Without that a fast thumb's next letter
+  could go in before the word it drew.
+- The glided word goes in as the COMPOSING word. What was being composed is finished as it stands (a
+  typed word learned as usual); a space goes in first when the text before ends a word
+  (`Composer.spaceBeforeGlide` — not after a space, a bracket, a quote, a hyphen, a slash, @ or #);
+  shift is re-read after that space, so a glide after ". " starts with a capital.
+- **Gboard's space rule**: a LETTER after a glided word starts the next word with a space between
+  (`Edit.CommitThenCompose`); a full stop sits against it; an apostrophe joins it ("don" + "'").
+- Delete straight after a glide takes the whole word. The strip holds the other readings, the word put
+  in bold in the middle (`StripWords.glided`); a tap swaps it.
+- ⚠️ **Only where corrections are allowed**: not in a password, and not in a web or email address,
+  where a space put in for you would break "www." + "google".
+- `AppSettings.keyboardGlide` (default on) and a "Glide typing" switch in Settings ▸ Android takeover ▸
+  LCARS keyboard; the section's keywords gained `glide swipe`.
+
+**Verification:** 15 GlideDecoder, 23 Composer, 6 strip and 8 real-list tests, run locally, including
+two real-list glide tests over thirty everyday words. **Negative-tested**: the ten decoder rules from
+before, plus nine composer, five panel-helper and three strip rules, each against a baseline asserted
+green first.
+
+⚠️ **Owner-verify on the Pixel:**
+1. Glide across "hello": it goes in underlined, and "help"/"hell" are in the strip.
+2. Glide a second word: a space goes in between. Tap "." straight after: it sits against the word.
+3. Delete straight after a glide removes the whole word.
+4. Slide from the edge of one letter onto its neighbour and lift: that letter, not a word.
+5. No glide, and no trail, in a password or an address field; none with the switch off.
