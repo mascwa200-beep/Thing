@@ -65,6 +65,16 @@ object ShadeStore {
     }
 
     /**
+     * Switch Do Not Disturb through the bound reader, which Android allows a notification listener to
+     * do without the separate Do Not Disturb grant. [filter] is a `NotificationListenerService`
+     * interruption filter. False when the reader is not bound.
+     */
+    fun requestInterruptionFilter(filter: Int): Boolean {
+        val service = listener?.get() ?: return false
+        return runCatching { service.requestInterruptionFilter(filter) }.isSuccess
+    }
+
+    /**
      * Clear what "Clear all" in the shade would clear, one key at a time, so the list sent is exactly
      * the one the owner saw — a notice arriving between drawing the button and pressing it is kept.
      */

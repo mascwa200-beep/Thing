@@ -153,6 +153,26 @@ class DevicePolicyController(context: Context) {
         dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspended)
     }.getOrNull()
 
+    /** Switch location on or off for the whole phone, as the quick-settings tile does. DO-only (API 30). */
+    fun setLocationEnabled(on: Boolean): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.setLocationEnabled(admin, on)
+        true
+    }.getOrDefault(false)
+
+    /**
+     * Write one of the three `Settings.System` values Android lets a device owner write: screen
+     * brightness, its automatic mode, and the screen-off timeout. DO-only; true if applied.
+     *
+     * ⚠️ Anything else throws `SecurityException` by design of the platform, which is caught here and
+     * reads as a refusal — the allowlist is Android's, not this method's.
+     */
+    fun setSystemSetting(key: String, value: String): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.setSystemSetting(admin, key, value)
+        true
+    }.getOrDefault(false)
+
     /**
      * Make [home] the phone's Home, or with null hand Home back to whatever the owner had chosen.
      * DO-only; true if applied.

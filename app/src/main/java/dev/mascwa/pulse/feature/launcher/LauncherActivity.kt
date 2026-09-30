@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.launcher
 
+import android.Manifest
 import android.app.ActivityOptions
 import android.content.Intent
 import android.os.Build
@@ -10,6 +11,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +30,9 @@ import dev.mascwa.pulse.data.comms.NotificationAccess
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
+import dev.mascwa.pulse.feature.controls.ControlActions
+import dev.mascwa.pulse.feature.controls.ControlsState
+import dev.mascwa.pulse.feature.controls.PhoneControls
 import dev.mascwa.pulse.feature.lcarsboard.hideStatusBarForConsole
 import dev.mascwa.pulse.feature.shade.NoticeActions
 import dev.mascwa.pulse.feature.shade.ShadeDigest
@@ -90,6 +95,13 @@ class LauncherActivity : ComponentActivity() {
      */
     private val noticeGranted = mutableStateOf(false)
 
+    private val phoneControls by lazy { PhoneControls(applicationContext) }
+    private val controlReading = mutableStateOf<ControlsState.Reading?>(null)
+    private val volumes = mutableStateOf<List<PhoneControls.Volume>>(emptyList())
+    private val askBluetooth = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refreshControls()
+    }
+
     /** Counts Home presses, so the screen can go back to the top on each without keeping a flag. */
     private val homePresses = mutableIntStateOf(0)
 
@@ -127,12 +139,9 @@ class LauncherActivity : ComponentActivity() {
                 clear = { keys ->
                     if (!ShadeStore.clear(keys)) notice.value = "Android would not clear the notifications."
                 },
-                grant = {
-                    if (!NotificationAccess.openSettings(this)) {
-                        notice.value = "Android would not open the notification-access page."
-                    }
-                },
+                grant = ::grantNotices,
             ),
+            controls = ControlActions(tap = ::tapControl, volume = ::adjustVolume),
         )
 
         // Registered BEFORE the content, so the screen's own BackHandler — added once it composes —
@@ -148,6 +157,8 @@ class LauncherActivity : ComponentActivity() {
                     val snapshot by LockBoard.latest.collectAsStateWithLifecycle()
                     val shade by ShadeStore.view.collectAsStateWithLifecycle()
                     val granted by noticeGranted
+                    val torch by phoneControls.torch.collectAsStateWithLifecycle()
+                    val reading by controlReading
                     val list = rememberLazyListState()
                     val presses by homePresses
                     val typed by query
@@ -175,6 +186,10 @@ class LauncherActivity : ComponentActivity() {
                         notice = notice.value,
                         noticeStatus = ShadeDigest.status(granted, shade.connected),
                         notices = shade.groups,
+                        // The torch is reported live and the reader's connection as it stands, so
+                        // neither waits for the next full read of the settings.
+                        controls = reading?.copy(torch = torch, listener = shade.connected),
+                        volumes = volumes.value,
                         progress = readProgress,
                         list = list,
                         icon = loadIcon,
@@ -220,11 +235,18 @@ class LauncherActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // A bar swiped into view, or a window that was over this one, can leave it showing.
-        if (hasFocus) hideStatusBarForConsole()
+        if (hasFocus) {
+            hideStatusBarForConsole()
+            // Coming back from Android's own shade or a settings page is exactly when a control may
+            // have been changed somewhere else.
+            refreshControls()
+        }
     }
 
     override fun onStart() {
         super.onStart()
+        phoneControls.start()
+        refreshControls()
         lifecycleScope.launch {
             noticeGranted.value = withContext(Dispatchers.IO) { NotificationAccess.isGranted(applicationContext) }
         }
@@ -244,6 +266,11 @@ class LauncherActivity : ComponentActivity() {
         query.value = ""
         notice.value = null
         if (alreadyHome) homePresses.intValue++
+    }
+
+    override fun onStop() {
+        phoneControls.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -318,6 +345,50 @@ class LauncherActivity : ComponentActivity() {
             .onFailure { notice.value = "That notification could not be opened." }
     }
 
+    private fun grantNotices() {
+        if (!NotificationAccess.openSettings(this)) {
+            notice.value = "Android would not open the notification-access page."
+        }
+    }
+
+    /** Read every control again, [afterMs] from now — a radio takes a moment to report its new state. */
+    private fun refreshControls(afterMs: Long = 0L) {
+        lifecycleScope.launch {
+            if (afterMs > 0) delay(afterMs)
+            val connected = ShadeStore.view.value.connected
+            controlReading.value = withContext(Dispatchers.IO) { phoneControls.read(connected) }
+            volumes.value = withContext(Dispatchers.IO) { phoneControls.volumes() }
+        }
+    }
+
+    private fun tapControl(control: ControlsState.Control) {
+        val r = controlReading.value ?: return
+        lifecycleScope.launch {
+            val now = r.copy(torch = phoneControls.torch.value, listener = ShadeStore.view.value.connected)
+            when (val out = withContext(Dispatchers.IO) { phoneControls.act(control, now) }) {
+                PhoneControls.Outcome.Done -> {
+                    notice.value = null
+                    refreshControls()
+                    refreshControls(afterMs = RADIO_SETTLE_MS)
+                }
+                is PhoneControls.Outcome.Panel -> {
+                    out.note?.let { notice.value = it }
+                    start(out.intent)
+                }
+                PhoneControls.Outcome.AskBluetooth -> askBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                PhoneControls.Outcome.AskNotices -> grantNotices()
+            }
+        }
+    }
+
+    private fun adjustVolume(stream: PhoneControls.Stream, up: Boolean) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) { phoneControls.adjust(stream, up) }
+            if (!ok) notice.value = "Android would not change the ${stream.label.lowercase()} volume."
+            volumes.value = withContext(Dispatchers.IO) { phoneControls.volumes() }
+        }
+    }
+
     private fun openLcars() {
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
         start(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -332,3 +403,6 @@ class LauncherActivity : ComponentActivity() {
         runCatching { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }
             .getOrDefault(1f)
 }
+
+/** How long a radio (Wi-Fi, Bluetooth) takes to report the state it was just switched to. */
+private const val RADIO_SETTLE_MS = 1_200L

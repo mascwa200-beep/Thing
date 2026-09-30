@@ -41,6 +41,10 @@ import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.LcarsDialog
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsIcons
+import dev.mascwa.pulse.feature.controls.ControlActions
+import dev.mascwa.pulse.feature.controls.ControlsPanel
+import dev.mascwa.pulse.feature.controls.ControlsState
+import dev.mascwa.pulse.feature.controls.PhoneControls
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleButton
 import dev.mascwa.pulse.feature.lcarsboard.ConsolePanel
@@ -74,13 +78,14 @@ internal class HomeActions(
     val openLcars: () -> Unit,
     val systemSettings: () -> Unit,
     val notices: NoticeActions,
+    val controls: ControlActions,
 )
 
 /**
  * The home screen: the same LCARS console as the lock screen, with the phone's apps in it.
  *
- * From the top: the dock of pinned apps, a search box, the notification centre, the widget's board,
- * and every app A to Z under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
+ * From the top: the dock of pinned apps, a search box, the notification centre, the quick
+ * controls, the widget's board, and every app A to Z under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
  * agenda or a long directory is scrolled to and never cut off. Typing narrows the directory to what
  * matches and hides the board, because somebody searching wants the answer, not the weather.
  *
@@ -98,6 +103,8 @@ internal fun HomeConsole(
     notice: String?,
     noticeStatus: ShadeDigest.Status,
     notices: List<ShadeDigest.Group>,
+    controls: ControlsState.Reading?,
+    volumes: List<PhoneControls.Volume>,
     progress: () -> Float,
     list: LazyListState,
     icon: suspend (HomeApp) -> ImageBitmap?,
@@ -176,6 +183,17 @@ internal fun HomeConsole(
                                 progress = progress,
                                 index = ELEMENT_RAIL + 1,
                                 actions = actions.notices,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
+                        item(key = "home:controls") {
+                            ControlsPanel(
+                                reading = controls,
+                                volumes = volumes,
+                                tab = block(4),
+                                progress = progress,
+                                index = ELEMENT_RAIL + 1,
+                                actions = actions.controls,
                                 modifier = Modifier.padding(top = 12.dp),
                             )
                         }
