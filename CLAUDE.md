@@ -15873,3 +15873,58 @@ widget or answer Android's prompt.
 3. Home ▸ WIDGETS ▸ `+ WIDGET`: pick one. Android's prompt appears the first time only, a configure
    screen opens where the widget has one, and the widget appears and survives a restart.
 4. REMOVE asks first, then takes it off. Try a widget with a long name: REMOVE must still show.
+
+### THE KEYBOARD AT GBOARD'S SIZE, WORKING THE WAY GBOARD DOES — K1–K5 (this session)
+
+Owner, with a screenshot of the LCARS keyboard in use: *"Make the way the keyboard works, that it is the
+same size as the gboard and functions the same too."*
+
+**The owner's choices (AskUserQuestion):**
+- All four behaviours: suggestions + autocorrect, long-press alternates, swipe gestures on keys, and
+  glide typing.
+- **Learning: "on the phone only".** Words typed often are kept in an encrypted list on the phone,
+  never logged or uploaded, with a Settings button to clear it. ⚠️ This DELIBERATELY relaxes the Wave 3
+  "the keyboard stores nothing" rule, for one sanctioned store. Learning still never happens in a
+  password field, or where the field sets `IME_FLAG_NO_PERSONALIZED_LEARNING` or asks for no
+  suggestions.
+
+**Zero subagent and zero workflow spend.**
+
+**K1 — the size, and one touch surface.**
+- **The shape.** A 48 dp strip over four rows of 50 dp keys, 8 dp apart: **284 dp** above the
+  gesture bar, Gboard's shape. It replaces 46 dp keys and a 16 dp header whose "INPUT" was clipped in
+  the owner's screenshot. Every dimension is a named constant at the foot of `KeyboardPanel.kt`, so
+  the keyboard can be matched to a screenshot by changing one.
+- **`KeyboardGeometry` (pure)** places every key twice:
+  - a BOX, which is what is drawn;
+  - a CELL, which is where a touch counts — its share of the row plus half of each gap.
+  So a touch in a gap types the nearer key, and a touch outside every cell goes to the nearest row,
+  then the nearest key. Nothing on the keyboard is a dead zone.
+- **`KeyTouch` (pure)** is one finger's state machine:
+  - A letter types on RELEASE, and it is the letter the finger is on then, so sliding onto the right
+    one corrects a miss.
+  - A second finger coming down types the first one's letter at once (rollover), so fast typing
+    comes out in order.
+  - A key that DOES something acts only when it is released on itself.
+  - Delete acts on down and repeats.
+  - `preview` is the pop-up.
+- **The panel handles every touch itself**: one `pointerInput(Unit)` over the whole keyboard,
+  replacing a tap detector on each key. That was what made slide-to-correct, rollover and a pop-up
+  impossible.
+  - ⚠️ **It is keyed on nothing**, and reads the layout and callbacks through `rememberUpdatedState`.
+    A keyed `pointerInput` restarts when its key changes, which cancels every press in progress.
+  - Holding the space bar opens Android's keyboard picker, as it does in Gboard. So does holding 🌐.
+- ⚠️ **A CANCELLED touch arrives looking like a lift, and must type nothing.** It is what Android
+  sends when the system takes the gesture, such as a back swipe from the edge over q or p. Read out of
+  the Compose 1.7.6 `SuspendingPointerInputModifierNodeImpl.onCancelPointerInput` bytecode: the
+  synthetic lift is built with `isInitiallyConsumed` = the old `pressed`, so it arrives CONSUMED. A
+  real lift reaches this handler unconsumed, since nothing else on the keyboard handles touch.
+
+**Verification (K1):**
+- `KeyboardGeometryTest` (10) and `KeyTouchTest` (9); **18 rules negative-tested**, all awake.
+  - ⚠️ `nearest-row` came back ASLEEP on the first pass. Every fixture listed the rows top to bottom,
+    and `minBy` returns the first tie, so a wrong distance-above-a-row still landed on row 0. The fix is
+    a real property rather than a contrived fixture: *the answer does not depend on the order the keys
+    are listed*, tested on the reversed list.
+- The whole keyboard package is frontend-clean against real Compose 1.7.6 and the public SDK stub
+  (`scratchpad/lcars/compile_c3.sh`), and that gate was negative-tested with a planted typo.
