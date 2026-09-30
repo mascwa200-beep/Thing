@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
-import android.telecom.TelecomManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
@@ -296,16 +295,22 @@ class LockBoardActivity : ComponentActivity() {
      * EMERGENCY: the system emergency dialer, which Android shows over the lock screen, so help needs
      * no unlock.
      *
-     * ⚠️ If the phone has no emergency dialer to hand this to, or Android refuses to open it, this
-     * asks for the unlock instead. Android's PIN screen carries its own Emergency button, so the way to
-     * a call is never a dead end. That also covers a phone with no telephony at all, where
-     * `TelecomManager` is absent.
+     * ⚠️ **Opened by action string, because the tidy API is not public.**
+     * `TelecomManager.createLaunchEmergencyDialerIntent` exists in the platform and is absent from the
+     * public SDK, so an app cannot call it. CI said so, where the local check, which compiles against
+     * Robolectric's full framework, did not. The actions tried are what the platform itself uses:
+     * - `ACTION_DIAL_EMERGENCY`, read out of the framework's `Intent`, where the constant is hidden but
+     *   its value is a plain string;
+     * - `com.android.phone.EmergencyDialer.DIAL`, the emergency dialer's own action in AOSP's
+     *   telephony package.
+     *
+     * ⚠️ If neither opens, or the phone has no dialer at all, this asks for the unlock instead. Android's
+     * PIN screen carries its own Emergency button, so the way to a call is never a dead end.
      */
     private fun emergency() {
-        val dialer = runCatching {
-            getSystemService(TelecomManager::class.java)?.createLaunchEmergencyDialerIntent(null)
-        }.getOrNull()
-        val opened = dialer != null && runCatching { startActivity(dialer) }.isSuccess
+        val opened = EMERGENCY_DIALER_ACTIONS.any { action ->
+            runCatching { startActivity(Intent(action)) }.isSuccess
+        }
         if (!opened) unlock(null)
     }
 
@@ -353,5 +358,11 @@ class LockBoardActivity : ComponentActivity() {
 
         /** How often the console checks whether the phone has started going to sleep. */
         private const val SLEEP_POLL_MS = 50L
+
+        /** Tried in order by [emergency]; see there for where each comes from. */
+        private val EMERGENCY_DIALER_ACTIONS = listOf(
+            "android.intent.action.DIAL_EMERGENCY",
+            "com.android.phone.EmergencyDialer.DIAL",
+        )
     }
 }

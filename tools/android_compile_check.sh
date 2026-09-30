@@ -24,6 +24,15 @@
 # ⚠️ It compiles. It does not run, and it knows nothing about resources, the manifest, or R8. A green
 # result here means the code is well-typed against the real platform, not that it behaves.
 #
+# ⚠️ WHICH PLATFORM — THE PUBLIC SDK, NOT ROBOLECTRIC'S IMPLEMENTATION
+# --------------------------------------------------------------------
+# `android-all` is the framework's IMPLEMENTATION, so it carries every hidden and system API too, and
+# a file calling one compiled clean here and then failed in CI. The case that found it:
+# `TelecomManager.createLaunchEmergencyDialerIntent` is in the platform and absent from the SDK. So the
+# check compiles against the PUBLIC stub `android.jar` from the SDK platform zip on dl.google.com,
+# which is exactly what CI compiles against. `android-all` is used only when that zip cannot be
+# fetched, and the verdict line then says so, because that result cannot vouch for API visibility.
+#
 # Usage:
 #   tools/android_compile_check.sh <file.kt> [more.kt ...]
 #   tools/android_compile_check.sh -l androidx.media3:media3-common:1.5.1 <file.kt>
@@ -65,8 +74,12 @@ CACHE="${ANDROID_JAR_CACHE:-/tmp/android-compile-check}"
 # Pinned so a run is reproducible. Any android-all works; this one is API 35, matching compileSdk.
 ANDROID_ALL_VERSION="15-robolectric-13954326"
 
+# The public SDK stubs for compileSdk 35 — what CI compiles against. See the header for why.
+SDK_PLATFORM="platform-35_r02"
+
 mkdir -p "$CACHE"
 ANDROID_JAR="$CACHE/android-all-$ANDROID_ALL_VERSION.jar"
+SDK_JAR="$CACHE/$SDK_PLATFORM-android.jar"
 
 libs=()
 plugins=()
@@ -141,10 +154,27 @@ if [ -z "${SERIALIZATION_PLUGIN:-}" ]; then
   done
 fi
 
-if [ ! -f "$ANDROID_JAR" ]; then
-  echo "fetching the platform classes (~186 MB, once per cache) …" >&2
-  url="https://repo1.maven.org/maven2/org/robolectric/android-all/$ANDROID_ALL_VERSION/android-all-$ANDROID_ALL_VERSION.jar"
-  curl -fsS -o "$ANDROID_JAR" "$url" || { echo "could not fetch $url"; rm -f "$ANDROID_JAR"; exit 1; }
+if [ ! -f "$SDK_JAR" ]; then
+  echo "fetching the public SDK platform ($SDK_PLATFORM, ~64 MB, once per cache) …" >&2
+  zip="$CACHE/$SDK_PLATFORM.zip"
+  if curl -fsS -m 600 -o "$zip" "https://dl.google.com/android/repository/$SDK_PLATFORM.zip" &&
+     unzip -o -j -q "$zip" '*/android.jar' -d "$CACHE/$SDK_PLATFORM-unpacked"; then
+    mv "$CACHE/$SDK_PLATFORM-unpacked/android.jar" "$SDK_JAR"
+  fi
+  rm -rf "$zip" "$CACHE/$SDK_PLATFORM-unpacked"
+fi
+if [ -f "$SDK_JAR" ]; then
+  PLATFORM_LABEL="the public SDK ($SDK_PLATFORM)"
+  ANDROID_JAR="$SDK_JAR"
+else
+  PLATFORM_LABEL="android-all $ANDROID_ALL_VERSION — ⚠️ NOT the public SDK, so a hidden API would pass"
+  echo "⚠️ the public SDK platform could not be fetched; falling back to android-all, which also" >&2
+  echo "   resolves hidden and system APIs that CI will reject." >&2
+  if [ ! -f "$ANDROID_JAR" ]; then
+    echo "fetching the platform classes (~186 MB, once per cache) …" >&2
+    url="https://repo1.maven.org/maven2/org/robolectric/android-all/$ANDROID_ALL_VERSION/android-all-$ANDROID_ALL_VERSION.jar"
+    curl -fsS -o "$ANDROID_JAR" "$url" || { echo "could not fetch $url"; rm -f "$ANDROID_JAR"; exit 1; }
+  fi
 fi
 
 # Resolve each -l onto the classpath. An AAR is a zip with the real classes inside it, so it is
@@ -224,7 +254,7 @@ errors=$(grep -E '^([^:]+\.kt):[0-9]+:[0-9]+: error:' <<<"$out")
 # The distinction that matters is whether the frontend had anything to say. A missing jar dies
 # before resolving a line and reports NoClassDefFoundError; that one really is "did not run".
 if grep -q 'Exception during IR lowering' <<<"$out" && [ -z "$errors" ]; then
-  echo "frontend clean — names and types resolve against the real platform ($# file(s))"
+  echo "frontend clean — names and types resolve against $PLATFORM_LABEL ($# file(s))"
   echo "  (backend IR lowering failed, which is expected for @Composable without the Compose plugin)"
   exit 0
 fi
@@ -249,4 +279,4 @@ if [ -n "$errors" ]; then
   echo "$errors"
   exit 1
 fi
-echo "compiles clean against android-all $ANDROID_ALL_VERSION ($# file(s))"
+echo "compiles clean against $PLATFORM_LABEL ($# file(s))"

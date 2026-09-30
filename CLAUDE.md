@@ -15634,12 +15634,27 @@ device owner, and not stood down by the crash-loop guard. `HomeSwitch.applyDefau
   never "0%"; any plug bit is charging). A sticky `ACTION_BATTERY_CHANGED` receiver, no polling.
 - A status bar swiped into view takes the header's ink (`isAppearanceLightStatusBars` from
   `textOnBlock(accent)`); `window.statusBarColor` is ignored at target 35, so this is the only lever.
-- **Back does nothing on the lock console.** ⚠️ **EMERGENCY is why that is safe**: it opens
-  `TelecomManager.createLaunchEmergencyDialerIntent(null)` (public, checked with `javap`) over the lock
-  screen, and falls back to the unlock — Android's PIN screen carries its own Emergency button.
+- **Back does nothing on the lock console.** ⚠️ **EMERGENCY is why that is safe**: it opens the
+  emergency dialer over the lock screen by action string — `android.intent.action.DIAL_EMERGENCY` (the
+  framework's own constant, hidden but a plain string), then `com.android.phone.EmergencyDialer.DIAL`
+  (AOSP telephony's) — and falls back to the unlock, since Android's PIN screen carries its own
+  Emergency button. ⚠️ The first version called `TelecomManager.createLaunchEmergencyDialerIntent`,
+  which I had called "public, checked with `javap`". **It is not public**, and CI (LCARS #2236) failed
+  on it — see the gate note below.
 - ⚠️ **No app can replace the keyguard while a PIN is set** (`setKeyguardDisabled` has no effect while
   a credential exists). Removing the PIN was offered and declined: it would cost the phone its real
   lock and GrapheneOS its credential-bound encryption.
+
+**⚠️ THE LOCAL COMPILE GATE HAD A HOLE, AND IT IS NOW CLOSED.** `tools/android_compile_check.sh`
+compiled against Robolectric's `android-all`, which is the framework IMPLEMENTATION and therefore
+carries every hidden and `@SystemApi` member. So a non-public call compiled clean locally and failed in
+CI, and a `javap` on that jar proves an API EXISTS, never that it is PUBLIC. The script now compiles
+against the **public SDK stub `android.jar`** from `https://dl.google.com/android/repository/platform-35_r02.zip`
+(~64 MB, reachable from this container, cached as `$CACHE/platform-35_r02-android.jar`). That is the
+jar CI compiles against. It falls back to `android-all` only if that fetch fails, and then says so in
+its verdict line. **Verified both ways:** the shipped `a9aa435` code fails with CI's exact errors at
+the same line and column (`306:59` unresolved, `308:68` type mismatch); the fix is frontend-clean.
+**To ask whether an API is public, `javap` the SDK stub jar, never `android-all`.**
 
 **Verification:** both Compose sets (19 and 28 files) frontend-clean against the real platform +
 Compose 1.7.6 + activity 1.9.3 + lifecycle + core; three planted typos, one per new API, each caught.
@@ -15655,5 +15670,6 @@ mechanism, in a new costume: **pick a separator the patterns cannot contain.**
    battery % in the header.
 3. Swipe down from the top: the bar appears for a moment; one more pull opens notifications.
 4. Lock and wake: the LCARS console; Back does nothing; UNLOCK → PIN/fingerprint; fingerprint alone
-   unlocks; EMERGENCY opens the emergency dialer.
+   unlocks; EMERGENCY opens the emergency dialer (or, if GrapheneOS refuses both actions, the PIN
+   screen, whose own Emergency button is one tap away — say which you get).
 5. Settings ▸ Appearance ▸ LCARS home screen OFF → the old launcher returns and stays.
