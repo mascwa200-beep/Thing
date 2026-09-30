@@ -1,12 +1,11 @@
 package dev.mascwa.pulse.feature.security
 
-import android.app.AppOpsManager
 import android.content.Context
 import android.net.Uri
-import android.os.Process
 import android.text.format.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.device.UsageAccess
 import dev.mascwa.pulse.core.telemetry.SecurityAudit
 import dev.mascwa.pulse.data.security.SecurityAuditStore
 import dev.mascwa.pulse.data.security.SecurityAuditor
@@ -64,12 +63,7 @@ class SecurityAuditViewModel(
     fun clearAll() = viewModelScope.launch { runCatching { store.clear() } }
 
     /** Whether the app currently holds Usage Access (gates per-app data usage). */
-    fun hasUsageAccess(): Boolean = runCatching {
-        val appOps = appContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), appContext.packageName,
-        ) == AppOpsManager.MODE_ALLOWED
-    }.getOrDefault(false)
+    fun hasUsageAccess(): Boolean = UsageAccess.isGranted(appContext)
 
     /** Export the current findings as a timestamped plain-text log to [uri]. */
     fun export(context: Context, uri: Uri) {

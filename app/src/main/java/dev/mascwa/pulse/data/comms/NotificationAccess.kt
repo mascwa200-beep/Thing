@@ -1,7 +1,10 @@
 package dev.mascwa.pulse.data.comms
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 
 /**
  * Whether this app is allowed to read the notifications on the shade.
@@ -14,8 +17,7 @@ import android.provider.Settings
  * ⚠️ **Matched by PACKAGE rather than by component**, deliberately. `ENABLED_NOTIFICATION_LISTENERS`
  * is a colon-separated list of flattened `ComponentName`s, and the question every caller here
  * actually asks is "may this app read notifications at all" — which the package answers without the
- * asker having to name a class. It also means this file compiles and can be reasoned about before
- * the listener it will eventually describe exists.
+ * asker having to name a class.
  */
 object NotificationAccess {
 
@@ -40,6 +42,42 @@ object NotificationAccess {
             // match that is right until somebody installs something whose id contains ours.
             .any { it.substringBefore('/') == us }
     }.getOrDefault(false)
+
+    /**
+     * Open the system's notification-access page, where the owner switches LCARS on.
+     *
+     * ⚠️ Tries the per-app detail page first, which lands on the switch itself rather than on a list
+     * of every app on the phone — but some builds do not implement it, so a failure falls back to the
+     * list. Both are system pages; neither can be replaced by anything this app draws.
+     *
+     * One definition, shared by the mail picker and the home console's notification centre.
+     */
+    fun openSettings(context: Context): Boolean {
+        val component = ComponentName(context, MailNotificationListener::class.java)
+        val detail = Intent(ACTION_LISTENER_DETAIL)
+            .putExtra(EXTRA_LISTENER_COMPONENT, component.flattenToString())
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { context.startActivity(detail) }.isSuccess) return true
+        return runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
+    }
+
+    /** Ask the system to bind the listener again after it has been killed. */
+    fun requestRebind(context: Context) {
+        runCatching {
+            NotificationListenerService.requestRebind(ComponentName(context, MailNotificationListener::class.java))
+        }
+    }
+
+    /**
+     * ⚠️ Spelled out rather than taken from the constants, which are API 30+ while this app's floor is
+     * lower. Both strings are fixed by the platform's own settings intent contract.
+     */
+    private const val ACTION_LISTENER_DETAIL = "android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS"
+    private const val EXTRA_LISTENER_COMPONENT = "android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME"
 
     /**
      * The settings key, spelled out rather than taken from the constant.

@@ -696,6 +696,13 @@ fun SettingsScreen(
                 }
             }
 
+            // ----- Android takeover -----
+            if (vis(SettingsSections.ANDROID_TAKEOVER)) item {
+                PrefSection("Android takeover") {
+                    TakeoverRows()
+                }
+            }
+
             // ----- Region & units -----
             if (vis(SettingsSections.REGION_UNITS)) item {
                 PrefSection("Region & units") {

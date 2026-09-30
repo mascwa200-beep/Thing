@@ -1,10 +1,8 @@
 package dev.mascwa.pulse.core.device
 
-import android.app.AppOpsManager
 import android.app.usage.NetworkStatsManager
 import android.content.Context
 import android.net.ConnectivityManager
-import android.os.Process
 import android.telephony.TelephonyManager
 import dev.mascwa.pulse.core.telemetry.BillingCycle
 import java.util.Calendar
@@ -60,12 +58,7 @@ class MobileData(private val appContext: Context) {
     }
 
     /** Whether the app currently holds Usage Access. The same AppOps check the Security Audit uses. */
-    fun hasUsageAccess(): Boolean = runCatching {
-        val appOps = appContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), appContext.packageName,
-        ) == AppOpsManager.MODE_ALLOWED
-    }.getOrDefault(false)
+    fun hasUsageAccess(): Boolean = UsageAccess.isGranted(appContext)
 
     /**
      * Mobile bytes since the cycle that [cycleDay] describes last began.

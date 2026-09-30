@@ -1,10 +1,6 @@
 package dev.mascwa.pulse.feature.settings
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.provider.Settings
-import android.service.notification.NotificationListenerService
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,7 +17,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.MailGlance
 import dev.mascwa.pulse.data.comms.MailNoticeStore
-import dev.mascwa.pulse.data.comms.MailNotificationListener
 import dev.mascwa.pulse.data.comms.NotificationAccess
 import dev.mascwa.pulse.feature.common.LcarsDialog
 
@@ -85,14 +80,14 @@ internal fun MailNotificationRows(
             "Switch on notification access",
             subtitle = "Opens the system list. There is no permission pop-up for this one — it can " +
                 "only be granted from that page.",
-            onClick = { context.openListenerSettings(); refresh++ },
+            onClick = { NotificationAccess.openSettings(context); refresh++ },
         )
 
         lastReadMs <= 0L -> PrefClickable(
             "Switched on, but it has not read the shade yet",
             subtitle = "Usually a moment after switching it on. If it stays this way, tap to ask " +
                 "the system to reconnect.",
-            onClick = { context.requestRebind(); refresh++ },
+            onClick = { NotificationAccess.requestRebind(context); refresh++ },
         )
 
         else -> PrefInfo("Notification access", "Counting")
@@ -207,38 +202,3 @@ private fun MailAppPickerRow(
 private fun Context.appLabel(pkg: String): String = runCatching {
     packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
 }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg
-
-/**
- * Open the system's notification-access page.
- *
- * ⚠️ Tries the per-app detail page first, which lands on the switch itself rather than on a list of
- * every app on the phone — but it is API 30+ and some builds do not implement it, so a failure falls
- * back to the list. Both are system pages; neither can be replaced by anything this app draws.
- */
-private fun Context.openListenerSettings() {
-    val component = ComponentName(this, MailNotificationListener::class.java)
-    val detail = Intent(ACTION_LISTENER_DETAIL)
-        .putExtra(EXTRA_LISTENER_COMPONENT, component.flattenToString())
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (runCatching { startActivity(detail) }.isSuccess) return
-    runCatching {
-        startActivity(
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
-}
-
-/** Ask the system to bind the listener again after it has been killed. */
-private fun Context.requestRebind() {
-    runCatching {
-        NotificationListenerService.requestRebind(ComponentName(this, MailNotificationListener::class.java))
-    }
-}
-
-/**
- * ⚠️ Spelled out rather than taken from the constants, which are API 30+ while this app's floor is
- * lower. Referencing them directly would be a lint failure on the minimum, and both strings are
- * fixed by the platform's own settings intent contract.
- */
-private const val ACTION_LISTENER_DETAIL = "android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS"
-private const val EXTRA_LISTENER_COMPONENT = "android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME"

@@ -4,6 +4,8 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.MailGlance
+import dev.mascwa.pulse.feature.shade.ShadeNotices
+import dev.mascwa.pulse.feature.shade.ShadeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -11,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Reads the notification shade and works out how much mail is waiting.
@@ -42,11 +45,25 @@ import kotlinx.coroutines.launch
  * close to nothing as possible: a package check against a field held in memory, then a debounced
  * hand-off to a background scope. The body is wrapped, because an exception thrown here would
  * crash-loop an app that uploads its own crash reports.
+ *
+ * ## It is also the home console's notification centre
+ *
+ * The same connection feeds [ShadeStore] — the whole shade, rebuilt as a snapshot a moment after
+ * anything on it changes — which is what the NOTICES panel draws and dismisses from. One listener,
+ * because Android grants notification access per component: a second listener would be a second
+ * switch for the owner to find.
+ *
+ * ⚠️ **The class keeps its name.** The grant is stored against this component's name, so renaming it
+ * would silently switch notification access off on every phone that has it on.
  */
 class MailNotificationListener : NotificationListenerService() {
 
     private var scope: CoroutineScope? = null
     private var pending: Job? = null
+    private var shadePending: Job? = null
+
+    /** App names, looked up once per package: a label lookup per notification would be waste. */
+    private val labels = ConcurrentHashMap<String, String>()
 
     /**
      * The packages that count, held in memory.
@@ -79,9 +96,15 @@ class MailNotificationListener : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        ShadeStore.disconnected()
         scope?.cancel()
         scope = null
         super.onDestroy()
+    }
+
+    override fun onListenerDisconnected() {
+        ShadeStore.disconnected()
+        super.onListenerDisconnected()
     }
 
     /**
@@ -94,7 +117,9 @@ class MailNotificationListener : NotificationListenerService() {
      */
     override fun onListenerConnected() {
         super.onListenerConnected()
+        ShadeStore.connected(this)
         recomputeSoon(immediate = true)
+        shadeSoon(immediate = true)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) = onShadeChanged(sbn)
@@ -102,6 +127,9 @@ class MailNotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = onShadeChanged(sbn)
 
     private fun onShadeChanged(sbn: StatusBarNotification?) {
+        // Every change matters to the notification centre, mail or not — and it goes first, because
+        // the mail half below returns early for anything that is not mail.
+        shadeSoon()
         runCatching {
             val pkg = sbn?.packageName ?: return
             // Learn that this app notifies, so the picker has something to offer. Free for a
@@ -150,7 +178,34 @@ class MailNotificationListener : NotificationListenerService() {
     private fun store(): MailNoticeStore? =
         runCatching { (application as? PulseApplication)?.container?.mailNoticeStore }.getOrNull()
 
+    /**
+     * Rebuild the notification centre's snapshot, coalescing a burst — shorter than the mail count's,
+     * because this one is on screen and a notice should appear about when it buzzes.
+     */
+    private fun shadeSoon(immediate: Boolean = false) {
+        val s = scope ?: return
+        if (!immediate && shadePending?.isActive == true) return
+        shadePending = s.launch {
+            if (!immediate) delay(SHADE_COALESCE_MS)
+            runCatching { publishShade() }
+        }
+    }
+
+    private fun publishShade() {
+        // ⚠️ Throws when not connected — an ordinary state, handled by leaving the last view alone
+        // until the disconnect callback clears it.
+        val active = runCatching { activeNotifications }.getOrNull() ?: return
+        ShadeStore.publish(active.mapNotNull { ShadeNotices.read(it, ::labelOf) }, packageName)
+    }
+
+    private fun labelOf(pkg: String): String = labels.getOrPut(pkg) {
+        runCatching {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg
+    }
+
     private companion object {
         const val COALESCE_MS = 1_200L
+        const val SHADE_COALESCE_MS = 300L
     }
 }

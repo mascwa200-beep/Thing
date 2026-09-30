@@ -1,6 +1,8 @@
 package dev.mascwa.pulse.feature.launcher
 
 import android.content.ComponentName
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherActivityInfo
@@ -143,6 +145,36 @@ class HomeApps(private val context: Context) {
         }
         val registered = runCatching { la.registerCallback(callback, Handler(Looper.getMainLooper())) }.isSuccess
         return { if (registered) runCatching { la.unregisterCallback(callback) } }
+    }
+
+    /**
+     * Every time an app came to the front in the last [windowMs], newest last, read from the usage
+     * record Android keeps. Empty without Usage Access — Android answers an empty list rather than
+     * refusing, so the caller asks `UsageAccess` first to tell "nothing used" from "not allowed".
+     *
+     * Blocking: it walks the event stream, so callers put it on a background thread.
+     */
+    fun recentUses(nowMs: Long, windowMs: Long): List<RecentApps.Use> {
+        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return emptyList()
+        val events = runCatching { usage.queryEvents(nowMs - windowMs, nowMs) }.getOrNull() ?: return emptyList()
+        val out = mutableListOf<RecentApps.Use>()
+        val event = UsageEvents.Event()
+        while (runCatching { events.getNextEvent(event) }.getOrDefault(false)) {
+            if (event.eventType != UsageEvents.Event.ACTIVITY_RESUMED) continue
+            val pkg = event.packageName ?: continue
+            out += RecentApps.Use(pkg, event.timeStamp)
+        }
+        return out
+    }
+
+    /**
+     * Every package that can be a home screen, this one included — none of them is a recent app,
+     * since coming home is not using an app.
+     */
+    fun homePackages(): Set<String> {
+        val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val found = runCatching { context.packageManager.queryIntentActivities(query, 0) }.getOrNull().orEmpty()
+        return found.mapNotNullTo(mutableSetOf()) { it.activityInfo?.packageName } + context.packageName
     }
 
     private fun LauncherActivityInfo.toApp(work: Boolean): HomeApp {

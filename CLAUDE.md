@@ -15673,3 +15673,72 @@ mechanism, in a new costume: **pick a separator the patterns cannot contain.**
    unlocks; EMERGENCY opens the emergency dialer (or, if GrapheneOS refuses both actions, the PIN
    screen, whose own Emergency button is one tap away — say which you get).
 5. Settings ▸ Appearance ▸ LCARS home screen OFF → the old launcher returns and stays.
+
+### LCARS TAKES OVER THE REST OF THE PHONE — Wave 1: notices, controls, recents (this session)
+
+Owner, after #478 merged: *"Keep going, making the whole LCARS take over every normal Android feature
+in every way."* AskUserQuestion answers: **all four feature groups** (notifications + controls;
+wallpaper/screensaver/assistant; phone/contacts/texts; keyboard/widgets/recents), **full default phone
++ full default SMS/MMS app with RCS off**, and **no kiosk mode** — Android's own shade, recents and
+settings stay reachable behind LCARS. Plan: `robust-baking-dewdrop.md`, five waves, each its own PR.
+**Zero subagent and zero workflow spend**, per the standing usage constraint.
+
+**What no app can replace, said once so nobody tries:** the pull-down shade itself, the volume and
+power pop-ups, the recents screen, the PIN pad and the boot animation. LCARS takes them over by
+offering its OWN version on the home console, and (Wave 2) by putting its look behind Android's screens.
+
+Three commits: `cea165e` W1a notification centre · `b11b8e8` W1b quick controls · `4284c11` W1c recents.
+
+**W1a — a notification centre on the home console.**
+- `feature/shade/ShadeDigest` (pure, 12 tests, 11 rules negative-tested): our own notices dropped; a
+  group summary dropped while a child is present and kept when alone; blanks dropped; newest first with
+  a key tie-break; `lockSummary` carries app names and counts, **never text**.
+- `ShadeStore` is in memory only, rebuilt WHOLE on every change by the listener that already exists for
+  mail — a snapshot, never an accumulator. ⚠️ `MailNotificationListener` keeps its class name because
+  notification access is granted per component; renaming it would silently revoke the grant.
+- ⚠️ **Opening another app's notice needs the home screen to LEND its right to start an activity**:
+  since Android 14 a sender must opt in (`ActivityOptions.setPendingIntentBackgroundActivityStartMode`),
+  or most taps open nothing. `FLAG_AUTO_CANCEL` is honoured by dismissing afterwards, because sending
+  the intent ourselves does not.
+- The panel names the reader's state (off / connecting / reading), so an empty panel is never ambiguous.
+- `NotificationAccess.openSettings`/`requestRebind` are now shared by the mail picker and this panel.
+
+**W1b — quick controls.** `feature/controls/ControlsState` (pure, 12 tests, 10 rules negative-tested)
+decides what each control reads, whether LCARS can change it here, why not, and the next setting.
+- ⚠️ **A control LCARS cannot change is never a dead switch**: it says why and a tap opens Android's own
+  control. Wi-Fi, location, brightness, screen timeout and (since 13) Bluetooth are **device-owner-only**;
+  `DevicePolicyController` gained `setLocationEnabled` and `setSystemSetting`.
+- ⚠️ **Null means "could not be read", never "off"** — an off switch invites a tap that cannot work.
+- Do Not Disturb goes through the bound listener's `requestInterruptionFilter`, which needs no separate
+  grant. Silent is skipped without the notification-policy grant (Android throws on it).
+- Brightness/timeout steps match the NEAREST step, so a value left between steps still moves forward.
+- The torch has no getter: tracked live via `CameraManager.TorchCallback` from `onStart` to `onStop`.
+
+**W1c — a recent-apps strip.** One row of four under the dock, from `UsageStatsManager`
+`ACTIVITY_RESUMED` events over 48 h. `feature/launcher/RecentApps.order` (pure, 5 tests, 6 rules
+negative-tested): newest first, one per app; only apps the home screen can open; never LCARS or any
+other home screen. Pinned apps are left out (the dock holds them).
+- ⚠️ **Below the dock, not above as the plan said**: the strip comes and goes as apps are used, and a
+  dock that moves under the thumb is worse than a strip one row lower.
+- ⚠️ **Only this profile's apps**: the usage record names a PACKAGE, and a work app's package matches its
+  personal twin, so guessing would sometimes open the wrong copy.
+- Usage access is read before anything is drawn (`null` = not yet known), so a phone that has the
+  grant never flashes the "needs access" line.
+- `core/device/UsageAccess` is the one AppOps check; `MobileData` and the security audit delegate to it
+  (it was written out twice and this would have been the third).
+
+**Verification.** Pure cores run under kotlinc + JUnit with every load-bearing rule negative-tested
+(baseline asserted green, perturbation asserted applied, restore byte-compared) — two W1b guards came
+back asleep first (no assertion that DND is refused without the reader; no fixture reaching the
+rounding branch) and were fixed. Platform files compile clean against the **public SDK stub jar**; the
+home console and launcher activity pass the Compose frontend type-check against real Compose,
+activity and lifecycle, with stubs copied from the real declarations. Each gate was negative-tested
+with a planted typo.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a panel, it never draws one or reads a notification:**
+1. Home: NOTICES lists real notifications grouped by app; tap one — it opens (the Android 14+ lending
+   rule is the part only a device proves); ✕ and CLEAR remove them from Android's shade too.
+2. Lock screen: the Notices panel names apps and counts and **no text**.
+3. CONTROLS: torch, ringer and Do Not Disturb act; Wi-Fi, location, brightness and timeout act as
+   device owner; anything that cannot says why and opens Android's control.
+4. Use two apps, press Home: RECENT shows them; without Usage access, one line says so and opens the page.

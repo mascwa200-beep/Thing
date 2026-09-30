@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.launcher
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,10 @@ import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.LcarsDialog
 import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsIcons
+import dev.mascwa.pulse.feature.controls.ControlActions
+import dev.mascwa.pulse.feature.controls.ControlsPanel
+import dev.mascwa.pulse.feature.controls.ControlsState
+import dev.mascwa.pulse.feature.controls.PhoneControls
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleButton
 import dev.mascwa.pulse.feature.lcarsboard.ConsolePanel
@@ -53,6 +58,9 @@ import dev.mascwa.pulse.feature.lcarsboard.PanelTab
 import dev.mascwa.pulse.feature.lcarsboard.arrive
 import dev.mascwa.pulse.feature.lcarsboard.legibleOn
 import dev.mascwa.pulse.feature.lcarsboard.textOnBlock
+import dev.mascwa.pulse.feature.shade.NoticeActions
+import dev.mascwa.pulse.feature.shade.NoticesPanel
+import dev.mascwa.pulse.feature.shade.ShadeDigest
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
@@ -70,13 +78,17 @@ internal class HomeActions(
     val tap: (BoardTap) -> Unit,
     val openLcars: () -> Unit,
     val systemSettings: () -> Unit,
+    val notices: NoticeActions,
+    val controls: ControlActions,
+    /** Android's Usage access page, which the recent-apps strip needs. */
+    val grantUsage: () -> Unit,
 )
 
 /**
  * The home screen: the same LCARS console as the lock screen, with the phone's apps in it.
  *
- * From the top: the dock of pinned apps, a search box, the widget's board, and every app A to Z
- * under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
+ * From the top: the dock of pinned apps, the apps used most recently, a search box, the notification
+ * centre, the quick controls, the widget's board, and every app A to Z under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
  * agenda or a long directory is scrolled to and never cut off. Typing narrows the directory to what
  * matches and hides the board, because somebody searching wants the answer, not the weather.
  *
@@ -92,6 +104,12 @@ internal fun HomeConsole(
     query: String,
     onQuery: (String) -> Unit,
     notice: String?,
+    noticeStatus: ShadeDigest.Status,
+    notices: List<ShadeDigest.Group>,
+    recent: List<HomeApp>,
+    usageGranted: Boolean?,
+    controls: ControlsState.Reading?,
+    volumes: List<PhoneControls.Volume>,
     progress: () -> Float,
     list: LazyListState,
     icon: suspend (HomeApp) -> ImageBitmap?,
@@ -130,6 +148,11 @@ internal fun HomeConsole(
                 item(key = "home:dock") {
                     Dock(docked, block(0), progress, icon, actions.launch) { held = it }
                 }
+                // Below the dock rather than above it: this strip comes and goes as apps are used,
+                // and the dock is what a thumb reaches for without looking.
+                item(key = "home:recent") {
+                    RecentStrip(recent, pins, usageGranted, block(5), progress, icon, actions.launch, actions.grantUsage) { held = it }
+                }
                 item(key = "home:search") {
                     LcarsField(
                         value = query,
@@ -162,6 +185,28 @@ internal fun HomeConsole(
                         }
                     }
                     else -> {
+                        item(key = "home:notices") {
+                            NoticesPanel(
+                                status = noticeStatus,
+                                groups = notices,
+                                tab = block(1),
+                                progress = progress,
+                                index = ELEMENT_RAIL + 1,
+                                actions = actions.notices,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
+                        item(key = "home:controls") {
+                            ControlsPanel(
+                                reading = controls,
+                                volumes = volumes,
+                                tab = block(4),
+                                progress = progress,
+                                index = ELEMENT_RAIL + 1,
+                                actions = actions.controls,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
                         if (board != null) {
                             item(key = "home:board") {
                                 LcarsBoardPanels(
@@ -265,6 +310,53 @@ private fun DockTile(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/**
+ * The apps used most recently, one row of four, newest first — Android's own recents screen belongs
+ * to the system, so this is LCARS's.
+ *
+ * Nothing is drawn until Usage access has been read; without it, one line says what it needs and a
+ * tap opens the page. With it and nothing to show — a fresh phone, or every recent app already
+ * pinned — the strip is simply absent rather than an empty panel.
+ *
+ * Pinned apps are left out: the dock above already holds them, one tap away.
+ */
+@Composable
+private fun RecentStrip(
+    recent: List<HomeApp>,
+    pins: List<String>,
+    granted: Boolean?,
+    tab: Color,
+    progress: () -> Float,
+    icon: suspend (HomeApp) -> ImageBitmap?,
+    onLaunch: (HomeApp) -> Unit,
+    onGrant: () -> Unit,
+    onHold: (HomeApp) -> Unit,
+) {
+    val c = Pulse.colors
+    val cue = rememberLcarsCue()
+    when (granted) {
+        null -> Unit
+        false -> Line(
+            RECENT_NEEDS_ACCESS,
+            c.muted,
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+                .clickable(onClickLabel = "Open Usage access") { cue(SoundCue.TAP, HapticCue.TAP_CRISP); onGrant() },
+        )
+        true -> {
+            val shown = remember(recent, pins) { recent.filter { it.key !in pins }.take(DOCK_PER_ROW) }
+            if (shown.isEmpty()) return
+            ConsolePanel(RECENT_TITLE, tab, progress, ELEMENT_RAIL + 1, Modifier.padding(top = 12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    shown.forEach { app -> DockTile(app, icon, onLaunch, onHold, Modifier.weight(1f)) }
+                    repeat(DOCK_PER_ROW - shown.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
     }
 }
 
@@ -376,6 +468,8 @@ private const val HOME_AGENDA_ROWS = 8
 private const val RAIL_SEED = "home-console"
 private const val DOCK_TITLE = "Dock"
 private const val DOCK_EMPTY = "Hold any app below to pin it here."
+private const val RECENT_TITLE = "Recent"
+private const val RECENT_NEEDS_ACCESS = "Recent apps need Usage access. Tap to allow it."
 private const val SEARCH_HINT = "Find an app"
 private const val LCARS_LABEL = "LCARS"
 private const val SETTINGS_LABEL = "Settings"
