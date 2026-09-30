@@ -29,6 +29,8 @@ import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
 import dev.mascwa.pulse.feature.lcarsboard.hideStatusBarForConsole
+import dev.mascwa.pulse.feature.shade.ShadeDigest
+import dev.mascwa.pulse.feature.shade.ShadeStore
 import dev.mascwa.pulse.ui.ProvideStardate
 import dev.mascwa.pulse.ui.theme.NightwireTheme
 import dev.mascwa.pulse.widget.LockBoard
@@ -134,6 +136,7 @@ class LockBoardActivity : ComponentActivity() {
             NightwireTheme(accent = defaults.accentColor, amoledBlack = defaults.amoledBlack) {
                 ProvideStardate {
                     val snapshot by LockBoard.latest.collectAsStateWithLifecycle()
+                    val shade by ShadeStore.view.collectAsStateWithLifecycle()
                     val target by powered
                     // ONE timeline, driven toward whichever end `powered` names, from wherever it is
                     // — which is what makes a power-down that interrupts a power-up continue from the
@@ -149,7 +152,10 @@ class LockBoardActivity : ComponentActivity() {
                         } while (progress.floatValue != end)
                     }
                     val readProgress = remember { { progress.floatValue } }
-                    LockConsole(snapshot?.board, readProgress, ::unlock, ::emergency)
+                    // Which apps, and how many — never a word of any notification, because anyone who
+                    // picks the phone up can read this screen.
+                    val notices = remember(shade) { ShadeDigest.lockSummary(shade.groups, LOCK_NOTICE_APPS) }
+                    LockConsole(snapshot?.board, notices, readProgress, ::unlock, ::emergency)
                 }
             }
         }
@@ -358,6 +364,9 @@ class LockBoardActivity : ComponentActivity() {
 
         /** How often the console checks whether the phone has started going to sleep. */
         private const val SLEEP_POLL_MS = 50L
+
+        /** How many apps the lock screen names in its notice line. */
+        private const val LOCK_NOTICE_APPS = 6
 
         /** Tried in order by [emergency]; see there for where each comes from. */
         private val EMERGENCY_DIALER_ACTIONS = listOf(

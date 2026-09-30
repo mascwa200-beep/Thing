@@ -53,6 +53,9 @@ import dev.mascwa.pulse.feature.lcarsboard.PanelTab
 import dev.mascwa.pulse.feature.lcarsboard.arrive
 import dev.mascwa.pulse.feature.lcarsboard.legibleOn
 import dev.mascwa.pulse.feature.lcarsboard.textOnBlock
+import dev.mascwa.pulse.feature.shade.NoticeActions
+import dev.mascwa.pulse.feature.shade.NoticesPanel
+import dev.mascwa.pulse.feature.shade.ShadeDigest
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
@@ -70,13 +73,14 @@ internal class HomeActions(
     val tap: (BoardTap) -> Unit,
     val openLcars: () -> Unit,
     val systemSettings: () -> Unit,
+    val notices: NoticeActions,
 )
 
 /**
  * The home screen: the same LCARS console as the lock screen, with the phone's apps in it.
  *
- * From the top: the dock of pinned apps, a search box, the widget's board, and every app A to Z
- * under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
+ * From the top: the dock of pinned apps, a search box, the notification centre, the widget's board,
+ * and every app A to Z under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
  * agenda or a long directory is scrolled to and never cut off. Typing narrows the directory to what
  * matches and hides the board, because somebody searching wants the answer, not the weather.
  *
@@ -92,6 +96,8 @@ internal fun HomeConsole(
     query: String,
     onQuery: (String) -> Unit,
     notice: String?,
+    noticeStatus: ShadeDigest.Status,
+    notices: List<ShadeDigest.Group>,
     progress: () -> Float,
     list: LazyListState,
     icon: suspend (HomeApp) -> ImageBitmap?,
@@ -162,6 +168,17 @@ internal fun HomeConsole(
                         }
                     }
                     else -> {
+                        item(key = "home:notices") {
+                            NoticesPanel(
+                                status = noticeStatus,
+                                groups = notices,
+                                tab = block(1),
+                                progress = progress,
+                                index = ELEMENT_RAIL + 1,
+                                actions = actions.notices,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
                         if (board != null) {
                             item(key = "home:board") {
                                 LcarsBoardPanels(

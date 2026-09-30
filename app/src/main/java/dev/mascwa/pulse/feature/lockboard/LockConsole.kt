@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleButton
+import dev.mascwa.pulse.feature.lcarsboard.ConsolePanel
+import dev.mascwa.pulse.feature.lcarsboard.ELEMENT_RAIL
 import dev.mascwa.pulse.feature.lcarsboard.LcarsBoardPanels
 import dev.mascwa.pulse.feature.lcarsboard.LcarsConsole
 import dev.mascwa.pulse.feature.lcarsboard.legibleOn
@@ -26,6 +28,9 @@ import dev.mascwa.pulse.widget.WidgetBoard
  * The lock screen as a full LCARS console: solid corner, header and rail, the board's regions in
  * their own panels, and UNLOCK and EMERGENCY as solid bars across the bottom.
  *
+ * [notices] names which apps have notifications waiting and how many — never a word of any of them,
+ * because anyone who picks the phone up can read this screen.
+ *
  * [onTap] is given null for "just unlock" — the UNLOCK bar, or a tap on any empty part of the
  * console, which is the ordinary lock-screen gesture.
  *
@@ -35,6 +40,7 @@ import dev.mascwa.pulse.widget.WidgetBoard
 @Composable
 internal fun LockConsole(
     board: WidgetBoard.Board?,
+    notices: List<Pair<String, Int>>,
     progress: () -> Float,
     onTap: (BoardTap?) -> Unit,
     onEmergency: () -> Unit,
@@ -55,6 +61,23 @@ internal fun LockConsole(
         },
         body = { modifier ->
             Column(modifier.verticalScroll(rememberScrollState()).padding(end = 4.dp, bottom = 8.dp)) {
+                if (notices.isNotEmpty()) {
+                    ConsolePanel(
+                        NOTICES_TITLE,
+                        c.violet,
+                        progress,
+                        ELEMENT_RAIL + 1,
+                        Modifier.padding(bottom = 12.dp),
+                    ) {
+                        Text(
+                            notices.joinToString("  ·  ") { (app, n) -> "$app $n" },
+                            fontFamily = JetBrainsMono,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            color = legibleOn(c.ink, c.void),
+                        )
+                    }
+                }
                 if (board != null) {
                     LcarsBoardPanels(board, progress, onTap, Modifier.fillMaxWidth())
                 } else {
@@ -73,4 +96,5 @@ internal fun LockConsole(
 private const val RAIL_SEED = "lock-console"
 private const val UNLOCK_LABEL = "▲  Unlock"
 private const val EMERGENCY_LABEL = "Emergency"
+private const val NOTICES_TITLE = "Notices"
 private const val WAITING_LINE = "Reading the board…"
