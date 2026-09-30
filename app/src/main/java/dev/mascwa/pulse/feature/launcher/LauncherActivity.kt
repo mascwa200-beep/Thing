@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.device.UsageAccess
+import dev.mascwa.pulse.core.util.openUsageAccessSettings
 import dev.mascwa.pulse.data.comms.NotificationAccess
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
@@ -95,6 +97,13 @@ class LauncherActivity : ComponentActivity() {
      */
     private val noticeGranted = mutableStateOf(false)
 
+    /**
+     * The recent-apps strip and whether Usage access allows it. Null until first read, so the strip
+     * does not flash a "needs access" line on a phone that has it.
+     */
+    private val recent = mutableStateOf<List<HomeApp>>(emptyList())
+    private val usageGranted = mutableStateOf<Boolean?>(null)
+
     private val phoneControls by lazy { PhoneControls(applicationContext) }
     private val controlReading = mutableStateOf<ControlsState.Reading?>(null)
     private val volumes = mutableStateOf<List<PhoneControls.Volume>>(emptyList())
@@ -142,6 +151,9 @@ class LauncherActivity : ComponentActivity() {
                 grant = ::grantNotices,
             ),
             controls = ControlActions(tap = ::tapControl, volume = ::adjustVolume),
+            grantUsage = {
+                if (!openUsageAccessSettings(this)) notice.value = "Android would not open the Usage access page."
+            },
         )
 
         // Registered BEFORE the content, so the screen's own BackHandler — added once it composes —
@@ -186,6 +198,8 @@ class LauncherActivity : ComponentActivity() {
                         notice = notice.value,
                         noticeStatus = ShadeDigest.status(granted, shade.connected),
                         notices = shade.groups,
+                        recent = recent.value,
+                        usageGranted = usageGranted.value,
                         // The torch is reported live and the reader's connection as it stands, so
                         // neither waits for the next full read of the settings.
                         controls = reading?.copy(torch = torch, listener = shade.connected),
@@ -247,6 +261,8 @@ class LauncherActivity : ComponentActivity() {
         super.onStart()
         phoneControls.start()
         refreshControls()
+        // Coming back home after using an app is exactly when the recent list has changed.
+        loadRecents()
         lifecycleScope.launch {
             noticeGranted.value = withContext(Dispatchers.IO) { NotificationAccess.isGranted(applicationContext) }
         }
@@ -284,6 +300,33 @@ class LauncherActivity : ComponentActivity() {
             val list = withContext(Dispatchers.IO) { apps.load() }
             appList.value = list
             pins.value = store.pins()
+            loadRecents()
+        }
+    }
+
+    /**
+     * The apps used most recently, from Android's usage record, as home-screen apps.
+     *
+     * ⚠️ Only apps in THIS profile: the usage record names a package, not a profile, and a work app's
+     * package matches its personal twin — opening the wrong one is worse than leaving it out.
+     */
+    private fun loadRecents() {
+        val all = appList.value ?: return
+        lifecycleScope.launch {
+            val (granted, list) = withContext(Dispatchers.IO) {
+                if (!UsageAccess.isGranted(applicationContext)) return@withContext false to emptyList<HomeApp>()
+                val byPkg = all.filter { !it.work }.groupBy { it.component.packageName }
+                val now = System.currentTimeMillis()
+                val order = RecentApps.order(
+                    uses = apps.recentUses(now, RECENT_WINDOW_MS),
+                    launchable = byPkg.keys,
+                    exclude = apps.homePackages(),
+                    limit = RECENT_LIMIT,
+                )
+                true to order.mapNotNull { byPkg[it]?.firstOrNull() }
+            }
+            usageGranted.value = granted
+            recent.value = list
         }
     }
 
@@ -406,3 +449,7 @@ class LauncherActivity : ComponentActivity() {
 
 /** How long a radio (Wi-Fi, Bluetooth) takes to report the state it was just switched to. */
 private const val RADIO_SETTLE_MS = 1_200L
+
+/** How far back the recent-apps strip looks, and how many it asks for before pinned apps are dropped. */
+private const val RECENT_WINDOW_MS = 48L * 60 * 60 * 1000
+private const val RECENT_LIMIT = 8
