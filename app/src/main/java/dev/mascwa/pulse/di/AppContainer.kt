@@ -197,6 +197,20 @@ class AppContainer(private val appContext: Context) {
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }
 
+    /**
+     * The words the LCARS keyboard has learned — the one place anything typed is kept. Sealed with the
+     * Keystore cipher and nothing weaker (`LearnedWordsTest` checks this call), in `noBackupFilesDir` so
+     * no backup carries it. Its own scope, because a save may be pending when the keyboard goes away.
+     */
+    val learnedWords: dev.mascwa.pulse.data.keyboard.LearnedWords by lazy {
+        dev.mascwa.pulse.data.keyboard.LearnedWords(
+            file = java.io.File(appContext.noBackupFilesDir, dev.mascwa.pulse.data.keyboard.LearnedWords.FILE_NAME),
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+            seal = dev.mascwa.pulse.security.SecretCrypto::encrypt,
+            unseal = dev.mascwa.pulse.security.SecretCrypto::decrypt,
+        )
+    }
+
     /** On-device, aggregated feature-usage store (counts + hour-of-day; no content/PII). */
     val usageRepository: dev.mascwa.pulse.data.usage.UsageRepository by lazy {
         dev.mascwa.pulse.data.usage.UsageRepository(appContext, json)

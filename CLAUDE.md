@@ -15967,3 +15967,69 @@ Verification: 9 alternates tests, plus one new model test; **12 rules negative-t
   all. On narrow keys it is the slop alone that holds, and a narrow-key fixture now proves it.
 
 Verification: 14 gesture tests; **16 rules negative-tested**, all awake.
+
+**K4 — suggestions, autocorrect, and learning on the phone.**
+- **The word list is AOSP LatinIME's English source (Apache-2.0)**, cut by
+  `tools/keyboard/build_wordlist.py` to the 91,541 words at frequency 40 and up, with nothing flagged
+  `possibly_offensive` or `not_a_word`. `--check` rebuilds it and compares with what is committed.
+  `assets/keyboard/NOTICE.txt` carries LatinIME's copyright line verbatim, the changes made (§4(b)) and
+  the full licence text (§4(a)). The source has no duplicate words and nothing outside the BMP, which
+  is why the NOTICE can say no frequency was changed.
+- **`Suggest`** is a keyboard-aware Damerau distance: a neighbouring key, a swap, or a doubled or
+  missed double letter costs half, and an apostrophe a quarter. Candidates are drawn from the typed
+  first letter, its neighbours and the typed SECOND letter (which is how "hte" finds "the"). Typing in
+  lower case puts acronyms and names behind ordinary words, except "I" and its contractions.
+- ⚠️ **`cost()`'s early exit has to look back two rows.** A swap reaches back two, so a row can be over
+  the limit while the next one comes back under it. Stopping on the row alone turned "teh" at a limit
+  of 0.5 from 0.5 into 1.
+- **`Autocorrect` does nothing when in doubt**: never in a password, a web address or an email; never
+  on a known or learned word, a word with a digit, or one with a capital after its first letter; only
+  a CORRECTION (never a completion), within 1 edit under six letters and 2 above, and at least 0.2 ahead
+  of the next suggestion. Measured on the real list: teh/hte/tge/yhe→the, dont→don't, recieve,
+  becuase, keybaord, adn, tommorow, definately and wgat are corrected; helo, im, thr, wierd and og are
+  left for the strip. `KeyboardWordListAssetTest` pins all of that against the shipped list.
+- **`Composer`** keeps the typed word as COMPOSING text (Gboard's underline). A separator commits the
+  correction, and delete straight afterwards puts back what was typed, but only if the field still ends
+  with what was put in.
+- ⚠️ **The service decides "the cursor moved" from the text, not only the numbers.** An update can
+  arrive late, from before the last few keys, and report no composing word while one is plainly there.
+  A missing range is settled by reading what is before the cursor. The undo lasts until the first
+  update the correction itself made; any later move, or a selection, and delete is only a delete.
+- **`StripWords`**: about to correct, the typed word sits on the left in quotes (tap to keep it), the
+  correction in the middle in bold, the next word on the right. Otherwise the best suggestion is in the
+  middle. No word appears twice in different capitals.
+- **Learning (owner's call: on the phone only).** `data/keyboard/LearnedWords` is the one place anything
+  typed is kept.
+  - It stores words and counts only, sealed with `SecretCrypto` in `noBackupFilesDir`.
+  - ⚠️ **If the cipher cannot seal, nothing is written.**
+  - ⚠️ **A kept file that will not open is left alone, not written over**, until "Forget learned words".
+  - A word learned before the file was read is ADDED to it rather than replacing it.
+  - Only words the dictionary lacks are learned, typed twice or kept on purpose (an undone correction,
+    or the quoted typed word tapped).
+  - Nothing is learned in a password, a web address, an email, a field asking for no learning, or from
+    a word ended by a digit or `@` ("mp3" must not teach "mp").
+- **Gates.** `LearnedWordsTest` has eleven tests and checks the source: `AppContainer` must build the
+  store with `SecretCrypto::encrypt`/`decrypt` and `noBackupFilesDir`, nothing else may build it, and
+  it reaches for no log, report or network. `KeyboardRecordsNothingTest` gained a container allowlist:
+  the keyboard may take `settingsRepository` and `learnedWords` from the app and nothing else. That
+  allowlist was negative-tested both ways, with an extra reach and with a missing one.
+- **Settings ▸ Android takeover ▸ LCARS keyboard** has two new switches, Autocorrect and "Learn words I
+  type" (`AppSettings.keyboardAutocorrect`/`keyboardLearn`, both defaulting on). It also has "Forget
+  learned words", which asks twice before it deletes anything. The Glide switch is not there yet: it
+  lands with K5, so it is never a dead control.
+
+Verification:
+- 23 Suggest, 17 Composer, 7 learned-count, 5 strip, 6 real-list and 11 store tests, all run locally.
+- **63 rules negative-tested** (61 in the cores and store, 2 on the allowlist gate), all awake after fixes. One guard came back asleep: no test slipped the
+  first letter onto a neighbour, so "rhe"→"the" was added. One case was invalid because my perturbation
+  had the wrong indentation, and the harness refused it.
+- The keyboard, panel, store and Settings rows: 62 files frontend-clean against the public SDK and real
+  Compose, with the check proven by three planted mistakes. The container's exact construction compiles
+  clean against the real store and cipher.
+
+⚠️ **Owner-verify on the Pixel:**
+1. "teh " becomes "the ", and delete brings "teh" back.
+2. The strip shows three words, the correction bold.
+3. Tapping the quoted word keeps it; type it twice and it stops being corrected.
+4. Nothing is learned in a password field.
+5. "Forget learned words" empties the list.

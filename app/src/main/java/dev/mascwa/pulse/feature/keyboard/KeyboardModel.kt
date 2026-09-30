@@ -6,9 +6,11 @@ package dev.mascwa.pulse.feature.keyboard
  *
  * ## What it deliberately does not do
  *
- * **It learns nothing.** No dictionary, no prediction, no history of what was typed. Every decision
- * here is a function of the key pressed, the keyboard's own state and the field's declared type — so
- * there is nothing to store, and `KeyboardRecordsNothingTest` holds the package to that.
+ * **It remembers nothing typed.** Every decision here is a function of the key pressed, the keyboard's
+ * own state and the field's declared type. Words are another layer's business: suggestions and
+ * corrections are [Suggest] and [Autocorrect] over the bundled [Dictionary], and the only thing kept is
+ * the learned-word list, reached through [WordMemory] and sealed elsewhere. `KeyboardRecordsNothingTest`
+ * holds this package to storing nothing itself.
  *
  * ## Shift
  *

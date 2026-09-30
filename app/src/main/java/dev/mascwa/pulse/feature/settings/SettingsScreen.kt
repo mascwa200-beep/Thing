@@ -699,7 +699,7 @@ fun SettingsScreen(
             // ----- Android takeover -----
             if (vis(SettingsSections.ANDROID_TAKEOVER)) item {
                 PrefSection("Android takeover") {
-                    TakeoverRows()
+                    TakeoverRows(s, vm::update)
                 }
             }
 

@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.keyboard
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -61,7 +62,8 @@ import kotlin.math.roundToInt
  *
  * A 48 dp strip over four rows of 50 dp keys with 8 dp between rows — [KeyHeight], [RowGap] and the
  * rest are named at the bottom of this file so the whole shape can be tuned from a screenshot. The
- * strip is where suggestions will go; until then it names the layer, sized so nothing in it is cut.
+ * strip carries the suggestions while a word is being typed and names the layer otherwise, sized so
+ * nothing in it is cut.
  *
  * ## One surface, not forty buttons
  *
@@ -85,6 +87,8 @@ internal fun KeyboardPanel(
     onPicker: () -> Unit,
     onCursor: (Int) -> Unit,
     onEraseWords: (Int) -> Unit,
+    strip: List<StripWord?>,
+    onPick: (StripWord) -> Unit,
 ) {
     val c = Pulse.colors
     val blocks = LocalConsoleBlocks.current
@@ -108,7 +112,7 @@ internal fun KeyboardPanel(
     val keysHeight = with(density) { KeyboardGeometry.height(rows.size, metrics).toDp() }
 
     Column(Modifier.fillMaxWidth().background(c.void).navigationBarsPadding()) {
-        Strip(state, block(0), block(4))
+        Strip(state, strip, onPick, stub = block(0), bar = block(4), divider = c.void)
         BoxWithConstraints(Modifier.fillMaxWidth().height(keysHeight)) {
             val width = constraints.maxWidth.toFloat()
             val placed = remember(rows, width, metrics) { KeyboardGeometry.place(rows, width, metrics) }
@@ -153,17 +157,29 @@ internal fun KeyboardPanel(
 }
 
 /**
- * The LCARS strip above the keys: a gold elbow stub and a bar naming what is showing. It is the height
- * Gboard's suggestion strip is, so the keys sit where a thumb trained on Gboard expects them, and the
- * key pop-ups over the top row have somewhere to go.
+ * The LCARS strip above the keys: a gold elbow stub and a bar. While a word is being typed the bar
+ * holds the suggestions, three to a strip as Gboard has them ([StripWords] decides which go where);
+ * otherwise it names the layer. It is the height Gboard's suggestion strip is, so the keys sit where a
+ * thumb trained on Gboard expects them, and the key pop-ups over the top row have somewhere to go.
+ *
+ * The word the space bar will put in is bold. The word exactly as typed, offered when it is about to
+ * be corrected, is in quotes — tapping it keeps it, and the keyboard learns it.
  */
 @Composable
-private fun Strip(state: KeyboardModel.State, stub: Color, bar: Color) {
+private fun Strip(
+    state: KeyboardModel.State,
+    words: List<StripWord?>,
+    onPick: (StripWord) -> Unit,
+    stub: Color,
+    bar: Color,
+    divider: Color,
+) {
     val name = when (state.layer) {
         Layer.LETTERS -> if (state.shift == ShiftState.LOCKED) "INPUT · CAPS" else "INPUT"
         Layer.SYMBOLS -> "INPUT · 123"
         Layer.MORE -> "INPUT · SYMBOLS"
     }
+    val ink = textOnBlock(bar)
     Row(
         Modifier.fillMaxWidth().height(StripHeight).padding(horizontal = PadSide, vertical = StripInset),
         horizontalArrangement = Arrangement.spacedBy(KeyGap),
@@ -175,20 +191,47 @@ private fun Strip(state: KeyboardModel.State, stub: Color, bar: Color) {
                 .clip(RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50))
                 .background(stub),
         )
-        Box(
-            Modifier.weight(1f).fillMaxHeight().background(bar).padding(horizontal = 12.dp),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Text(
-                name,
-                fontFamily = Antonio,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                letterSpacing = 2.sp,
-                color = textOnBlock(bar),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (words.all { it == null }) {
+            Box(
+                Modifier.weight(1f).fillMaxHeight().background(bar).padding(horizontal = 12.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    name,
+                    fontFamily = Antonio,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 2.sp,
+                    color = ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            Row(Modifier.weight(1f).fillMaxHeight().background(bar)) {
+                words.forEachIndexed { i, word ->
+                    if (i > 0) Box(Modifier.width(StripDivider).fillMaxHeight().background(divider))
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .then(if (word != null) Modifier.clickable { onPick(word) } else Modifier)
+                            .padding(horizontal = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (word != null) {
+                            Text(
+                                if (word.typed) "\u201C${word.word}\u201D" else word.word,
+                                fontSize = SuggestionSize,
+                                fontWeight = if (word.primary) FontWeight.Bold else FontWeight.Normal,
+                                color = ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -580,6 +623,8 @@ private fun Bubble(
 private val StripHeight = 48.dp
 private val StripInset = 6.dp
 private val StripStub = 44.dp
+private val StripDivider = 2.dp
+private val SuggestionSize = 17.sp
 private val KeyHeight = 50.dp
 private val RowGap = 8.dp
 private val KeyGap = 6.dp
