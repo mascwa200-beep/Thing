@@ -15948,3 +15948,22 @@ highlighted choice, and dragging a key-height below the key backs out.
 - Sliding onto another letter starts that letter's own hold.
 
 Verification: 9 alternates tests, plus one new model test; **12 rules negative-tested**, all awake.
+
+**K3 — gestures on keys, and the double-space full stop.**
+- **Space-bar slide.** Sliding along the space bar moves the cursor one character for every 0.35 of a
+  key's width, sent as arrow keys. Arrow keys cross an emoji or a line break exactly as a hardware
+  keyboard would, and the keyboard never needs to know where in the text the cursor is. A slide never
+  types a space and never opens the picker.
+- **Delete swipe.** Swiping left from delete marks one more word for every half key. A wider pop-up
+  says "ERASE 2 WORDS" before anything goes, and lifting erases them. `WordErase` counts the characters
+  over what the field reports is there; if text is selected, the selection is deleted instead.
+- ⚠️ **"The last key was the space bar" is a claim about the TEXT.** `DoubleSpace.Tracker` remembers
+  where the space bar left the cursor. Any cursor move the keyboard did not make forgets it, so a space
+  typed after tapping elsewhere is only a space. `pending` covers a fast double tap that lands before
+  the editor reports where the first space went.
+- **No full stop** in passwords, web addresses, email addresses or number fields.
+- ⚠️ **A guard came back asleep, and the rule was real.** While a cursor step is wider than the 12 dp
+  slop, rounding down already turns a wobble into no movement, so the fixtures passed with no slop at
+  all. On narrow keys it is the slop alone that holds, and a narrow-key fixture now proves it.
+
+Verification: 14 gesture tests; **16 rules negative-tested**, all awake.

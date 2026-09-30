@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.keyboard.KeyboardGeometry.Placed
@@ -82,6 +83,8 @@ internal fun KeyboardPanel(
     offerSwitch: Boolean,
     onKey: (Key) -> Unit,
     onPicker: () -> Unit,
+    onCursor: (Int) -> Unit,
+    onEraseWords: (Int) -> Unit,
 ) {
     val c = Pulse.colors
     val blocks = LocalConsoleBlocks.current
@@ -111,11 +114,13 @@ internal fun KeyboardPanel(
             val placed = remember(rows, width, metrics) { KeyboardGeometry.place(rows, width, metrics) }
             val fingers = remember { mutableStateMapOf<PointerId, KeyTouch.Finger>() }
             val alternates = remember { mutableStateOf<OpenAlternates?>(null) }
+            val erasing = remember { mutableStateMapOf<PointerId, Int>() }
 
             Keys(
                 placed = placed,
                 fingers = fingers,
                 alternates = alternates,
+                erasing = erasing,
                 state = state,
                 enter = enter,
                 metrics = metrics,
@@ -138,8 +143,10 @@ internal fun KeyboardPanel(
                 },
                 onKey = onKey,
                 onPicker = onPicker,
+                onCursor = onCursor,
+                onEraseWords = onEraseWords,
             )
-            Previews(fingers = fingers, state = state, metrics = metrics, width = width, bubble = block(0))
+            Previews(fingers, erasing, state, metrics, width, bubble = block(0), erase = block(2))
             alternates.value?.let { AlternateRow(it, state, metrics, lit = block(0), back = c.raise) }
         }
     }
@@ -199,6 +206,13 @@ private data class OpenAlternates(
 )
 
 /**
+ * Where a finger on the space bar or delete came down, whether it has started a gesture, and — for the
+ * space bar — how many characters the cursor has already been moved, so each move sends only the
+ * difference.
+ */
+private data class Slide(val startX: Float, val moved: Boolean = false, val sent: Int = 0)
+
+/**
  * Every key, and the one touch handler for all of them.
  *
  * ⚠️ **The handler is keyed on nothing.** A keyed `pointerInput` restarts when its key changes, which
@@ -211,6 +225,7 @@ private fun Keys(
     placed: List<Placed>,
     fingers: MutableMap<PointerId, KeyTouch.Finger>,
     alternates: MutableState<OpenAlternates?>,
+    erasing: MutableMap<PointerId, Int>,
     state: KeyboardModel.State,
     enter: EnterKey.Spec,
     metrics: KeyboardGeometry.Metrics,
@@ -218,6 +233,8 @@ private fun Keys(
     colourOf: (Key) -> Color,
     onKey: (Key) -> Unit,
     onPicker: () -> Unit,
+    onCursor: (Int) -> Unit,
+    onEraseWords: (Int) -> Unit,
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -227,8 +244,15 @@ private fun Keys(
     val picker by rememberUpdatedState(onPicker)
     val across by rememberUpdatedState(width)
     val m by rememberUpdatedState(metrics)
-    // A held key's timers, by finger. Not state: nothing is drawn from them.
+    val cursor by rememberUpdatedState(onCursor)
+    val eraseWords by rememberUpdatedState(onEraseWords)
+    // One key's width and the slop, in pixels — what the space-bar and delete gestures measure against.
+    val unit by rememberUpdatedState((width - 2 * metrics.padSide) / KeyboardModel.ROW_WEIGHT)
+    val slop = with(density) { KeyGestures.SLOP_DP.dp.toPx() }
+    // A held key's timers, and where a space-bar or delete finger came down, by finger. Not state:
+    // nothing is drawn from them.
     val timers = remember { HashMap<PointerId, Job>() }
+    val slides = remember { HashMap<PointerId, Slide>() }
 
     // Brighter while held: the only feedback a key under a thumb can give that the thumb does not hide
     // is the colour round its edge.
@@ -283,6 +307,9 @@ private fun Keys(
                                             fingers[id] = KeyTouch.down(key)
                                             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                                             timers.remove(id)?.cancel()
+                                            if (key.key == Key.Space || key.key == Key.Delete) {
+                                                slides[id] = Slide(startX = change.position.x)
+                                            }
                                             if (KeyTouch.actsOnDown(key.key)) {
                                                 press(key.key)
                                                 timers[id] = scope.launch {
@@ -309,6 +336,34 @@ private fun Keys(
                                         if (choice != open.selected) alternates.value = open.copy(selected = choice)
                                         change.consume()
                                     }
+                                    change.pressed && slides.containsKey(id) -> {
+                                        // A finger that came down on the space bar or delete: it stays that
+                                        // key however it moves, and its travel is the gesture.
+                                        val f = fingers[id]
+                                        val slide = slides.getValue(id)
+                                        val dx = change.position.x - slide.startX
+                                        if (f != null && f.down.key == Key.Space) {
+                                            val steps = KeyGestures.cursorSteps(dx, slop, unit)
+                                            if (steps != 0 || slide.moved) {
+                                                // A slide: it never types a space, and never opens the picker.
+                                                if (!f.done) fingers[id] = f.copy(done = true)
+                                                timers.remove(id)?.cancel()
+                                                val delta = steps - slide.sent
+                                                if (delta != 0) cursor(delta)
+                                                slides[id] = slide.copy(moved = true, sent = steps)
+                                            }
+                                        } else if (f != null) {
+                                            val words = KeyGestures.deleteWords(dx, slop, unit)
+                                            if (words > 0 || slide.moved) {
+                                                // Marking words stops the repeat: this is a different request.
+                                                if (!f.done) fingers[id] = f.copy(done = true)
+                                                timers.remove(id)?.cancel()
+                                                if (erasing[id] != words) erasing[id] = words
+                                                slides[id] = slide.copy(moved = true)
+                                            }
+                                        }
+                                        change.consume()
+                                    }
                                     change.pressed -> {
                                         val f = fingers[id]
                                         if (f != null) {
@@ -325,6 +380,8 @@ private fun Keys(
                                     change.previousPressed -> {
                                         timers.remove(id)?.cancel()
                                         val finger = fingers.remove(id)
+                                        slides.remove(id)
+                                        val marked = erasing.remove(id) ?: 0
                                         // ⚠️ A CANCELLED touch arrives looking like a lift, and must type
                                         // nothing: it is what Android sends when the system takes the
                                         // gesture — a back swipe from the edge, over q or p. Compose builds
@@ -338,6 +395,8 @@ private fun Keys(
                                             alternates.value = null
                                             val chosen = open.selected?.let { open.choices.getOrNull(it) }
                                             if (!cancelled && chosen != null) press(Key.Text(chosen))
+                                        } else if (marked > 0) {
+                                            if (!cancelled) eraseWords(marked)
                                         } else if (finger != null && !cancelled) {
                                             KeyTouch.release(finger)?.let { press(it.key) }
                                         }
@@ -353,6 +412,8 @@ private fun Keys(
                     timers.values.forEach { it.cancel() }
                     timers.clear()
                     fingers.clear()
+                    slides.clear()
+                    erasing.clear()
                     alternates.value = null
                 }
             },
@@ -454,39 +515,63 @@ private fun AlternateRow(
 /**
  * The pop-up over every key a finger is about to type, drawn above the key the finger hides. For the
  * top row it reaches up over the strip, which is one reason the strip is there.
+ *
+ * A swipe from delete gets a wider one saying how many words lifting will erase, so a gesture that
+ * destroys text says what it will do before it does it.
  */
 @Composable
 private fun Previews(
     fingers: Map<PointerId, KeyTouch.Finger>,
+    erasing: Map<PointerId, Int>,
     state: KeyboardModel.State,
     metrics: KeyboardGeometry.Metrics,
     width: Float,
     bubble: Color,
+    erase: Color,
+) {
+    fingers.values.mapNotNull { KeyTouch.preview(it) }.distinct().forEach { p ->
+        Bubble(p, (p.box.width * PopupWidth).coerceAtMost(width), metrics, width, bubble, KeyboardModel.label(p.key, state), PopupLetterSize)
+    }
+    erasing.forEach { (id, words) ->
+        val key = fingers[id]?.down ?: return@forEach
+        if (words <= 0) return@forEach
+        val text = if (words == 1) "ERASE 1 WORD" else "ERASE $words WORDS"
+        Bubble(key, (key.cell.width * EraseWidth).coerceAtMost(width), metrics, width, erase, text, EraseSize)
+    }
+}
+
+@Composable
+private fun Bubble(
+    over: Placed,
+    w: Float,
+    metrics: KeyboardGeometry.Metrics,
+    width: Float,
+    colour: Color,
+    text: String,
+    size: TextUnit,
 ) {
     val density = LocalDensity.current
-    fingers.values.mapNotNull { KeyTouch.preview(it) }.distinct().forEach { p ->
-        val w = (p.box.width * PopupWidth).coerceAtMost(width)
-        val h = metrics.keyHeight * PopupHeight
-        val left = (p.box.cx - w / 2f).coerceIn(0f, (width - w).coerceAtLeast(0f))
-        val top = p.box.top + metrics.keyHeight * PopupOverlap - h
-        Box(
-            Modifier
-                .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-                .size(with(density) { w.toDp() }, with(density) { h.toDp() })
-                .clip(RoundedCornerShape(12.dp))
-                .background(bubble),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                KeyboardModel.label(p.key, state),
-                fontFamily = Antonio,
-                fontWeight = FontWeight.Bold,
-                fontSize = PopupLetterSize,
-                color = textOnBlock(bubble),
-                maxLines = 1,
-                overflow = TextOverflow.Clip,
-            )
-        }
+    val h = metrics.keyHeight * PopupHeight
+    val left = (over.box.cx - w / 2f).coerceIn(0f, (width - w).coerceAtLeast(0f))
+    val top = over.box.top + metrics.keyHeight * PopupOverlap - h
+    Box(
+        Modifier
+            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+            .size(with(density) { w.toDp() }, with(density) { h.toDp() })
+            .clip(RoundedCornerShape(12.dp))
+            .background(colour),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            fontFamily = Antonio,
+            fontWeight = FontWeight.Bold,
+            fontSize = size,
+            letterSpacing = if (text.length > 2) 1.sp else 0.sp,
+            color = textOnBlock(colour),
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
     }
 }
 
@@ -510,4 +595,6 @@ private const val PopupHeight = 1.3f
 private const val PopupOverlap = 0.25f
 private val PopupLetterSize = 30.sp
 private val AlternateSize = 24.sp
+private const val EraseWidth = 3.4f
+private val EraseSize = 16.sp
 private val HintSize = 11.sp

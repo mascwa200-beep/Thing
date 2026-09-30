@@ -16,6 +16,7 @@ import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.keyboard.KeyboardModel.Output
 import dev.mascwa.pulse.ui.ServiceComposeOwner
 import dev.mascwa.pulse.ui.theme.NightwireTheme
+import kotlin.math.abs
 
 /**
  * The LCARS keyboard: a full on-screen keyboard in the console's own look, for every app on the phone.
@@ -48,6 +49,10 @@ class LcarsKeyboard : InputMethodService() {
     private var punctuation by mutableStateOf(",")
     private var offerSwitch by mutableStateOf(false)
 
+    /** Whether the last key was the space bar, and where it left the cursor — see [DoubleSpace]. */
+    private var spaces = DoubleSpace.Tracker()
+    private var doubleSpaceHere = false
+
     override fun onCreate() {
         super.onCreate()
         owner.create()
@@ -71,6 +76,8 @@ class LcarsKeyboard : InputMethodService() {
                         offerSwitch = offerSwitch,
                         onKey = ::onKey,
                         onPicker = ::showPicker,
+                        onCursor = ::moveCursor,
+                        onEraseWords = ::eraseWords,
                     )
                 }
             }
@@ -90,6 +97,8 @@ class LcarsKeyboard : InputMethodService() {
         punctuation = KeyboardModel.punctuation(inputType)
         offerSwitch = runCatching { shouldOfferSwitchingToNextInputMethod() }.getOrDefault(false)
         state = KeyboardModel.State(layer = KeyboardModel.startLayer(inputType))
+        spaces = DoubleSpace.Tracker()
+        doubleSpaceHere = DoubleSpace.allowed(inputType)
         refreshCaps()
     }
 
@@ -111,6 +120,7 @@ class LcarsKeyboard : InputMethodService() {
         candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        spaces = DoubleSpace.selectionMoved(spaces, newSelStart, newSelEnd)
         refreshCaps()
     }
 
@@ -129,6 +139,21 @@ class LcarsKeyboard : InputMethodService() {
         val result = KeyboardModel.press(state, key, SystemClock.uptimeMillis())
         state = result.state
         val ic = currentInputConnection ?: return
+        if (key == KeyboardModel.Key.Space) {
+            // The second of two spaces after a word types ". " in place of the first — Gboard's full stop.
+            val before = runCatching { ic.getTextBeforeCursor(2, 0) }.getOrNull()
+            if (DoubleSpace.applies(spaces, before, doubleSpaceHere)) {
+                ic.beginBatchEdit()
+                ic.deleteSurroundingText(1, 0)
+                ic.commitText(". ", 1)
+                ic.endBatchEdit()
+                spaces = DoubleSpace.typedOther()
+                return
+            }
+            spaces = DoubleSpace.typedSpace()
+        } else {
+            spaces = DoubleSpace.typedOther()
+        }
         when (val out = result.output) {
             is Output.Commit -> ic.commitText(out.text, 1)
             // A key event rather than deleting a character ourselves: the field then removes a whole
@@ -143,6 +168,35 @@ class LcarsKeyboard : InputMethodService() {
         }
     }
 
+    /**
+     * The space bar slid [steps] characters (negative is left). Arrow-key events rather than setting the
+     * selection ourselves: the field then moves across an emoji or a line break exactly as it would for
+     * a hardware keyboard, and the keyboard needs no idea where in the text the cursor is.
+     */
+    private fun moveCursor(steps: Int) {
+        spaces = DoubleSpace.typedOther()
+        val code = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        repeat(abs(steps).coerceAtMost(MAX_CURSOR_STEPS)) { sendDownUpKeyEvents(code) }
+    }
+
+    /**
+     * A swipe from delete marked [words] words. A selection is deleted as delete would delete it;
+     * otherwise the words before the cursor go, counted by [WordErase] over what the field says is
+     * there — never more than it says.
+     */
+    private fun eraseWords(words: Int) {
+        spaces = DoubleSpace.typedOther()
+        val ic = currentInputConnection ?: return
+        val selected = runCatching { ic.getSelectedText(0) }.getOrNull()
+        if (!selected.isNullOrEmpty()) {
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            return
+        }
+        val before = runCatching { ic.getTextBeforeCursor(ERASE_LOOKBACK, 0) }.getOrNull() ?: return
+        val chars = WordErase.chars(before, words)
+        if (chars > 0) ic.deleteSurroundingText(chars, 0)
+    }
+
     private fun refreshCaps() {
         val ic = currentInputConnection ?: return
         val type = currentInputEditorInfo?.inputType ?: return
@@ -152,5 +206,13 @@ class LcarsKeyboard : InputMethodService() {
 
     private fun showPicker() {
         runCatching { getSystemService(InputMethodManager::class.java)?.showInputMethodPicker() }
+    }
+
+    private companion object {
+        /** How much text before the cursor a word erase reads — far more than any swipe marks. */
+        const val ERASE_LOOKBACK = 256
+
+        /** A bound on one slide's arrow keys, so a runaway gesture cannot queue thousands of events. */
+        const val MAX_CURSOR_STEPS = 64
     }
 }
