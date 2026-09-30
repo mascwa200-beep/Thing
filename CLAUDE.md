@@ -15785,3 +15785,91 @@ row reads the phone's actual state again each time the screen returns, never a s
 2. Pick LCARS as the screensaver and charge the phone: the clock, stardate and board appear and shift
    slightly each minute.
 3. Pick LCARS as the digital assistant: the assistant gesture opens the Computer.
+
+### THE KEYBOARD AND OTHER APPS' WIDGETS — Wave 3 (this session, PR #480)
+
+Same standing directive: LCARS takes over every normal Android feature it can. Budget unchanged:
+**zero subagents and zero workflows**, which overrides plan mode's own Explore/Plan instruction and
+the ultracode reminder. Two slices, each its own commit.
+
+**W3a `a96903c`: the LCARS keyboard** (`feature/keyboard/`). This is a full `InputMethodService` in
+the console's look: letters, two symbol layers, shift ONCE and a double-tap CAPS, auto-caps from
+`getCursorCapsMode`, a held delete that repeats, and an enter key that follows the field.
+- ⚠️ **The enter key follows `EditorInfo`, and `IME_FLAG_NO_ENTER_ACTION` wins.** Android's own
+  `TextView` sets that flag on every multi-line field, so a note gets a new line and is never "sent".
+  A field that names no action gets an Enter KEY EVENT rather than a typed line break, because every
+  kind of field understands that one.
+- ⚠️ **The gesture is not keyed on its callbacks.** A keyed `pointerInput` restarts when its key
+  changes, and the callbacks are new lambdas on every recomposition. So holding delete across the
+  start of a sentence flips shift, recomposes the panel, and would stop the repeat dead.
+  `rememberUpdatedState` reads the latest callbacks instead.
+- **Records nothing, and a gate holds it to that.** `KeyboardRecordsNothingTest` strips comments and
+  fails the build if `feature/keyboard/` reaches for the activity log, crash reports, logcat, stored
+  preferences, a file, the network or the clipboard. It is negative-tested with a planted `Log.d`.
+- `ServiceComposeOwner` (`ui/`) is now the ONE lifecycle-and-saved-state owner for a service, shared
+  by the screensaver and the keyboard. ⚠️ It must be **STARTED**: Compose pauses its frame clock below
+  STARTED, so a view on screen whose owner sits at CREATED composes once and never redraws.
+- Settings ▸ Android takeover ▸ "LCARS keyboard" reads the truth every time it is shown, from the
+  enabled list plus `DEFAULT_INPUT_METHOD`. It refreshes on window focus as well as ON_START, because
+  the picker is a system dialog and closing it only returns focus.
+
+**W3b (this commit): other apps' widgets on the home console** (`HomeWidgets` pure core,
+`HomeWidgetHost`, `WidgetPanels`).
+- A WIDGETS panel sits between the controls and the board. `+ WIDGET` opens a picker of every
+  provider on the phone; each placed widget has its own tab with REMOVE. The console holds at most
+  six, and **a full console refuses rather than dropping one somebody placed**, the dock's rule.
+- **The add flow:** allocate → bind silently if Android trusts us, otherwise Android's own "allow
+  LCARS to place widgets" prompt → the widget's configure screen if it has one it did not mark
+  optional → place. A cancel anywhere gives the id back. The prompt is how a launcher gets the right,
+  so there is **no new manifest permission**.
+- ⚠️ **The PENDING id is on disk, and that is load-bearing.** Activity results arrive AFTER
+  `onStart`, where `reconcile` hands orphaned ids back to Android. Without the spared pending id, it
+  would delete the very widget whose bind or configure answer is on its way. On disk, not in memory,
+  because the process can be reclaimed while the prompt is up.
+- ⚠️ **One lock over every change to the list.** A reconcile that read the list before a placement
+  and wrote it back after would silently take the new widget off again.
+- ⚠️ **The configure screen's answer comes through the deprecated `onActivityResult`.**
+  `AppWidgetHost` starts it with the legacy `startIntentSenderForResult` and there is no result
+  contract for it. This works because `ComponentActivity.onActivityResult` asks the registry first
+  and the registry's request codes are `nextInt(2147418112) + 65536`, both read out of the activity
+  1.9.3 bytecode. So `REQUEST_CONFIGURE` (0x4C57) can never belong to it.
+- ⚠️ **The feature flags are RECONFIGURABLE = 1, HIDE_FROM_PICKER = 2, CONFIGURATION_OPTIONAL = 4**,
+  read with `javap -constants`. They are not in the order their names suggest.
+- ⚠️ **Host views are cached per id and detached from their old parent before reuse.**
+  `AndroidView` with the default `onReset = null` is not reused, so it re-runs its factory every time
+  a lazy item scrolls back into view, and a rebuilt widget would flicker and lose its state.
+- ⚠️ **REMOVE is on the tab, not a long press.** A widget is another app's view and takes its own
+  touches, so a long press never reaches the console.
+- ⚠️ **The tab's title is capped at 20 characters (`HomeWidgets.title`)**, and the cap is measured,
+  not guessed. `PanelTab` lays out its title first and unweighted, so a long name takes the whole row
+  and REMOVE is drawn at zero width.
+  - The row is about 260 dp on a 360 dp phone, REMOVE takes about 64, and Antonio capitals run about
+    7.6 dp each.
+  - The fix is local on purpose. Weighting `PanelTab`'s title would cap short titles like
+    "NOTICES · 12" at half the row everywhere.
+  - At the largest font scales, the narrowest phones can still crowd it.
+- **Honest limits:** only this profile's providers are offered; a widget that scrolls internally may
+  fight the console's scroll; widgets update only while the console is visible (`stopListening` in
+  `onStop`, as on every launcher).
+
+**Verification:**
+- **Tests:** 21 `HomeWidgets` tests. **17 rules negative-tested**, all awake. `const-hide` is caught
+  only by the reconfigurable-flag test, because the hidden-provider fixture reads the same constant.
+- ⚠️ **A fixture I wrote was wrong twice before it was right.** The first sort test could not tell
+  case-insensitive order from raw order, because "Weather" already sorts before "weather". The first
+  title test compared a string with itself. Both expectations are now computed from the rule before
+  being written.
+- **Compile.** The whole launcher package plus the shade and controls compiles frontend-clean against
+  the public SDK stub and the real Compose, activity and lifecycle artifacts (42 files). The gate was
+  negative-tested with a planted typo in each of the three touched files, and each typo was caught.
+- **`LazyKeyTest`.** It sees the new keyed list: unprefixing its key fails the test and names the
+  scope.
+
+⚠️ **Owner-verify on the Pixel.** CI compiles a keyboard and a widget host; it cannot type, place a
+widget or answer Android's prompt.
+1. Settings ▸ Android takeover ▸ LCARS keyboard: enable it, pick it, and type. Check shift, CAPS,
+   both symbol layers and a held delete. Search submits; a note gets a new line.
+2. The keyboard sits above the gesture bar, and the 🌐 key returns to Gboard.
+3. Home ▸ WIDGETS ▸ `+ WIDGET`: pick one. Android's prompt appears the first time only, a configure
+   screen opens where the widget has one, and the widget appears and survives a restart.
+4. REMOVE asks first, then takes it off. Try a widget with a long name: REMOVE must still show.
