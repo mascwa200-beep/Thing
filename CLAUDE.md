@@ -15418,6 +15418,9 @@ open on success. `RemoteViews.InteractionHandler` exists but is hidden API; do n
 
 **Never a trap:** Back leaves; USER_PRESENT (fingerprint/face/bouncer) ends it; it never turns the
 screen on or keeps it on. Not `noHistory` — that finishes on invisibility, i.e. at screen-off.
+⚠️ **SUPERSEDED: Back no longer leaves** — the owner asked for the lock screen to be "the default, not
+just an overlay", and Back revealing the stock lock screen is what made it one. EMERGENCY replaced it
+as the way out that needs no unlock. See "THE CONSOLE IS THE DEFAULT" at the end of this file.
 
 ⚠️ **One unlock path, not three (found re-reading the diff while CI ran).** Three signals say the
 phone is unlocked — the dismiss callback, USER_PRESENT, and `onResume` seeing a lit unlocked phone —
@@ -15517,7 +15520,9 @@ the build if any field is read nowhere in `feature/lcarsboard/` — two renderer
 exactly how a region goes quietly missing. It says in its own KDoc what it cannot catch (a field read
 and not drawn). The board scrolls; header, rail and controls stay put; `safeDrawing` insets keep the
 system's own status and gesture bars on black, never on an LCARS colour; a long agenda on the home
-screen is capped with a COUNTED "+N more" line that opens the calendar.
+screen is capped with a COUNTED "+N more" line that opens the calendar. ⚠️ **SUPERSEDED for the status
+bar**: both consoles now HIDE it and the header runs to the top edge (see "THE CONSOLE IS THE
+DEFAULT"); the gesture bar is still on black.
 
 **One timeline, both ways (`ConsoleSequence`).** The power-down is the power-up's progress
 travelling backward, so "the same animation, reversed" holds by construction; a reversal continues
@@ -15556,7 +15561,9 @@ still unlocks first through the one idempotent `unlocked()` path; `TapGate` is g
 
 **⚠️ Becoming Home, and the switch is the alias.** The HOME filter is on `.LcarsHome`, an
 `activity-alias` **declared disabled**: no phone is offered LCARS as a launcher until Settings ▸
-Appearance ▸ "LCARS home screen" enables it. There is deliberately **no `AppSettings` field** — the
+Appearance ▸ "LCARS home screen" enables it. ⚠️ **Partly superseded: as device owner it is now switched
+on ONCE by default** (`HomeSwitch.applyDefaultOnce`, see "THE CONSOLE IS THE DEFAULT"); the manifest
+still declares it disabled, which remains the no-owner default. There is deliberately **no `AppSettings` field** — the
 alias's enabled state is what Android persists, and a second copy could disagree with it.
 - ON: enable the alias; as device owner `setPersistentHome` (`addPersistentPreferredActivity`) so
   Home opens LCARS with no chooser; otherwise open `ACTION_HOME_SETTINGS`.
@@ -15591,3 +15598,78 @@ GOLD fixture and `durationFor(-1f)`.
 3. Appearance ▸ LCARS home screen ON → press Home: the console, dock, search and directory; hold an
    app to pin it; Home while home returns to the top.
 4. Switch it OFF: the old launcher is Home again.
+
+### THE CONSOLE IS THE DEFAULT — merged #477, the top bar, Home and lock screen (this session)
+
+Owner, with a screenshot of the LCARS home screen under Android's status bar: *"Merge it into main +
+deal with the normal phone top bar above the LCARS home screen as seen in the img. Also, the homescreen
+and lockscreen 'must' be the default, not just an overlay."* Two AskUserQuestion answers: the lock
+screen stays **LCARS always, with Android's PIN underneath**, and the top bar is **hidden**. **Zero
+subagent and zero workflow spend.**
+
+**#477 merged as `0b4ef926`** (squash, `expectedHeadSha` pinned). `git diff --stat d92e92d origin/main`
+was **empty**, so LCARS #2234 on main was cancelled — `latest` already held #2233 from that tree. The
+dev branch re-synced with `--no-ff` (`6a4cfed`, committer ours).
+
+**`f599cfb` — LCARS is the Home by default, once, as device owner.** `HomeDefaultPolicy.shouldApply`
+(pure, tested over all eight combinations, each rule negative-tested) is true only when never applied,
+device owner, and not stood down by the crash-loop guard. `HomeSwitch.applyDefaultOnce` runs from
+`PulseApplication.onCreate`, main process only, on `appScope`.
+- ⚠️ **Once, recorded whatever it did** (`HomeStore` key `default_applied`, `commit()`): a default that
+  retried every start would override a deliberate "off" sooner or later.
+- ⚠️ **A half-applied default is rolled back**: alias on but `setPersistentHome` refused is exactly the
+  unasked "which Home?" chooser the device-owner condition exists to prevent.
+- The manifest still declares the alias disabled, so `turnOff`'s return to the manifest state stays right.
+
+**`a9aa435` — the console owns the top of the screen; the lock console is the lock screen.**
+- `hideStatusBarForConsole()` (`lcarsboard/ConsoleWindow.kt`): status bar only, transient-by-swipe,
+  re-applied in `onWindowFocusChanged(true)`. ⚠️ Cost: notifications now take a swipe to reveal the bar
+  and one more pull — Android's rule for immersive windows.
+- ⚠️ **With the bar hidden, `safeDrawing` still carries the camera cutout**, so padding the whole frame
+  would have left a black band as tall as the bar just removed. The frame pads sides and bottom only;
+  the corner and header blocks are drawn from the top edge and only the header's CONTENT is pushed
+  below the cutout. That works because activity 1.9.3's `EdgeToEdgeApi30` sets the cutout mode to
+  `3` (ALWAYS) — read out of the shipped class, not recalled.
+- The header gains the battery (`ConsoleBattery`, pure: a level Android did not give is no reading,
+  never "0%"; any plug bit is charging). A sticky `ACTION_BATTERY_CHANGED` receiver, no polling.
+- A status bar swiped into view takes the header's ink (`isAppearanceLightStatusBars` from
+  `textOnBlock(accent)`); `window.statusBarColor` is ignored at target 35, so this is the only lever.
+- **Back does nothing on the lock console.** ⚠️ **EMERGENCY is why that is safe**: it opens the
+  emergency dialer over the lock screen by action string — `android.intent.action.DIAL_EMERGENCY` (the
+  framework's own constant, hidden but a plain string), then `com.android.phone.EmergencyDialer.DIAL`
+  (AOSP telephony's) — and falls back to the unlock, since Android's PIN screen carries its own
+  Emergency button. ⚠️ The first version called `TelecomManager.createLaunchEmergencyDialerIntent`,
+  which I had called "public, checked with `javap`". **It is not public**, and CI (LCARS #2236) failed
+  on it — see the gate note below.
+- ⚠️ **No app can replace the keyguard while a PIN is set** (`setKeyguardDisabled` has no effect while
+  a credential exists). Removing the PIN was offered and declined: it would cost the phone its real
+  lock and GrapheneOS its credential-bound encryption.
+
+**⚠️ THE LOCAL COMPILE GATE HAD A HOLE, AND IT IS NOW CLOSED.** `tools/android_compile_check.sh`
+compiled against Robolectric's `android-all`, which is the framework IMPLEMENTATION and therefore
+carries every hidden and `@SystemApi` member. So a non-public call compiled clean locally and failed in
+CI, and a `javap` on that jar proves an API EXISTS, never that it is PUBLIC. The script now compiles
+against the **public SDK stub `android.jar`** from `https://dl.google.com/android/repository/platform-35_r02.zip`
+(~64 MB, reachable from this container, cached as `$CACHE/platform-35_r02-android.jar`). That is the
+jar CI compiles against. It falls back to `android-all` only if that fetch fails, and then says so in
+its verdict line. **Verified both ways:** the shipped `a9aa435` code fails with CI's exact errors at
+the same line and column (`306:59` unresolved, `308:68` type mismatch); the fix is frontend-clean.
+**To ask whether an API is public, `javap` the SDK stub jar, never `android-all`.**
+
+**Verification:** both Compose sets (19 and 28 files) frontend-clean against the real platform +
+Compose 1.7.6 + activity 1.9.3 + lifecycle + core; three planted typos, one per new API, each caught.
+HomeLauncherCoreTest 15/15, ConsoleBatteryTest 4/4, LcarsBoardCoverageTest + LazyKeyTest green;
+**seven rules negative-tested**. ⚠️ Two battery cases first reported OK with the perturbation NOT
+applied — the pattern contained `||`, which split on my `|` separator. The harness's own traceback
+said so; they were rerun with `@@` and both fail their test. The recorded "perturbation never matched"
+mechanism, in a new costume: **pick a separator the patterns cannot contain.**
+
+⚠️ **Owner-verify on the Pixel:**
+1. After the update, press Home — LCARS, with no Settings visit.
+2. No Android bar at the top: the gold header reaches the edge, the camera hole inside it, time and
+   battery % in the header.
+3. Swipe down from the top: the bar appears for a moment; one more pull opens notifications.
+4. Lock and wake: the LCARS console; Back does nothing; UNLOCK → PIN/fingerprint; fingerprint alone
+   unlocks; EMERGENCY opens the emergency dialer (or, if GrapheneOS refuses both actions, the PIN
+   screen, whose own Emergency button is one tap away — say which you get).
+5. Settings ▸ Appearance ▸ LCARS home screen OFF → the old launcher returns and stays.

@@ -109,6 +109,17 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         container.observeVoicePreference(appScope)
         // The lock-screen board: put in place as the screen goes off. Main process only, checked inside.
         runCatching { dev.mascwa.pulse.feature.lockboard.LockBoardTrigger.install(this) }
+        // The LCARS home screen becomes Home by default, once, as device owner — HomeDefaultPolicy
+        // says when. Main process only, because the inference process must never touch the Home, and
+        // off the main thread because it writes with commit() and talks to the package manager.
+        if (runCatching { Application.getProcessName() == packageName }.getOrDefault(false)) {
+            appScope.launch {
+                val result = dev.mascwa.pulse.feature.launcher.HomeSwitch.applyDefaultOnce(this@PulseApplication)
+                if (result != null) {
+                    runCatching { container.usageRepository.log("home", "LCARS made the default Home: $result") }
+                }
+            }
+        }
         // Open in whatever alert condition the last published board was in.
         appScope.launch {
             runCatching { dev.mascwa.pulse.notifications.BriefEngine.restoreCondition(container) }

@@ -1,7 +1,11 @@
 package dev.mascwa.pulse.feature.lcarsboard
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.IntentSender
+import android.os.BatteryManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,7 +22,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +45,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,14 +131,18 @@ internal fun LcarsBoardHeader(
     onTap: (BoardTap) -> Unit,
     modifier: Modifier = Modifier,
     waitingLine: String? = null,
+    topInset: Dp = 0.dp,
 ) {
     val ink = textOnBlock(block)
     val clock = rememberClock(board?.clock24 ?: true)
+    val battery = rememberBattery()
     val headerRoute = board?.headerRoute
     Row(
         modifier
             .background(block)
             .then(if (headerRoute != null) Modifier.clickable { onTap(BoardTap.Route(headerRoute)) } else Modifier)
+            // The block is drawn from the top edge; what is written on it starts below the camera.
+            .padding(top = topInset)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -141,6 +154,19 @@ internal fun LcarsBoardHeader(
             color = ink,
             maxLines = 1,
         )
+        // What the hidden status bar used to say that still matters. Absent, never "0%", when
+        // Android has not reported a level.
+        if (battery != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                ConsoleBattery.label(battery),
+                fontFamily = JetBrainsMono,
+                fontSize = 11.sp,
+                letterSpacing = 1.sp,
+                color = ink,
+                maxLines = 1,
+            )
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
@@ -560,6 +586,37 @@ private fun rememberClock(clock24: Boolean): String {
         }
     }
     return text
+}
+
+/**
+ * The battery, as Android reports it. `ACTION_BATTERY_CHANGED` is sticky, so registering answers at
+ * once with the current reading and every change after that arrives on its own — nothing polls.
+ *
+ * ⚠️ No export flag, as for every protected system broadcast in this app: this is one only the
+ * system can send.
+ */
+@Composable
+private fun rememberBattery(): ConsoleBattery.Reading? {
+    val context = LocalContext.current
+    var reading by remember { mutableStateOf<ConsoleBattery.Reading?>(null) }
+    DisposableEffect(context) {
+        fun read(intent: Intent?) {
+            if (intent == null) return
+            reading = ConsoleBattery.reading(
+                level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
+                scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
+                plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0),
+            )
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) = read(intent)
+        }
+        val registered = runCatching {
+            read(context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
+        }.isSuccess
+        onDispose { if (registered) runCatching { context.unregisterReceiver(receiver) } }
+    }
+    return reading
 }
 
 private fun clockNow(pattern: String): String =

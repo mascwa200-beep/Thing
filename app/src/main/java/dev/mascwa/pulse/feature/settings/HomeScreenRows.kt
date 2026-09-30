@@ -85,10 +85,11 @@ private fun describe(st: HomeRowState?): String = when {
             "launcher is back. The crash console has what went wrong."
     !st.on ->
         "Makes the LCARS console your home screen: the dock, a search box, the board, and every app " +
-            "A to Z. Your current launcher stays installed, and switching this off brings it back." +
+            "A to Z. Your other launcher stays installed, and switching this off brings it back." +
             if (st.owner) "" else " You pick LCARS once in Android's Home app setting."
     st.isDefault ->
-        "LCARS is your home screen." + if (st.owner) " Set as the phone's Home by device owner." else ""
+        "LCARS is your home screen" + (if (st.owner) ", set as the phone's Home by device owner." else ".") +
+            " Switching this off hands Home back to your other launcher, and it stays off."
     else -> "Switched on, but not yet chosen as Home."
 }
 

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.lcarsboard
 
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,10 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -20,14 +24,18 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsRail
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
@@ -46,10 +54,25 @@ import dev.mascwa.pulse.widget.WidgetBoard
  * drawn over text, and the body is the only part that scrolls, so a long board is scrolled to rather
  * than cut off.
  *
- * ⚠️ **The system's own status bar and gesture bar sit on black, never on an LCARS colour.** The
- * frame pads itself inside the safe-drawing insets and paints the ground black behind them, so the
- * clock, the battery and the notification icons Android draws up there keep the contrast Android
- * gave them. The header block starts BELOW the status bar, not behind it.
+ * ## The top of the screen belongs to the console
+ *
+ * Both consoles hide Android's status bar ([hideStatusBarForConsole]), so the corner and the header
+ * block run all the way to the top edge rather than sitting under a black strip. The time was
+ * already in the header, and the battery joins it ([ConsoleBattery]).
+ *
+ * ⚠️ **The camera cutout is why only the header's CONTENT is padded down.** With the status bar
+ * hidden, `safeDrawing` still carries the display cutout — the camera hole — and padding the whole
+ * frame by it would leave an empty black band about as tall as the bar just removed. So the frame
+ * pads its sides and bottom only, the two top blocks are drawn from the very edge, and the
+ * header's clock and words are pushed below the cutout. The hole sits inside the gold, like the
+ * lens it is, and no text is ever under it. That works because activity 1.9.3's edge-to-edge sets
+ * the cutout mode to ALWAYS (`EdgeToEdgeApi30`, read out of the shipped class).
+ *
+ * The gesture bar at the bottom is Android's still, and sits on black: the frame pads the bottom
+ * inset and paints the ground behind it.
+ *
+ * When somebody swipes the status bar back into view for a moment, its icons are drawn in the same
+ * ink as the header they land on — black on gold, white on the darkest red-alert block.
  *
  * Shared by the lock console and the home screen, so the two are one console.
  */
@@ -65,14 +88,23 @@ internal fun LcarsConsole(
     body: @Composable (Modifier) -> Unit,
 ) {
     val c = Pulse.colors
+    // The icons of a status bar swiped into view land on the header, so they take its ink.
+    val view = LocalView.current
+    val darkIcons = textOnBlock(c.accent).luminance() < 0.5f
+    SideEffect {
+        (view.context as? Activity)?.window?.let { window ->
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkIcons
+        }
+    }
+    val topInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     Column(
         modifier
             .fillMaxSize()
             .background(c.void)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+            .padding(start = 6.dp, end = 6.dp, bottom = 4.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(HeaderHeight), horizontalArrangement = Arrangement.spacedBy(Gutter)) {
+        Row(Modifier.fillMaxWidth().height(HeaderHeight + topInset), horizontalArrangement = Arrangement.spacedBy(Gutter)) {
             Box(
                 Modifier
                     .width(RailWidth)
@@ -86,6 +118,7 @@ internal fun LcarsConsole(
                 block = c.accent,
                 onTap = onTap,
                 waitingLine = waitingLine,
+                topInset = topInset,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()

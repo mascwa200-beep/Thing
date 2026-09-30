@@ -119,4 +119,38 @@ class HomeLauncherCoreTest {
         // Unpinning is never refused, or a full dock could never be changed at all.
         assertEquals(full - "p3", HomeDirectory.togglePin(full, "p3"))
     }
+
+    // ── the one-time default ────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `the default applies to a device owner that has never had it and never stood down`() {
+        assertTrue(HomeDefaultPolicy.shouldApply(applied = false, deviceOwner = true, stoodDownAtMs = null))
+    }
+
+    @Test
+    fun `the default is applied once and never again`() {
+        // Otherwise switching the home screen off would be undone at the next launch.
+        assertFalse(HomeDefaultPolicy.shouldApply(applied = true, deviceOwner = true, stoodDownAtMs = null))
+    }
+
+    @Test
+    fun `a phone that is not device owner is never offered a Home unasked`() {
+        assertFalse(HomeDefaultPolicy.shouldApply(applied = false, deviceOwner = false, stoodDownAtMs = null))
+    }
+
+    @Test
+    fun `a stand-down by the crash-loop guard is never overridden by the default`() {
+        assertFalse(HomeDefaultPolicy.shouldApply(applied = false, deviceOwner = true, stoodDownAtMs = t0))
+    }
+
+    @Test
+    fun `every other combination leaves the Home alone`() {
+        // Exhaustive over the eight combinations, so no future edit can make a second one true.
+        val yes = listOf(false, true).flatMap { applied ->
+            listOf(false, true).flatMap { owner ->
+                listOf(null, t0).map { stood -> Triple(applied, owner, stood) }
+            }
+        }.filter { (a, o, s) -> HomeDefaultPolicy.shouldApply(a, o, s) }
+        assertEquals(listOf(Triple(false, true, null as Long?)), yes)
+    }
 }

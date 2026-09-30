@@ -28,6 +28,7 @@ import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.lcarsboard.BoardTap
 import dev.mascwa.pulse.feature.lcarsboard.ConsoleSequence
+import dev.mascwa.pulse.feature.lcarsboard.hideStatusBarForConsole
 import dev.mascwa.pulse.ui.ProvideStardate
 import dev.mascwa.pulse.ui.theme.NightwireTheme
 import dev.mascwa.pulse.widget.LockBoard
@@ -67,13 +68,26 @@ import kotlinx.coroutines.launch
  * ordinary screen behind a locked keyguard. So a tap is HELD, the keyguard is asked to go away, and
  * the held tap opens once it has. Cancel the unlock and nothing opens.
  *
+ * ## It is the lock screen, not something in front of it
+ *
+ * ⚠️ **Back does nothing.** When Back finished it, the stock lock screen was one press away, which made
+ * this an overlay rather than the lock screen the owner asked for. Now the ways past it are the ones
+ * past any lock screen: unlocking — fingerprint, face, or UNLOCK and then Android's PIN — or the power
+ * button.
+ *
+ * ⚠️ **Android's lock is still underneath, and that is deliberate (the owner's choice).** No app can
+ * replace the keyguard while a PIN is set: `setKeyguardDisabled` does nothing while a credential
+ * exists, and the alternative, removing the PIN, would cost the phone its real lock and GrapheneOS its
+ * credential-bound encryption. So the PIN and fingerprint stay Android's, and this is what you see.
+ *
  * ## Never a trap
  *
- * Back leaves at once, showing the ordinary lock screen. Unlocking by any route — fingerprint, face,
- * the UNLOCK bar, a tap anywhere — ends it. It never keeps the screen on, never turns it on, and a
- * phone that is not locked when its screen comes on sends it away before it is in the way. It is
- * `showWhenLocked` and nothing more: it covers the keyguard the way a navigation app does, and has no
- * power to stop anybody using their own phone.
+ * Without Back, the console needs its own way to call for help, so EMERGENCY opens the system
+ * emergency dialer, which Android shows over the lock screen. If that cannot be opened, EMERGENCY asks
+ * for the unlock instead, because Android's PIN screen carries its own Emergency button. It never keeps
+ * the screen on, never turns it on, and a phone that is not locked when its screen comes on sends it
+ * away before it is in the way. It is `showWhenLocked` and nothing more: it has no power to stop
+ * anybody using their own phone, only to be what they see first.
  *
  * ⚠️ Anyone who picks the phone up sees it, agenda titles included. That is what was asked for, and
  * Settings says so beside the switch.
@@ -104,12 +118,15 @@ class LockBoardActivity : ComponentActivity() {
         // normally, so this is the only place that knows the board really came into being.
         LockBoardLog.record(this, LockBoardPolicy.Outcome.SHOWN)
 
-        // Dark bars with light icons over the console's black ground: the system's own clock and
-        // battery keep the contrast Android gave them, and never sit on an LCARS colour.
+        // Edge to edge, so the console can draw behind the camera cutout. The gesture bar keeps light
+        // icons over the black ground; the status bar is hidden just below.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        // The console owns the top of the screen: Android's status bar is hidden, and the header
+        // carries the time and the battery instead. The gesture bar stays.
+        hideStatusBarForConsole()
 
         val defaults = AppSettings()
         val sweepMs = ConsoleSequence.durationFor(animatorScale())
@@ -132,13 +149,15 @@ class LockBoardActivity : ComponentActivity() {
                         } while (progress.floatValue != end)
                     }
                     val readProgress = remember { { progress.floatValue } }
-                    LockConsole(snapshot?.board, readProgress, ::unlock)
+                    LockConsole(snapshot?.board, readProgress, ::unlock, ::emergency)
                 }
             }
         }
 
+        // Back does nothing: this is the lock screen, not something in front of it. See the class
+        // notes for the ways past it, and EMERGENCY for the one that needs no unlock.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = finish()
+            override fun handleOnBackPressed() = Unit
         })
 
         // ⚠️ Registered at runtime because they have to be: USER_PRESENT is never delivered to a
@@ -173,6 +192,12 @@ class LockBoardActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // A bar swiped into view, or a window that was over this one, can leave it showing.
+        if (hasFocus) hideStatusBarForConsole()
     }
 
     override fun onStart() {
@@ -267,6 +292,29 @@ class LockBoardActivity : ComponentActivity() {
     }
 
     /**
+     * EMERGENCY: the system emergency dialer, which Android shows over the lock screen, so help needs
+     * no unlock.
+     *
+     * ⚠️ **Opened by action string, because the tidy API is not public.**
+     * `TelecomManager.createLaunchEmergencyDialerIntent` exists in the platform and is absent from the
+     * public SDK, so an app cannot call it. CI said so, where the local check, which compiles against
+     * Robolectric's full framework, did not. The actions tried are what the platform itself uses:
+     * - `ACTION_DIAL_EMERGENCY`, read out of the framework's `Intent`, where the constant is hidden but
+     *   its value is a plain string;
+     * - `com.android.phone.EmergencyDialer.DIAL`, the emergency dialer's own action in AOSP's
+     *   telephony package.
+     *
+     * ⚠️ If neither opens, or the phone has no dialer at all, this asks for the unlock instead. Android's
+     * PIN screen carries its own Emergency button, so the way to a call is never a dead end.
+     */
+    private fun emergency() {
+        val opened = EMERGENCY_DIALER_ACTIONS.any { action ->
+            runCatching { startActivity(Intent(action)) }.isSuccess
+        }
+        if (!opened) unlock(null)
+    }
+
+    /**
      * The keyguard has gone: open what was tapped, if anything, and step aside.
      *
      * ⚠️ **Three signals say the phone is unlocked and Android does not order them**: the dismiss
@@ -310,5 +358,11 @@ class LockBoardActivity : ComponentActivity() {
 
         /** How often the console checks whether the phone has started going to sleep. */
         private const val SLEEP_POLL_MS = 50L
+
+        /** Tried in order by [emergency]; see there for where each comes from. */
+        private val EMERGENCY_DIALER_ACTIONS = listOf(
+            "android.intent.action.DIAL_EMERGENCY",
+            "com.android.phone.EmergencyDialer.DIAL",
+        )
     }
 }

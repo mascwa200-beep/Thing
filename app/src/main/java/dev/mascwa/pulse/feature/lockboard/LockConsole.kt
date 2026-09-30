@@ -24,16 +24,20 @@ import dev.mascwa.pulse.widget.WidgetBoard
 
 /**
  * The lock screen as a full LCARS console: solid corner, header and rail, the board's regions in
- * their own panels, and UNLOCK as a solid bar across the bottom.
+ * their own panels, and UNLOCK and EMERGENCY as solid bars across the bottom.
  *
  * [onTap] is given null for "just unlock" — the UNLOCK bar, or a tap on any empty part of the
  * console, which is the ordinary lock-screen gesture.
+ *
+ * ⚠️ **EMERGENCY is there because Back no longer is.** A lock screen that cannot be backed out of has
+ * to let anybody holding the phone call for help without unlocking it, as Android's own does.
  */
 @Composable
 internal fun LockConsole(
     board: WidgetBoard.Board?,
     progress: () -> Float,
     onTap: (BoardTap?) -> Unit,
+    onEmergency: () -> Unit,
 ) {
     val c = Pulse.colors
     val quiet = remember { MutableInteractionSource() }
@@ -46,7 +50,8 @@ internal fun LockConsole(
         // No ripple on the ground: tapping empty space is a gesture, not a button.
         modifier = Modifier.clickable(interactionSource = quiet, indication = null) { onTap(null) },
         bottom = {
-            ConsoleButton(UNLOCK_LABEL, c.accent) { onTap(null) }
+            ConsoleButton(UNLOCK_LABEL, c.accent, weight = 2f) { onTap(null) }
+            ConsoleButton(EMERGENCY_LABEL, c.negative) { onEmergency() }
         },
         body = { modifier ->
             Column(modifier.verticalScroll(rememberScrollState()).padding(end = 4.dp, bottom = 8.dp)) {
@@ -67,4 +72,5 @@ internal fun LockConsole(
 
 private const val RAIL_SEED = "lock-console"
 private const val UNLOCK_LABEL = "▲  Unlock"
+private const val EMERGENCY_LABEL = "Emergency"
 private const val WAITING_LINE = "Reading the board…"
