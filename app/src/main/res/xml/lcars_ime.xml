@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The LCARS keyboard, as Android's keyboard list sees it.
+
+     supportsSwitchingToNextInputMethod: the keyboard draws its own switch key (the globe) whenever
+     Android says there is another keyboard to move to, so the system need not add one.
+
+     One subtype, US English: the layout is QWERTY and the keyboard offers no language features, so
+     claiming more languages would only put entries in Android's list that behave identically. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:label="@string/keyboard_subtype_en_us"
+        android:imeSubtypeLocale="en_US"
+        android:languageTag="en-US"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

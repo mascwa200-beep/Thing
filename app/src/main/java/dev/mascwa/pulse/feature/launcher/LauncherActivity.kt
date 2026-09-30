@@ -111,6 +111,18 @@ class LauncherActivity : ComponentActivity() {
         refreshControls()
     }
 
+    /**
+     * Other apps' widgets on the console — made once the crash-loop guard has let this start go ahead,
+     * so a start that stands down never touches Android's widget host.
+     */
+    private var widgetHost: HomeWidgetHost? = null
+
+    /** Android's own "allow LCARS to place widgets" prompt — see [HomeWidgetHost]. */
+    private val bindWidget = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val host = widgetHost ?: return@registerForActivityResult
+        lifecycleScope.launch { afterWidgetStep(host.onBindResult(result.resultCode == RESULT_OK)) }
+    }
+
     /** Counts Home presses, so the screen can go back to the top on each without keeping a flag. */
     private val homePresses = mutableIntStateOf(0)
 
@@ -133,6 +145,7 @@ class LauncherActivity : ComponentActivity() {
         val loadIcon: suspend (HomeApp) -> ImageBitmap? = { app ->
             withContext(Dispatchers.IO) { apps.icon(app, iconPx)?.asImageBitmap() }
         }
+        val host = HomeWidgetHost(this, store).also { widgetHost = it }
         val actions = HomeActions(
             launch = ::launch,
             togglePin = ::togglePin,
@@ -154,6 +167,13 @@ class LauncherActivity : ComponentActivity() {
             grantUsage = {
                 if (!openUsageAccessSettings(this)) notice.value = "Android would not open the Usage access page."
             },
+            widgets = WidgetActions(
+                view = host::view,
+                sized = host::sized,
+                offers = { host.offers() },
+                add = { offer -> lifecycleScope.launch { afterWidgetStep(host.begin(offer)) } },
+                remove = { id -> lifecycleScope.launch { host.remove(id) } },
+            ),
         )
 
         // Registered BEFORE the content, so the screen's own BackHandler — added once it composes —
@@ -204,6 +224,7 @@ class LauncherActivity : ComponentActivity() {
                         // neither waits for the next full read of the settings.
                         controls = reading?.copy(torch = torch, listener = shade.connected),
                         volumes = volumes.value,
+                        widgets = host.placed.value,
                         progress = readProgress,
                         list = list,
                         icon = loadIcon,
@@ -259,6 +280,11 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        widgetHost?.let { host ->
+            host.start()
+            // A widget whose app was removed, or one left half-added, is sorted out here.
+            lifecycleScope.launch { host.reconcile() }
+        }
         phoneControls.start()
         refreshControls()
         // Coming back home after using an app is exactly when the recent list has changed.
@@ -286,10 +312,27 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onStop() {
         phoneControls.stop()
+        widgetHost?.stop()
         super.onStop()
     }
 
+    /**
+     * A widget's own configuration screen answering. Opened by `AppWidgetHost`, which starts it with
+     * the legacy `startIntentSenderForResult` — there is no result contract for it — so its answer
+     * arrives here. `super` runs first: it hands the result registry every request it recognises, and
+     * the registry numbers its own from 0x10000 up, so [HomeWidgetHost.REQUEST_CONFIGURE] is never one.
+     */
+    @Deprecated("Deprecated in Java")
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != HomeWidgetHost.REQUEST_CONFIGURE) return
+        val host = widgetHost ?: return
+        lifecycleScope.launch { afterWidgetStep(host.onConfigureResult(resultCode == RESULT_OK)) }
+    }
+
     override fun onDestroy() {
+        widgetHost?.clear()
         unwatch?.invoke()
         unwatch = null
         super.onDestroy()
@@ -327,6 +370,18 @@ class LauncherActivity : ComponentActivity() {
             }
             usageGranted.value = granted
             recent.value = list
+        }
+    }
+
+    /** Carry out what adding a widget asked for next. */
+    private fun afterWidgetStep(step: HomeWidgetHost.Step) {
+        when (step) {
+            HomeWidgetHost.Step.Done -> Unit
+            is HomeWidgetHost.Step.Refused -> notice.value = step.why
+            is HomeWidgetHost.Step.Ask -> runCatching { bindWidget.launch(step.intent) }.onFailure {
+                val host = widgetHost ?: return
+                lifecycleScope.launch { afterWidgetStep(host.abandonPending("Android would not ask to place that widget.")) }
+            }
         }
     }
 

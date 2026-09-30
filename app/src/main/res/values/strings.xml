@@ -66,4 +66,8 @@
     <string name="interrogator_no_model">Speech model unavailable — check storage and the network, then try again.</string>
     <string name="interrogator_no_mic">Could not open the microphone — another app may be holding it.</string>
     <string name="interrogator_stop">Stop</string>
+
+    <!-- The LCARS keyboard: its name in Android's keyboard list and its one language. -->
+    <string name="keyboard_name">LCARS keyboard</string>
+    <string name="keyboard_subtype_en_us">English (US)</string>
 </resources>

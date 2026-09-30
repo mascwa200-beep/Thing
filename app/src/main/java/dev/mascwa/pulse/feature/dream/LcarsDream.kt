@@ -20,14 +20,8 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -35,6 +29,7 @@ import dev.mascwa.pulse.feature.lcarsboard.LcarsBoardPanels
 import dev.mascwa.pulse.feature.lcarsboard.legibleOn
 import dev.mascwa.pulse.ui.LocalStardate
 import dev.mascwa.pulse.ui.ProvideStardate
+import dev.mascwa.pulse.ui.ServiceComposeOwner
 import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwireTheme
@@ -58,12 +53,12 @@ import java.util.Date
  *
  * A dream is a `Service`, not an activity, so it is neither a `LifecycleOwner` nor a
  * `SavedStateRegistryOwner` — and a `ComposeView` without both on its view tree throws the moment it
- * attaches. [DreamOwner] supplies them, driven by the dream's own start and stop, which is also what
- * lets the board's flow collect only while the dream is showing.
+ * attaches. [ServiceComposeOwner] supplies them, driven by the dream's own start and stop, which is
+ * also what lets the board's flow collect only while the dream is showing.
  */
 class LcarsDream : DreamService() {
 
-    private val owner = DreamOwner()
+    private val owner = ServiceComposeOwner()
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -154,38 +149,6 @@ private fun DreamConsole() {
                 )
             }
         }
-    }
-}
-
-/** The lifecycle and saved-state owners a `ComposeView` needs, for a service that has neither. */
-private class DreamOwner : LifecycleOwner, SavedStateRegistryOwner {
-    private val registry = LifecycleRegistry(this)
-    private val saved = SavedStateRegistryController.create(this)
-
-    override val lifecycle: Lifecycle get() = registry
-    override val savedStateRegistry: SavedStateRegistry get() = saved.savedStateRegistry
-
-    fun create() {
-        if (registry.currentState != Lifecycle.State.INITIALIZED) return
-        saved.performRestore(null)
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-    }
-
-    fun start() {
-        if (!registry.currentState.isAtLeast(Lifecycle.State.CREATED)) return
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-    }
-
-    fun stop() {
-        if (!registry.currentState.isAtLeast(Lifecycle.State.STARTED)) return
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-    }
-
-    fun destroy() {
-        stop()
-        if (registry.currentState == Lifecycle.State.CREATED) registry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     }
 }
 

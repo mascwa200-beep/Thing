@@ -82,13 +82,15 @@ internal class HomeActions(
     val controls: ControlActions,
     /** Android's Usage access page, which the recent-apps strip needs. */
     val grantUsage: () -> Unit,
+    val widgets: WidgetActions,
 )
 
 /**
  * The home screen: the same LCARS console as the lock screen, with the phone's apps in it.
  *
  * From the top: the dock of pinned apps, the apps used most recently, a search box, the notification
- * centre, the quick controls, the widget's board, and every app A to Z under its letter. The header, rail and control bar stay put; everything else scrolls, so a long
+ * centre, the quick controls, other apps' widgets, LCARS's own board, and every app A to Z under its
+ * letter. The header, rail and control bar stay put; everything else scrolls, so a long
  * agenda or a long directory is scrolled to and never cut off. Typing narrows the directory to what
  * matches and hides the board, because somebody searching wants the answer, not the weather.
  *
@@ -110,6 +112,8 @@ internal fun HomeConsole(
     usageGranted: Boolean?,
     controls: ControlsState.Reading?,
     volumes: List<PhoneControls.Volume>,
+    /** The widgets placed on the console; null until the home screen has read them. */
+    widgets: List<PlacedWidget>?,
     progress: () -> Float,
     list: LazyListState,
     icon: suspend (HomeApp) -> ImageBitmap?,
@@ -119,6 +123,8 @@ internal fun HomeConsole(
     val blocks = LocalConsoleBlocks.current
     fun block(i: Int): Color = if (blocks.isEmpty()) c.accent else blocks[i % blocks.size]
     var held by remember { mutableStateOf<HomeApp?>(null) }
+    var picking by remember { mutableStateOf(false) }
+    var removing by remember { mutableStateOf<PlacedWidget?>(null) }
 
     LcarsConsole(
         board = board,
@@ -207,6 +213,25 @@ internal fun HomeConsole(
                                 modifier = Modifier.padding(top = 12.dp),
                             )
                         }
+                        item(key = "home:widgets") {
+                            WidgetsHeader(
+                                count = widgets?.size,
+                                tab = block(6),
+                                progress = progress,
+                                onAdd = { picking = true },
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
+                        items(widgets.orEmpty(), key = { "widget:${it.id}" }) { w ->
+                            WidgetPanel(
+                                widget = w,
+                                tab = block(6),
+                                progress = progress,
+                                actions = actions.widgets,
+                                onRemove = { removing = w },
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
                         if (board != null) {
                             item(key = "home:board") {
                                 LcarsBoardPanels(
@@ -230,6 +255,15 @@ internal fun HomeConsole(
             }
         },
     )
+
+    if (picking) WidgetPicker(actions.widgets) { picking = false }
+    removing?.let { w ->
+        RemoveWidgetDialog(
+            widget = w,
+            onConfirm = { actions.widgets.remove(w.id); removing = null },
+            onDismiss = { removing = null },
+        )
+    }
 
     held?.let { app ->
         val pinned = app.key in pins
