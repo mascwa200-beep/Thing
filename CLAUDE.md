@@ -15742,3 +15742,46 @@ with a planted typo.
 3. CONTROLS: torch, ringer and Do Not Disturb act; Wi-Fi, location, brightness and timeout act as
    device owner; anything that cannot says why and opens Android's control.
 4. Use two apps, press Home: RECENT shows them; without Usage access, one line says so and opens the page.
+
+### LCARS BEHIND ANDROID'S OWN SCREENS — Wave 2: wallpaper, screensaver, assistant (PR #479, merged `01eb349`)
+
+Waves 1 and 2 shipped together as **PR #479**, squash-merged as **`01eb349`**. The merge commit's
+message is the PR body rather than GitHub's default, which would have concatenated all 104 commit
+messages (the recorded 159 KB case). `git diff --stat 12c189a origin/main` came back empty, so LCARS
+#2243 on main was cancelled: `latest` already held that tree. The dev branch was re-synced with
+`--no-ff` (`6a1a7ab`, committer ours). **Zero subagent and zero workflow spend.**
+
+**Wallpaper (`feature/wallpaper/`).** An LCARS frame round a black middle, set for home AND lock via
+`WallpaperManager.setBitmap`, so the PIN pad, the app switcher and the shade sit on LCARS.
+- `WallpaperFrame` (pure, 8 tests, 8 rules negative-tested) is the geometry, plus `dimmed(argb)`: each
+  block is scaled toward black until its luminance is ≤ 0.18, so Android's own WHITE text over it keeps
+  4.5:1. Nothing is drawn in the middle, under the status bar or under the gesture bar.
+- ⚠️ **Set only from Settings, never automatically.** Android does not let an app read the current
+  wallpaper to save it, so "off" can only return Android's DEFAULT wallpaper, not the one somebody had.
+  The switch says so before the tap.
+
+**Screensaver (`feature/dream/`).** A `DreamService` drawing the clock, the stardate and the board.
+- `DreamDrift` (pure, 6 tests, 5 rules negative-tested) moves the whole picture 2 dp a minute round an
+  8 dp square that averages to the centre, because it runs for hours on an OLED screen.
+- Not interactive: a touch ends it and wakes the phone.
+- ⚠️ The date is keyed on the MINUTE, not `now / DAY_MS`, which is a UTC day and would sit on yesterday
+  for hours after local midnight west of Greenwich.
+- A dream is a service, so its `ComposeView` needs a `LifecycleOwner` and a `SavedStateRegistryOwner`
+  supplied. That owner is now `ui/ServiceComposeOwner.kt`, shared with the keyboard (Wave 3).
+
+**Assistant (`feature/assist/`).** A windowless `ACTION_ASSIST` trampoline that opens the Computer
+console (`Routes.JARVIS`). An app cannot make itself the assistant, so Settings opens Default apps.
+Holding the power button reaches the assistant only if Android's gesture settings say so, and the row
+says that too.
+
+**Settings ▸ Interface ▸ Android takeover** is a new section, registered in `SettingsSections`. Every
+row reads the phone's actual state again each time the screen returns, never a stored preference.
+- Whether LCARS is the chosen screensaver is read from `screensaver_components`, a hidden key. When
+  Android will not say, the row shows UNKNOWN rather than guessing.
+
+⚠️ **Owner-verify on the Pixel:**
+1. Switch the wallpaper on: the PIN pad and the app switcher sit on the LCARS frame, and Android's
+   white text stays readable over it.
+2. Pick LCARS as the screensaver and charge the phone: the clock, stardate and board appear and shift
+   slightly each minute.
+3. Pick LCARS as the digital assistant: the assistant gesture opens the Computer.

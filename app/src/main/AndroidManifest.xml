@@ -317,6 +317,22 @@
             </intent-filter>
         </service>
 
+        <!-- THE LCARS KEYBOARD — an input method, picked in Android's own keyboard settings (an app
+             cannot pick itself). BIND_INPUT_METHOD means only the system can bind it. It records and
+             sends nothing; every other keyboard stays switched on as the way back. -->
+        <service
+            android:name=".feature.keyboard.LcarsKeyboard"
+            android:exported="true"
+            android:label="@string/keyboard_name"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/lcars_ime" />
+        </service>
+
         <!-- OFFICIAL EMERGENCY ALERT — a full-screen condition-red takeover with a full-volume alarm on
              the alarm stream, raised from a government CAP feed (never from a news headline). Back is
              deliberately disabled; the acknowledge button is the only way out. Shows over the lock screen
