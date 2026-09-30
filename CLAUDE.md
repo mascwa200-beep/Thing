@@ -15928,3 +15928,23 @@ same size as the gboard and functions the same too."*
     are listed*, tested on the reversed list.
 - The whole keyboard package is frontend-clean against real Compose 1.7.6 and the public SDK stub
   (`scratchpad/lcars/compile_c3.sh`), and that gate was negative-tested with a planted typo.
+
+**K2 — long-press alternates.** `KeyAlternates` (pure) holds what each key offers when held:
+- Each top-row letter carries its digit first. That digit is drawn small in the key's corner, as Gboard
+  does.
+- The vowels and a few consonants carry their accents.
+- The full stop carries ten marks of punctuation.
+
+`AlternatePicker` lays out the row and reads the finger's position along it. At `KeyTouch.LONG_PRESS_MS`
+(300 ms, Gboard's default) the row opens. Sliding along it moves the highlight, lifting types the
+highlighted choice, and dragging a key-height below the key backs out.
+- ⚠️ **The first choice sits over the key whenever it can.** It is the one highlighted as the row opens,
+  while the finger has not moved. Near the right edge the row therefore runs LEFT, rather than sliding
+  along until it fits: sliding would put another choice under a still finger, and lifting would type
+  that one.
+- ⚠️ **One capital rule, `KeyboardModel.capital`, for the letter typed, its label and the alternates.**
+  `"ß".uppercase()` is "SS", two letters for one key. A character with no one-character capital now
+  stays as it is.
+- Sliding onto another letter starts that letter's own hold.
+
+Verification: 9 alternates tests, plus one new model test; **12 rules negative-tested**, all awake.

@@ -84,7 +84,7 @@ object KeyboardModel {
         return when (key) {
             is Key.Text -> {
                 val upper = state.layer == Layer.LETTERS && state.shift != ShiftState.OFF
-                val text = if (upper) key.value.uppercase() else key.value
+                val text = if (upper) capital(key.value) else key.value
                 // One letter uses up a ONCE; a lock stays until it is tapped off.
                 val next = if (state.layer == Layer.LETTERS && state.shift == ShiftState.ONCE) {
                     settled.copy(shift = ShiftState.OFF, auto = false)
@@ -193,7 +193,7 @@ object KeyboardModel {
 
     /** What a key says. Letters follow shift; everything else says what it does. */
     fun label(key: Key, state: State): String = when (key) {
-        is Key.Text -> if (state.layer == Layer.LETTERS && state.shift != ShiftState.OFF) key.value.uppercase() else key.value
+        is Key.Text -> if (state.layer == Layer.LETTERS && state.shift != ShiftState.OFF) capital(key.value) else key.value
         Key.Shift -> if (state.shift == ShiftState.LOCKED) "CAPS" else "SHIFT"
         Key.Delete -> "DEL"
         Key.Space -> "SPACE"
@@ -201,6 +201,17 @@ object KeyboardModel {
         is Key.ToLayer -> key.label
         Key.SwitchIme -> "🌐"
         Key.Gap -> ""
+    }
+
+    /**
+     * [value]'s capital, the one rule every capital on the keyboard follows — the letter typed, its label
+     * and a held key's alternates. A character with no one-character capital stays as it is: `ß`
+     * capitalises to "SS" in Kotlin, which would type two letters for one key and change the width of a
+     * row under a finger.
+     */
+    fun capital(value: String): String {
+        val up = value.uppercase()
+        return if (up.length == value.length) up else value
     }
 
     private fun texts(chars: String): List<Slot> = chars.map { Slot(Key.Text(it.toString())) }

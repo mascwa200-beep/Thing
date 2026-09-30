@@ -45,6 +45,13 @@ class KeyboardModelTest {
     }
 
     @Test
+    fun `a character with no one-letter capital is typed as it is under shift`() {
+        val out = KeyboardModel.press(State(shift = ShiftState.ONCE), Key.Text("ß"), 0L).output
+        assertEquals(Output.Commit("ß"), out)
+        assertEquals(Output.Commit("É"), KeyboardModel.press(State(shift = ShiftState.ONCE), Key.Text("é"), 0L).output)
+    }
+
+    @Test
     fun `the letters layer carries every letter exactly once`() {
         val letters = textsOf(Layer.LETTERS).filter { it.length == 1 && it[0] in 'a'..'z' }
         assertEquals(('a'..'z').map { it.toString() }, letters.sorted())
