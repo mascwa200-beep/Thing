@@ -34,10 +34,10 @@ data class SettingsSection(
      * ⚠️ **Nothing reads this, and the claim that used to stand here — "used by the coverage gate"
      * — was false.** `SettingsSectionCoverageTest` identifies a section by its Kotlin `val`
      * identifier, which it extracts from the source text (`tableKeys()`); it never touches this
-     * field. Measured: all 26 values are exactly `valName.lowercase()`, so the field is redundancy
+     * field. Measured: all 27 values are exactly `valName.lowercase()`, so the field is redundancy
      * that can silently drift from the identifier it duplicates.
      *
-     * Kept for now rather than deleted, because removing it touches 26 constructor call sites and
+     * Kept for now rather than deleted, because removing it touches 27 constructor call sites and
      * belongs in a change of its own — but recorded here honestly, so nobody reasons from the old
      * sentence and believes a gate is watching this.
      */
@@ -46,7 +46,7 @@ data class SettingsSection(
     /**
      * The section heading exactly as it renders.
      *
-     * ⚠️ 22 of these come from `PrefSection` and **4 from `collapsibleHeader`** (Home dashboard,
+     * ⚠️ 23 of these come from `PrefSection` and **4 from `collapsibleHeader`** (Home dashboard,
      * Markets watchlist, Custom RSS feeds, Muted keywords), so "the PrefSection title" would be a
      * false description of a quarter of the table.
      */
@@ -103,6 +103,10 @@ object SettingsSections {
     val APPEARANCE = SettingsSection(
         "appearance", SettingsCategory.INTERFACE, "Appearance",
         "appearance haptics sounds audio boot theme lock screen lockscreen keyguard board home homescreen launcher dock",
+    )
+    val ANDROID_TAKEOVER = SettingsSection(
+        "android_takeover", SettingsCategory.INTERFACE, "Android takeover",
+        "wallpaper screensaver dream assistant assist gesture power button takeover lcars",
     )
     val REGION_UNITS = SettingsSection(
         "region_units", SettingsCategory.REGION, "Region & units",
@@ -176,7 +180,7 @@ object SettingsSections {
 
     val ALL: List<SettingsSection> = listOf(
         SOFTWARE_UPDATE, NUTRITION_APP, DEVICE_OS, DEVICE_OWNER, GRAPHENE_HARDENING, SPECIAL_ACCESS,
-        ACCESSIBILITY, DIAGNOSTICS, APPEARANCE, REGION_UNITS, DATA_REFRESH, TEXTS_MAIL,
+        ACCESSIBILITY, DIAGNOSTICS, APPEARANCE, ANDROID_TAKEOVER, REGION_UNITS, DATA_REFRESH, TEXTS_MAIL,
         NOTIFICATIONS, REMOTE_LINK, LIVE_TV, VIEWSCREEN, AMBIENT_SENSING, SECURITY_NETWORK,
         HOME_DASHBOARD, MARKETS_WATCHLIST, CUSTOM_FEEDS, MUTED_KEYWORDS, API_KEYS, SAFETY_SOS,
         BACKUP_RESTORE, STORAGE_ABOUT,

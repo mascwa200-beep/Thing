@@ -191,7 +191,7 @@ class SettingsSectionCoverageTest {
         val scan = blankCommentsAndStrings(src)
         val gates = Regex("""vis\(\s*SettingsSections\.([A-Z_]+)\s*\)""").findAll(scan)
             .map { it.range.first to it.groupValues[1] }.toList()
-        check(gates.size == 30) { "expected 30 section gates, found ${gates.size}" }
+        check(gates.size == 31) { "expected 31 section gates, found ${gates.size}" }
         val end = bodyEnd(scan, gates.last().first)
 
         val out = ArrayList<Pair<String, String>>()
@@ -271,9 +271,9 @@ class SettingsSectionCoverageTest {
         // this one, and it is the section ("Texts & mail") the whole arc is about — so if the
         // extractor ever regresses to line-oriented, this is what says so rather than a silent 29.
         assertEquals(
-            "expected 30 vis() call sites; a different number means the extractor broke or a " +
+            "expected 31 vis() call sites; a different number means the extractor broke or a " +
                 "section was added/removed without updating this gate",
-            30, args.size,
+            31, args.size,
         )
         assertTrue(
             "the extractor no longer sees the multi-line Texts & mail site — it has gone " +
@@ -296,7 +296,7 @@ class SettingsSectionCoverageTest {
     @Test
     fun `every call site names a real table entry, and every entry is used`() {
         val keys = tableKeys()
-        assertEquals("the table should hold 26 sections", 26, keys.size)
+        assertEquals("the table should hold 27 sections", 27, keys.size)
         assertEquals("section keys must be unique", keys.size, keys.distinct().size)
 
         val used = visArgs().map { normalisedArg(it) }
@@ -440,7 +440,7 @@ class SettingsSectionCoverageTest {
     fun `every actionable Settings row can be found by its own name`() {
         val sections = sectionVocab()
         val categories = categoryVocab()
-        assertEquals("expected 26 sections parsed from the table", 26, sections.size)
+        assertEquals("expected 27 sections parsed from the table", 27, sections.size)
         assertEquals("expected 10 categories parsed from the enum", 10, categories.size)
 
         val unreachable = controlsBySection().filterNot { (key, title) ->
