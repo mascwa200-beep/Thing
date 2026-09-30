@@ -38,6 +38,10 @@ object AppSuspension {
      * @param keyboard the active input method, when known. Not fatal to lose (the emergency dialer
      *   carries its own keypad) but crippling for everything else, so it is kept whenever it is
      *   known.
+     * @param systemDialer the phone's BUILT-IN dialler (`TelecomManager.getSystemDialerPackage`), which
+     *   is always kept when known — see [refusesForSystemDialer] for when not knowing it refuses.
+     *   ⚠️ Required, not defaulted: a default of null would be a default that quietly means "no
+     *   built-in dialler to keep", which is the one package this file exists to protect.
      * @param alsoKeep anything the caller wants spared — a user's own exceptions, later.
      */
     fun suspendable(
@@ -45,15 +49,18 @@ object AppSuspension {
         self: String,
         dialer: String?,
         launcher: String?,
+        systemDialer: String?,
         settings: String? = null,
         keyboard: String? = null,
         alsoKeep: Set<String> = emptySet(),
     ): List<String> {
         if (dialer.isNullOrBlank() || launcher.isNullOrBlank()) return emptyList()
+        if (refusesForSystemDialer(self, dialer, systemDialer)) return emptyList()
         val keep = buildSet {
             add(self)
             add(dialer)
             add(launcher)
+            systemDialer?.takeIf { it.isNotBlank() }?.let { add(it) }
             settings?.takeIf { it.isNotBlank() }?.let { add(it) }
             keyboard?.takeIf { it.isNotBlank() }?.let { add(it) }
             addAll(alsoKeep.filter { it.isNotBlank() })
@@ -64,18 +71,32 @@ object AppSuspension {
     }
 
     /**
+     * ⚠️ **When THIS app is the phone app, the built-in dialler must be known too, or nothing is
+     * paused.** An emergency call is never shown by the default phone app: Android's Telecom
+     * (`InCallController.EmergencyInCallServiceConnection.takeControl`) hands it to the BUILT-IN
+     * dialler's call screen, and does the same the moment the default phone app's call screen dies.
+     * A paused package cannot start an activity, so pausing the built-in dialler would leave an
+     * emergency call with no screen to answer or end it on. When the default phone app is some other
+     * app it is kept under [dialer] already, and the built-in one is kept whenever it is known.
+     */
+    private fun refusesForSystemDialer(self: String, dialer: String?, systemDialer: String?): Boolean =
+        dialer == self && systemDialer.isNullOrBlank()
+
+    /**
      * Whether [suspendable] could return anything at all for this phone, so a surface can say why a
      * hold was refused rather than showing an action that silently does nothing.
      */
-    fun canSuspend(dialer: String?, launcher: String?): Boolean =
-        !dialer.isNullOrBlank() && !launcher.isNullOrBlank()
+    fun canSuspend(dialer: String?, launcher: String?, self: String, systemDialer: String?): Boolean =
+        whyCannot(dialer, launcher, self, systemDialer) == null
 
     /** Why it cannot, in the words a person would use, or null when it can. */
-    fun whyCannot(dialer: String?, launcher: String?): String? = when {
+    fun whyCannot(dialer: String?, launcher: String?, self: String, systemDialer: String?): String? = when {
         dialer.isNullOrBlank() && launcher.isNullOrBlank() ->
             "this phone's dialler and home app could not be identified"
         dialer.isNullOrBlank() -> "this phone's dialler could not be identified"
         launcher.isNullOrBlank() -> "this phone's home app could not be identified"
+        refusesForSystemDialer(self, dialer, systemDialer) ->
+            "this phone's built-in dialler could not be identified, and it answers emergency calls"
         else -> null
     }
 }

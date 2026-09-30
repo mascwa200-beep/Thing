@@ -1,8 +1,9 @@
 package dev.mascwa.pulse.feature.launcher
 
-import dev.mascwa.pulse.feature.launcher.HomeGuardPolicy.FAILURES_TO_STAND_DOWN
-import dev.mascwa.pulse.feature.launcher.HomeGuardPolicy.State
-import dev.mascwa.pulse.feature.launcher.HomeGuardPolicy.WINDOW_MS
+import dev.mascwa.pulse.core.util.CrashLoopGuard
+import dev.mascwa.pulse.core.util.CrashLoopGuard.FAILURES_TO_STAND_DOWN
+import dev.mascwa.pulse.core.util.CrashLoopGuard.State
+import dev.mascwa.pulse.core.util.CrashLoopGuard.WINDOW_MS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -16,11 +17,11 @@ class HomeLauncherCoreTest {
     private val t0 = 1_800_000_000_000L
 
     /** Start the home screen [times] times, [gapMs] apart, none of them ever becoming healthy. */
-    private fun startsThatDie(times: Int, gapMs: Long, from: State = State()): HomeGuardPolicy.Verdict {
+    private fun startsThatDie(times: Int, gapMs: Long, from: State = State()): CrashLoopGuard.Verdict {
         var state = from
-        var verdict = HomeGuardPolicy.Verdict(state, false)
+        var verdict = CrashLoopGuard.Verdict(state, false)
         repeat(times) { i ->
-            verdict = HomeGuardPolicy.onStart(state, t0 + i * gapMs)
+            verdict = CrashLoopGuard.onStart(state, t0 + i * gapMs)
             state = verdict.state
         }
         return verdict
@@ -28,7 +29,7 @@ class HomeLauncherCoreTest {
 
     @Test
     fun `a first start never stands down`() {
-        assertFalse(HomeGuardPolicy.onStart(State(), t0).standDown)
+        assertFalse(CrashLoopGuard.onStart(State(), t0).standDown)
     }
 
     @Test
@@ -41,10 +42,10 @@ class HomeLauncherCoreTest {
     @Test
     fun `a healthy start clears the record`() {
         val nearly = startsThatDie(FAILURES_TO_STAND_DOWN, gapMs = 1_000)
-        val cleared = HomeGuardPolicy.onHealthy()
+        val cleared = CrashLoopGuard.onHealthy()
         assertEquals(State(), cleared)
         // After a start that worked, the next one begins from nothing.
-        assertFalse(HomeGuardPolicy.onStart(cleared, t0 + 10_000).standDown)
+        assertFalse(CrashLoopGuard.onStart(cleared, t0 + 10_000).standDown)
         assertTrue(nearly.state.failuresMs.isNotEmpty())
     }
 
@@ -59,7 +60,7 @@ class HomeLauncherCoreTest {
     @Test
     fun `a failure stamped in the future is forgotten rather than kept for ever`() {
         val poisoned = State(failuresMs = List(FAILURES_TO_STAND_DOWN) { t0 + 3_600_000L })
-        val v = HomeGuardPolicy.onStart(poisoned, t0)
+        val v = CrashLoopGuard.onStart(poisoned, t0)
         assertFalse(v.standDown)
         assertTrue(v.state.failuresMs.isEmpty())
         assertEquals(t0, v.state.pendingStartMs)

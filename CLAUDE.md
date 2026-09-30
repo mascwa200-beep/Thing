@@ -16098,3 +16098,87 @@ green first.
 3. Delete straight after a glide removes the whole word.
 4. Slide from the edge of one letter onto its neighbour and lift: that letter, not a word.
 5. No glide, and no trail, in a password or an address field; none with the switch off.
+
+### THE PHONE — Wave 4: LCARS becomes the phone app (this session, P1–P5)
+
+Standing directive: *"Keep going, making the whole LCARS take over every normal Android feature in every
+way."* Keyboard K1–K5 merged as PR #481 (`07b72c8`); the dev branch was re-synced with `--no-ff`
+(`0eca405`); LCARS #2252 on main was cancelled after `git diff --stat f939274 origin/main` came back
+empty (build #2251 had already published that tree). **Zero subagent and zero workflow spend.**
+
+**The owner's two answers (AskUserQuestion):**
+- **A Settings switch.** LCARS becomes the phone app only when the owner flips it, never
+  automatically. CI compiles a call screen and cannot place a call.
+- **LCARS posts missed-call notifications**, not Android.
+
+**Facts read from AOSP source, which the design rests on.** These are not recalled; the files were
+fetched from `android.googlesource.com` with `?format=TEXT`, base64-decoded into the scratchpad.
+- **Emergency calls never depend on LCARS.**
+  - Telecom's `InCallController` wraps the default phone app's call screen in an
+    `EmergencyInCallServiceConnection` whose own component is the **built-in** dialler.
+  - `setHasEmergency(true)` → `takeControl()` hands every emergency call to the built-in dialler. So
+    does the default dialler's service dying or failing to bind.
+- **Telecom binds the call screen with `BIND_ALLOW_BACKGROUND_ACTIVITY_STARTS`**, so it may start an
+  activity. With no `IN_CALL_SERVICE_RINGING` meta-data, Telecom rings the phone itself.
+- **The dialer role** (`roles.xml`):
+  - It requires `DIAL` and `DIAL tel:` activities, plus an InCallService with `BIND_INCALL_SERVICE`,
+    `IN_CALL_SERVICE_UI=true` and **no** car-mode meta-data.
+  - It grants the phone, contacts, SMS, microphone, camera and notification permission sets, for
+    whatever the manifest declares.
+  - `fallBackToDefaultHolder=true`.
+- **`DevicePolicyManager.setDefaultDialerApplication(String)` is public** (API 34+), as are
+  `TelecomManager.getSystemDialerPackage()`, `placeCall` and `cancelMissedCallsNotification`.
+  Checked with `javap` against the public SDK stub.
+- ⚠️ **Missed calls** (`MissedCallNotifierImpl`):
+  - Telecom stops posting its own missed-call notice the moment the default phone app has a receiver
+    for `SHOW_MISSED_CALLS_NOTIFICATION`, as `queryBroadcastReceivers` reports.
+  - It then sends that broadcast with `READ_PHONE_STATE` **required of the receiver**. So a receiver
+    that is present but lacks the permission means missed calls vanish silently.
+  - Only `EXTRA_NOTIFICATION_COUNT` and `EXTRA_NOTIFICATION_PHONE_NUMBER` are public. The call-back
+    and clear intents are hidden APIs.
+  - `SHOW_MISSED_CALLS_NOTIFICATION` and `DEFAULT_DIALER_CHANGED` are protected broadcasts.
+- ⚠️ **NotificationManagerService throws** (*"Not posted. CallStyle notifications must be for a
+  foreground service … or use a fullScreenIntent"*) for a CallStyle notice that has neither.
+
+#### P1 — the pure cores
+
+- **`core:telemetry/AppSuspension`** gains a **required** `systemDialer`.
+  - The built-in dialler is always kept.
+  - When LCARS itself is the phone app, an unidentifiable built-in dialler refuses the whole list,
+    because a paused package cannot start an activity and Telecom hands emergency calls to exactly
+    that package's call screen.
+  - ⚠️ Required, not defaulted: a default of null would quietly mean "no built-in dialler to keep",
+    the recorded shape of `VitalsAnalyzer`'s motion argument.
+  - `OwnerHolds` passes `TelecomManager.systemDialerPackage`.
+- **`core/util/CrashLoopGuard`** is `HomeGuardPolicy` renamed and made generic (`git mv`, same body).
+  Home keeps its own state; the phone's call screen will keep its own. Home's 15 tests are unchanged.
+- **`feature/phone/`** holds the rest:
+  - **`DialPad`**: keys, dialable input with `+` only first, paste made dialable including vanity
+    letters, and T9 scoring.
+  - **`PhoneMatch`**: the last nine digits, and null for no digits, so two withheld calls never
+    match.
+  - **`CallLogDigest`**: rows grouped by local date via `java.time`, withheld callers merged only
+    with the same presentation, and day labels.
+  - **`CallDisplay`**: phase, controls (ANSWER and DECLINE only while ringing), the timer, and both
+    audio-route tables.
+  - **`MissedCalls`**: the claim rule (all four conditions or Android posts) and the notice text.
+- **`ShadeDigest`** now keeps LCARS's own notice on `MissedCalls.CHANNEL`. It stands in for
+  Telecom's, which used to appear in NOTICES.
+
+⚠️ **The two route APIs number routes differently.** `CallAudioState.ROUTE_SPEAKER` is 8 and
+`CallEndpoint.TYPE_SPEAKER` is 4, and 4 in the first table is the wired headset. `CallDisplay` reads
+each with its own table, and a test holds that.
+
+**Verification:**
+- 49 phone-core tests, 2 more in `ShadeDigestTest`, 3 more in `AppSuspensionTest` (now 14); core suite
+  **2,820** green through Gradle.
+- **22 rules negative-tested.** One came back asleep, and the check was dead code rather than a
+  sleeping guard. Names and numbers are compared as digits only, so a `*` in the query can never
+  match either way. The check was deleted and its test kept.
+- `OwnerHolds` and `HomeStore` compile clean against the public SDK stub and the rebuilt core; the gate
+  was negative-tested with a planted typo.
+- ⚠️ The resolve gate's two complaints on `HomeStore` were its cascade. HEAD had no
+  `CrashLoopGuard.State` to resolve, so the argument-type fallout had nothing to cancel against. The
+  real compile settled it.
+- ⚠️ **`getSystemService<T>()` is `androidx.core:core-ktx`, not `core`.** Without it the compile gate
+  reports every such call unresolved, including code nobody touched. That is the tell.

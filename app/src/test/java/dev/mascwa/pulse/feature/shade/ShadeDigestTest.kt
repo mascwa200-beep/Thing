@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.shade
 
+import dev.mascwa.pulse.feature.phone.MissedCalls
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,12 +16,34 @@ class ShadeDigestTest {
         clearable: Boolean = true,
         group: String = key,
         summary: Boolean = false,
-    ) = ShadeDigest.Entry(key, pkg, pkg.substringAfterLast('.'), title, text, at, clearable, group, summary)
+        channel: String = "",
+    ) = ShadeDigest.Entry(key, pkg, pkg.substringAfterLast('.'), title, text, at, clearable, group, summary, channel)
 
     @Test
     fun `our own notices are not shown`() {
         val groups = ShadeDigest.digest(listOf(entry("a", pkg = "dev.lcars"), entry("b")), self = "dev.lcars")
         assertEquals(listOf("com.chat"), groups.map { it.pkg })
+    }
+
+    @Test
+    fun `our own missed-call notice is shown, because it stands in for Android's`() {
+        // Once LCARS is the phone app, Telecom posts no missed-call notice of its own; hiding ours as
+        // well would leave the panel with no record of the call.
+        val groups = ShadeDigest.digest(
+            listOf(
+                entry("m", pkg = "dev.lcars", channel = MissedCalls.CHANNEL),
+                entry("board", pkg = "dev.lcars", channel = "channel_brief"),
+                entry("b"),
+            ),
+            self = "dev.lcars",
+        )
+        assertEquals(setOf("m", "b"), groups.flatMap { g -> g.entries.map { it.key } }.toSet())
+    }
+
+    @Test
+    fun `another app's notice on a channel with the same name is shown as ever`() {
+        val groups = ShadeDigest.digest(listOf(entry("x", channel = "channel_brief")), self = "dev.lcars")
+        assertEquals(listOf("x"), groups.flatMap { g -> g.entries.map { it.key } })
     }
 
     @Test
