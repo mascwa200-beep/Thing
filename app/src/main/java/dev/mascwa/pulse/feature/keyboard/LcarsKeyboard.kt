@@ -55,6 +55,18 @@ import kotlin.math.abs
  * separator then puts in the correction [Autocorrect] allows, if any, and delete straight afterwards
  * puts back what was typed. A password field gets none of this — its letters go straight in.
  *
+ * ## Glide typing
+ *
+ * A finger drawn across the letters is read as a word ([GlideDecoder]) off the main thread, and the word
+ * goes in as the composing word, with a space before it when the text before it ends a word — Gboard's
+ * rule, which puts the space in when the next word starts, so a full stop straight after sits against
+ * it. The other readings go in the strip. Only where corrections are allowed: not in a password, and not
+ * in a web or email address, where a space put in for you would break it.
+ *
+ * ⚠️ **Nothing overtakes a word being read.** Anything done on the keyboard while a glide is still being
+ * decoded — a key, a tap in the strip, the next glide — waits for it and then runs in the order it was
+ * done ([whenIdle]); otherwise a fast thumb could put the letter it tapped next before the word it drew.
+ *
  * ## Compose inside an input method
  *
  * An input method is a service, so — like the screensaver — its `ComposeView` needs owners supplied
@@ -97,6 +109,13 @@ class LcarsKeyboard : InputMethodService() {
     private var learnHere = false
     @Volatile private var autocorrectOn = true
     @Volatile private var learnOn = true
+    private var glideOn by mutableStateOf(true)
+    private var glideHere by mutableStateOf(false)
+    private var dictionaryReady by mutableStateOf(false)
+
+    /** A glide being read, and what was done on the keyboard since, waiting for it in order. */
+    private var decoding: Job? = null
+    private val waiting = ArrayList<() -> Unit>()
 
     override fun onCreate() {
         super.onCreate()
@@ -114,11 +133,15 @@ class LcarsKeyboard : InputMethodService() {
                 settings.collect {
                     autocorrectOn = it.keyboardAutocorrect
                     learnOn = it.keyboardLearn
+                    glideOn = it.keyboardGlide
                 }
             }
         }
         scope.launch { withContext(Dispatchers.IO) { memory?.load() } }
-        scope.launch { dictionary = WordList.get(applicationContext) }
+        scope.launch {
+            dictionary = WordList.get(applicationContext)
+            dictionaryReady = dictionary != null
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -133,12 +156,14 @@ class LcarsKeyboard : InputMethodService() {
                         enter = enter,
                         punctuation = punctuation,
                         offerSwitch = offerSwitch,
-                        onKey = ::onKey,
+                        onKey = { key -> whenIdle { onKey(key) } },
                         onPicker = ::showPicker,
-                        onCursor = ::moveCursor,
-                        onEraseWords = ::eraseWords,
+                        onCursor = { steps -> whenIdle { moveCursor(steps) } },
+                        onEraseWords = { words -> whenIdle { eraseWords(words) } },
                         strip = strip,
-                        onPick = ::pick,
+                        onPick = { word -> whenIdle { pick(word) } },
+                        glide = glideHere && glideOn && dictionaryReady,
+                        onGlide = { stroke -> whenIdle { glide(stroke) } },
                     )
                 }
             }
@@ -163,7 +188,9 @@ class LcarsKeyboard : InputMethodService() {
         suggestHere = KeyboardPrivacy.maySuggest(inputType)
         correctHere = KeyboardPrivacy.mayAutocorrect(inputType)
         learnHere = KeyboardPrivacy.mayLearn(inputType, info?.imeOptions ?: 0)
+        glideHere = correctHere
         // A new field, or the same one restarted: whatever was being composed belonged to the last one.
+        dropWaiting()
         composer = Composer.State()
         clearStrip()
         refreshCaps()
@@ -176,6 +203,7 @@ class LcarsKeyboard : InputMethodService() {
 
     /** Leaving a field mid-word leaves the word as typed, not underlined; it is not learned. */
     override fun onFinishInput() {
+        dropWaiting()
         runCatching { currentInputConnection?.finishComposingText() }
         composer = Composer.State()
         clearStrip()
@@ -337,7 +365,7 @@ class LcarsKeyboard : InputMethodService() {
                 if (mayLearn()) memory?.accept(edit.text)
                 clearStrip()
             }
-            is Edit.Commit -> apply(ic, edit)
+            is Edit.Commit, is Edit.CommitThenCompose -> apply(ic, edit)
             Edit.Backspace -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
     }
@@ -364,10 +392,91 @@ class LcarsKeyboard : InputMethodService() {
         if (learn) learnTyped(word)
     }
 
+    /**
+     * Runs [action] now, or — while a glide is still being read — after it, in the order things were
+     * done. See the class's note.
+     */
+    private fun whenIdle(action: () -> Unit) {
+        if (decoding?.isActive == true) waiting += action else action()
+    }
+
+    /** What was waiting on a glide, run in order until one of them starts another glide. */
+    private fun runWaiting() {
+        while (waiting.isNotEmpty() && decoding?.isActive != true) waiting.removeAt(0)()
+    }
+
+    /** A new field: a glide still being read, and what waited on it, belonged to the last one. */
+    private fun dropWaiting() {
+        decoding?.cancel()
+        decoding = null
+        waiting.clear()
+    }
+
+    /**
+     * A glide has lifted: its path is read off the main thread, and the word it spells goes in — or, if it
+     * spells nothing, the letter the finger lifted on, as a tap would have typed it.
+     */
+    private fun glide(stroke: GlideDecoder.Stroke) {
+        val dict = dictionary
+        if (dict == null) {
+            stroke.fallback?.let(::onKey)
+            return
+        }
+        val learned = learnedWords()
+        decoding = scope.launch {
+            val found = withContext(Dispatchers.Default) {
+                GlideDecoder.decode(stroke.path, stroke.centres, stroke.unit, dict, learned)
+            }
+            decoding = null
+            if (found.isEmpty()) stroke.fallback?.let(::onKey) else glided(found.map { it.word })
+            runWaiting()
+        }
+    }
+
+    /**
+     * [words] were read from a glide, best first. What was being typed is finished as it stands; a space
+     * goes in first if the text before ends a word; and the best word goes in as the composing word,
+     * capitalised as shift says, with the rest in the strip.
+     */
+    private fun glided(words: List<String>) {
+        val ic = currentInputConnection ?: return
+        spaces = DoubleSpace.typedOther()
+        undoAt = -1
+        ic.beginBatchEdit()
+        val previous = composer
+        composer = Composer.State()
+        if (previous.word.isNotEmpty()) {
+            ic.finishComposingText()
+            // A glided word was already a word; one typed by hand is kept as typed, and learned as one.
+            if (!previous.glided) learnTyped(previous.word)
+        }
+        val before = runCatching { ic.getTextBeforeCursor(1, 0) }.getOrNull()
+        if (Composer.spaceBeforeGlide(before)) {
+            ic.commitText(" ", 1)
+            // Shift follows the space just put in: after ". " the word starts a sentence.
+            refreshCaps()
+        }
+        val shift = state.shift
+        val cased = words.map { Composer.glideCase(it, shift) }
+        if (shift == KeyboardModel.ShiftState.ONCE) state = state.copy(shift = KeyboardModel.ShiftState.OFF, auto = false)
+        val (s, edit) = Composer.glide(cased.first())
+        composer = s
+        apply(ic, edit)
+        ic.endBatchEdit()
+        clearStrip()
+        strip = StripWords.glided(cased)
+    }
+
     private fun apply(ic: InputConnection, edit: Edit) {
         when (edit) {
             is Edit.Compose -> ic.setComposingText(edit.text, 1)
             is Edit.Commit -> ic.commitText(edit.text, 1)
+            is Edit.CommitThenCompose -> {
+                ic.beginBatchEdit()
+                ic.commitText(edit.commit, 1)
+                ic.setComposingText(edit.compose, 1)
+                ic.endBatchEdit()
+            }
             is Edit.Revert, Edit.Backspace -> Unit
         }
     }

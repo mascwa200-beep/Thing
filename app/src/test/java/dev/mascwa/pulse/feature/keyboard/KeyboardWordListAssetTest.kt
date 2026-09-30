@@ -93,4 +93,54 @@ class KeyboardWordListAssetTest {
             assertNull("'$word' was corrected", corrected(word))
         }
     }
+
+    // ── glide typing on the real list ─────────────────────────────────────────────────────────
+
+    private val d = 2.625f
+    private val metrics = KeyboardGeometry.Metrics(
+        keyHeight = 50 * d, rowGap = 8 * d, keyGap = 6 * d, padTop = 6 * d, padBottom = 6 * d, padSide = 4 * d,
+    )
+    private val centres = GlideDecoder.centres(
+        KeyboardGeometry.place(KeyboardModel.rows(KeyboardModel.Layer.LETTERS, ",", false), 1080f, metrics),
+    )
+    private val unit = (1080f - 2 * metrics.padSide) / KeyboardModel.ROW_WEIGHT
+
+    /** Everyday words, long and short, glided on a Pixel's keyboard. */
+    private val glideWords = listOf(
+        "hello", "world", "keyboard", "people", "would", "about", "there", "their", "because", "something",
+        "together", "question", "before", "little", "great", "thanks", "please", "morning", "tomorrow",
+        "weather", "water", "music", "phone", "house", "school", "friend", "family", "dinner", "coffee", "meeting",
+    )
+
+    /** A thumb's path through [word]: its keys, each missed by up to [noise] of a key, joined up. */
+    private fun thumb(word: String, noise: Float, trial: Int): List<GlideDecoder.Point> {
+        val rnd = kotlin.random.Random(word.hashCode() * 31 + trial)
+        val pts = GlideDecoder.letters(word)!!.map { centres.getValue(it) }.map {
+            GlideDecoder.Point(it.x + (rnd.nextFloat() * 2 - 1) * noise * unit, it.y + (rnd.nextFloat() * 2 - 1) * noise * unit)
+        }
+        return GlideDecoder.resample(pts, 60)
+    }
+
+    @Test
+    fun `a clean glide spells the word it was drawn through`() {
+        for (w in glideWords) {
+            assertEquals("'$w'", w, GlideDecoder.decode(thumb(w, 0f, 0), centres, unit, dict).firstOrNull()?.word)
+        }
+    }
+
+    @Test
+    fun `a sloppy glide still spells it, or offers it in the strip`() {
+        // Measured: 149 of 150 first, and the one miss — coffee drawn as "code" — has coffee second.
+        var first = 0
+        var total = 0
+        for (w in glideWords) {
+            for (trial in 0 until 5) {
+                val got = GlideDecoder.decode(thumb(w, 0.25f, trial), centres, unit, dict).map { it.word }
+                assertTrue("'$w' trial $trial is not even offered: $got", w in got)
+                total++
+                if (got.first() == w) first++
+            }
+        }
+        assertTrue("only $first of $total glides spelled their word", first * 100 >= total * 95)
+    }
 }

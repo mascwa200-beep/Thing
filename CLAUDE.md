@@ -16033,3 +16033,68 @@ Verification:
 3. Tapping the quoted word keeps it; type it twice and it stops being corrected.
 4. Nothing is learned in a password field.
 5. "Forget learned words" empties the list.
+
+#### K5 — glide typing (this session, PR #481)
+
+The last slice of the owner's ask: draw a word across the letters without lifting, as Gboard does.
+**Zero subagent and zero workflow spend**, as with K1–K4.
+
+**`GlideDecoder` (pure)** is SHARK²: each word's ideal path is the polyline through its keys' centres,
+and the drawn path is compared with it for WHERE it went (mean point distance, in key widths) and for
+its SHAPE (both normalised to the same centre and size), minus a frequency bonus.
+- ⚠️ **A word is only scored if the path could have spelled it**: it starts within 1.2 keys of the
+  word's first key, ends within 1.2 of its last, and passes within 1.5 of every letter between, in
+  order. That is what keeps a decode to a few hundred words out of 91,541, and what stops a short path
+  matching a long word it only resembles.
+- ⚠️ **The path's two ENDS count on their own (`END_WEIGHT`).** A mean over thirty-two points cannot see
+  one key more or less at the end of a long word, so "keyboard" read as "keyboards" under noise until
+  the ends were weighed. A finger comes down and lifts deliberately; where it did is worth more.
+- A letter typed twice is one stop; an apostrophe or hyphen is not drawn; a word with an accented
+  letter is not a path at all. Learned words count, at `Suggest.LEARNED_FREQ`.
+- **Measured on the real list** (a Pixel's geometry, 1080 px at 2.625): 150/150 clean, 149/150 with
+  every key missed by up to a quarter (the miss, coffee → "code", has coffee second), and 590/600 on the
+  300 commonest words held out. The misses are paths that are genuinely the same (to/too, of/off,
+  its/it's), which is what the strip is for. About 5 ms a decode on a desktop JVM.
+
+**The panel.** A finger alone on the keyboard, on a letter, has its path kept (a point per sixth of a
+key, at most 1,024). Once it is **a key's width from where it came down** (`START_KEYS`) it is a glide:
+the finger is marked done, so its release types nothing and no hold opens a row of choices; a fading
+trail follows it; lifting hands the path over as a `Stroke`.
+- ⚠️ **Under a key's width is still slide-to-correct**: land on the edge of r, slide into t, lift, get
+  t. At a key's width and more it is a word, as Gboard has it — w to e is "we". The threshold is one
+  constant.
+- ⚠️ **A second finger landing ends the glide first**, so its word goes in before the next key.
+- A cancelled touch (the system taking a back swipe) hands over nothing.
+- If the path spells no word, the key the finger lifted on is typed, as a plain release would.
+- The trail is drawn in the draw pass only (a `Canvas` reading a snapshot map), so a moving finger is a
+  redraw and never a recomposition.
+
+**The service.**
+- Decoding runs on `Dispatchers.Default`. ⚠️ **Nothing overtakes a word being read**: every key, strip
+  tap, cursor slide, word erase and the next glide goes through `whenIdle`, which queues it behind a
+  decode in progress and runs the queue in order when it lands. Without that a fast thumb's next letter
+  could go in before the word it drew.
+- The glided word goes in as the COMPOSING word. What was being composed is finished as it stands (a
+  typed word learned as usual); a space goes in first when the text before ends a word
+  (`Composer.spaceBeforeGlide` — not after a space, a bracket, a quote, a hyphen, a slash, @ or #);
+  shift is re-read after that space, so a glide after ". " starts with a capital.
+- **Gboard's space rule**: a LETTER after a glided word starts the next word with a space between
+  (`Edit.CommitThenCompose`); a full stop sits against it; an apostrophe joins it ("don" + "'").
+- Delete straight after a glide takes the whole word. The strip holds the other readings, the word put
+  in bold in the middle (`StripWords.glided`); a tap swaps it.
+- ⚠️ **Only where corrections are allowed**: not in a password, and not in a web or email address,
+  where a space put in for you would break "www." + "google".
+- `AppSettings.keyboardGlide` (default on) and a "Glide typing" switch in Settings ▸ Android takeover ▸
+  LCARS keyboard; the section's keywords gained `glide swipe`.
+
+**Verification:** 15 GlideDecoder, 23 Composer, 6 strip and 8 real-list tests, run locally, including
+two real-list glide tests over thirty everyday words. **Negative-tested**: the ten decoder rules from
+before, plus nine composer, five panel-helper and three strip rules, each against a baseline asserted
+green first.
+
+⚠️ **Owner-verify on the Pixel:**
+1. Glide across "hello": it goes in underlined, and "help"/"hell" are in the strip.
+2. Glide a second word: a space goes in between. Tap "." straight after: it sits against the word.
+3. Delete straight after a glide removes the whole word.
+4. Slide from the edge of one letter onto its neighbour and lift: that letter, not a word.
+5. No glide, and no trail, in a password or an address field; none with the switch off.

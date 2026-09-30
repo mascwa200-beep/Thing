@@ -6,6 +6,9 @@ package dev.mascwa.pulse.feature.keyboard
  * sends it.
  *
  * - A letter adds to the word ([Edit.Compose]).
+ * - A glided word goes in whole ([glide]), and a letter after it starts a new word with a space between
+ *   ([Edit.CommitThenCompose]) — Gboard's rule: the space goes in when the next word starts, so a full
+ *   stop straight after a glided word sits against it.
  * - A separator finishes it, as the autocorrection when there is one, followed by the separator
  *   ([Edit.Commit]). An autocorrection is remembered ([Undo]) until the next key.
  * - Delete takes a letter off the word; with no word, straight after an autocorrection, it puts back
@@ -17,7 +20,8 @@ package dev.mascwa.pulse.feature.keyboard
  */
 object Composer {
 
-    data class State(val word: String = "", val undo: Undo? = null)
+    /** The word being composed; how to undo the last correction; whether the word was glided. */
+    data class State(val word: String = "", val undo: Undo? = null, val glided: Boolean = false)
 
     /** An autocorrection: what was [typed], and the [committed] text that replaced it, separator included. */
     data class Undo(val typed: String, val committed: String)
@@ -28,6 +32,9 @@ object Composer {
 
         /** Put [text] into the field, finishing the composing word. */
         data class Commit(val text: String) : Edit
+
+        /** Put [commit] into the field, finishing the composing word, then show [compose] as a new one. */
+        data class CommitThenCompose(val commit: String, val compose: String) : Edit
 
         /** Delete [delete] characters before the cursor, then put in [text]. */
         data class Revert(val delete: Int, val text: String) : Edit
@@ -45,8 +52,39 @@ object Composer {
     private val SENTENCE_MARKS = setOf(",", ".", "?", "!", ";", ":")
 
     fun letter(s: State, text: String): Pair<State, Edit> {
+        // A LETTER after a glided word starts the next word. An apostrophe does not: "don" glided and
+        // then "'" is the start of "don't", not a new word.
+        if (s.glided && s.word.isNotEmpty() && text.first().isLetter()) {
+            return State(word = text) to Edit.CommitThenCompose(s.word + " ", text)
+        }
         val word = s.word + text
         return State(word = word) to Edit.Compose(word)
+    }
+
+    /**
+     * A glided [word] goes in as the composing word, marked as glided. What was being composed before it
+     * has already been finished by the keyboard, and any space it needs already put in ([spaceBeforeGlide]).
+     */
+    fun glide(word: String): Pair<State, Edit> = State(word = word, glided = true) to Edit.Compose(word)
+
+    /**
+     * Whether a glided word needs a space before it: when what is before the cursor ends a word or a
+     * sentence. Not at the start of the field or of a line, not after a space, and not straight after a
+     * mark that opens something or joins a word to the next — a bracket, a quote, a hyphen, a slash,
+     * an @, a # — where the word belongs against it.
+     */
+    fun spaceBeforeGlide(before: CharSequence?): Boolean {
+        val c = before?.lastOrNull() ?: return false
+        return !c.isWhitespace() && c !in JOINS_NEXT
+    }
+
+    private const val JOINS_NEXT = "([{<\"'\u201C\u2018\u00BF\u00A1/@#-_"
+
+    /** A glided word, capitalised as the shift key says: the first letter once, or every letter locked. */
+    fun glideCase(word: String, shift: KeyboardModel.ShiftState): String = when (shift) {
+        KeyboardModel.ShiftState.LOCKED -> word.uppercase()
+        KeyboardModel.ShiftState.ONCE -> word.replaceFirstChar { it.uppercaseChar() }
+        KeyboardModel.ShiftState.OFF -> word
     }
 
     /** [separator] typed after the word, which becomes [replacement] if that is not null. */
@@ -67,6 +105,8 @@ object Composer {
     fun backspace(s: State, before: CharSequence?): Pair<State, Edit> {
         val undo = s.undo
         return when {
+            // A glided word went in whole, so it comes out whole.
+            s.glided && s.word.isNotEmpty() -> State() to Edit.Compose("")
             s.word.isNotEmpty() -> {
                 val word = s.word.dropLast(1)
                 State(word = word) to Edit.Compose(word)

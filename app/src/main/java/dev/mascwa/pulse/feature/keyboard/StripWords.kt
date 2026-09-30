@@ -29,5 +29,16 @@ object StripWords {
         return listOf(words.getOrNull(1), words.getOrNull(0), words.getOrNull(2)).map { w -> w?.let { StripWord(it) } }
     }
 
+    /**
+     * After a glide: the word put in, in the middle and marked, and the next two either side, so a tap
+     * swaps it for what was meant. A path is often ambiguous — "to" and "too", "of" and "off" are drawn
+     * the same — and this is where the other reading is one tap away.
+     */
+    fun glided(words: List<String>): List<StripWord?> {
+        val distinct = words.fold(emptyList<String>()) { acc, w -> if (acc.any { same(it, w) }) acc else acc + w }
+        val best = distinct.firstOrNull() ?: return listOf(null, null, null)
+        return listOf(distinct.getOrNull(1)?.let { StripWord(it) }, StripWord(best, primary = true), distinct.getOrNull(2)?.let { StripWord(it) })
+    }
+
     private fun same(a: String, b: String): Boolean = Dictionary.key(a) == Dictionary.key(b)
 }

@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.feature.keyboard
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -29,7 +31,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
@@ -73,6 +77,10 @@ import kotlin.math.roundToInt
  * one before lifting, put the next finger down before lifting the last, see which letter is about to
  * be typed. [KeyTouch] decides all of that; this file only carries it out.
  *
+ * With [glide] on, a finger that goes more than a key's width from where it came down on a letter is
+ * GLIDING: nothing it passes is typed, a fading trail follows it, and when it lifts its path goes to
+ * [onGlide] to be read as a word ([GlideDecoder]).
+ *
  * Every key is a filled block lettered in whichever of black or white reads on it (`LcarsContrast`),
  * so nothing is an outline and no label can clash with its key. Letters are one quiet colour so the
  * eye finds them; the keys that DO something each have their own.
@@ -89,6 +97,8 @@ internal fun KeyboardPanel(
     onEraseWords: (Int) -> Unit,
     strip: List<StripWord?>,
     onPick: (StripWord) -> Unit,
+    glide: Boolean,
+    onGlide: (GlideDecoder.Stroke) -> Unit,
 ) {
     val c = Pulse.colors
     val blocks = LocalConsoleBlocks.current
@@ -119,12 +129,14 @@ internal fun KeyboardPanel(
             val fingers = remember { mutableStateMapOf<PointerId, KeyTouch.Finger>() }
             val alternates = remember { mutableStateOf<OpenAlternates?>(null) }
             val erasing = remember { mutableStateMapOf<PointerId, Int>() }
+            val trails = remember { mutableStateMapOf<PointerId, List<GlideDecoder.Point>>() }
 
             Keys(
                 placed = placed,
                 fingers = fingers,
                 alternates = alternates,
                 erasing = erasing,
+                trails = trails,
                 state = state,
                 enter = enter,
                 metrics = metrics,
@@ -149,7 +161,10 @@ internal fun KeyboardPanel(
                 onPicker = onPicker,
                 onCursor = onCursor,
                 onEraseWords = onEraseWords,
+                glide = glide,
+                onGlide = onGlide,
             )
+            Trails(trails, block(0))
             Previews(fingers, erasing, state, metrics, width, bubble = block(0), erase = block(2))
             alternates.value?.let { AlternateRow(it, state, metrics, lit = block(0), back = c.raise) }
         }
@@ -269,6 +284,7 @@ private fun Keys(
     fingers: MutableMap<PointerId, KeyTouch.Finger>,
     alternates: MutableState<OpenAlternates?>,
     erasing: MutableMap<PointerId, Int>,
+    trails: MutableMap<PointerId, List<GlideDecoder.Point>>,
     state: KeyboardModel.State,
     enter: EnterKey.Spec,
     metrics: KeyboardGeometry.Metrics,
@@ -278,6 +294,8 @@ private fun Keys(
     onPicker: () -> Unit,
     onCursor: (Int) -> Unit,
     onEraseWords: (Int) -> Unit,
+    glide: Boolean,
+    onGlide: (GlideDecoder.Stroke) -> Unit,
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -289,6 +307,8 @@ private fun Keys(
     val m by rememberUpdatedState(metrics)
     val cursor by rememberUpdatedState(onCursor)
     val eraseWords by rememberUpdatedState(onEraseWords)
+    val glideOn by rememberUpdatedState(glide)
+    val glided by rememberUpdatedState(onGlide)
     // One key's width and the slop, in pixels — what the space-bar and delete gestures measure against.
     val unit by rememberUpdatedState((width - 2 * metrics.padSide) / KeyboardModel.ROW_WEIGHT)
     val slop = with(density) { KeyGestures.SLOP_DP.dp.toPx() }
@@ -296,6 +316,10 @@ private fun Keys(
     // nothing is drawn from them.
     val timers = remember { HashMap<PointerId, Job>() }
     val slides = remember { HashMap<PointerId, Slide>() }
+    // The path of the one finger that might be gliding, and whether it has started to. Not state either:
+    // what is drawn of a glide is its trail, kept in [trails].
+    val paths = remember { HashMap<PointerId, MutableList<GlideDecoder.Point>>() }
+    val gliding = remember { HashSet<PointerId>() }
 
     // Brighter while held: the only feedback a key under a thumb can give that the thumb does not hide
     // is the colour round its edge.
@@ -329,6 +353,18 @@ private fun Keys(
                         }
                     }
                 }
+                /**
+                 * A glide ends: its path is handed over to be read, with the letter [under] the finger
+                 * to type if it spells nothing. A cancelled touch hands over nothing.
+                 */
+                fun endGlide(id: PointerId, under: Placed?, lift: GlideDecoder.Point?, cancelled: Boolean) {
+                    val path = paths.remove(id)
+                    trails.remove(id)
+                    if (!gliding.remove(id) || path == null || cancelled) return
+                    if (lift != null && path.last() != lift) path += lift
+                    val fallback = under?.key?.takeIf { it is Key.Text }
+                    glided(GlideDecoder.Stroke(path.toList(), GlideDecoder.centres(keys), unit, fallback))
+                }
                 try {
                     awaitPointerEventScope {
                         while (true) {
@@ -338,6 +374,11 @@ private fun Keys(
                                 val open = alternates.value?.takeIf { it.pointer == id }
                                 when {
                                     change.pressed && !change.previousPressed -> {
+                                        // A glide under way ends the moment another finger lands, and its
+                                        // word goes in first; a glide is one finger's, and what comes out
+                                        // is in the order it was done.
+                                        gliding.toList().forEach { endGlide(it, fingers[it]?.current, null, cancelled = false) }
+                                        paths.clear()
                                         // A second finger down: the first one's letter is typed NOW, so
                                         // fast typing comes out in the order it was typed.
                                         fingers.keys.toList().forEach { other ->
@@ -349,6 +390,10 @@ private fun Keys(
                                         if (key != null) {
                                             fingers[id] = KeyTouch.down(key)
                                             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                            // Only a finger alone on the keyboard, on a letter, can glide.
+                                            if (glideOn && fingers.size == 1 && GlideDecoder.startsOn(key.key)) {
+                                                paths[id] = mutableListOf(GlideDecoder.Point(change.position.x, change.position.y))
+                                            }
                                             timers.remove(id)?.cancel()
                                             if (key.key == Key.Space || key.key == Key.Delete) {
                                                 slides[id] = Slide(startX = change.position.x)
@@ -408,6 +453,29 @@ private fun Keys(
                                         change.consume()
                                     }
                                     change.pressed -> {
+                                        val path = paths[id]
+                                        val tracked = fingers[id]
+                                        if (path != null && tracked != null) {
+                                            if (tracked.done && id !in gliding) {
+                                                // Taken by a hold or a rollover first: it is not a glide.
+                                                paths.remove(id)
+                                            } else {
+                                                val at = GlideDecoder.Point(change.position.x, change.position.y)
+                                                val added = GlideDecoder.extend(path, at, unit)
+                                                if (id !in gliding && GlideDecoder.isGlide(path.first(), at, unit)) {
+                                                    // It is a glide now: lifting types the word it spells and
+                                                    // nothing else, and no hold opens a row of choices under it.
+                                                    gliding += id
+                                                    fingers[id] = tracked.copy(done = true)
+                                                    timers.remove(id)?.cancel()
+                                                    trails[id] = path.takeLast(TRAIL_POINTS)
+                                                } else if (added && id in gliding) {
+                                                    trails[id] = path.takeLast(TRAIL_POINTS)
+                                                }
+                                            }
+                                        }
+                                        // Which key it is on is kept up while gliding too: it is what is typed
+                                        // if the path turns out to spell nothing.
                                         val f = fingers[id]
                                         if (f != null) {
                                             val key = KeyboardGeometry.keyAt(keys, change.position.x, change.position.y)
@@ -425,6 +493,7 @@ private fun Keys(
                                         val finger = fingers.remove(id)
                                         slides.remove(id)
                                         val marked = erasing.remove(id) ?: 0
+                                        val wasGliding = id in gliding
                                         // ⚠️ A CANCELLED touch arrives looking like a lift, and must type
                                         // nothing: it is what Android sends when the system takes the
                                         // gesture — a back swipe from the edge, over q or p. Compose builds
@@ -440,9 +509,13 @@ private fun Keys(
                                             if (!cancelled && chosen != null) press(Key.Text(chosen))
                                         } else if (marked > 0) {
                                             if (!cancelled) eraseWords(marked)
+                                        } else if (wasGliding) {
+                                            val lift = GlideDecoder.Point(change.position.x, change.position.y)
+                                            endGlide(id, finger?.current, lift, cancelled)
                                         } else if (finger != null && !cancelled) {
                                             KeyTouch.release(finger)?.let { press(it.key) }
                                         }
+                                        paths.remove(id)
                                         change.consume()
                                     }
                                 }
@@ -457,6 +530,9 @@ private fun Keys(
                     fingers.clear()
                     slides.clear()
                     erasing.clear()
+                    paths.clear()
+                    gliding.clear()
+                    trails.clear()
                     alternates.value = null
                 }
             },
@@ -502,6 +578,32 @@ private fun KeyCap(p: Placed, label: String, hint: String?, face: Color, large: 
                 color = ink.copy(alpha = 0.7f),
                 maxLines = 1,
             )
+        }
+    }
+}
+
+/**
+ * The line a gliding finger leaves behind, fading and thinning towards where it has been, so a word can
+ * be drawn by eye. Drawn in the draw pass alone: a finger moving is a redraw, never a recomposition.
+ */
+@Composable
+private fun Trails(trails: Map<PointerId, List<GlideDecoder.Point>>, colour: Color) {
+    val density = LocalDensity.current
+    val thin = with(density) { TrailThin.toPx() }
+    val thick = with(density) { TrailThick.toPx() }
+    Canvas(Modifier.fillMaxSize()) {
+        trails.values.forEach { trail ->
+            val last = trail.size - 1
+            for (i in 1..last) {
+                val t = i.toFloat() / last
+                drawLine(
+                    color = colour.copy(alpha = t),
+                    start = Offset(trail[i - 1].x, trail[i - 1].y),
+                    end = Offset(trail[i].x, trail[i].y),
+                    strokeWidth = thin + (thick - thin) * t,
+                    cap = StrokeCap.Round,
+                )
+            }
         }
     }
 }
@@ -641,5 +743,10 @@ private const val PopupOverlap = 0.25f
 private val PopupLetterSize = 30.sp
 private val AlternateSize = 24.sp
 private const val EraseWidth = 3.4f
+
+// A glide's trail: its last 36 points — six keys of path — tapering from 2 dp to 6 dp at the finger.
+private const val TRAIL_POINTS = 36
+private val TrailThin = 2.dp
+private val TrailThick = 6.dp
 private val EraseSize = 16.sp
 private val HintSize = 11.sp

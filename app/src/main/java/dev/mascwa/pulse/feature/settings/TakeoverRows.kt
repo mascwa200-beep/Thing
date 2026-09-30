@@ -192,6 +192,13 @@ private fun KeyboardWordRows(settings: AppSettings, onUpdate: ((AppSettings) -> 
     ) { v -> onUpdate { it.copy(keyboardAutocorrect = v) } }
 
     PrefSwitch(
+        "Glide typing",
+        subtitle = "Draw a word across the letters without lifting, and it goes in whole, the other readings " +
+            "above the keys. Never in a password, a web address or an email.",
+        checked = settings.keyboardGlide,
+    ) { v -> onUpdate { it.copy(keyboardGlide = v) } }
+
+    PrefSwitch(
         "Learn words I type",
         subtitle = "A word the keyboard does not know, typed twice, stops being corrected. Kept on this phone " +
             "only, sealed with its hardware key; never learned in a password field or an address.",

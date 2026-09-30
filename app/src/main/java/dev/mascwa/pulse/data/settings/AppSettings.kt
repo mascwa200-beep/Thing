@@ -399,11 +399,12 @@ data class AppSettings(
     // The widget's board over the lock screen, waiting when the screen comes on. Defaults on
     // because it was asked for by name; one switch away in Appearance.
     val lockScreenBoard: Boolean = true,
-    // The LCARS keyboard's corrections and learning, on by default as Gboard's are; both one switch
-    // away in Android takeover. Learned words are kept sealed on the phone (data/keyboard/LearnedWords),
-    // never here: these two are preferences, not anything typed.
+    // The LCARS keyboard's corrections, learning and glide typing, on by default as Gboard's are; each
+    // one switch away in Android takeover. Learned words are kept sealed on the phone
+    // (data/keyboard/LearnedWords), never here: these are preferences, not anything typed.
     val keyboardAutocorrect: Boolean = true,
     val keyboardLearn: Boolean = true,
+    val keyboardGlide: Boolean = true,
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)

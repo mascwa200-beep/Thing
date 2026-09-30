@@ -41,4 +41,13 @@ class StripWordsTest {
     fun `nothing typed, nothing shown`() {
         assertEquals(listOf(null, null, null), StripWords.arrange("", listOf(c("the")), null))
     }
+
+    @Test
+    fun `after a glide the word put in is in the middle, marked, with the other readings either side`() {
+        val s = StripWords.glided(listOf("to", "too", "top"))
+        assertEquals(listOf("too", "to", "top"), s.map { it?.word })
+        assertEquals(listOf(false, true, false), s.map { it?.primary })
+        assertEquals(listOf(null, "to", null), StripWords.glided(listOf("to", "To")).map { it?.word })
+        assertEquals(listOf(null, null, null), StripWords.glided(emptyList()))
+    }
 }

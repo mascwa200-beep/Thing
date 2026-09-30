@@ -115,6 +115,58 @@ class ComposerTest {
         assertFalse(KeyboardPrivacy.maySuggest(0x02 or 0x10)) // a number password
     }
 
+    // ── a glided word ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a glided word goes in whole, and comes out whole`() {
+        val (s, e) = Composer.glide("hello")
+        assertEquals(State(word = "hello", glided = true), s)
+        assertEquals(Edit.Compose("hello"), e)
+        val (after, del) = Composer.backspace(s, null)
+        assertEquals(State(), after)
+        assertEquals(Edit.Compose(""), del)
+        // A word typed by hand still loses one letter at a time.
+        assertEquals(Edit.Compose("hell"), Composer.backspace(State(word = "hello"), null).second)
+    }
+
+    @Test
+    fun `a letter after a glided word starts the next word, with the space between`() {
+        val (s, e) = Composer.letter(State(word = "hello", glided = true), "w")
+        assertEquals(State(word = "w"), s)
+        assertEquals(Edit.CommitThenCompose("hello ", "w"), e)
+    }
+
+    @Test
+    fun `an apostrophe after a glided word joins it`() {
+        val (s, e) = Composer.letter(State(word = "don", glided = true), "'")
+        assertEquals(State(word = "don'"), s)
+        assertEquals(Edit.Compose("don'"), e)
+    }
+
+    @Test
+    fun `a separator after a glided word sits against it`() {
+        assertEquals(Edit.Commit("hello."), Composer.separator(State(word = "hello", glided = true), ".", null).second)
+    }
+
+    @Test
+    fun `a glided word gets a space before it only when the text before ends a word`() {
+        for (before in listOf("hello", "end.", "yes,", "I", "that's", "done!", "4")) {
+            assertTrue("'$before'", Composer.spaceBeforeGlide(before))
+        }
+        for (before in listOf(null, "", "hello ", "line\n", "(", "\"", "well-", "and/", "@", "#", "\u201C")) {
+            assertFalse("'$before'", Composer.spaceBeforeGlide(before))
+        }
+    }
+
+    @Test
+    fun `a glided word is capitalised as shift says`() {
+        assertEquals("hello", Composer.glideCase("hello", KeyboardModel.ShiftState.OFF))
+        assertEquals("Hello", Composer.glideCase("hello", KeyboardModel.ShiftState.ONCE))
+        assertEquals("HELLO", Composer.glideCase("hello", KeyboardModel.ShiftState.LOCKED))
+        // A word the list spells with a capital keeps it.
+        assertEquals("London", Composer.glideCase("London", KeyboardModel.ShiftState.OFF))
+    }
+
     @Test
     fun `a field that asks for no suggestions, or no learning, gets none`() {
         assertFalse(KeyboardPrivacy.maySuggest(text or 0x80000))
