@@ -179,6 +179,20 @@ class PhoneActivity : ComponentActivity() {
      * a bare `DIAL`) leaves the screen as it was.
      */
     private fun read(intent: Intent?) {
+        // The missed-call notice's own entry points, before the tel: link below.
+        when (intent?.action) {
+            ACTION_RECENTS -> {
+                show(PhoneTab.RECENTS)
+                return
+            }
+            ACTION_CALL_BACK -> {
+                val number = intent.getStringExtra(EXTRA_NUMBER).orEmpty()
+                digits.value = number
+                tab.value = PhoneTab.KEYPAD
+                if (number.isNotBlank()) call(number)
+                return
+            }
+        }
         val data: Uri = intent?.data ?: return
         if (data.scheme.equals("tel", ignoreCase = true)) {
             digits.value = DialPad.fromTelUri(data.schemeSpecificPart.orEmpty())
@@ -209,7 +223,9 @@ class PhoneActivity : ComponentActivity() {
     private fun markSeen() {
         lifecycleScope.launch {
             callLog.markMissedRead()
+            // Both notices go: Android's (if it posted) and LCARS's own (if it did).
             runCatching { getSystemService(TelecomManager::class.java)?.cancelMissedCallsNotification() }
+            MissedCallReceiver.cancel(this@PhoneActivity)
         }
     }
 
@@ -312,7 +328,14 @@ class PhoneActivity : ComponentActivity() {
         runCatching { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }
             .getOrDefault(1f)
 
-    private companion object {
-        const val RELOAD_SETTLE_MS = 400L
+    companion object {
+        /** The missed-call notice's tap: open RECENTS, which marks the calls seen and clears it. */
+        const val ACTION_RECENTS = "dev.mascwa.pulse.phone.RECENTS"
+
+        /** The missed-call notice's CALL BACK: open on the keypad and place the call. */
+        const val ACTION_CALL_BACK = "dev.mascwa.pulse.phone.CALL_BACK"
+        const val EXTRA_NUMBER = "number"
+
+        private const val RELOAD_SETTLE_MS = 400L
     }
 }

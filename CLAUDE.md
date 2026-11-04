@@ -16322,3 +16322,48 @@ Ring the phone from another: the LCARS call screen should appear over the lock s
 test MUTE, SPEAKER, KEYPAD and END. Place a call and check the screen comes up. A second call during
 one in progress should ring (call-waiting). ⚠️ **Do not test with a real emergency call.**
 
+
+#### P4 — missed calls, posted by LCARS on Android's behalf (Wave 4, P4)
+
+While LCARS is the phone app, Android stops posting missed calls and LCARS posts them. **Zero
+subagent and zero workflow spend.**
+
+- ⚠️ **The receiver ships DISABLED, and that is the whole safety design.** Telecom stops posting its
+  own missed-call notification the instant the default phone app has a receiver for
+  `SHOW_MISSED_CALLS_NOTIFICATION`, and sends that broadcast with `READ_PHONE_STATE` required of the
+  receiver. So a receiver that is present but cannot act — permission revoked, notifications off,
+  LCARS no longer the phone app — is the worst state there is: Android has stepped aside and nobody
+  posts. A disabled receiver is invisible to Telecom's query, so `MissedCallReceiver.reconcile` turns
+  it on **only** when `MissedCalls.claim` (P1's pure core) says every condition holds, and off
+  otherwise — which keeps "whenever LCARS cannot post, Android does" true by the component's state
+  rather than by anything remembering to. Run from `PulseApplication.onCreate` (main process); P5
+  adds the switch and Settings-return calls.
+- **`MissedCallReceiver`** reads the count and number from the broadcast, looks the name up on-device
+  (`ContactsRepository.nameFor`), and posts `MissedCalls.text(...)` on `MissedCalls.CHANNEL`
+  (`NotifId.MISSED_CALLS`). Count 0 (Telecom's "they have been seen") cancels. CALL BACK is offered
+  only for a single missed call with a dialable number (Telecom's own rule — with several the one it
+  would ring is ambiguous); it and MESSAGE are activity PendingIntents, distinct by action and by the
+  `smsto:` data. ⚠️ **It records and sends nothing** — PhoneRecordsNothingTest holds it to that.
+- **The notice's three taps.** Tapping the card opens RECENTS (`PhoneActivity.ACTION_RECENTS`), which
+  marks the calls seen and clears the notice — both Android's, via `cancelMissedCallsNotification`,
+  and LCARS's own, via `MissedCallReceiver.cancel`. CALL BACK opens the keypad and places the call
+  (`ACTION_CALL_BACK` + the number), reusing the activity's own permission flow rather than dialling
+  from a background broadcast. MESSAGE hands the number to the SMS app.
+- **`ShadeStore.read` now fills `ShadeDigest.Entry.channel`** from the notification's channel id —
+  the one missing wire. `ShadeDigest.digest` drops every LCARS-own notice EXCEPT those on
+  `ON_BEHALF_OF_ANDROID` (the missed-call channel), so without the channel being read, LCARS's own
+  missed-call card was being filtered out of the home console's NOTICES panel; now it shows there,
+  as it must, since Android would otherwise have shown its own.
+
+**Verification, all local.** Compose frontend clean over 30 phone files, catching a planted typo in
+the receiver. `ShadeStore` + `ShadeDigest` + the pure phone deps compile clean against the SDK stub
+(a full backend compile — `n.channelId` resolves). `NotifIdTest` 4/4 with `MISSED_CALLS` added to its
+independent list. `PhoneRecordsNothingTest` 4/4 — the receiver records nothing. `LazyKeyTest` 12/12.
+The `tools/check_changed.sh` chain is clean; the resolve gate's lone complaint is `onReceive overrides
+nothing`, its no-Android-classpath cascade for a new `BroadcastReceiver`.
+
+⚠️ **Owner-verify on the Pixel — CI posts no missed call.** Only meaningful once P5's switch makes
+LCARS the phone app. Miss a call: an LCARS missed-call notice should appear with CALL BACK and
+MESSAGE for a single caller; opening RECENTS (or tapping the card) should clear it; and with LCARS
+NOT the phone app, Android should post its own instead.
+

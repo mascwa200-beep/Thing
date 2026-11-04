@@ -252,12 +252,15 @@ object NotifId {
      */
     const val CALL = 7501
 
+    /** Missed calls, posted by LCARS on Android's behalf while it is the phone app. Not a service. */
+    const val MISSED_CALLS = 7502
+
     /** Every id a sweep must never touch: the board, the takeover, and each service's ongoing. */
     val PERSISTENT: Set<Int> = setOf(
         BRIEF, TAKEOVER,
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_LOCK_BOARD, FGS_RADIO,
-        FGS_INTERROGATOR, FGS_ONDEMAND, CALL,
+        FGS_INTERROGATOR, FGS_ONDEMAND, CALL, MISSED_CALLS,
     )
 
     /**

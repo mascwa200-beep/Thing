@@ -374,6 +374,19 @@
             android:name=".feature.phone.CallActionReceiver"
             android:exported="false" />
 
+        <!-- Posts missed calls while LCARS is the phone app, in Android's place. ⚠️ Ships DISABLED and
+             is turned on only by MissedCallReceiver.reconcile when LCARS can actually post — because a
+             present-but-dead receiver makes Telecom step aside and nobody posts at all. Exported so the
+             system (Telecom) can send to it. -->
+        <receiver
+            android:name=".feature.phone.MissedCallReceiver"
+            android:exported="true"
+            android:enabled="false">
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
         <!-- THE ASSISTANT GESTURE — any app with an ASSIST activity appears in Android's Default apps ▸
              Digital assistant list; an app cannot choose itself, so Settings sends the owner there. A
              windowless trampoline to the Computer console: it starts the console and finishes. -->
