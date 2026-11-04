@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.feature.phone
 
+import dev.mascwa.pulse.feature.launcher.HomeDirectory
+
 /**
  * The phone's keypad: what each key types, how a number is edited, and how typed digits find a
  * contact — T9, the way every phone's dial pad does.
@@ -70,9 +72,32 @@ object DialPad {
     fun sanitise(pasted: String): String =
         pasted.fold("") { acc, raw -> append(acc, digitFor(raw) ?: raw) }
 
-    /** The digits a name's letters sit on, one run per word: "Ann Lee" is ["266", "533"]. */
+    /**
+     * A `tel:` link's number, ready for the keypad. Its scheme-specific part is RFC 3966: a number,
+     * then `;name=value` parameters. An extension (`;ext=42`) is kept as a pause and its digits — what
+     * a phone dials after the call connects — and every other parameter (`phone-context`, `isub`) is
+     * dropped, because it is not something to dial. A bare `;` is Android's wait character and stays.
+     */
+    fun fromTelUri(ssp: String): String {
+        val parts = ssp.split(';')
+        val number = StringBuilder(parts.first())
+        for (part in parts.drop(1)) {
+            val eq = part.indexOf('=')
+            when {
+                eq < 0 -> number.append(';').append(part)
+                part.substring(0, eq).trim().equals("ext", ignoreCase = true) ->
+                    number.append(',').append(part.substring(eq + 1))
+            }
+        }
+        return sanitise(number.toString())
+    }
+
+    /**
+     * The digits a name's letters sit on, one run per word: "Ann Lee" is ["266", "533"]. Folded first
+     * ([HomeDirectory.fold]), so an accented letter is on the key its plain letter is: "Zoë" is 963.
+     */
     fun t9Words(name: String): List<String> =
-        name.split(' ', '-', '.', ',', '\'', '(', ')', '/')
+        HomeDirectory.fold(name).split(' ', '-', '.', ',', '\'', '(', ')', '/')
             .map { word -> word.mapNotNull { digitFor(it) }.joinToString("") }
             .filter { it.isNotEmpty() }
 

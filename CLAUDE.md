@@ -16182,3 +16182,77 @@ each with its own table, and a test holds that.
   real compile settled it.
 - ⚠️ **`getSystemService<T>()` is `androidx.core:core-ktx`, not `core`.** Without it the compile gate
   reports every such call unresolved, including code nobody touched. That is the tell.
+
+#### P2 — the phone screen: keypad, recents, contacts
+
+`PhoneActivity` (its own task, never `MainActivity`, whose boot screen would stand in front of a dial
+pad) draws `PhoneConsole` in the shared LCARS console frame. It has three tabs along the bottom bar:
+KEYPAD, RECENTS and CONTACTS. `LcarsConsole` and `LcarsBoardHeader` gained an optional `title`, so a
+console with no board can name itself.
+
+- **`PhoneBook` (pure, 10 tests)** turns Android's one-row-per-number table into people.
+  - A number synced twice from two accounts is one number, by `PhoneMatch`.
+  - The number marked primary comes first. A nameless contact is named by their number.
+  - Sorting is on `HomeDirectory.fold`, the launcher's own rule.
+  - Typed digits find the name they spell before the number they end: 7285 is Paul, not the tail of
+    Rob's number.
+- **`DialPad.fromTelUri`.** An RFC 3966 `;ext=` becomes a pause plus its digits. Other parameters are
+  dropped. A bare `;` is Android's wait character and stays. T9 now folds accents, so "Zoë" is 963.
+- **`CallLogDigest.title`/`word`.** A withheld caller is named by Android's reason, whatever the book
+  says. Otherwise the order is the book, then the cached name, then the number. "Answered elsewhere"
+  is never worded as missed.
+- **`Loaded` has four states.** "Nobody in your contacts", "not allowed to read them" and "Android
+  would not answer" are three different sentences on screen.
+- **Calls go through `TelecomManager.placeCall`.** Without the permission, or on refusal, the number
+  goes to the built-in dialler by explicit package, never an implicit DIAL, which would come straight
+  back to LCARS. URIs come from `Uri.fromParts`, so `*#06#` keeps its `#`.
+- **`EmergencyService.dial` (SOS) now prefers the built-in dialler by package** for the same reason.
+  The SOS path must not depend on LCARS once LCARS holds the role.
+- **Manifest.** Five permissions are declared. The activity has filters for MAIN/LAUNCHER, DIAL, and
+  DIAL with `tel:`.
+  - ⚠️ **No `VIEW tel:` filter.** `roles.xml` makes the role holder preferred for DIAL only, and a VIEW
+    filter would put a chooser in front of every tel link.
+  - A `tel:` link fills the keypad and never dials.
+- ⚠️ **Opening RECENTS marks missed calls read only when one is unread.** Marking writes the log, the
+  write fires the observer, and the reload comes back to RECENTS. Unguarded, that is one provider
+  quirk away from a loop.
+- **`PhoneRecordsNothingTest`** gates `feature/phone` and `data/phone`: no logcat, activity log, crash
+  report, preferences, file, network or clipboard, and nothing taken from the container. Patterns are
+  word-bounded, so `CallLog.Calls` is not mistaken for `Log.`.
+- **Deviations from the plan, both on evidence:**
+  - Starred contacts are a section inside CONTACTS, not a fourth FAVOURITES tab. Four bottom buttons
+    crowd the console, and a fourth tab would only repeat a filter.
+  - There is no `VIEW tel:` filter, for the reason above.
+
+**Verification, all local.**
+- **Tests:** PhoneBook 10, DialPad 14 and CallLogDigest 15 pass. **13 rules negative-tested, all
+  awake.** One perturbation was invalid at first because it did not compile; it was rewritten and then
+  failed exactly its test.
+- **Compiles:**
+  - The repositories and `PhoneCalls` compile against the public SDK stub, and the gate catches a
+    planted typo.
+  - The whole screen is frontend-clean against real Compose 1.7.6, material3 1.3.1, activity 1.9.3 and
+    lifecycle 2.8.7. The kit is stubbed from its real declarations. Three planted mistakes were each
+    caught at their line.
+- **Gates:** `LazyKeyTest` sees the screen; a planted key collision fails it and names the scope. The
+  records-nothing gate catches a planted `Log.d` and a planted container reach.
+
+⚠️ **P2 WAS LOST ONCE, EXACTLY AS A1/A2 WERE.**
+- **What happened.** It was written, fully verified and **left uncommitted** while the session waited
+  in plan mode. The container was reclaimed, taking the working tree, the scratchpad harness and the
+  plan file.
+- **How it was rebuilt.** Four files survived verbatim only because their `Read` results were still in
+  the conversation. The rest was rebuilt from the compaction summary.
+- **The rule, restated because it was broken a second time: commit and push each verified slice at
+  once.** Never leave verified work local across anything that can wait on the owner — plan mode, a
+  question, an approval prompt.
+
+⚠️ **Owner-verify on the Pixel.** CI compiles a dial pad and never dials.
+1. Open **LCARS Phone** from the app drawer and type a number. The name it spells should be suggested
+   above the keypad.
+2. Place a call. On the first call Android asks for the call permission; refusing hands the number to
+   the built-in dialler.
+3. Open RECENTS. Missed calls should stop being missed. A withheld caller has no CALL button.
+4. Open CONTACTS. Starred contacts should sit above A–Z, and search should work by name and by digits.
+5. Tap a phone number in another app. It should appear on the LCARS keypad, undialled, once LCARS is
+   the phone app; until then Android's own dialler opens as before.

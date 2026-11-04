@@ -170,4 +170,36 @@ class CallLogDigestTest {
         assertEquals("1:02:03", CallLogDigest.duration(3723))
         assertEquals("0:00", CallLogDigest.duration(-5))
     }
+
+    @Test
+    fun `a row is named by the book, then the cache, then the number`() {
+        val cached = CallLogDigest.rows(listOf(e("6165550100", nov1At0030, name = "Old Name")), detroit).single()
+        assertEquals("Ann", CallLogDigest.title(cached, "Ann"))
+        assertEquals("Old Name", CallLogDigest.title(cached, null))
+        assertEquals("Old Name", CallLogDigest.title(cached, " "))
+        val bare = CallLogDigest.rows(listOf(e("6165550100", nov1At0030)), detroit).single()
+        assertEquals("6165550100", CallLogDigest.title(bare, null))
+    }
+
+    @Test
+    fun `a withheld caller is named by the reason, whatever the book says`() {
+        val payphone = CallLogDigest.rows(
+            listOf(e("", nov1At0030, presentation = CallLogDigest.PRESENTATION_PAYPHONE)),
+            detroit,
+        ).single()
+        assertEquals("Payphone", CallLogDigest.title(payphone, "Somebody"))
+        val restricted = CallLogDigest.rows(
+            listOf(e("6165550100", nov1At0030, presentation = CallLogDigest.PRESENTATION_RESTRICTED)),
+            detroit,
+        ).single()
+        assertEquals("Private number", CallLogDigest.title(restricted, "Ann"))
+    }
+
+    @Test
+    fun `a call answered elsewhere is never worded as missed`() {
+        val k = CallLogDigest.kindOf(CallLogDigest.TYPE_ANSWERED_EXTERNALLY)
+        assertEquals("Answered elsewhere", CallLogDigest.word(k))
+        assertEquals("Missed", CallLogDigest.word(Kind.MISSED))
+        assertEquals("Declined", CallLogDigest.word(Kind.REJECTED))
+    }
 }

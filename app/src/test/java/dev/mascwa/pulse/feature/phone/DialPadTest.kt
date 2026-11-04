@@ -92,4 +92,20 @@ class DialPadTest {
     fun `a name match outranks a number match`() {
         assertTrue(DialPad.score("555", "Kim", "5550100") < DialPad.score("546", "Kim", "123"))
     }
+
+    @Test
+    fun `an accented name is on the keys its plain letters are`() {
+        assertEquals(listOf("963"), DialPad.t9Words("Zoë"))
+        assertEquals(listOf("35634"), DialPad.t9Words("Élodie").map { it.take(5) })
+        assertEquals(3, DialPad.score("356", "Élodie", null))
+    }
+
+    @Test
+    fun `a tel link keeps an extension and drops other parameters`() {
+        assertEquals("+16165550100,42", DialPad.fromTelUri("+1-616-555-0100;ext=42;phone-context=example.com"))
+        assertEquals("6165550100", DialPad.fromTelUri("616.555.0100;isub=1234"))
+        // A bare `;` is Android's wait character, and stays.
+        assertEquals("5550100;123", DialPad.fromTelUri("5550100;123"))
+        assertEquals("*#06#", DialPad.fromTelUri("*#06#"))
+    }
 }

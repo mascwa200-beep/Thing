@@ -125,6 +125,20 @@
     -->
     <uses-permission android:name="android.permission.READ_SMS" />
 
+    <!--
+      THE LCARS PHONE (Wave 4). Placing a call, reading who calls and who you call, and the phone book.
+      Holding the dialer role grants all five; without it they are asked for at the point each is used,
+      and a refusal says so on screen rather than leaving an empty list. READ_PHONE_STATE is also what
+      Telecom requires of the missed-call receiver, so without it Android keeps posting its own.
+      Nothing read under these is kept or sent anywhere — PhoneRecordsNothingTest holds the phone
+      packages to that.
+    -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
+
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -287,6 +301,35 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!-- THE LCARS PHONE — keypad, recents and contacts. Its own task, so it opens straight onto
+             the keypad rather than behind the main app's boot screen. ⚠️ DIAL only, never VIEW tel:
+             Android's roles.xml makes the dialer role's holder the preferred handler for DIAL and
+             DIAL tel:, and a VIEW filter would put a chooser in front of every tel: link instead. A
+             tel: link fills the keypad and never dials by itself. -->
+        <activity
+            android:name=".feature.phone.PhoneActivity"
+            android:exported="true"
+            android:label="@string/phone_app_name"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.phone"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+        </activity>
 
         <!-- THE ASSISTANT GESTURE — any app with an ASSIST activity appears in Android's Default apps ▸
              Digital assistant list; an app cannot choose itself, so Settings sends the owner there. A

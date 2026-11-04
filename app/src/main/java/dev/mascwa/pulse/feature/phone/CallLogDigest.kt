@@ -84,6 +84,8 @@ object CallLogDigest {
         val latestMs: Long,
         val day: LocalDate,
         val withheld: Boolean,
+        /** How Android presented the newest call's number — what names a withheld caller. */
+        val presentation: Int,
         /** Any call in the row is a missed call nobody has seen. */
         val unread: Boolean,
         val ids: List<Long>,
@@ -102,6 +104,27 @@ object CallLogDigest {
         else -> "Unknown caller"
     }
 
+    /**
+     * What a row is called: a withheld caller by the reason Android gives, otherwise the phone book's
+     * name ([bookName], looked up now), then the name Android cached with the call, then the number.
+     * The book comes before the cache because the cache is whatever the name was when the call came in.
+     */
+    fun title(row: Row, bookName: String?): String = when {
+        row.withheld -> withheldLabel(row.presentation)
+        else -> bookName?.takeIf(String::isNotBlank) ?: row.name ?: row.number
+    }
+
+    /** The word a row's kind is written as. "Answered elsewhere" is never shown as missed. */
+    fun word(kind: Kind): String = when (kind) {
+        Kind.INCOMING -> "Incoming"
+        Kind.OUTGOING -> "Outgoing"
+        Kind.MISSED -> "Missed"
+        Kind.REJECTED -> "Declined"
+        Kind.BLOCKED -> "Blocked"
+        Kind.VOICEMAIL -> "Voicemail"
+        Kind.ELSEWHERE -> "Answered elsewhere"
+    }
+
     fun rows(entries: List<Entry>, zone: ZoneId): List<Row> {
         val sorted = entries.sortedWith(compareByDescending<Entry> { it.dateMs }.thenByDescending { it.id })
         val out = ArrayList<Row>()
@@ -118,6 +141,7 @@ object CallLogDigest {
                 latestMs = newest.dateMs,
                 day = dayOf(newest.dateMs, zone),
                 withheld = withheld(newest),
+                presentation = newest.presentation,
                 unread = group.any { it.unread && kindOf(it.type) == Kind.MISSED },
                 ids = group.map { it.id },
             )
