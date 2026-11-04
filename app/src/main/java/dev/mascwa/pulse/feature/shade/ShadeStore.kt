@@ -118,6 +118,10 @@ internal object ShadeNotices {
             groupKey = sbn.groupKey.orEmpty(),
             // ⚠️ The flag, not `sbn.isGroup`, which is true for a summary AND its children.
             isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+            // The channel is how `ShadeDigest.digest` tells LCARS's own notices apart: all of ours are
+            // dropped EXCEPT the ones posted on behalf of Android (the missed-call channel), which must
+            // show in the panel because Android would otherwise have shown them itself.
+            channel = n.channelId.orEmpty(),
         )
         ShadeStore.Item(entry, ShadeStore.Handle(n.contentIntent, (n.flags and Notification.FLAG_AUTO_CANCEL) != 0))
     }.getOrNull()

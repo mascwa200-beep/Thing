@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.telecom.TelecomManager
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.core.telemetry.Geodesy
@@ -25,10 +26,24 @@ class EmergencyService(private val context: Context) {
         return EMERGENCY_NUMBERS[cc] ?: "112" // 112 works across most of the world / GSM
     }
 
+    /**
+     * The phone's dialler, ready to call [number].
+     *
+     * ⚠️ **Android's BUILT-IN dialler by package first**, and only then whatever answers DIAL. Once
+     * LCARS is the phone app, a plain DIAL opens LCARS — and the SOS path must not depend on LCARS
+     * working. Emergency calls themselves are Telecom's either way: it hands every one to the built-in
+     * dialler's call screen, whichever app placed it.
+     *
+     * `Uri.fromParts`, not `Uri.parse("tel:…")`, so a `#` is encoded rather than read as a fragment.
+     */
     fun dial(number: String) {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(intent) }
+        val uri = Uri.fromParts("tel", number, null)
+        val system = runCatching { context.getSystemService(TelecomManager::class.java)?.systemDialerPackage }.getOrNull()
+        if (!system.isNullOrBlank() && system != context.packageName) {
+            val direct = Intent(Intent.ACTION_DIAL, uri).setPackage(system).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (runCatching { context.startActivity(direct) }.isSuccess) return
+        }
+        runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     fun buildSosMessage(

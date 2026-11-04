@@ -125,6 +125,23 @@
     -->
     <uses-permission android:name="android.permission.READ_SMS" />
 
+    <!--
+      THE LCARS PHONE (Wave 4). Placing a call, reading who calls and who you call, and the phone book.
+      Holding the dialer role grants all five; without it they are asked for at the point each is used,
+      and a refusal says so on screen rather than leaving an empty list. READ_PHONE_STATE is also what
+      Telecom requires of the missed-call receiver, so without it Android keeps posting its own.
+      Nothing read under these is kept or sent anywhere — PhoneRecordsNothingTest holds the phone
+      packages to that.
+    -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
+    <!-- The in-progress-call card is a foreground service of type phoneCall: the only owner Android
+         accepts for a call-style notification with no full-screen intent. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -287,6 +304,88 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!-- THE LCARS PHONE — keypad, recents and contacts. Its own task, so it opens straight onto
+             the keypad rather than behind the main app's boot screen. ⚠️ DIAL only, never VIEW tel:
+             Android's roles.xml makes the dialer role's holder the preferred handler for DIAL and
+             DIAL tel:, and a VIEW filter would put a chooser in front of every tel: link instead. A
+             tel: link fills the keypad and never dials by itself. -->
+        <activity
+            android:name=".feature.phone.PhoneActivity"
+            android:exported="true"
+            android:label="@string/phone_app_name"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.phone"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+        </activity>
+
+        <!-- THE CALL SCREEN — shown over a locked or sleeping phone when a call rings (the ringing
+             card's full-screen intent), and the "return to call" surface after. Its own task, kept
+             out of recents: a call screen is not a document you scroll back to. -->
+        <activity
+            android:name=".feature.phone.InCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.incall"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- What Telecom binds while LCARS is the phone app and a call exists. The permission is held
+             only by the system, which is what protects it; the UI meta-data marks it as the call
+             screen's owner. No IN_CALL_SERVICE_RINGING, so Telecom plays the ringtone itself. -->
+        <service
+            android:name=".feature.phone.LcarsInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!-- Owns the in-progress-call card as a foreground service of type phoneCall. -->
+        <service
+            android:name=".feature.phone.OngoingCallService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+
+        <!-- The call card's DECLINE and HANG UP. Only LCARS's own PendingIntents reach it. -->
+        <receiver
+            android:name=".feature.phone.CallActionReceiver"
+            android:exported="false" />
+
+        <!-- Posts missed calls while LCARS is the phone app, in Android's place. ⚠️ Ships DISABLED and
+             is turned on only by MissedCallReceiver.reconcile when LCARS can actually post — because a
+             present-but-dead receiver makes Telecom step aside and nobody posts at all. Exported so the
+             system (Telecom) can send to it. -->
+        <receiver
+            android:name=".feature.phone.MissedCallReceiver"
+            android:exported="true"
+            android:enabled="false">
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
 
         <!-- THE ASSISTANT GESTURE — any app with an ASSIST activity appears in Android's Default apps ▸
              Digital assistant list; an app cannot choose itself, so Settings sends the owner there. A

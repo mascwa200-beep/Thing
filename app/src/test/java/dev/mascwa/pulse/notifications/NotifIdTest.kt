@@ -38,6 +38,8 @@ class NotifIdTest {
         "FGS_INTERROGATOR" to NotifId.FGS_INTERROGATOR,
         "FGS_RADIO" to NotifId.FGS_RADIO,
         "FGS_ONDEMAND" to NotifId.FGS_ONDEMAND,
+        "CALL" to NotifId.CALL,
+        "MISSED_CALLS" to NotifId.MISSED_CALLS,
     )
 
     @Test

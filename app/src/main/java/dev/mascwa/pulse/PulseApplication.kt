@@ -119,6 +119,9 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
                     runCatching { container.usageRepository.log("home", "LCARS made the default Home: $result") }
                 }
             }
+            // Turn the missed-call receiver on iff LCARS is the phone app with what it needs — so that
+            // whenever it is not, Android keeps posting missed calls itself.
+            runCatching { dev.mascwa.pulse.feature.phone.MissedCallReceiver.reconcile(this@PulseApplication) }
         }
         // Open in whatever alert condition the last published board was in.
         appScope.launch {

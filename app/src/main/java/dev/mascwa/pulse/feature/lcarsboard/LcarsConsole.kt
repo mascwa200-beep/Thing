@@ -84,6 +84,8 @@ internal fun LcarsConsole(
     railSeed: String,
     modifier: Modifier = Modifier,
     waitingLine: String? = null,
+    /** What the header says when there is no board — the phone screen names itself here. */
+    title: String? = null,
     bottom: @Composable RowScope.() -> Unit,
     body: @Composable (Modifier) -> Unit,
 ) {
@@ -118,6 +120,7 @@ internal fun LcarsConsole(
                 block = c.accent,
                 onTap = onTap,
                 waitingLine = waitingLine,
+                title = title,
                 topInset = topInset,
                 modifier = Modifier
                     .weight(1f)
