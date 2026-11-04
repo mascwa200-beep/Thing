@@ -138,6 +138,9 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
+    <!-- The in-progress-call card is a foreground service of type phoneCall: the only owner Android
+         accepts for a call-style notification with no full-screen intent. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -330,6 +333,46 @@
                 <data android:scheme="tel" />
             </intent-filter>
         </activity>
+
+        <!-- THE CALL SCREEN — shown over a locked or sleeping phone when a call rings (the ringing
+             card's full-screen intent), and the "return to call" surface after. Its own task, kept
+             out of recents: a call screen is not a document you scroll back to. -->
+        <activity
+            android:name=".feature.phone.InCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.mascwa.pulse.incall"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- What Telecom binds while LCARS is the phone app and a call exists. The permission is held
+             only by the system, which is what protects it; the UI meta-data marks it as the call
+             screen's owner. No IN_CALL_SERVICE_RINGING, so Telecom plays the ringtone itself. -->
+        <service
+            android:name=".feature.phone.LcarsInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!-- Owns the in-progress-call card as a foreground service of type phoneCall. -->
+        <service
+            android:name=".feature.phone.OngoingCallService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+
+        <!-- The call card's DECLINE and HANG UP. Only LCARS's own PendingIntents reach it. -->
+        <receiver
+            android:name=".feature.phone.CallActionReceiver"
+            android:exported="false" />
 
         <!-- THE ASSISTANT GESTURE — any app with an ASSIST activity appears in Android's Default apps ▸
              Digital assistant list; an app cannot choose itself, so Settings sends the owner there. A

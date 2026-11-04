@@ -245,12 +245,19 @@ object NotifId {
     const val FGS_RADIO = 4201
     const val FGS_ONDEMAND = 4211
 
+    /**
+     * The call — the ringing card and then the in-progress one, carried by one id and rebuilt from
+     * [dev.mascwa.pulse.feature.phone.CallRegistry] on every change. [OngoingCallService] owns it as a
+     * foreground service while a call is in progress, so it is in [FOREGROUND] too.
+     */
+    const val CALL = 7501
+
     /** Every id a sweep must never touch: the board, the takeover, and each service's ongoing. */
     val PERSISTENT: Set<Int> = setOf(
         BRIEF, TAKEOVER,
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_LOCK_BOARD, FGS_RADIO,
-        FGS_INTERROGATOR, FGS_ONDEMAND,
+        FGS_INTERROGATOR, FGS_ONDEMAND, CALL,
     )
 
     /**
@@ -273,6 +280,6 @@ object NotifId {
     val FOREGROUND: Set<Int> = setOf(
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_LOCK_BOARD, FGS_RADIO,
-        FGS_INTERROGATOR, FGS_ONDEMAND,
+        FGS_INTERROGATOR, FGS_ONDEMAND, CALL,
     )
 }

@@ -16256,3 +16256,69 @@ console with no board can name itself.
 4. Open CONTACTS. Starred contacts should sit above A–Z, and search should work by name and by digits.
 5. Tap a phone number in another app. It should appear on the LCARS keypad, undialled, once LCARS is
    the phone app; until then Android's own dialler opens as before.
+
+#### P3 — the call screen, and the call's one notification (Wave 4, P3)
+
+The screen Telecom binds while LCARS is the phone app and a call exists: who it is, how long it has
+been, the buttons the call allows — over a locked or sleeping phone when it rings. **Zero subagent
+and zero workflow spend.**
+
+- **`LcarsInCallService`** is the `InCallService` Telecom binds. It hands every call to
+  `CallRegistry`, keeps the one call notification current, and brings the screen up for an outgoing
+  call. ⚠️ **It is responsible for no emergency call** — Telecom routes those to the BUILT-IN
+  dialler's own screen (`EmergencyInCallServiceConnection.takeControl`), whichever app is the phone
+  app, which is the reason the built-in dialler is never paused. **No `IN_CALL_SERVICE_RINGING`
+  meta-data**, so Telecom plays the ringtone and honours Do Not Disturb itself.
+- **`CallRegistry`** (internal object) is the one place a live `Call` is held. The screen reads its
+  `calls`/`audio` StateFlow snapshots and asks it to answer/hold/mute/route — so a screen that
+  outlives its call (rotated, recreated, left open) holds nothing that can act on a call that has
+  gone. ⚠️ **The service is held WEAKLY**: Telecom owns its lifetime, and a strong reference would
+  keep a dead service reachable. `focus(list)` picks the call the screen is about — one ringing,
+  else one in progress, else any.
+- ⚠️ **Answered audio-only, always**, a video call included: LCARS has no camera surface for a call,
+  and the screen says so on a video call. The two audio-route APIs number routes DIFFERENTLY
+  (`CallAudioState` bits vs `CallEndpoint` values), so `CallDisplay.Route` is the one vocabulary and
+  each is mapped with its own table; mapping one with the other's would put a speaker call on a
+  headset. On API 34+ the route is set by the endpoint Telecom offered (the only way to reach a
+  particular Bluetooth device); below it, by the old route bits.
+- **`InCallActivity`** — `showWhenLocked` + `turnScreenOn`, its own task, kept out of recents. It
+  reads the two flows, ticks a once-a-second timer for the elapsed label, and **finishes when no
+  call is left**. A proximity wake lock blanks the screen only while the phone is held to an ear
+  (`CallDisplay.heldToEar`), released with `WAIT_FOR_NO_PROXIMITY` so the screen does not blank-then-
+  black as the call ends with the phone still up. ⚠️ **ANSWER from the ringing card arrives as
+  `ACTION_ANSWER`, not a button the notification taps** — Android 12 blocks an activity started from
+  a receiver a notification started, so the card's Answer opens this screen with the answer baked
+  into the intent; the intent's action is cleared once consumed so a recreation does not answer a
+  call that has since changed.
+- **`CallNotices` + `OngoingCallService` + `CallActionReceiver`** — one id (`NotifId.CALL`), rebuilt
+  from the registry on every change. Ringing is posted with a full-screen intent to the screen;
+  in-progress is owned by `OngoingCallService`, a foreground service of type `phoneCall`, because
+  Android only lets a call-style card stand without a full-screen intent when a foreground service
+  owns it. ⚠️ **Android REFUSES a call-style card it does not like** ("CallStyle notifications must
+  be for a foreground service … or use a fullScreenIntent"), and a refused card is no card at all —
+  so every post is wrapped, and a refusal posts a PLAIN card with the same buttons. DECLINE and
+  HANG UP are a broadcast to the receiver (acting on the call by id, so a button tapped after its
+  call has gone does nothing); ANSWER is the activity intent above.
+- ⚠️ **`setOnlyAlertOnce`/`setSilent` are on the ONGOING card only, never the ringing one** — the
+  ongoing card's once-a-second timer update must not re-alert, but a ringing card marked either way
+  gets no heads-up over a phone in use, and `setOnlyAlertOnce` would stop a SECOND incoming call
+  (call-waiting replaces the same id) from re-firing its full-screen intent. The channel is silent
+  (Telecom rings), so a re-posted ringing card cannot buzz.
+
+**Verification, all local.** The Compose frontend check is clean over all 29 phone files and catches
+a planted typo in `InCallActivity` and in `CallNotices`. `NotifIdTest` passes 4/4 and, dropping
+`CALL` from its independent list, fails naming the id (negative-tested). `PhoneRecordsNothingTest`
+4/4 — the call files record nothing. `LazyKeyTest` 12/12. The `tools/check_changed.sh` chain is
+clean; the resolve gate's unresolved references are all Telecom/Compose/platform symbols the frontend
+check resolves against the real SDK and Compose jars — its documented new-file cascade.
+⚠️ **A real bug in `tools/run_notifid_test.sh` fixed on the way:** on a fresh container `$GC` (the
+Gradle cache) does not exist, so `find "$GC" … | head` under `set -euo pipefail` killed the script
+before its own documented GL fallback could run; a `|| true` inside each of the three command
+substitutions lets the pipeline fail harmlessly.
+
+⚠️ **Owner-verify on the Pixel — CI compiles a call screen and never places a call.** Turn
+Settings ▸ Android takeover ▸ LCARS phone ON (that is P5; until then this screen is never bound).
+Ring the phone from another: the LCARS call screen should appear over the lock screen; answer, then
+test MUTE, SPEAKER, KEYPAD and END. Place a call and check the screen comes up. A second call during
+one in progress should ring (call-waiting). ⚠️ **Do not test with a real emergency call.**
+
