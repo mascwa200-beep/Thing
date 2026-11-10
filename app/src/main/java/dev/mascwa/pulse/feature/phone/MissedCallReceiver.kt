@@ -125,8 +125,11 @@ class MissedCallReceiver : BroadcastReceiver() {
          * Turn the receiver on exactly when [MissedCalls.claim] says LCARS should post, off otherwise —
          * the one mechanism that keeps "Android posts them whenever LCARS cannot" true. Run on
          * app start, from the switch, and whenever Settings returns.
+         *
+         * ⚠️ The stand-down is read from [PhoneStore], not passed in, so a call-screen crash-loop
+         * stand-down also stops missed-call posting — until the switch's `turnOn` clears the guard.
          */
-        fun reconcile(context: Context, stoodDown: Boolean = false) {
+        fun reconcile(context: Context) {
             val claim = MissedCalls.claim(
                 isPhoneApp = isPhoneApp(context),
                 readPhoneState = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) ==
@@ -134,7 +137,7 @@ class MissedCallReceiver : BroadcastReceiver() {
                 notificationsAllowed = runCatching {
                     NotificationManagerCompat.from(context).areNotificationsEnabled()
                 }.getOrDefault(false),
-                stoodDown = stoodDown,
+                stoodDown = runCatching { PhoneStore(context).standDownAtMs() != null }.getOrDefault(false),
             )
             enable(context, claim == MissedCalls.Claim.LCARS)
         }

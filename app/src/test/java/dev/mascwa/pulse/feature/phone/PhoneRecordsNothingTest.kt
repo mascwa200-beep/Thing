@@ -49,6 +49,18 @@ class PhoneRecordsNothingTest {
         Regex("""\bClipboardManager\b""") to "the clipboard",
     )
 
+    /**
+     * The one sanctioned store. [PhoneStore] keeps the crash-loop guard's counters, the package name of
+     * the dialler that held the role before LCARS, and when the guard stood the call screen down —
+     * operational state, never a call, a number or a name from the phone book. So it alone is allowed
+     * stored preferences, and it is allowed nothing else; every other file is allowed neither. The
+     * exception lives here, in a diff somebody reads, which is exactly what the class KDoc asks for.
+     */
+    private val prefsAllowed = setOf("PhoneStore.kt")
+
+    /** True when [file] is permitted this reach — only [prefsAllowed] files, and only stored preferences. */
+    private fun allowed(file: String, what: String): Boolean = file in prefsAllowed && what == "stored preferences"
+
     private fun code(): Map<String, String> =
         roots.flatMap { SourceGate.kotlinFilesUnder(it) }
             .associate { it.name to SourceGate.stripComments(it.readText()) }
@@ -56,7 +68,8 @@ class PhoneRecordsNothingTest {
     @Test
     fun `the phone reaches for no log, no storage and no network`() {
         val found = code().flatMap { (file, src) ->
-            forbidden.filterKeys { it.containsMatchIn(src) }.map { (pattern, what) -> "$file matches $pattern ($what)" }
+            forbidden.filterKeys { it.containsMatchIn(src) && !allowed(file, forbidden.getValue(it)) }
+                .map { (pattern, what) -> "$file matches $pattern ($what)" }
         }
         assertTrue("the phone must record and send nothing:\n" + found.joinToString("\n"), found.isEmpty())
     }
@@ -91,5 +104,20 @@ class PhoneRecordsNothingTest {
         }
         assertTrue("placeCall" in files.getValue("PhoneCalls.kt"))
         assertTrue("CallLog.Calls" in files.getValue("CallLogRepository.kt"))
+    }
+
+    /**
+     * The prefs allowlist is a door, so this proves only stored preferences walk through it: a logcat
+     * reach planted in the allowlisted file is still caught, and the exemption is granted to no other
+     * file. Without this the exception could quietly widen into a blanket pass that let the one file
+     * keep call data and log it.
+     */
+    @Test
+    fun `the prefs allowlist is scoped to preferences, nothing else`() {
+        val planted = """fun f(number: String) { android.util.Log.d("phone", number) }"""
+        val caught = forbidden.filterKeys { it.containsMatchIn(planted) && !allowed("PhoneStore.kt", forbidden.getValue(it)) }
+        assertFalse("a logcat reach in the allowlisted file must still fail the gate", caught.isEmpty())
+        assertTrue("PhoneStore may keep its prefs", allowed("PhoneStore.kt", "stored preferences"))
+        assertFalse("but no other file may", allowed("MissedCallReceiver.kt", "stored preferences"))
     }
 }
