@@ -60,7 +60,7 @@ class OwnerHolds(
         if (!DevicePolicyController.isDeviceOwner(context)) {
             return "this app is not this device's owner"
         }
-        return AppSuspension.whyCannot(dialerPackage(), launcherPackage())
+        return AppSuspension.whyCannot(dialerPackage(), launcherPackage(), context.packageName, systemDialerPackage())
     }
 
     private fun suspendThem() {
@@ -69,6 +69,7 @@ class OwnerHolds(
             self = context.packageName,
             dialer = dialerPackage(),
             launcher = launcherPackage(),
+            systemDialer = systemDialerPackage(),
             settings = settingsPackage(),
             keyboard = keyboardPackage(),
         )
@@ -87,6 +88,7 @@ class OwnerHolds(
             self = context.packageName,
             dialer = dialerPackage(),
             launcher = launcherPackage(),
+            systemDialer = systemDialerPackage(),
             settings = settingsPackage(),
             keyboard = keyboardPackage(),
         )
@@ -102,6 +104,14 @@ class OwnerHolds(
 
     private fun dialerPackage(): String? = runCatching {
         context.getSystemService<TelecomManager>()?.defaultDialerPackage
+    }.getOrNull()
+
+    /**
+     * The phone's BUILT-IN dialler, which Telecom hands every emergency call to whatever the default
+     * phone app is — so it is kept even when LCARS is the phone app. See `AppSuspension`.
+     */
+    private fun systemDialerPackage(): String? = runCatching {
+        context.getSystemService<TelecomManager>()?.systemDialerPackage
     }.getOrNull()
 
     private fun launcherPackage(): String? = runCatching {

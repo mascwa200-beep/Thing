@@ -131,6 +131,8 @@ internal fun LcarsBoardHeader(
     onTap: (BoardTap) -> Unit,
     modifier: Modifier = Modifier,
     waitingLine: String? = null,
+    /** Overrides the board's own header; the phone screen has no board and names itself. */
+    title: String? = null,
     topInset: Dp = 0.dp,
 ) {
     val ink = textOnBlock(block)
@@ -170,7 +172,7 @@ internal fun LcarsBoardHeader(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
-                (board?.header ?: "LCARS").uppercase(),
+                (title ?: board?.header ?: "LCARS").uppercase(),
                 fontFamily = Antonio,
                 fontSize = 15.sp,
                 letterSpacing = 1.5.sp,

@@ -15,7 +15,7 @@ package dev.mascwa.pulse.feature.launcher
  *   alias makes Android ask "which Home?" at the next press of the button. An automatic update must
  *   never put that question in front of anyone unasked. A phone that is not device owner keeps the
  *   Settings switch, off by default.
- * - **Not stood down.** A stand-down by the crash-loop guard ([HomeGuardPolicy]) records the time it
+ * - **Not stood down.** A stand-down by the crash-loop guard ([CrashLoopGuard]) records the time it
  *   happened. Applying the default over that would send the phone straight back into the loop it
  *   just escaped.
  *

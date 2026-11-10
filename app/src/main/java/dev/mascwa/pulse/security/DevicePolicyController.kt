@@ -185,6 +185,19 @@ class DevicePolicyController(context: Context) {
      * `addPersistentPreferredActivity` would have its preference cleared here and must not be added
      * without changing this.
      */
+    /**
+     * Make [packageName] the default phone app without a chooser, as device owner. API 34+; a no-op
+     * returning false below, where [dev.mascwa.pulse.feature.phone.PhoneSwitch] falls back to the role
+     * request. The platform requires a package — to hand the role back, the caller passes the system
+     * dialler, never null.
+     */
+    fun setDefaultDialer(packageName: String): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+        dpm.setDefaultDialerApplication(packageName)
+        true
+    }.getOrDefault(false)
+
     fun setPersistentHome(home: ComponentName?): Boolean = runCatching {
         if (!isDeviceOwner() || dpm == null) return false
         dpm.clearPackagePersistentPreferredActivities(admin, appContext.packageName)

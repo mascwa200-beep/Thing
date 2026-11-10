@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.feature.shade
 
+import dev.mascwa.pulse.feature.phone.MissedCalls
+
 /**
  * The notification centre's arithmetic: what Android's shade holds, arranged the way the LCARS home
  * console shows it.
@@ -13,6 +15,9 @@ package dev.mascwa.pulse.feature.shade
  * - **LCARS's own notifications are not shown.** The home console already draws the board those
  *   notices describe, and the rest are foreground-service lines ("Lock-screen board ready") that are
  *   chrome, not news. Showing them would put the console inside itself.
+ *   ⚠️ **Except the ones LCARS posts in Android's place** ([ON_BEHALF_OF_ANDROID]): once LCARS is the
+ *   phone app, a missed call is LCARS's notice where it used to be Telecom's, and it belongs in the
+ *   panel exactly as Telecom's did.
  * - **A group summary is dropped while any of its children is present**, and kept when it stands
  *   alone. A summary restates its children ("3 new messages"), so showing both counts every message
  *   twice; a summary whose children were all cleared is the only record left, so dropping it would
@@ -34,7 +39,12 @@ object ShadeDigest {
         val clearable: Boolean,
         val groupKey: String,
         val isGroupSummary: Boolean,
+        /** The notification channel; only consulted for LCARS's own notices. */
+        val channel: String = "",
     )
+
+    /** LCARS's own channels whose notices stand in for one Android would otherwise post. */
+    val ON_BEHALF_OF_ANDROID: Set<String> = setOf(MissedCalls.CHANNEL)
 
     data class Group(val pkg: String, val appLabel: String, val entries: List<Entry>) {
         /** Never called on an empty group: [digest] only builds groups that hold something. */
@@ -60,7 +70,9 @@ object ShadeDigest {
     }
 
     fun digest(entries: List<Entry>, self: String): List<Group> {
-        val shown = entries.filter { it.pkg != self && (it.title.isNotBlank() || it.text.isNotBlank()) }
+        val shown = entries.filter {
+            (it.pkg != self || it.channel in ON_BEHALF_OF_ANDROID) && (it.title.isNotBlank() || it.text.isNotBlank())
+        }
         val withChildren = shown.asSequence().filter { !it.isGroupSummary }.map { it.groupKey }.toSet()
         val kept = shown.filterNot { it.isGroupSummary && it.groupKey in withChildren }
         return kept.groupBy { it.pkg }

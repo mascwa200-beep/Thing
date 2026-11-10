@@ -1,11 +1,15 @@
 package dev.mascwa.pulse.feature.settings
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +21,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.mascwa.pulse.PulseApplication
@@ -24,6 +30,9 @@ import dev.mascwa.pulse.data.keyboard.LearnedWords
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.feature.dream.LcarsDream
 import dev.mascwa.pulse.feature.keyboard.LcarsKeyboard
+import dev.mascwa.pulse.feature.phone.MissedCalls
+import dev.mascwa.pulse.feature.phone.PhoneStore
+import dev.mascwa.pulse.feature.phone.PhoneSwitch
 import dev.mascwa.pulse.feature.wallpaper.LcarsWallpaper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,7 +44,11 @@ private data class TakeoverState(
     val dream: Chosen,
     val assistant: Boolean,
     val keyboard: KeyboardStatus,
+    val phone: PhoneState,
 )
+
+/** Whether LCARS is the phone app, what posts missed calls, and whether the guard stood it down. */
+private data class PhoneState(val isPhoneApp: Boolean, val missedSentence: String, val stoodDown: Boolean)
 
 /** Where the LCARS keyboard stands: not switched on, switched on but not in use, or the keyboard. */
 private enum class KeyboardStatus { OFF, ENABLED, CHOSEN }
@@ -69,6 +82,8 @@ internal fun TakeoverRows(settings: AppSettings, onUpdate: ((AppSettings) -> App
     // the screen — getting the focus back is the only sign that something may have been picked.
     val focused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(focused) { if (focused) refresh++ }
+    // The system prompt that asks to make LCARS the phone app; getting focus back re-reads the state.
+    val roleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh++ }
     val state by produceState<TakeoverState?>(null, refresh) {
         value = withContext(Dispatchers.IO) {
             TakeoverState(
@@ -76,6 +91,7 @@ internal fun TakeoverRows(settings: AppSettings, onUpdate: ((AppSettings) -> App
                 dream = dreamChosen(context),
                 assistant = holdsAssistant(context),
                 keyboard = keyboardStatus(context),
+                phone = phoneState(context),
             )
         }
     }
@@ -163,6 +179,52 @@ internal fun TakeoverRows(settings: AppSettings, onUpdate: ((AppSettings) -> App
             }
         },
     )
+    PrefSwitch(
+        "LCARS phone",
+        subtitle = when {
+            st == null || busy -> "Working…"
+            st.phone.isPhoneApp -> "LCARS is the phone app: the keypad, the call screen over the lock " +
+                "screen, and the recents and contacts. Emergency calls always use Android's own call " +
+                "screen — LCARS never comes between you and one."
+            else -> "Makes LCARS the phone app — its own keypad and call screen. Emergency calls always " +
+                "use Android's own call screen. As device owner it switches straight over; otherwise " +
+                "Android asks you to confirm."
+        },
+        checked = st?.phone?.isPhoneApp == true,
+        enabled = st != null && !busy,
+    ) { on ->
+        busy = true
+        note = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                if (on) PhoneSwitch.turnOn(context) else PhoneSwitch.turnOff(context)
+            }
+            when (result) {
+                PhoneSwitch.Result.NEEDS_REQUEST ->
+                    PhoneSwitch.roleRequestIntent(context)?.let { runCatching { roleLauncher.launch(it) } }
+                        ?: run { note = "Android would not open the request to make LCARS the phone app." }
+                PhoneSwitch.Result.NEEDS_SETTINGS ->
+                    if (!open(context, PhoneSwitch.defaultAppsSettings())) {
+                        note = "Android would not open its default-apps settings."
+                    }
+                PhoneSwitch.Result.FAILED -> note = "Android would not change the phone app."
+                PhoneSwitch.Result.ROLE_SET, PhoneSwitch.Result.OFF -> Unit
+            }
+            busy = false
+            refresh++
+        }
+    }
+    st?.phone?.let { p ->
+        PrefInfo("Missed calls", subtitle = p.missedSentence)
+        if (p.stoodDown) {
+            PrefInfo(
+                "The call screen stood down",
+                subtitle = "The LCARS call screen crashed as it started, three times in two minutes, so it " +
+                    "switched off and Android took over the phone. Turn \"LCARS phone\" on again to retry.",
+            )
+        }
+    }
+
     KeyboardWordRows(settings, onUpdate, refresh)
     openNote?.let { PrefInfo("Could not open", subtitle = it) }
 }
@@ -270,6 +332,22 @@ private fun keyboardStatus(context: Context): KeyboardStatus {
 private fun showKeyboardPicker(context: Context): Boolean {
     val imm = context.getSystemService(InputMethodManager::class.java) ?: return false
     return runCatching { imm.showInputMethodPicker() }.isSuccess
+}
+
+/** Whether LCARS is the phone app, the missed-call sentence, and whether the guard stood it down. */
+private fun phoneState(context: Context): PhoneState {
+    val isPhoneApp = PhoneSwitch.isOn(context)
+    val stoodDown = PhoneStore(context).standDownAtMs() != null
+    val claim = MissedCalls.claim(
+        isPhoneApp = isPhoneApp,
+        readPhoneState = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) ==
+            PackageManager.PERMISSION_GRANTED,
+        notificationsAllowed = runCatching {
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }.getOrDefault(false),
+        stoodDown = stoodDown,
+    )
+    return PhoneState(isPhoneApp = isPhoneApp, missedSentence = MissedCalls.sentence(claim), stoodDown = stoodDown)
 }
 
 private fun holdsAssistant(context: Context): Boolean = runCatching {

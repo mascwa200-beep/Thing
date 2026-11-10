@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.launcher
 
+import dev.mascwa.pulse.core.util.CrashLoopGuard
 import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.Dispatchers
@@ -50,13 +51,13 @@ class HomeStore(context: Context) {
      * have happened when the process died, and a crash loop would then never add up to anything.
      * The file is a few dozen bytes, so this costs one small read on the start it protects.
      */
-    fun guardState(): HomeGuardPolicy.State = HomeGuardPolicy.State(
+    fun guardState(): CrashLoopGuard.State = CrashLoopGuard.State(
         pendingStartMs = prefs.getLong(KEY_PENDING, NONE).takeIf { it != NONE },
         failuresMs = prefs.getString(KEY_FAILURES, null).orEmpty().split(',').mapNotNull { it.toLongOrNull() },
     )
 
     /** Written with commit(), for the reason [guardState] gives: it must land before a crash does. */
-    fun saveGuard(state: HomeGuardPolicy.State) {
+    fun saveGuard(state: CrashLoopGuard.State) {
         prefs.edit()
             .putLong(KEY_PENDING, state.pendingStartMs ?: NONE)
             .putString(KEY_FAILURES, state.failuresMs.joinToString(","))

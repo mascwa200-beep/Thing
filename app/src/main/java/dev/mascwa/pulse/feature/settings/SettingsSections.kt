@@ -107,7 +107,8 @@ object SettingsSections {
     val ANDROID_TAKEOVER = SettingsSection(
         "android_takeover", SettingsCategory.INTERFACE, "Android takeover",
         "wallpaper screensaver dream assistant assist gesture power button keyboard ime typing takeover lcars " +
-            "autocorrect autocorrection suggestions learned words forget glide swipe",
+            "autocorrect autocorrection suggestions learned words forget glide swipe " +
+            "phone dialer dialler call calls caller contacts recents missed voicemail",
     )
     val REGION_UNITS = SettingsSection(
         "region_units", SettingsCategory.REGION, "Region & units",

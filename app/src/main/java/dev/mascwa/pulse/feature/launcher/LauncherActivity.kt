@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.launcher
 
+import dev.mascwa.pulse.core.util.CrashLoopGuard
 import android.Manifest
 import android.app.ActivityOptions
 import android.content.Intent
@@ -70,7 +71,7 @@ import kotlin.math.roundToInt
  * ## If it crashes as it starts
  *
  * A default Home that dies on start is a phone whose Home button leads nowhere, reopened by Android
- * the moment it dies. So every start is counted ([HomeGuardPolicy]) and, after three that never lived
+ * the moment it dies. So every start is counted ([CrashLoopGuard]) and, after three that never lived
  * five seconds within two minutes, this hands Home back to the previous launcher and switches itself
  * off. Settings says when that happened.
  *
@@ -239,16 +240,16 @@ class LauncherActivity : ComponentActivity() {
     }
 
     /**
-     * The crash-loop guard ([HomeGuardPolicy]). True when this start is the one that stands the home
+     * The crash-loop guard ([CrashLoopGuard]). True when this start is the one that stands the home
      * screen down, in which case it has already handed Home back and is finishing.
      *
      * ⚠️ Runs before anything that could crash, and its record is written synchronously, for the
-     * reason `HomeStore.guardState` gives. A start that then lives [HomeGuardPolicy.HEALTHY_AFTER_MS]
+     * reason `HomeStore.guardState` gives. A start that then lives [CrashLoopGuard.HEALTHY_AFTER_MS]
      * clears the record, so only starts that die young count against it.
      */
     private fun standDownIfLooping(): Boolean {
         val now = System.currentTimeMillis()
-        val verdict = runCatching { HomeGuardPolicy.onStart(store.guardState(), now) }.getOrNull() ?: return false
+        val verdict = runCatching { CrashLoopGuard.onStart(store.guardState(), now) }.getOrNull() ?: return false
         runCatching { store.saveGuard(verdict.state) }
         if (verdict.standDown) {
             HomeSwitch.standDown(this, now)
@@ -261,8 +262,8 @@ class LauncherActivity : ComponentActivity() {
             return true
         }
         lifecycleScope.launch {
-            delay(HomeGuardPolicy.HEALTHY_AFTER_MS)
-            withContext(Dispatchers.IO) { runCatching { store.saveGuard(HomeGuardPolicy.onHealthy()) } }
+            delay(CrashLoopGuard.HEALTHY_AFTER_MS)
+            withContext(Dispatchers.IO) { runCatching { store.saveGuard(CrashLoopGuard.onHealthy()) } }
         }
         return false
     }
